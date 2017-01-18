@@ -37,6 +37,7 @@ before_script:
     - make $PLATFORM
   after_script:
     - |
+        mkdir -p build
         lftp -c "open 'ftp://$FTP_USER:$FTP_PASS@$FTP_HOST'; \
         mkdir -p -f quasar-binaries/$CI_BUILD_REF_NAME; \
         lcd build; \
