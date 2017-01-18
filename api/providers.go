@@ -79,6 +79,10 @@ func ProviderList(ctx *gin.Context) {
 				[]string{"LOCALIZE[30240]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/provider/%s/enable", provider.ID))},
 			)
 		}
+		item.ContextMenu = append(item.ContextMenu,
+			[]string{"LOCALIZE[30274]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/providers/enable"))},
+			[]string{"LOCALIZE[30275]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/providers/disable"))},
+		)
 		items = append(items, item)
 	}
 
@@ -118,6 +122,32 @@ func ProviderEnable(ctx *gin.Context) {
 func ProviderDisable(ctx *gin.Context) {
 	addonId := ctx.Params.ByName("provider")
 	xbmc.SetAddonEnabled(addonId, false)
+	path := xbmc.InfoLabel("Container.FolderPath")
+	if path == "plugin://plugin.video.quasar/provider/" {
+		xbmc.Refresh()
+	}
+	ctx.String(200, "")
+}
+
+func ProvidersEnableAll(ctx *gin.Context) {
+	providers := getProviders()
+
+	for _, addon := range providers {
+		xbmc.SetAddonEnabled(addon.ID, true)
+	}
+	path := xbmc.InfoLabel("Container.FolderPath")
+	if path == "plugin://plugin.video.quasar/provider/" {
+		xbmc.Refresh()
+	}
+	ctx.String(200, "")
+}
+
+func ProvidersDisableAll(ctx *gin.Context) {
+	providers := getProviders()
+
+	for _, addon := range providers {
+		xbmc.SetAddonEnabled(addon.ID, false)
+	}
 	path := xbmc.InfoLabel("Container.FolderPath")
 	if path == "plugin://plugin.video.quasar/provider/" {
 		xbmc.Refresh()
