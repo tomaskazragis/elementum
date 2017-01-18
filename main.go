@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
 	"os"
+	"fmt"
+	"time"
+	"strings"
 	"runtime"
 	"strconv"
-	"strings"
-	"time"
+	"net/http"
 
 	"github.com/op/go-logging"
 	"github.com/scakemyer/quasar/api"
@@ -73,7 +73,6 @@ func main() {
 	// Make sure we are properly multithreaded.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// logging.SetFormatter(logging.MustStringFormatter("%{time:2006-01-02 15:04:05}  %{level:.4s}  %{module:-15s}  %{message}"))
 	logging.SetFormatter(logging.MustStringFormatter(
 		`%{color}%{level:.4s}  %{module:-12s} ▶ %{shortfunc:-15s}  %{color:reset}%{message}`,
 	))
@@ -124,12 +123,14 @@ func main() {
 		shutdown()
 	}))
 
-	xbmc.ResetRPC()
-
-	log.Info("Updating Kodi add-on repositories...")
-	xbmc.UpdateAddonRepos()
-
 	xbmc.Notify("Quasar", "LOCALIZE[30208]", config.AddonIcon())
 
-	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
+	go func() {
+		log.Info("Updating Kodi add-on repositories...")
+		xbmc.UpdateAddonRepos()
+
+		xbmc.ResetRPC()
+	}()
+
+	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)
 }
