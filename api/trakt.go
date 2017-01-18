@@ -96,7 +96,7 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Movie added to watchlist", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		xbmc.Refresh()
 	}
 }
@@ -110,7 +110,7 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Movie removed from watchlist", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		xbmc.Refresh()
 	}
 }
@@ -124,7 +124,7 @@ func AddShowToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed %d", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Show added to watchlist", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		xbmc.Refresh()
 	}
 }
@@ -138,7 +138,7 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Show removed from watchlist", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		xbmc.Refresh()
 	}
 }
@@ -152,7 +152,7 @@ func AddMovieToCollection(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Movie added to collection", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		xbmc.Refresh()
 	}
 }
@@ -166,7 +166,7 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Movie removed from collection", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		xbmc.Refresh()
 	}
 }
@@ -180,7 +180,7 @@ func AddShowToCollection(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Show added to collection", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		xbmc.Refresh()
 	}
 }
@@ -194,7 +194,7 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Quasar", "Show removed from collection", config.AddonIcon())
-		os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		xbmc.Refresh()
 	}
 }
