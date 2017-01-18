@@ -22,7 +22,7 @@ import (
 
 const (
 	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
-	tarballURL           = "https://github.com/%s/%s/archive/%s.tar.gz"
+	backupRepositoryURL  = "https://offshoregit.com/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
 
@@ -56,8 +56,19 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	_, lastReleaseBranch := getLastRelease(user, repository)
 	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository, lastReleaseBranch) + "/addon.xml")
+	if err == nil && resp.StatusCode != 200 {
+		err = errors.New(resp.Status)
+	}
 	if err != nil {
-		return nil, err
+		log.Warning("Unable to retrieve the addon.xml file, checking backup repository...")
+		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/addon.xml")
+		if err == nil && resp.StatusCode != 200 {
+			err = errors.New(resp.Status)
+		}
+		if err != nil {
+			log.Error("Unable to retrieve the backup's addon.xml file.")
+			return nil, err
+		}
 	}
 	addon := xbmc.Addon{}
 	xml.NewDecoder(resp.Body).Decode(&addon)
@@ -100,6 +111,7 @@ func GetAddonFiles(ctx *gin.Context) {
 		addons, err := getAddons(user, repository)
 		if err != nil {
 			ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addon.xml file."))
+			return
 		}
 		lastReleaseTag = "v" + addons.Addons[0].Version
 	}
@@ -146,23 +158,32 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 		for _, asset := range assets {
 			if strings.HasSuffix(*asset.Name, platform + ".zip") {
 				assetPlatform := *asset.BrowserDownloadURL
-				log.Info("Using release asset for " + platform + ": " + assetPlatform)
+				log.Infof("Using release asset for %s: %s", platform, assetPlatform)
 				ctx.Redirect(302, assetPlatform)
 				return
 			}
 			if addonZipRE.MatchString(*asset.Name) {
 				assetAllPlatforms = *asset.BrowserDownloadURL
-				log.Info("Found all platforms release asset: " + assetAllPlatforms)
+				log.Infof("Found all platforms release asset: %s", assetAllPlatforms)
 				continue
 			}
 		}
 		if assetAllPlatforms != "" {
-			log.Info("Using release asset for all platforms: " + assetAllPlatforms)
+			log.Infof("Using release asset for all platforms: %s", assetAllPlatforms)
 			ctx.Redirect(302, assetAllPlatforms)
 			return
 		}
+	} else {
+		log.Warning("Release not found on main repository, using backup...")
+		platformStruct := xbmc.GetPlatform()
+		platform := platformStruct.OS + "_" + platformStruct.Arch
+		backupRepoPath := fmt.Sprintf(backupRepositoryURL, user, repository)
+		addonFile := fmt.Sprintf("%s-%s.%s.zip", repository, lastReleaseTag[1:], platform)
+		assetPlatform := fmt.Sprintf("%s/%s/%s", backupRepoPath, lastReleaseTag, addonFile)
+		log.Infof("Backup release asset: %s", assetPlatform)
+		ctx.Redirect(302, assetPlatform)
+		return
 	}
-	ctx.AbortWithError(404, errors.New("Release asset not found."))
 }
 
 func fetchChangelog(user string, repository string) string {
