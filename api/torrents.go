@@ -176,6 +176,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playUrl)},
 				torrentAction,
 				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%d", i))},
+				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%d?files=1", i))},
 				sessionAction,
 			}
 			item.IsPlayable = true
@@ -400,6 +401,7 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		btService.Session.GetHandle().GetTorrents()
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
 		torrentId := ctx.Params.ByName("torrentId")
+		deleteFiles := ctx.Request.URL.Query().Get("files")
 		torrentIndex, _ := strconv.Atoi(torrentId)
 		torrentHandle := torrentsVector.Get(torrentIndex)
 		if torrentHandle.IsValid() == false {
@@ -425,13 +427,13 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		askedToDelete := false
-		if config.Get().KeepFilesAsk == true {
+		if config.Get().KeepFilesAsk == true && deleteFiles == "" {
 			if xbmc.DialogConfirm("Quasar", "LOCALIZE[30269]") {
 				askedToDelete = true
 			}
 		}
 
-		if config.Get().KeepFilesAfterStop == false || askedToDelete == true {
+		if config.Get().KeepFilesAfterStop == false || askedToDelete == true || deleteFiles != "" {
 			torrentsLog.Info("Removing the torrent and deleting files...")
 			btService.Session.GetHandle().RemoveTorrent(torrentHandle, int(libtorrent.SessionHandleDeleteFiles))
 		} else {
