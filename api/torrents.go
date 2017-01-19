@@ -342,8 +342,8 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
-		torrentsLog.Infof("Downloading %s", torrentStatus.GetName())
+		torrentsLog.Infof("Downloading %s", uri)
+		btService.SpaceChecked[infoHash] = false
 
 		xbmc.Refresh()
 		ctx.String(200, "")

@@ -113,6 +113,7 @@ type BTService struct {
 	alertsBroadcaster *broadcast.Broadcaster
 	dialogProgressBG  *xbmc.DialogProgressBG
 	packSettings      libtorrent.SettingsPack
+	SpaceChecked      map[string]bool
 	closing           chan interface{}
 	mx                sync.Mutex
 }
@@ -132,6 +133,7 @@ func NewBTService(config BTConfiguration) *BTService {
 		log:               logging.MustGetLogger("btservice"),
 		libtorrentLog:     logging.MustGetLogger("libtorrent"),
 		alertsBroadcaster: broadcast.NewBroadcaster(),
+		SpaceChecked:      make(map[string]bool, 0),
 		config:            &config,
 		closing:           make(chan interface{}),
 		mx:                sync.Mutex{},
@@ -445,14 +447,16 @@ func (s *BTService) checkAvailableSpace(torrentHandle libtorrent.TorrentHandle) 
 		}
 
 		status := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryAccurateDownloadCounters) | uint(libtorrent.TorrentHandleQuerySavePath))
-		sizeLeft := torrentInfo.TotalSize() - status.GetTotalDone()
+		totalSize := torrentInfo.TotalSize()
+		totalDone := status.GetTotalDone()
+		sizeLeft := totalSize - totalDone
 		availableSpace := diskStatus.Free
 		path := status.GetSavePath()
 
 		s.log.Infof("Checking for sufficient space on %s...", path)
-		s.log.Infof("Total size of download: %s", humanize.Bytes(uint64(torrentInfo.TotalSize())))
+		s.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
 		s.log.Infof("All time download: %s", humanize.Bytes(uint64(status.GetAllTimeDownload())))
-		s.log.Infof("Size total done: %s", humanize.Bytes(uint64(status.GetTotalDone())))
+		s.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
 		s.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
 		s.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
 
@@ -471,7 +475,15 @@ func (s *BTService) onStateChanged(stateAlert libtorrent.StateChangedAlert) {
 	switch stateAlert.GetState() {
 	case libtorrent.TorrentStatusDownloading:
 		torrentHandle := stateAlert.GetHandle()
-		s.checkAvailableSpace(torrentHandle)
+		torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
+		shaHash := torrentStatus.GetInfoHash().ToString()
+		infoHash := hex.EncodeToString([]byte(shaHash))
+		if spaceChecked, exists := s.SpaceChecked[infoHash]; exists {
+			if spaceChecked == false {
+				s.checkAvailableSpace(torrentHandle)
+				delete(s.SpaceChecked, infoHash)
+			}
+		}
 	}
 }
 

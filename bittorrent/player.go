@@ -50,10 +50,13 @@ type BTPlayer struct {
 	torrentHandle            libtorrent.TorrentHandle
 	torrentInfo              libtorrent.TorrentInfo
 	chosenFile               int
+	fileSize                 int64
 	lastStatus               libtorrent.TorrentStatus
 	bufferPiecesProgress     map[int]float64
 	bufferPiecesProgressLock sync.RWMutex
 	torrentName              string
+	hasChosenFile            bool
+	isDownloading            bool
 	notEnoughSpace           bool
 	diskStatus               *diskusage.DiskStatus
 	bufferEvents             *broadcast.Broadcaster
@@ -76,6 +79,7 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		uri:                  params.URI,
 		fileIndex:            params.FileIndex,
 		resumeIndex:          params.ResumeIndex,
+		fileSize:             0,
 		overlayStatusEnabled: config.Get().EnableOverlayStatus == true,
 		backgroundHandling:   config.Get().BackgroundHandling == true,
 		deleteAfter:          config.Get().KeepFilesAfterStop == false,
@@ -86,6 +90,8 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		runtime:              params.Runtime * 60,
 		fastResumeFile:       "",
 		torrentFile:          "",
+		hasChosenFile:        false,
+		isDownloading:        false,
 		notEnoughSpace:       false,
 		closing:              make(chan interface{}),
 		bufferEvents:         broadcast.NewBroadcaster(),
@@ -202,6 +208,10 @@ func (btp *BTPlayer) resumeTorrent(torrentIndex int) error {
 	return nil
 }
 
+func (btp *BTPlayer) PlayURL() string {
+	return strings.Join(strings.Split(btp.torrentInfo.Files().FilePath(btp.chosenFile), string(os.PathSeparator)), "/")
+}
+
 func (btp *BTPlayer) Buffer() error {
 	if btp.resumeIndex >= 0 {
 		if err := btp.resumeTorrent(btp.resumeIndex); err != nil {
@@ -221,6 +231,7 @@ func (btp *BTPlayer) Buffer() error {
 
 	btp.overlayStatus = xbmc.NewOverlayStatus()
 
+	go btp.waitCheckAvailableSpace()
 	go btp.playerLoop()
 
 	if err := <-buffered; err != nil {
@@ -229,8 +240,19 @@ func (btp *BTPlayer) Buffer() error {
 	return nil
 }
 
-func (btp *BTPlayer) PlayURL() string {
-	return strings.Join(strings.Split(btp.torrentInfo.Files().FilePath(btp.chosenFile), string(os.PathSeparator)), "/")
+func (btp *BTPlayer) waitCheckAvailableSpace() {
+	halfSecond := time.NewTicker(500 * time.Millisecond)
+	defer halfSecond.Stop()
+
+	for {
+		select {
+		case <-halfSecond.C:
+			if btp.hasChosenFile && btp.isDownloading {
+				btp.CheckAvailableSpace()
+				return
+			}
+		}
+	}
 }
 
 func (btp *BTPlayer) CheckAvailableSpace() bool {
@@ -241,13 +263,19 @@ func (btp *BTPlayer) CheckAvailableSpace() bool {
 		}
 
 		status := btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryAccurateDownloadCounters))
-		sizeLeft := btp.torrentInfo.TotalSize() - status.GetTotalDone()
+
+		totalSize := btp.torrentInfo.TotalSize()
+		totalDone := status.GetTotalDone()
+		if btp.fileSize > 0 {
+			totalSize = btp.fileSize
+		}
+		sizeLeft := totalSize - totalDone
 		availableSpace := btp.diskStatus.Free
 
 		btp.log.Infof("Checking for sufficient space on %s...", btp.bts.config.DownloadPath)
-		btp.log.Infof("Total size of download: %s", humanize.Bytes(uint64(btp.torrentInfo.TotalSize())))
+		btp.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
 		btp.log.Infof("All time download: %s", humanize.Bytes(uint64(status.GetAllTimeDownload())))
-		btp.log.Infof("Size total done: %s", humanize.Bytes(uint64(status.GetTotalDone())))
+		btp.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
 		btp.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
 		btp.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
 
@@ -283,11 +311,12 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.fastResumeFile = filepath.Join(btp.bts.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 
 	var err error
-	btp.chosenFile, err = btp.chooseFile()
+	btp.chosenFile, btp.fileSize, err = btp.chooseFile()
 	if err != nil {
 		btp.bufferEvents.Broadcast(errors.New("User cancelled."))
 		return
 	}
+	btp.hasChosenFile = true
 	btp.log.Infof("Chosen file: %s", btp.torrentInfo.Files().FilePath(btp.chosenFile))
 
 	btp.log.Info("Setting piece priorities")
@@ -369,7 +398,7 @@ func (btp *BTPlayer) getFilePiecesAndOffset(fe int) (int, int, int64) {
 	return startPiece, endPiece, offset
 }
 
-func (btp *BTPlayer) chooseFile() (int, error) {
+func (btp *BTPlayer) chooseFile() (int, int64, error) {
 	var biggestFile int
 	maxSize := int64(0)
 	numFiles := btp.torrentInfo.NumFiles()
@@ -390,7 +419,7 @@ func (btp *BTPlayer) chooseFile() (int, error) {
 	if len(candidateFiles) > 1 {
 		btp.log.Info(fmt.Sprintf("There are %d candidate files", len(candidateFiles)))
 		if btp.fileIndex >= 0 && btp.fileIndex < len(candidateFiles) {
-			return candidateFiles[btp.fileIndex], nil
+			return candidateFiles[btp.fileIndex], files.FileSize(candidateFiles[btp.fileIndex]), nil
 		}
 		choices := make([]string, 0, len(candidateFiles))
 		for _, index := range candidateFiles {
@@ -399,13 +428,13 @@ func (btp *BTPlayer) chooseFile() (int, error) {
 		}
 		choice := xbmc.ListDialog("LOCALIZE[30223]", choices...)
 		if choice >= 0 {
-			return candidateFiles[choice], nil
+			return candidateFiles[choice], files.FileSize(candidateFiles[choice]), nil
 		} else {
-			return biggestFile, fmt.Errorf("User cancelled")
+			return biggestFile, files.FileSize(biggestFile), fmt.Errorf("User cancelled")
 		}
 	}
 
-	return biggestFile, nil
+	return biggestFile, files.FileSize(biggestFile), nil
 }
 
 func (btp *BTPlayer) onStateChanged(stateAlert libtorrent.StateChangedAlert) {
@@ -420,7 +449,7 @@ func (btp *BTPlayer) onStateChanged(stateAlert libtorrent.StateChangedAlert) {
 		}
 		btp.torrentHandle.PrioritizePieces(piecesPriorities)
 	case libtorrent.TorrentStatusDownloading:
-		btp.CheckAvailableSpace()
+		btp.isDownloading = true
 	}
 }
 
