@@ -297,8 +297,17 @@ func (btp *BTPlayer) onMetadataReceived() {
 
 	btp.torrentInfo = btp.torrentHandle.TorrentFile()
 
+	// Set all file priorities to 0 until chosenFile is determined
+	numFiles := btp.torrentInfo.NumFiles()
+	filesPriorities := libtorrent.NewStdVectorInt()
+	defer libtorrent.DeleteStdVectorInt(filesPriorities)
+	for i := 0; i < numFiles; i++ {
+		filesPriorities.Add(0)
+	}
+	btp.torrentHandle.PrioritizeFiles(filesPriorities)
+
 	// Save .torrent
-	btp.log.Infof("Saving %s...", btp.torrentFile)
+	btp.log.Infof("Saving %s ...", btp.torrentFile)
 	torrentFile := libtorrent.NewCreateTorrent(btp.torrentInfo)
 	defer libtorrent.DeleteCreateTorrent(torrentFile)
 	torrentContent := torrentFile.Generate()
@@ -318,6 +327,10 @@ func (btp *BTPlayer) onMetadataReceived() {
 	}
 	btp.hasChosenFile = true
 	btp.log.Infof("Chosen file: %s", btp.torrentInfo.Files().FilePath(btp.chosenFile))
+
+	// Set normal file priority to chosenFile
+	btp.log.Info("Setting file priority")
+	btp.torrentHandle.FilePriority(btp.chosenFile, 4)
 
 	btp.log.Info("Setting piece priorities")
 
@@ -346,12 +359,12 @@ func (btp *BTPlayer) onMetadataReceived() {
 	for _ = 0; curPiece < startPiece; curPiece++ {
 		piecesPriorities.Add(0)
 	}
-	for _ = 0; curPiece < startPiece+startBufferPieces; curPiece++ { // get this part
+	for _ = 0; curPiece < startPiece + startBufferPieces; curPiece++ { // get this part
 		piecesPriorities.Add(7)
 		btp.bufferPiecesProgress[curPiece] = 0
 		btp.torrentHandle.SetPieceDeadline(curPiece, 0, 0)
 	}
-	for _ = 0; curPiece < endPiece-endBufferPieces; curPiece++ {
+	for _ = 0; curPiece < endPiece - endBufferPieces; curPiece++ {
 		piecesPriorities.Add(1)
 	}
 	for _ = 0; curPiece <= endPiece; curPiece++ { // get this part
