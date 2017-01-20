@@ -19,6 +19,7 @@ import (
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
 	"github.com/scakemyer/quasar/xbmc"
+	"github.com/zeebo/bencode"
 )
 
 var torrentsLog = logging.MustGetLogger("torrents")
@@ -318,7 +319,26 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 			infoHash = torrent.InfoHash
 		} else {
-			info := libtorrent.NewTorrentInfo(uri) // FIXME crashes on invalid paths
+			if _, err := os.Stat(uri); err != nil {
+				ctx.String(404, err.Error())
+				return
+			}
+
+			file, err := os.Open(uri)
+			if err != nil {
+				ctx.String(404, err.Error())
+				return
+			}
+			dec := bencode.NewDecoder(file)
+			var torrentFile *bittorrent.TorrentFileRaw
+			if err := dec.Decode(&torrentFile); err != nil {
+				errMsg := fmt.Sprintf("Invalid torrent file %s, failed to decode with: %s", uri, err.Error())
+				torrentsLog.Error(errMsg)
+				ctx.String(404, errMsg)
+				return
+			}
+
+			info := libtorrent.NewTorrentInfo(uri)
 			torrentParams.SetTorrentInfo(info)
 
 			shaHash := info.InfoHash().ToString()

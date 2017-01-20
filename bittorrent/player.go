@@ -20,6 +20,7 @@ import (
 	"github.com/scakemyer/quasar/config"
 	"github.com/scakemyer/quasar/trakt"
 	"github.com/scakemyer/quasar/xbmc"
+	"github.com/zeebo/bencode"
 )
 
 const (
@@ -135,7 +136,23 @@ func (btp *BTPlayer) addTorrent() error {
 		}
 		infoHash = torrent.InfoHash
 	} else {
-		info := libtorrent.NewTorrentInfo(btp.uri) // FIXME crashes on invalid paths
+		if _, err := os.Stat(btp.uri); err != nil {
+			return err
+		}
+
+		file, err := os.Open(btp.uri)
+		if err != nil {
+			return err
+		}
+		dec := bencode.NewDecoder(file)
+		var torrentFile *TorrentFileRaw
+		if err := dec.Decode(&torrentFile); err != nil {
+			errMsg := fmt.Sprintf("Invalid torrent file %s, failed to decode with: %s", btp.uri, err.Error())
+			btp.log.Error(errMsg)
+			return err
+		}
+
+		info := libtorrent.NewTorrentInfo(btp.uri)
 		defer libtorrent.DeleteTorrentInfo(info)
 		torrentParams.SetTorrentInfo(info)
 
