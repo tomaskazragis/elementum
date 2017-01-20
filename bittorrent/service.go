@@ -4,7 +4,6 @@ import (
 	"os"
 	"io"
 	"fmt"
-	"sync"
 	"time"
 	"bytes"
 	"strings"
@@ -115,7 +114,6 @@ type BTService struct {
 	packSettings      libtorrent.SettingsPack
 	SpaceChecked      map[string]bool
 	closing           chan interface{}
-	mx                sync.Mutex
 }
 
 type activeTorrent struct {
@@ -136,7 +134,6 @@ func NewBTService(config BTConfiguration) *BTService {
 		SpaceChecked:      make(map[string]bool, 0),
 		config:            &config,
 		closing:           make(chan interface{}),
-		mx:                sync.Mutex{},
 	}
 
 	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
@@ -547,7 +544,6 @@ func (s *BTService) saveResumeDataConsumer() {
 				s.onStateChanged(stateAlert)
 
 			case libtorrent.SaveResumeDataAlertAlertType:
-				s.mx.Lock()
 				saveResumeData := libtorrent.SwigcptrSaveResumeDataAlert(alert.Pointer)
 				if saveResumeData.Swigcptr() == 0 {
 					break
@@ -572,7 +568,6 @@ func (s *BTService) saveResumeDataConsumer() {
 					path := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 					ioutil.WriteFile(path, bEncoded, 0644)
 				}
-				s.mx.Unlock()
 			}
 		}
 	}
