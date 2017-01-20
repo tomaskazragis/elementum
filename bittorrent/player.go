@@ -120,10 +120,19 @@ func (btp *BTPlayer) addTorrent() error {
 	var infoHash string
 
 	if strings.HasPrefix(btp.uri, "magnet") || strings.HasPrefix(btp.uri, "http") {
-		torrentParams.SetUrl(btp.uri)
-
 		torrent := NewTorrent(btp.uri)
-		torrent.Magnet()
+		if torrent.IsMagnet() {
+			torrent.Magnet()
+			btp.log.Infof("Parsed magnet: %s", torrent.URI)
+			if err := torrent.IsValidMagnet(); err == nil {
+				torrentParams.SetUrl(torrent.URI)
+			} else {
+				return err
+			}
+		} else {
+			torrent.Resolve()
+			torrentParams.SetUrl(torrent.URI)
+		}
 		infoHash = torrent.InfoHash
 	} else {
 		info := libtorrent.NewTorrentInfo(btp.uri) // FIXME crashes on invalid paths
@@ -156,7 +165,7 @@ func (btp *BTPlayer) addTorrent() error {
 		torrentParams.SetResumeData(fastResumeVector)
 	}
 
-	btp.torrentHandle = btp.bts.Session.GetHandle().AddTorrent(torrentParams) // FIXME crashes on invalid magnet
+	btp.torrentHandle = btp.bts.Session.GetHandle().AddTorrent(torrentParams)
 	go btp.consumeAlerts()
 
 	if btp.torrentHandle == nil {

@@ -286,13 +286,13 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 		if uri == "" {
-			ctx.String(200, "Missing torrent URI")
+			ctx.String(404, "Missing torrent URI")
 		}
 		torrentsLog.Infof("Adding torrent from %s", uri)
 
 		if config.Get().DownloadPath == "." {
 			xbmc.Notify("Quasar", "LOCALIZE[30113]", config.AddonIcon())
-			ctx.String(200, "Download path empty")
+			ctx.String(404, "Download path empty")
 			return
 		}
 
@@ -302,10 +302,20 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		var infoHash string
 
 		if strings.HasPrefix(uri, "magnet") || strings.HasPrefix(uri, "http") {
-			torrentParams.SetUrl(uri)
-
 			torrent := bittorrent.NewTorrent(uri)
-			torrent.Magnet()
+			if torrent.IsMagnet() {
+				torrent.Magnet()
+				torrentsLog.Infof("Parsed magnet: %s", torrent.URI)
+				if err := torrent.IsValidMagnet(); err == nil {
+					torrentParams.SetUrl(torrent.URI)
+				} else {
+					ctx.String(404, err.Error())
+					return
+				}
+			} else {
+				torrent.Resolve()
+				torrentParams.SetUrl(torrent.URI)
+			}
 			infoHash = torrent.InfoHash
 		} else {
 			info := libtorrent.NewTorrentInfo(uri) // FIXME crashes on invalid paths
@@ -325,7 +335,7 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			fastResumeData, err := ioutil.ReadFile(fastResumeFile)
 			if err != nil {
 				torrentsLog.Error(err.Error())
-				ctx.String(200, err.Error())
+				ctx.String(404, err.Error())
 				return
 			}
 			fastResumeVector := libtorrent.NewStdVectorChar()
@@ -336,10 +346,10 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			torrentParams.SetResumeData(fastResumeVector)
 		}
 
-		torrentHandle := btService.Session.GetHandle().AddTorrent(torrentParams) // FIXME crashes on invalid magnet
+		torrentHandle := btService.Session.GetHandle().AddTorrent(torrentParams)
 
 		if torrentHandle == nil {
-			ctx.String(200, fmt.Sprintf("Unable to add torrent with URI %s", uri))
+			ctx.String(404, fmt.Sprintf("Unable to add torrent with URI %s", uri))
 			return
 		}
 

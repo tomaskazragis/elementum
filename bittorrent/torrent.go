@@ -157,6 +157,7 @@ var (
 )
 
 const (
+	xtPrefix = "urn:btih:"
 	torCache = "http://itorrents.org/torrent/%s.torrent"
 )
 
@@ -175,6 +176,58 @@ func (t *Torrent) UnmarshalJSON(b []byte) error {
 
 func (t *Torrent) IsMagnet() bool {
 	return strings.HasPrefix(t.URI, "magnet:")
+}
+
+// From anacrolix/torrent
+func (t *Torrent) IsValidMagnet() (err error) {
+	u, err := url.Parse(t.URI)
+	if err != nil {
+		err = fmt.Errorf("error parsing uri: %s", err)
+		return
+	}
+	if u.Scheme != "magnet" {
+		err = fmt.Errorf("unexpected scheme: %q", u.Scheme)
+		return
+	}
+	xt := u.Query().Get("xt")
+	if !strings.HasPrefix(xt, xtPrefix) {
+		err = fmt.Errorf("bad xt parameter")
+		return
+	}
+	infoHash := xt[len(xtPrefix):]
+
+	// BTIH hash can be in HEX or BASE32 encoding
+	// will assign appropriate func judging from symbol length
+	var decode func(dst, src []byte) (int, error)
+	switch len(infoHash) {
+	case 40:
+		decode = hex.Decode
+	case 32:
+		decode = base32.StdEncoding.Decode
+	}
+
+	if decode == nil {
+		err = fmt.Errorf("unhandled xt parameter encoding: encoded length %d", len(infoHash))
+		return
+	}
+	n, err := decode([]byte(t.InfoHash)[:], []byte(infoHash))
+	if err != nil {
+		err = fmt.Errorf("error decoding xt: %s", err)
+		return
+	}
+	if n != 20 {
+		err = fmt.Errorf("invalid magnet length: %d", n)
+		return
+	}
+	return
+}
+
+func NewTorrent(uri string) *Torrent {
+	t := &Torrent{
+		URI: uri,
+	}
+	t.initialize()
+	return t
 }
 
 func (t *Torrent) initialize() {
@@ -224,28 +277,30 @@ func (t *Torrent) initializeFromMagnet() {
 	}
 }
 
-func NewTorrent(uri string) *Torrent {
-	t := &Torrent{
-		URI: uri,
-	}
-	t.initialize()
-	return t
-}
-
-func (t *Torrent) Magnet() string {
+func (t *Torrent) Magnet() {
 	if t.hasResolved == false {
 		t.Resolve()
 	}
-	if t.IsMagnet() {
-		return t.URI + "&" + url.Values{"as": []string{fmt.Sprintf(torCache, t.InfoHash)}}.Encode()
-	}
+
 	params := url.Values{}
 	params.Set("dn", t.Name)
-	for _, tracker := range t.Trackers {
-		params.Add("tr", tracker)
+	if len(t.Trackers) == 0 {
+		for _, tracker := range DefaultTrackers {
+			params.Add("tr", tracker)
+		}
+	} else {
+		for _, tracker := range t.Trackers {
+			params.Add("tr", tracker)
+		}
 	}
-	params.Add("as", t.URI)
-	return fmt.Sprintf("magnet:?xt=urn:btih:%s&%s", t.InfoHash, params.Encode())
+
+	t.URI = fmt.Sprintf("magnet:?xt=urn:btih:%s&%s", t.InfoHash, params.Encode())
+
+	if t.IsValidMagnet() == nil {
+		params.Add("as", t.URI)
+	} else {
+		params.Add("as", fmt.Sprintf(torCache, t.InfoHash))
+	}
 }
 
 func (t *Torrent) Resolve() error {
