@@ -23,6 +23,7 @@ import (
 
 const (
 	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
+	burstWebsiteURL      = "https://burst.surge.sh/release/%s"
 	backupRepositoryURL  = "https://offshoregit.com/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
@@ -74,12 +75,19 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 		}
 	}
 
-	respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.quasar.burst") + "/addon.xml")
+	respBurst, errBurst := http.Get(fmt.Sprintf(burstWebsiteURL, "addon.xml"))
 	if errBurst == nil && respBurst.StatusCode != 200 {
-		errBurst = errors.New(respBurst.Status)
+		err = errors.New(resp.Status)
 	}
-	if errBurst != nil {
-		log.Error("Unable to retrieve Burst's addon.xml file.")
+	if err != nil {
+		log.Warning("Unable to retrieve Burst's addon.xml file, checking backup repository...")
+		respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.quasar.burst") + "/addon.xml")
+		if errBurst == nil && respBurst.StatusCode != 200 {
+			errBurst = errors.New(respBurst.Status)
+		}
+		if errBurst != nil {
+			log.Error("Unable to retrieve Burst's addon.xml file.")
+		}
 	}
 
 	addon := xbmc.Addon{}
@@ -99,7 +107,7 @@ func GetAddonsXML(ctx *gin.Context) {
 	repository := ctx.Params.ByName("repository")
 	addons, err := getAddons(user, repository)
 	if err != nil {
-		ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addon.xml file."))
+		ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addons.xml file."))
 	}
 	ctx.XML(200, addons)
 }
@@ -108,6 +116,12 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 	user := ctx.Params.ByName("user")
 	repository := ctx.Params.ByName("repository")
 	addons, err := getAddons(user, repository)
+	if len(addons.Addons) > 0 {
+		log.Infof("Last release of %s: v%s", repository, addons.Addons[0].Version)
+	}
+	if len(addons.Addons) > 1 {
+		log.Infof("Last release of script.quasar.burst: v%s", addons.Addons[1].Version)
+	}
 	if err != nil {
 		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file."))
 	}
@@ -122,9 +136,8 @@ func GetAddonFiles(ctx *gin.Context) {
 	filepath := ctx.Params.ByName("filepath")[1:] // strip the leading "/"
 
 	lastReleaseTag := ""
-	lastReleaseBranch := "master"
 	if repository == "plugin.video.quasar" {
-		lastReleaseTag, lastReleaseBranch = getLastRelease(user, repository)
+		lastReleaseTag, _ = getLastRelease(user, repository)
 		if lastReleaseTag == "" {
 			// Get last release from addons.xml on master
 			log.Warning("Unable to find a last tag, using master.")
@@ -143,7 +156,6 @@ func GetAddonFiles(ctx *gin.Context) {
 		}
 		lastReleaseTag = "v" + addons.Addons[1].Version
 	}
-	log.Infof("Last release of %s: %s on %s", repository, lastReleaseTag, lastReleaseBranch)
 
 	switch filepath {
 	case "addons.xml":
@@ -160,7 +172,7 @@ func GetAddonFiles(ctx *gin.Context) {
 		if repository == "plugin.video.quasar" {
 			ctx.Redirect(302, fmt.Sprintf(githubUserContentURL + "/" + filepath, user, repository, lastReleaseTag))
 		} else {
-			ctx.Redirect(302, fmt.Sprintf(backupRepositoryURL + "/" + filepath, user, repository))
+			ctx.Redirect(302, fmt.Sprintf(burstWebsiteURL, filepath))
 		}
 		return
 	}
@@ -220,11 +232,18 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 			return
 		}
 	} else {
-		repoURI := fmt.Sprintf(backupRepositoryURL, user, repository)
 		addonFile := fmt.Sprintf("%s-%s.zip", repository, lastReleaseTag[1:])
-		assetURI := fmt.Sprintf("%s/%s", repoURI, addonFile)
-		log.Infof("Release asset: %s", assetURI)
-		ctx.Redirect(302, assetURI)
+		assetURI := fmt.Sprintf(burstWebsiteURL, addonFile)
+		if resp, err := http.Head(assetURI); err == nil && resp.StatusCode == 200 {
+			ctx.Redirect(302, assetURI)
+			return
+		} else {
+			log.Warningf("Release of %s not found on main repository, using backup...", repository)
+			repoURI := fmt.Sprintf(backupRepositoryURL, user, repository)
+			assetURI = fmt.Sprintf("%s/%s", repoURI, addonFile)
+			log.Infof("Release asset: %s", assetURI)
+			ctx.Redirect(302, assetURI)
+		}
 	}
 }
 
@@ -239,16 +258,20 @@ func fetchChangelog(user string, repository string) string {
 			changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), *release.Body)
 		}
 	} else {
-		resp, err := http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/changelog.txt")
+		resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
 		if err != nil || resp.StatusCode != 200 {
-			changelog = "Unable to fetch changelog, try again later."
-		} else {
-			data, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				changelog = err.Error()
-			} else {
-				changelog = string(data)
+			log.Warning("Unable to fetch changelog, trying backup repository...")
+			resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/changelog.txt")
+			if err != nil || resp.StatusCode != 200 {
+				changelog = "Unable to fetch changelog, try again later."
+				return changelog
 			}
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			changelog = err.Error()
+		} else {
+			changelog = string(data)
 		}
 	}
 	return changelog
