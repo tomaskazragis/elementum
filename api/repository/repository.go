@@ -150,8 +150,9 @@ func GetAddonFiles(ctx *gin.Context) {
 		GetAddonsXML(ctx)
 		return
 	case "addons.xml.md5":
+		go writeChangelog(user, "plugin.video.quasar")
+		go writeChangelog(user, "script.quasar.burst")
 		GetAddonsXMLChecksum(ctx)
-		writeChangelog(user, repository)
 		return
 	case "fanart.jpg":
 		fallthrough
@@ -168,6 +169,7 @@ func GetAddonFiles(ctx *gin.Context) {
 	case addonZipRE.MatchString(filepath):
 		addonZip(ctx, user, repository, lastReleaseTag)
 	case addonChangelogRE.MatchString(filepath):
+		writeChangelog(user, repository)
 		addonChangelog(ctx, user, repository)
 	default:
 		ctx.AbortWithError(404, errors.New(filepath))
