@@ -26,6 +26,7 @@ before_script:
     - make $PLATFORM
   except:
     - tags
+    - master
 
 .push_template: &push_definition
   script:
@@ -46,6 +47,7 @@ before_script:
         exit;"
   only:
     - tags
+    - master
 
 android-arm:
   stage: build

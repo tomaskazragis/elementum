@@ -3,8 +3,6 @@ package repository
 import (
 	"os"
 	"fmt"
-	"path"
-	"time"
 	"bufio"
 	"errors"
 	"regexp"
@@ -20,7 +18,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
 	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/cache"
 	"github.com/scakemyer/quasar/xbmc"
 )
 
@@ -60,45 +57,37 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.%s.%s", user, repository)
-
-	if err := cacheStore.Get(key, &addons); err != nil {
-		_, lastReleaseBranch := getLastRelease(user, "plugin.video.quasar")
-		resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.quasar", lastReleaseBranch) + "/addon.xml")
+	_, lastReleaseBranch := getLastRelease(user, "plugin.video.quasar")
+	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.quasar", lastReleaseBranch) + "/addon.xml")
+	if err == nil && resp.StatusCode != 200 {
+		err = errors.New(resp.Status)
+	}
+	if err != nil {
+		log.Warning("Unable to retrieve the addon.xml file, checking backup repository...")
+		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, "plugin.video.quasar") + "/addon.xml")
 		if err == nil && resp.StatusCode != 200 {
 			err = errors.New(resp.Status)
 		}
 		if err != nil {
-			log.Warning("Unable to retrieve the addon.xml file, checking backup repository...")
-			resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, "plugin.video.quasar") + "/addon.xml")
-			if err == nil && resp.StatusCode != 200 {
-				err = errors.New(resp.Status)
-			}
-			if err != nil {
-				log.Error("Unable to retrieve the backup's addon.xml file.")
-				return nil, err
-			}
+			log.Error("Unable to retrieve the backup's addon.xml file.")
+			return nil, err
 		}
-
-		respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.quasar.burst") + "/addon.xml")
-		if errBurst == nil && respBurst.StatusCode != 200 {
-			errBurst = errors.New(respBurst.Status)
-		}
-		if errBurst != nil {
-			log.Error("Unable to retrieve Burst's addon.xml file.")
-		}
-
-		addon := xbmc.Addon{}
-		burst := xbmc.Addon{}
-		xml.NewDecoder(resp.Body).Decode(&addon)
-		xml.NewDecoder(respBurst.Body).Decode(&burst)
-		addons := make([]xbmc.Addon, 0)
-		addons = append(addons, addon)
-		addons = append(addons, burst)
-
-		cacheStore.Set(key, addons, 15 * time.Second)
 	}
+
+	respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.quasar.burst") + "/addon.xml")
+	if errBurst == nil && respBurst.StatusCode != 200 {
+		errBurst = errors.New(respBurst.Status)
+	}
+	if errBurst != nil {
+		log.Error("Unable to retrieve Burst's addon.xml file.")
+	}
+
+	addon := xbmc.Addon{}
+	burst := xbmc.Addon{}
+	xml.NewDecoder(resp.Body).Decode(&addon)
+	xml.NewDecoder(respBurst.Body).Decode(&burst)
+	addons = append(addons, addon)
+	addons = append(addons, burst)
 
 	return &xbmc.AddonList{
 		Addons: addons,
@@ -140,7 +129,7 @@ func GetAddonFiles(ctx *gin.Context) {
 			// Get last release from addons.xml on master
 			log.Warning("Unable to find a last tag, using master.")
 			addons, err := getAddons(user, repository)
-			if err != nil || addons.Addons[0].Version == "" {
+			if err != nil || len(addons.Addons) < 1 || addons.Addons[0].Version == "" {
 				ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addon.xml file."))
 				return
 			}
@@ -266,7 +255,7 @@ func fetchChangelog(user string, repository string) string {
 func writeChangelog(user string, repository string) error {
 	changelog := fetchChangelog(user, repository)
 	lines := strings.Split(changelog, "\n")
-	path := filepath.Clean(filepath.Join(config.Get().Info.Path, "changelog.txt"))
+	path := filepath.Clean(filepath.Join(config.Get().Info.Path, "..", repository, "changelog.txt"))
 
   file, err := os.Create(path)
   if err != nil {
