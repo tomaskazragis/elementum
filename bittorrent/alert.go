@@ -12,4 +12,7 @@ type Alert struct {
 	What     string
 	Message  string
 	Pointer  uintptr
+	Name     string
+	Entry    libtorrent.Entry
+	InfoHash string
 }

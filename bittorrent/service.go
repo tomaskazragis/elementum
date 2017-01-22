@@ -544,28 +544,15 @@ func (s *BTService) saveResumeDataConsumer() {
 				s.onStateChanged(stateAlert)
 
 			case libtorrent.SaveResumeDataAlertAlertType:
-				saveResumeData := libtorrent.SwigcptrSaveResumeDataAlert(alert.Pointer)
-				if saveResumeData.Swigcptr() == 0 {
-					break
-				}
-				torrentHandle := saveResumeData.GetHandle()
-				torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQuerySavePath) | uint(libtorrent.TorrentHandleQueryName))
-				shaHash := torrentStatus.GetInfoHash().ToString()
-				infoHash := hex.EncodeToString([]byte(shaHash))
-				if saveResumeData.Swigcptr() == 0 {
-					break
-				}
-				entry := saveResumeData.ResumeData()
-				bEncoded := []byte(libtorrent.Bencode(entry))
-
+				bEncoded := []byte(libtorrent.Bencode(alert.Entry))
 				b := bytes.NewReader(bEncoded)
 				dec := bencode.NewDecoder(b)
 				var torrentFile *TorrentFileRaw
 				if err := dec.Decode(&torrentFile); err != nil {
-					s.log.Warningf("Resume data corrupted for %s, %d bytes received and failed to decode with: %s, skipping...", torrentStatus.GetName(), len(bEncoded), err.Error())
+					s.log.Warningf("Resume data corrupted for %s, %d bytes received and failed to decode with: %s, skipping...", alert.Name, len(bEncoded), err.Error())
 				} else {
 					// s.log.Infof("Saving resume data for %s to %s.fastresume", torrentStatus.GetName(), infoHash)
-					path := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
+					path := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", alert.InfoHash))
 					ioutil.WriteFile(path, bEncoded, 0644)
 				}
 			}
@@ -736,14 +723,32 @@ func (s *BTService) alertsConsumer() {
 			var alerts libtorrent.StdVectorAlerts
 			alerts = s.Session.GetHandle().PopAlerts()
 			queueSize := alerts.Size()
+			var name string
+			var infoHash string
+			var entry libtorrent.Entry
 			for i := 0; i < int(queueSize); i++ {
 				ltAlert := alerts.Get(i)
+				alertType := ltAlert.Type()
+				alertPtr := ltAlert.Swigcptr()
+				switch alertType {
+					case libtorrent.SaveResumeDataAlertAlertType:
+						saveResumeData := libtorrent.SwigcptrSaveResumeDataAlert(alertPtr)
+						torrentHandle := saveResumeData.GetHandle()
+						torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQuerySavePath) | uint(libtorrent.TorrentHandleQueryName))
+						name = torrentStatus.GetName()
+						shaHash := torrentStatus.GetInfoHash().ToString()
+						infoHash = hex.EncodeToString([]byte(shaHash))
+						entry = saveResumeData.ResumeData()
+				}
 				alert := &Alert{
-					Type: ltAlert.Type(),
+					Type: alertType,
 					Category: ltAlert.Category(),
 					What: ltAlert.What(),
 					Message: ltAlert.Message(),
-					Pointer: ltAlert.Swigcptr(),
+					Pointer: alertPtr,
+					Name: name,
+					Entry: entry,
+					InfoHash: infoHash,
 				}
 				s.alertsBroadcaster.Broadcast(alert)
 			}
