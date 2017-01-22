@@ -84,6 +84,7 @@ func PlayTorrent(ctx *gin.Context) {
 }
 
 func PlayURI(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	uri := ctx.Request.URL.Query().Get("uri")
 	resume := ctx.Request.URL.Query().Get("resume")
 
@@ -96,6 +97,5 @@ func PlayURI(ctx *gin.Context) {
 	} else {
 		xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "resume", resume))
 	}
-	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	ctx.String(200, "")
 }

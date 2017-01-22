@@ -195,6 +195,7 @@ func TVMostVoted(ctx *gin.Context) {
 }
 
 func SearchShows(ctx *gin.Context) {
+	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	query := ctx.Request.URL.Query().Get("q")
 	if query == "" {
 		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
@@ -207,6 +208,9 @@ func SearchShows(ctx *gin.Context) {
 			}
 			searchHistory = append(searchHistory, query)
 		}
+	}
+	if query == "" {
+		return
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
 	renderShows(tmdb.SearchShows(query, config.Get().Language, page), ctx, page, query)
@@ -439,179 +443,185 @@ func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bitto
 	return providers.SearchEpisode(searchers, show, episode), nil
 }
 
-func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc { return func(ctx *gin.Context) {
-	tmdbId := ctx.Params.ByName("showId")
-	showId, _ := strconv.Atoi(tmdbId)
-	seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
-	episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
+func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		tmdbId := ctx.Params.ByName("showId")
+		showId, _ := strconv.Atoi(tmdbId)
+		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
+		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-	show := tmdb.GetShow(showId, "")
-	if show == nil {
-		ctx.Error(errors.New("Unable to find show"))
-		return
+		show := tmdb.GetShow(showId, "")
+		if show == nil {
+			ctx.Error(errors.New("Unable to find show"))
+			return
+		}
+
+		episode := tmdb.GetEpisode(showId, seasonNumber, episodeNumber, "")
+		if episode == nil {
+			ctx.Error(errors.New("Unable to find episode"))
+			return
+		}
+
+		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
+
+		runtime := 45
+		if len(show.EpisodeRunTime) > 0 {
+			runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
+		}
+
+		existingTorrent := ExistingTorrent(btService, longName)
+		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+			rUrl := UrlQuery(
+				UrlForXBMC("/play"), "uri", existingTorrent,
+				                     "tmdb", strconv.Itoa(episode.Id),
+				                     "type", "episode",
+				                     "runtime", strconv.Itoa(runtime))
+			ctx.Redirect(302, rUrl)
+			return
+		}
+
+		if torrents := InTorrentsMap(strconv.Itoa(episode.Id)); len(torrents) > 0 {
+			rUrl := UrlQuery(
+				UrlForXBMC("/play"), "uri", torrents[0].URI,
+				                     "tmdb", strconv.Itoa(episode.Id),
+				                     "type", "episode",
+				                     "runtime", strconv.Itoa(runtime))
+			ctx.Redirect(302, rUrl)
+			return
+		}
+
+		torrents, err := showEpisodeLinks(showId, seasonNumber, episodeNumber)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		if len(torrents) == 0 {
+			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			return
+		}
+
+		choices := make([]string, 0, len(torrents))
+		for _, torrent := range torrents {
+			resolution := ""
+			if torrent.Resolution > 0 {
+				resolution = fmt.Sprintf("[B][COLOR %s]%s[/COLOR][/B] ", bittorrent.Colors[torrent.Resolution], bittorrent.Resolutions[torrent.Resolution])
+			}
+
+			info := make([]string, 0)
+			if torrent.Size != "" {
+				info = append(info, fmt.Sprintf("[B][%s][/B]", torrent.Size))
+			}
+			if torrent.RipType > 0 {
+				info = append(info, bittorrent.Rips[torrent.RipType])
+			}
+			if torrent.VideoCodec > 0 {
+				info = append(info, bittorrent.Codecs[torrent.VideoCodec])
+			}
+			if torrent.AudioCodec > 0 {
+				info = append(info, bittorrent.Codecs[torrent.AudioCodec])
+			}
+			if torrent.Provider != "" {
+				info = append(info, fmt.Sprintf(" - [B]%s[/B]", torrent.Provider))
+			}
+
+			multi := ""
+			if torrent.Multi {
+				multi = "\nmulti"
+			}
+
+			label := fmt.Sprintf("%s(%d / %d) %s\n%s\n%s%s",
+				resolution,
+				torrent.Seeds,
+				torrent.Peers,
+				strings.Join(info, " "),
+				torrent.Name,
+				torrent.Icon,
+				multi,
+			)
+			choices = append(choices, label)
+		}
+
+		choice := xbmc.ListDialogLarge("LOCALIZE[30228]", longName, choices...)
+		if choice >= 0 {
+			AddToTorrentsMap(strconv.Itoa(episode.Id), torrents[choice])
+
+			rUrl := UrlQuery(
+				UrlForXBMC("/play"), "uri", torrents[choice].URI,
+				                     "tmdb", strconv.Itoa(episode.Id),
+				                     "type", "episode",
+				                     "runtime", strconv.Itoa(runtime))
+			ctx.Redirect(302, rUrl)
+		}
 	}
+}
 
-	episode := tmdb.GetEpisode(showId, seasonNumber, episodeNumber, "")
-	if episode == nil {
-		ctx.Error(errors.New("Unable to find episode"))
-		return
-	}
+func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		tmdbId := ctx.Params.ByName("showId")
+		showId, _ := strconv.Atoi(tmdbId)
+		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
+		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-	longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
+		show := tmdb.GetShow(showId, "")
+		if show == nil {
+			ctx.Error(errors.New("Unable to find show"))
+			return
+		}
 
-	runtime := 45
-	if len(show.EpisodeRunTime) > 0 {
-		runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
-	}
+		episode := tmdb.GetEpisode(showId, seasonNumber, episodeNumber, "")
+		if episode == nil {
+			ctx.Error(errors.New("Unable to find episode"))
+			return
+		}
 
-	existingTorrent := ExistingTorrent(btService, longName)
-	if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
-		rUrl := UrlQuery(
-			UrlForXBMC("/play"), "uri", existingTorrent,
-			                     "tmdb", strconv.Itoa(episode.Id),
-			                     "type", "episode",
-			                     "runtime", strconv.Itoa(runtime))
-		ctx.Redirect(302, rUrl)
-		return
-	}
+		runtime := 45
+		if len(show.EpisodeRunTime) > 0 {
+			runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
+		}
 
-	if torrents := InTorrentsMap(strconv.Itoa(episode.Id)); len(torrents) > 0 {
+		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
+		existingTorrent := ExistingTorrent(btService, longName)
+		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+			rUrl := UrlQuery(
+				UrlForXBMC("/play"), "uri", existingTorrent,
+				                     "tmdb", strconv.Itoa(episode.Id),
+				                     "type", "episode",
+				                     "runtime", strconv.Itoa(runtime))
+			ctx.Redirect(302, rUrl)
+			return
+		}
+
+		if torrents := InTorrentsMap(strconv.Itoa(episode.Id)); len(torrents) > 0 {
+			rUrl := UrlQuery(
+				UrlForXBMC("/play"), "uri", torrents[0].URI,
+				                     "tmdb", strconv.Itoa(episode.Id),
+				                     "type", "episode",
+				                     "runtime", strconv.Itoa(runtime))
+			ctx.Redirect(302, rUrl)
+			return
+		}
+
+		torrents, err := showEpisodeLinks(showId, seasonNumber, episodeNumber)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		if len(torrents) == 0 {
+			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			return
+		}
+
+		AddToTorrentsMap(strconv.Itoa(episode.Id), torrents[0])
+
 		rUrl := UrlQuery(
 			UrlForXBMC("/play"), "uri", torrents[0].URI,
 			                     "tmdb", strconv.Itoa(episode.Id),
 			                     "type", "episode",
 			                     "runtime", strconv.Itoa(runtime))
 		ctx.Redirect(302, rUrl)
-		return
 	}
-
-	torrents, err := showEpisodeLinks(showId, seasonNumber, episodeNumber)
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
-
-	if len(torrents) == 0 {
-		xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
-		return
-	}
-
-	choices := make([]string, 0, len(torrents))
-	for _, torrent := range torrents {
-		resolution := ""
-		if torrent.Resolution > 0 {
-			resolution = fmt.Sprintf("[B][COLOR %s]%s[/COLOR][/B] ", bittorrent.Colors[torrent.Resolution], bittorrent.Resolutions[torrent.Resolution])
-		}
-
-		info := make([]string, 0)
-		if torrent.Size != "" {
-			info = append(info, fmt.Sprintf("[B][%s][/B]", torrent.Size))
-		}
-		if torrent.RipType > 0 {
-			info = append(info, bittorrent.Rips[torrent.RipType])
-		}
-		if torrent.VideoCodec > 0 {
-			info = append(info, bittorrent.Codecs[torrent.VideoCodec])
-		}
-		if torrent.AudioCodec > 0 {
-			info = append(info, bittorrent.Codecs[torrent.AudioCodec])
-		}
-		if torrent.Provider != "" {
-			info = append(info, fmt.Sprintf(" - [B]%s[/B]", torrent.Provider))
-		}
-
-		multi := ""
-		if torrent.Multi {
-			multi = "\nmulti"
-		}
-
-		label := fmt.Sprintf("%s(%d / %d) %s\n%s\n%s%s",
-			resolution,
-			torrent.Seeds,
-			torrent.Peers,
-			strings.Join(info, " "),
-			torrent.Name,
-			torrent.Icon,
-			multi,
-		)
-		choices = append(choices, label)
-	}
-
-	choice := xbmc.ListDialogLarge("LOCALIZE[30228]", longName, choices...)
-	if choice >= 0 {
-		AddToTorrentsMap(strconv.Itoa(episode.Id), torrents[choice])
-
-		rUrl := UrlQuery(
-			UrlForXBMC("/play"), "uri", torrents[choice].URI,
-			                     "tmdb", strconv.Itoa(episode.Id),
-			                     "type", "episode",
-			                     "runtime", strconv.Itoa(runtime))
-		ctx.Redirect(302, rUrl)
-	}
-}}
-
-func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc { return func(ctx *gin.Context) {
-	tmdbId := ctx.Params.ByName("showId")
-	showId, _ := strconv.Atoi(tmdbId)
-	seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
-	episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
-
-	show := tmdb.GetShow(showId, "")
-	if show == nil {
-		ctx.Error(errors.New("Unable to find show"))
-		return
-	}
-
-	episode := tmdb.GetEpisode(showId, seasonNumber, episodeNumber, "")
-	if episode == nil {
-		ctx.Error(errors.New("Unable to find episode"))
-		return
-	}
-
-	runtime := 45
-	if len(show.EpisodeRunTime) > 0 {
-		runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
-	}
-
-	longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
-	existingTorrent := ExistingTorrent(btService, longName)
-	if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
-		rUrl := UrlQuery(
-			UrlForXBMC("/play"), "uri", existingTorrent,
-			                     "tmdb", strconv.Itoa(episode.Id),
-			                     "type", "episode",
-			                     "runtime", strconv.Itoa(runtime))
-		ctx.Redirect(302, rUrl)
-		return
-	}
-
-	if torrents := InTorrentsMap(strconv.Itoa(episode.Id)); len(torrents) > 0 {
-		rUrl := UrlQuery(
-			UrlForXBMC("/play"), "uri", torrents[0].URI,
-			                     "tmdb", strconv.Itoa(episode.Id),
-			                     "type", "episode",
-			                     "runtime", strconv.Itoa(runtime))
-		ctx.Redirect(302, rUrl)
-		return
-	}
-
-	torrents, err := showEpisodeLinks(showId, seasonNumber, episodeNumber)
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
-
-	if len(torrents) == 0 {
-		xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
-		return
-	}
-
-	AddToTorrentsMap(strconv.Itoa(episode.Id), torrents[0])
-
-	rUrl := UrlQuery(
-		UrlForXBMC("/play"), "uri", torrents[0].URI,
-		                     "tmdb", strconv.Itoa(episode.Id),
-		                     "type", "episode",
-		                     "runtime", strconv.Itoa(runtime))
-	ctx.Redirect(302, rUrl)
-}}
+}

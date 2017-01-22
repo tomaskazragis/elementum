@@ -17,17 +17,21 @@ var searchHistory []string
 
 func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		query := ctx.Request.URL.Query().Get("q")
 
 		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
 			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)
 			query = searchHistory[choice]
-		} else {
+		} else if query == "" {
 			query = xbmc.Keyboard("", "LOCALIZE[30209]")
 			if query == "" {
 				return
 			}
 			searchHistory = append(searchHistory, query)
+		}
+		if query == "" {
+			return
 		}
 
 		existingTorrent := ExistingTorrent(btService, query)
