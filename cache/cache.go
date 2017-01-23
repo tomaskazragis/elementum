@@ -111,7 +111,7 @@ func Cache(store CacheStore, expire time.Duration) gin.HandlerFunc {
 			// replace writer
 			writer := ctx.Writer
 			ctx.Writer = newCachedWriter(store, expire, ctx.Writer, key)
-			// ctx.Next()
+			ctx.Next()
 			ctx.Writer = writer
 		}
 	}

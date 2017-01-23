@@ -19,8 +19,9 @@ import (
 
 const (
 	DefaultCacheTime    = 6 * time.Hour
-	RepositoryCacheTime = 20 * time.Minute
 	EpisodesCacheTime   = 15 * time.Minute
+	RepositoryCacheTime = 20 * time.Minute
+	RecentCacheTime     = 30 * time.Minute
 	IndexCacheTime      = 15 * 24 * time.Hour // 15 days caching for index
 )
 
@@ -69,10 +70,10 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	{
 		movies.GET("/", cache.Cache(store, IndexCacheTime), MoviesIndex)
 		movies.GET("/search", SearchMovies)
-		movies.GET("/popular", cache.Cache(store, DefaultCacheTime), PopularMovies)
-		movies.GET("/popular/:genre", cache.Cache(store, DefaultCacheTime), PopularMovies)
-		movies.GET("/recent", cache.Cache(store, DefaultCacheTime), RecentMovies)
-		movies.GET("/recent/:genre", cache.Cache(store, DefaultCacheTime), RecentMovies)
+		movies.GET("/popular", cache.Cache(store, RecentCacheTime), PopularMovies)
+		movies.GET("/popular/:genre", cache.Cache(store, RecentCacheTime), PopularMovies)
+		movies.GET("/recent", cache.Cache(store, RecentCacheTime), RecentMovies)
+		movies.GET("/recent/:genre", cache.Cache(store, RecentCacheTime), RecentMovies)
 		movies.GET("/top", cache.Cache(store, DefaultCacheTime), TopRatedMovies)
 		movies.GET("/imdb250", cache.Cache(store, DefaultCacheTime), IMDBTop250)
 		movies.GET("/mostvoted", cache.Cache(store, DefaultCacheTime), MoviesMostVoted)
@@ -82,7 +83,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		{
 			trakt.GET("/", cache.Cache(store, IndexCacheTime), MoviesTrakt)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheTime), TraktPopularMovies)
-			trakt.GET("/trending", cache.Cache(store, DefaultCacheTime), TraktTrendingMovies)
+			trakt.GET("/trending", cache.Cache(store, RecentCacheTime), TraktTrendingMovies)
 			trakt.GET("/played", cache.Cache(store, DefaultCacheTime), TraktMostPlayedMovies)
 			trakt.GET("/watched", cache.Cache(store, DefaultCacheTime), TraktMostWatchedMovies)
 			trakt.GET("/collected", cache.Cache(store, DefaultCacheTime), TraktMostCollectedMovies)
@@ -91,7 +92,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 			lists := trakt.Group("/lists")
 			{
-				lists.GET("/", cache.Cache(store, IndexCacheTime), MoviesTraktLists)
+				lists.GET("/", cache.Cache(store, RecentCacheTime), MoviesTraktLists)
 				lists.GET("/watchlist", WatchlistMovies)
 				lists.GET("/collection", CollectionMovies)
 				lists.GET("/id/:listId", UserlistMovies)
@@ -112,12 +113,12 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	{
 		shows.GET("/", cache.Cache(store, IndexCacheTime), TVIndex)
 		shows.GET("/search", SearchShows)
-		shows.GET("/popular", cache.Cache(store, DefaultCacheTime), PopularShows)
-		shows.GET("/popular/:genre", cache.Cache(store, DefaultCacheTime), PopularShows)
+		shows.GET("/popular", cache.Cache(store, RecentCacheTime), PopularShows)
+		shows.GET("/popular/:genre", cache.Cache(store, RecentCacheTime), PopularShows)
 		shows.GET("/recent/shows", cache.Cache(store, DefaultCacheTime), RecentShows)
 		shows.GET("/recent/shows/:genre", cache.Cache(store, DefaultCacheTime), RecentShows)
-		shows.GET("/recent/episodes", cache.Cache(store, DefaultCacheTime), RecentEpisodes)
-		shows.GET("/recent/episodes/:genre", cache.Cache(store, DefaultCacheTime), RecentEpisodes)
+		shows.GET("/recent/episodes", cache.Cache(store, EpisodesCacheTime), RecentEpisodes)
+		shows.GET("/recent/episodes/:genre", cache.Cache(store, EpisodesCacheTime), RecentEpisodes)
 		shows.GET("/top", cache.Cache(store, DefaultCacheTime), TopRatedShows)
 		shows.GET("/mostvoted", cache.Cache(store, DefaultCacheTime), TVMostVoted)
 		shows.GET("/genres", cache.Cache(store, IndexCacheTime), TVGenres)
@@ -126,7 +127,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		{
 			trakt.GET("/", cache.Cache(store, IndexCacheTime), TVTrakt)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheTime), TraktPopularShows)
-			trakt.GET("/trending", cache.Cache(store, DefaultCacheTime), TraktTrendingShows)
+			trakt.GET("/trending", cache.Cache(store, RecentCacheTime), TraktTrendingShows)
 			trakt.GET("/played", cache.Cache(store, DefaultCacheTime), TraktMostPlayedShows)
 			trakt.GET("/watched", cache.Cache(store, DefaultCacheTime), TraktMostWatchedShows)
 			trakt.GET("/collected", cache.Cache(store, DefaultCacheTime), TraktMostCollectedShows)
@@ -134,7 +135,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 			lists := trakt.Group("/lists")
 			{
-				lists.GET("/", cache.Cache(store, IndexCacheTime), TVTraktLists)
+				lists.GET("/", cache.Cache(store, RecentCacheTime), TVTraktLists)
 				lists.GET("/watchlist", WatchlistShows)
 				lists.GET("/collection", CollectionShows)
 				lists.GET("/id/:listId", UserlistShows)
