@@ -120,8 +120,9 @@ func (btp *BTPlayer) addTorrent() error {
 
 	var infoHash string
 
+	loadFromFile := false
+	torrent := NewTorrent(btp.uri)
 	if strings.HasPrefix(btp.uri, "magnet") || strings.HasPrefix(btp.uri, "http") {
-		torrent := NewTorrent(btp.uri)
 		if torrent.IsMagnet() {
 			torrent.Magnet()
 			btp.log.Infof("Parsed magnet: %s", torrent.URI)
@@ -131,28 +132,35 @@ func (btp *BTPlayer) addTorrent() error {
 				return err
 			}
 		} else {
-			torrent.Resolve()
-			torrentParams.SetUrl(torrent.URI)
+			if err := torrent.Resolve(); err == nil {
+				loadFromFile = true
+			} else {
+				return err
+			}
 		}
 		infoHash = torrent.InfoHash
 	} else {
-		if _, err := os.Stat(btp.uri); err != nil {
+		loadFromFile = true
+	}
+
+	if loadFromFile {
+		if _, err := os.Stat(torrent.URI); err != nil {
 			return err
 		}
 
-		file, err := os.Open(btp.uri)
+		file, err := os.Open(torrent.URI)
 		if err != nil {
 			return err
 		}
 		dec := bencode.NewDecoder(file)
 		var torrentFile *TorrentFileRaw
 		if err := dec.Decode(&torrentFile); err != nil {
-			errMsg := fmt.Sprintf("Invalid torrent file %s, failed to decode with: %s", btp.uri, err.Error())
+			errMsg := fmt.Sprintf("Invalid torrent file %s, failed to decode with: %s", torrent.URI, err.Error())
 			btp.log.Error(errMsg)
 			return err
 		}
 
-		info := libtorrent.NewTorrentInfo(btp.uri)
+		info := libtorrent.NewTorrentInfo(torrent.URI)
 		defer libtorrent.DeleteTorrentInfo(info)
 		torrentParams.SetTorrentInfo(info)
 
