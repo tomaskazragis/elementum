@@ -30,6 +30,8 @@ type Configuration struct {
 	ChooseStreamAuto    bool
 	UseOriginalTitle    bool
 	AddSpecials         bool
+	ShowUnairedSeasons  bool
+	ShowUnairedEpisodes bool
 	BufferSize          int
 	UploadRateLimit     int
 	DownloadRateLimit   int
@@ -50,7 +52,6 @@ type Configuration struct {
 	TraktToken          string
 	TraktRefreshToken   string
 	TvScraper           int
-	IgnoreDuplicates    bool
 	UseCloudHole        bool
 	CloudHoleKey        string
 	TMDBApiKey          string
@@ -151,6 +152,8 @@ func Reload() *Configuration {
 		ChooseStreamAuto:    settings["choose_stream_auto"].(bool),
 		UseOriginalTitle:    settings["use_original_title"].(bool),
 		AddSpecials:         settings["add_specials"].(bool),
+		ShowUnairedSeasons:  settings["unaired_seasons"].(bool),
+		ShowUnairedEpisodes: settings["unaired_episodes"].(bool),
 		ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit:       settings["seed_time_limit"].(int) * 3600,
@@ -166,7 +169,6 @@ func Reload() *Configuration {
 		TraktUsername:       settings["trakt_username"].(string),
 		TraktToken:          settings["trakt_token"].(string),
 		TraktRefreshToken:   settings["trakt_refresh_token"].(string),
-		IgnoreDuplicates:    settings["library_ignore_duplicates"].(bool),
 		TvScraper:           settings["library_tv_scraper"].(int),
 		UseCloudHole:        settings["use_cloudhole"].(bool),
 		CloudHoleKey:        settings["cloudhole_key"].(string),

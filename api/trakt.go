@@ -322,7 +322,7 @@ func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
 		}
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
-		if inJsonDb, err := InJsonDB(strconv.Itoa(movie.IDs.TMDB), LMovie); err == nil && inJsonDb == true {
+		if err := isDuplicateMovie(strconv.Itoa(movie.IDs.TMDB)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.IDs.TMDB))}
 		}
 
@@ -448,9 +448,10 @@ func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
 		item.Path = UrlForXBMC("/show/%d/seasons", show.IDs.TMDB)
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d", show.IDs.TMDB))}
-		if inJsonDb, err := InJsonDB(strconv.Itoa(show.IDs.TMDB), LShow); err == nil && inJsonDb == true {
+		if err := isDuplicateShow(strconv.Itoa(show.IDs.TMDB)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
+		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/merge/%d", show.IDs.TMDB))}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/add", show.IDs.TMDB))}
 		if InShowsWatchlist(show.IDs.TMDB) {
@@ -464,6 +465,7 @@ func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
 
 		item.ContextMenu = [][]string{
 			libraryAction,
+			mergeAction,
 			watchlistAction,
 			collectionAction,
 			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},

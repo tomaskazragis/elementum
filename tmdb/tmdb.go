@@ -99,6 +99,7 @@ type Season struct {
 	EpisodeCount int    `json:"episode_count,omitempty"`
 	AirDate      string `json:"air_date"`
 	Poster       string `json:"poster_path"`
+	ExternalIDs  *ExternalIDs `json:"external_ids"`
 
 	Episodes EpisodeList `json:"episodes"`
 }
@@ -112,6 +113,7 @@ type Episode struct {
 	EpisodeNumber int     `json:"episode_number"`
 	VoteAverage   float32 `json:"vote_average"`
 	StillPath     string  `json:"still_path"`
+	ExternalIDs   *ExternalIDs `json:"external_ids"`
 }
 
 type Entity struct {

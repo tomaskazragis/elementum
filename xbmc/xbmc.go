@@ -15,14 +15,14 @@ func Refresh() (retVal string) {
 	return
 }
 
-func VideoLibraryScan() {
-	var retVal string
+func VideoLibraryScan() (retVal string) {
 	executeJSONRPC("VideoLibrary.Scan", &retVal, nil)
+	return
 }
 
-func VideoLibraryClean() {
-	var retVal string
+func VideoLibraryClean() (retVal string) {
 	executeJSONRPC("VideoLibrary.Clean", &retVal, nil)
+	return
 }
 
 func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
@@ -41,6 +41,15 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 		log.Error(ret)
 	}
 	return shows
+}
+
+func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
+	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{"uniqueid", "season", "episode"}}
+	ret := executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+	if ret != nil {
+		log.Error(ret)
+	}
+	return episodes
 }
 
 func TranslatePath(path string) (retVal string) {

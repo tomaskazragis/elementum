@@ -69,6 +69,18 @@ func GetShow(Id string) (show *Show) {
 	return show
 }
 
+func GetShowByTMDB(tmdbId string) (show *Show) {
+	endPoint := fmt.Sprintf("search/tmdb/%s?type=show", tmdbId)
+	params := napping.Params{}.AsUrlValues()
+	resp, err := Get(endPoint, params)
+	if err != nil {
+		log.Error(err.Error())
+		xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
+	}
+	resp.Unmarshal(&show)
+	return show
+}
+
 func SearchShows(query string, page string) (shows []*Shows, err error) {
 	endPoint := "search"
 

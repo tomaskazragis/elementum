@@ -134,6 +134,18 @@ type VideoLibraryShows struct {
 	} `json:"tvshows"`
 }
 
+type VideoLibraryEpisodes struct {
+	Episodes []*struct {
+		ID         int    `json:"episodeid"`
+		Title      string `json:"label"`
+		Season     int    `json:"season"`
+		Episode    int    `json:"episode"`
+		UniqueIDs  struct {
+			ID       string `json:"unknown"`
+		} `json:uniqueid`
+	} `json:"episodes"`
+}
+
 func NewView(contentType string, items ListItems) *View {
 	return &View{
 		ContentType: contentType,

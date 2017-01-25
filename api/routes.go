@@ -169,14 +169,13 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		library.GET("/movie/collection/add", AddMovieCollection)
 		library.GET("/show/add/:tmdbId", AddShow)
 		library.GET("/show/remove/:tmdbId", RemoveShow)
+		library.GET("/show/merge/:tmdbId", MergeShow)
 		library.GET("/show/list/add/:listId", AddShowList)
 		library.GET("/show/watchlist/add", AddShowWatchlist)
 		library.GET("/show/collection/add", AddShowCollection)
-		library.GET("/userlists", GetUserLists)
-		library.GET("/update", UpdateLibrary)
-		library.GET("/getpath", GetLibraryPath)
-		library.GET("/getcount", GetCount)
-		library.GET("/lookup", Lookup)
+
+		// library.GET("/update", UpdateLibrary)
+		// DEPRECATED
 		library.GET("/play/movie/:tmdbId", PlayMovie(btService))
 		library.GET("/play/show/:showId/season/:season/episode/:episode", PlayShow(btService))
 	}

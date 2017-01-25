@@ -14,6 +14,7 @@ import (
 var cmdLog = logging.MustGetLogger("cmd")
 
 func ClearCache(ctx *gin.Context) {
+	ctx.Abort()
 	os.RemoveAll(filepath.Join(config.Get().Info.Profile, "cache"))
 	xbmc.Notify("Quasar", "LOCALIZE[30200]", config.AddonIcon())
 }

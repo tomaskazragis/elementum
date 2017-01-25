@@ -21,6 +21,7 @@ func TVIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
 		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/shows/search"), Thumbnail: config.AddonResource("img", "search.png")},
 		{Label: "LOCALIZE[30056]", Path: UrlForXBMC("/shows/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/shows/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30238]", Path: UrlForXBMC("/shows/recent/episodes"), Thumbnail: config.AddonResource("img", "fresh.png")},
 		{Label: "LOCALIZE[30237]", Path: UrlForXBMC("/shows/recent/shows"), Thumbnail: config.AddonResource("img", "clock.png")},
 		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/shows/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
@@ -118,9 +119,10 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 		item.Path = UrlForXBMC("/show/%d/seasons", show.Id)
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d", show.Id))}
-		if inJsonDb, err := InJsonDB(strconv.Itoa(show.Id), LShow); err == nil && inJsonDb == true {
+		if err := isDuplicateShow(strconv.Itoa(show.Id)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.Id))}
 		}
+		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/merge/%d", show.Id))}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/add", show.Id))}
 		if InShowsWatchlist(show.Id) {
@@ -134,6 +136,7 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 
 		item.ContextMenu = [][]string{
 			libraryAction,
+			mergeAction,
 			watchlistAction,
 			collectionAction,
 			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},

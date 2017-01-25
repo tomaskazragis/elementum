@@ -54,6 +54,11 @@ func GetShowImages(showId int) *Images {
 	return images
 }
 
+func GetShowById(tmdbId string, language string) *Show {
+	id, _ := strconv.Atoi(tmdbId)
+	return GetShow(id, language)
+}
+
 func GetShow(showId int, language string) *Show {
 	var show *Show
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
@@ -83,7 +88,7 @@ func GetShow(showId int, language string) *Show {
 				LogError(err)
 				xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("GetShow bad status: %d", resp.Status())
+				message := fmt.Sprintf("GetShow bad status for %d: %d", showId, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}

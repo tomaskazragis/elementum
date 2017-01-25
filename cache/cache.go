@@ -1,12 +1,12 @@
 package cache
 
 import (
+	"io"
+	"time"
+	"errors"
+	"net/http"
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	PageCachePrefix = "io.scakemyer.quasar.page.cache"
-	ErrCacheMiss    = errors.New("cache: key not found.")
-	ErrNotStored    = errors.New("cache: not stored.")
-	ErrNotSupport   = errors.New("cache: not support.")
+	PageCachePrefix = "quasar.page.cache"
+	ErrCacheMiss    = errors.New("cache: key not found")
+	ErrNotStored    = errors.New("cache: not stored")
+	ErrNotSupport   = errors.New("cache: not supported")
 	log             = logging.MustGetLogger("cache")
 )
 
