@@ -49,6 +49,7 @@ var DefaultTrackers = []string{
 	"udp://tracker.coppersurfer.tk:6969/announce",
 	"udp://tracker.leechers-paradise.org:6969/announce",
 	"udp://tracker.openbittorrent.com:80/announce",
+	"udp://public.popcorn-tracker.org:6969/announce",
 	"udp://explodie.org:6969",
 }
 

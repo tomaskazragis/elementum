@@ -95,7 +95,8 @@ func main() {
 	var shutdown = func() {
 		log.Info("Shutting down...")
 		btService.Close()
-		log.Info("Bye bye")
+		api.CloseLibrary()
+		log.Info("Goodbye")
 		os.Exit(0)
 	}
 
@@ -131,6 +132,8 @@ func main() {
 
 		xbmc.ResetRPC()
 	}()
+
+	go api.LibraryUpdateLoop()
 
 	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)
 }

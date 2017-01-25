@@ -51,6 +51,8 @@ type Configuration struct {
 	TraktUsername       string
 	TraktToken          string
 	TraktRefreshToken   string
+	UpdateFrequency     int
+	UpdateDelay         int
 	TvScraper           int
 	UseCloudHole        bool
 	CloudHoleKey        string
@@ -169,6 +171,8 @@ func Reload() *Configuration {
 		TraktUsername:       settings["trakt_username"].(string),
 		TraktToken:          settings["trakt_token"].(string),
 		TraktRefreshToken:   settings["trakt_refresh_token"].(string),
+		UpdateFrequency:     settings["library_update_frequency"].(int),
+		UpdateDelay:         settings["library_update_delay"].(int),
 		TvScraper:           settings["library_tv_scraper"].(int),
 		UseCloudHole:        settings["use_cloudhole"].(bool),
 		CloudHoleKey:        settings["cloudhole_key"].(string),
