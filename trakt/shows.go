@@ -93,6 +93,32 @@ func GetShowByTMDB(tmdbId string) (show *Show) {
 	return show
 }
 
+func GetShowByTVDB(tvdbId string) (show *Show) {
+	endPoint := fmt.Sprintf("search/tvdb/%s?type=show", tvdbId)
+	params := napping.Params{}.AsUrlValues()
+	resp, err := Get(endPoint, params)
+	if err != nil {
+		log.Error(err.Error())
+		xbmc.Notify("Quasar", "GetShowByTVDB failed, check your logs.", config.AddonIcon())
+		return
+	}
+	resp.Unmarshal(&show)
+	return show
+}
+
+func GetEpisode(traktId string) (episode *Episode) {
+	endPoint := fmt.Sprintf("search/trakt/%s?type=episode", traktId)
+	params := napping.Params{}.AsUrlValues()
+	resp, err := Get(endPoint, params)
+	if err != nil {
+		log.Error(err.Error())
+		xbmc.Notify("Quasar", "GetEpisode failed, check your logs.", config.AddonIcon())
+		return
+	}
+	resp.Unmarshal(&episode)
+	return
+}
+
 func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
 	endPoint := fmt.Sprintf("search/tmdb/%s?type=episode", tmdbId)
 	params := napping.Params{}.AsUrlValues()
@@ -100,6 +126,19 @@ func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
 	if err != nil {
 		log.Error(err.Error())
 		xbmc.Notify("Quasar", "GetEpisodeByTMDB failed, check your logs.", config.AddonIcon())
+		return
+	}
+	resp.Unmarshal(&episode)
+	return
+}
+
+func GetEpisodeByTVDB(tvdbId string) (episode *Episode) {
+	endPoint := fmt.Sprintf("search/tvdb/%s?type=episode", tvdbId)
+	params := napping.Params{}.AsUrlValues()
+	resp, err := Get(endPoint, params)
+	if err != nil {
+		log.Error(err.Error())
+		xbmc.Notify("Quasar", "GetEpisodeByTVDB failed, check your logs.", config.AddonIcon())
 		return
 	}
 	resp.Unmarshal(&episode)

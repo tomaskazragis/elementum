@@ -59,12 +59,22 @@ var (
 	DB                *bolt.DB
 	bucket            = "Library"
 	closing           = make(chan struct{})
+	removedEpisodes   = make(chan *removedEpisode)
 )
 
 type DBItem struct {
 	ID       string `json:"id"`
 	Type     int    `json:"type"`
 	TVShowID int    `json:"showid"`
+}
+
+type removedEpisode struct {
+	ID        string
+	ShowID    string
+	ScraperID string
+	ShowName  string
+	Season    int
+	Episode   int
 }
 
 func clearPageCache(ctx *gin.Context) {
@@ -183,7 +193,7 @@ func isDuplicateShow(tmdbId string) error {
 	}
 	for _, existingShow := range libraryShows.Shows {
 		// TODO Aho-Corasick name matching to allow mixed scraper sources
-		if existingShow.IMDBNumber == showId {
+		if existingShow.ScraperID == showId {
 			return errors.New(fmt.Sprintf("%s already in library", show.Name))
 		}
 	}
@@ -225,7 +235,7 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 
 	var tvshowId int
 	for _, existingShow := range libraryShows.Shows {
-		if existingShow.IMDBNumber == showId {
+		if existingShow.ScraperID == showId {
 			tvshowId = existingShow.ID
 			break
 		}
@@ -312,15 +322,10 @@ func wasRemoved(id string, removedType int) (wasRemoved bool) {
 	DB.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte(bucket)).Cursor()
 		prefix := []byte(fmt.Sprintf("%d_", removedType))
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var item *DBItem
-			if err := json.Unmarshal(v, &item); err != nil {
-				return err
-			}
-			if item.ID == id {
-				wasRemoved = true
-				return nil
-			}
+		suffix := []byte(fmt.Sprintf("_%s", id))
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix) && bytes.HasSuffix(k, suffix); k, _ = c.Next() {
+			wasRemoved = true
+			return nil
 		}
 		return nil
 	})
@@ -343,7 +348,7 @@ func doUpdateLibrary() error {
 			if err := json.Unmarshal(v, &item); err != nil {
 				return err
 			}
-			if _, err := writeShowStrm(item.ID); err != nil {
+			if _, err := writeShowStrm(item.ID, false); err != nil {
 				libraryLog.Error(err)
 			}
 		}
@@ -499,7 +504,7 @@ func removeMovie(tmdbId string) error {
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); err != nil {
-		return errors.New("Nothing left to remove from Quasar")
+		return errors.New("LOCALIZE[30282]")
 	}
 	if err := os.RemoveAll(moviePath); err != nil {
 		return err
@@ -569,7 +574,7 @@ func syncShowsList(listId string, updating bool) (err error) {
 			}
 		}
 
-		if _, err := writeShowStrm(tmdbId); err != nil {
+		if _, err := writeShowStrm(tmdbId, false); err != nil {
 			libraryLog.Error(err)
 			continue
 		}
@@ -590,7 +595,7 @@ func syncShowsList(listId string, updating bool) (err error) {
 	return nil
 }
 
-func writeShowStrm(showId string) (*tmdb.Show, error) {
+func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 	Id, _ := strconv.Atoi(showId)
 	show := tmdb.GetShow(Id, "en")
 	if show == nil {
@@ -629,6 +634,7 @@ func writeShowStrm(showId string) (*tmdb.Show, error) {
 
 		episodes := tmdb.GetSeason(Id, season.Season, "en").Episodes
 
+		var reAddIDs []string
 		for _, episode := range episodes {
 			if episode == nil {
 				continue
@@ -643,7 +649,14 @@ func writeShowStrm(showId string) (*tmdb.Show, error) {
 				}
 			}
 
-			// TODO Check if single episode was previously removed?
+			if adding {
+				reAddIDs = append(reAddIDs, strconv.Itoa(episode.Id))
+			} else {
+				// Check if single episode was previously removed
+				if wasRemoved(strconv.Itoa(episode.Id), RemovedEpisode) {
+					continue
+				}
+			}
 
 			if err := isDuplicateEpisode(Id, season.Season, episode.EpisodeNumber); err != nil {
 				continue
@@ -656,12 +669,55 @@ func writeShowStrm(showId string) (*tmdb.Show, error) {
 				return show, err
 			}
 		}
+		if len(reAddIDs) > 0 {
+			if err := updateDB(BatchDelete, RemovedEpisode, reAddIDs, Id); err != nil {
+				libraryLog.Error(err)
+			}
+		}
 	}
 
 	return show, nil
 }
 
-func removeEpisode(tmdbId string, showId string, seasonNumber int, episodeNumber int) error {
+func removeShow(tmdbId string) error {
+	if err := checkShowsPath(); err != nil {
+		return err
+	}
+	Id, _ := strconv.Atoi(tmdbId)
+	show := tmdb.GetShow(Id, "en")
+
+	if show == nil {
+		return errors.New("Unable to find show to remove")
+	}
+
+	showStrm := toFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+	showPath := filepath.Join(showsLibraryPath, showStrm)
+
+	if _, err := os.Stat(showPath); err != nil {
+		libraryLog.Warning(err)
+		return errors.New("LOCALIZE[30282]")
+	}
+	if err := os.RemoveAll(showPath); err != nil {
+		libraryLog.Error(err)
+		return err
+	}
+
+	if err := updateDB(Delete, Show, []string{tmdbId}, 0); err != nil {
+		return err
+	}
+	if err := updateDB(Update, RemovedShow, []string{tmdbId}, 0); err != nil {
+		return err
+	}
+
+	libraryLog.Noticef("%s removed from library", show.Name)
+	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", show.Name)) {
+		xbmc.VideoLibraryClean()
+	}
+
+	return nil
+}
+
+func removeEpisode(tmdbId string, showId string, scraperId string, seasonNumber int, episodeNumber int) error {
 	if err := checkShowsPath(); err != nil {
 		return err
 	}
@@ -676,21 +732,29 @@ func removeEpisode(tmdbId string, showId string, seasonNumber int, episodeNumber
 	episodeStrm := fmt.Sprintf("%s S%02dE%02d.strm", showPath, seasonNumber, episodeNumber)
 	episodePath := filepath.Join(showsLibraryPath, showPath, episodeStrm)
 
+	alreadyRemoved := false
 	if _, err := os.Stat(episodePath); err != nil {
+		alreadyRemoved = true
+	}
+	if !alreadyRemoved {
+		if err := os.Remove(episodePath); err != nil {
+			return err
+		}
+	}
+
+	removedEpisodes <- &removedEpisode{
+		ID: tmdbId,
+		ShowID: showId,
+		ScraperID: scraperId,
+		ShowName: show.Name,
+		Season: seasonNumber,
+		Episode: episodeNumber,
+	}
+
+	if !alreadyRemoved {
+		libraryLog.Noticef("%s removed from library", episodeStrm)
+	} else {
 		return errors.New("Nothing left to remove from Quasar")
-	}
-	if err := os.Remove(episodePath); err != nil {
-		return err
-	}
-
-	// TODO Add single episodes to removed prefix?
-	// if err := updateDB(Update, RemovedEpisode, []string{tmdbId}, Id); err != nil {
-	// 	return err
-	// }
-
-	libraryLog.Noticef("%s removed from library", episodeStrm)
-	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)) {
-		xbmc.VideoLibraryClean()
 	}
 
 	return nil
@@ -779,7 +843,7 @@ func AddShow(ctx *gin.Context) {
 
 	var err error
 	var show *tmdb.Show
-	if show, err = writeShowStrm(tmdbId); err != nil {
+	if show, err = writeShowStrm(tmdbId, true); err != nil {
 		libraryLog.Error(err)
 		ctx.String(200, err.Error())
 		return
@@ -813,52 +877,16 @@ func AddShowsList(ctx *gin.Context) {
 }
 
 func RemoveShow(ctx *gin.Context) {
-	if err := checkShowsPath(); err != nil {
-		ctx.String(200, err.Error())
-		return
-	}
 	tmdbId := ctx.Params.ByName("tmdbId")
-	Id, _ := strconv.Atoi(tmdbId)
-	show := tmdb.GetShow(Id, "en")
-
-	if show == nil {
-		ctx.String(200, "Unable to find show to remove")
-		return
-	}
-
-	showStrm := toFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(showsLibraryPath, showStrm)
-
-	if _, err := os.Stat(showPath); os.IsNotExist(err) {
-		libraryLog.Warning(err)
-		ctx.String(200, "LOCALIZE[30282]")
-		return
-	}
-	if err := os.RemoveAll(showPath); err != nil {
-		libraryLog.Error(err)
+	if err := removeShow(tmdbId); err != nil {
 		ctx.String(200, err.Error())
-		return
-	}
-
-	if err := updateDB(Delete, Show, []string{tmdbId}, 0); err != nil {
-		ctx.String(200, err.Error())
-		return
-	}
-	if err := updateDB(Update, RemovedShow, []string{tmdbId}, 0); err != nil {
-		ctx.String(200, err.Error())
-		return
-	}
-
-	libraryLog.Noticef("%s removed from library", show.Name)
-	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", show.Name)) {
-		xbmc.VideoLibraryClean()
 	}
 }
 
 //
 // Library update loop
 //
-func LibraryUpdateLoop() {
+func LibraryUpdate() {
 	if err := checkMoviesPath(); err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 		return
@@ -922,6 +950,81 @@ func LibraryUpdateLoop() {
 		updateLibraryShows()
 	}()
 
+	// Removed episodes debouncer
+	go func() {
+		var episodes []*removedEpisode
+		for {
+			select {
+			case <-time.After(3 * time.Second):
+				if len(episodes) == 0 {
+					break
+				}
+
+				shows := make(map[string][]*removedEpisode, 0)
+				for _, episode := range episodes {
+					shows[episode.ShowName] = append(shows[episode.ShowName], episode)
+				}
+
+				var label string
+				var labels []string
+				if len(episodes) > 1 {
+					for showName, showEpisodes := range shows {
+						var libraryTotal int
+						for _, libraryShow := range libraryShows.Shows {
+							if libraryShow.ScraperID == showEpisodes[0].ScraperID {
+								libraryLog.Warningf("Library removed %d episodes for %s", libraryShow.Episodes, libraryShow.Title)
+								libraryTotal = libraryShow.Episodes
+								break
+							}
+						}
+						if len(showEpisodes) == libraryTotal {
+							if err := removeShow(showEpisodes[0].ShowID); err != nil {
+								libraryLog.Error("Unable to remove show after removing all episodes...")
+							}
+						} else {
+							labels = append(labels, fmt.Sprintf("%d episodes of %s", len(showEpisodes), showName))
+						}
+
+						// Add single episodes to removed prefix
+						var tmdbIDs []string
+						for _, showEpisode := range showEpisodes {
+							tmdbIDs = append(tmdbIDs, showEpisode.ID)
+						}
+						Id, _ := strconv.Atoi(showEpisodes[0].ShowID)
+						if err := updateDB(Batch, RemovedEpisode, tmdbIDs, Id); err != nil {
+							libraryLog.Error(err)
+						}
+					}
+					if len(labels) > 0 {
+						label = strings.Join(labels, ", ")
+						if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
+							xbmc.VideoLibraryClean()
+						}
+					}
+				} else {
+					for showName, episode := range shows {
+						label = fmt.Sprintf("%s S%02dE%02d", showName, episode[0].Season, episode[0].Episode)
+						Id, _ := strconv.Atoi(episode[0].ShowID)
+						if err := updateDB(Update, RemovedEpisode, []string{episode[0].ID}, Id); err != nil {
+							libraryLog.Error(err)
+						}
+					}
+					if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
+						xbmc.VideoLibraryClean()
+					}
+				}
+
+				episodes = make([]*removedEpisode, 0)
+
+			case episode, ok := <- removedEpisodes:
+				if !ok {
+					break
+				}
+				episodes = append(episodes, episode)
+			}
+		}
+	}()
+
 	updateDelay := config.Get().UpdateDelay
 	if updateDelay > 0 {
 		if updateDelay < 10 {
@@ -973,6 +1076,7 @@ func LibraryUpdateLoop() {
 			}
 		case <- closing:
 			libraryLog.Info("Closing library...")
+			close(removedEpisodes)
 			return
 		}
 	}
@@ -1029,15 +1133,54 @@ func Notification(ctx *gin.Context) {
 					libraryLog.Warningf("No episode found with ID: %d", item.ID)
 					return
 				}
-				var showId string
+
+				var scraperId string
 				for _, tvshow := range libraryShows.Shows {
 					if tvshow.ID == episode.TVShowID {
-						showId = tvshow.IMDBNumber
+						scraperId = tvshow.ScraperID
 						break
 					}
 				}
-				if showId != "" && episode.UniqueIDs.ID != "" {
-					if err := removeEpisode(episode.UniqueIDs.ID, showId, episode.Season, episode.Episode); err != nil {
+
+				if scraperId != "" && episode.UniqueIDs.ID != "" {
+					var tmdbId string
+					var showId string
+
+					switch config.Get().TvScraper {
+					case TMDBScraper:
+						tmdbId = episode.UniqueIDs.ID
+						showId = scraperId
+					case TVDBScraper:
+						traktShow := trakt.GetShowByTVDB(scraperId)
+						if traktShow == nil {
+							libraryLog.Warning("No matching TVDB show to remove (%s)", scraperId)
+							return
+						}
+						showId = strconv.Itoa(traktShow.IDs.TVDB)
+						TVDBEpisode := trakt.GetEpisodeByTVDB(episode.UniqueIDs.ID)
+						if TVDBEpisode == nil {
+							libraryLog.Warning("No matching TVDB episode to remove (%s)", scraperId)
+							return
+						}
+						tmdbId = strconv.Itoa(TVDBEpisode.IDs.TMDB)
+					case TraktScraper:
+						traktShow := trakt.GetShow(scraperId)
+						if traktShow == nil {
+							libraryLog.Warning("No matching show to remove (%s)", scraperId)
+							return
+						}
+						showId = strconv.Itoa(traktShow.IDs.Trakt)
+						traktEpisode := trakt.GetEpisode(episode.UniqueIDs.ID)
+						if traktEpisode == nil {
+							libraryLog.Warning("No matching episode to remove (%s)", scraperId)
+							return
+						}
+						libraryLog.Warning("No matching episode to remove (%s)", episode.UniqueIDs.ID)
+						return
+						tmdbId = strconv.Itoa(traktEpisode.IDs.Trakt)
+					}
+
+					if err := removeEpisode(tmdbId, showId, scraperId, episode.Season, episode.Episode); err != nil {
 						libraryLog.Warning(err)
 					}
 				} else {
@@ -1051,7 +1194,7 @@ func Notification(ctx *gin.Context) {
 							break
 						}
 						if err := removeMovie(strconv.Itoa(tmdbMovie.Id)); err != nil {
-							libraryLog.Warning(err.Error())
+							libraryLog.Warning("Nothing left to remove from Quasar")
 							break
 						}
 					}

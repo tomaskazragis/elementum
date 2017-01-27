@@ -35,7 +35,7 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
 }
 
 func VideoLibraryGetShows() (shows *VideoLibraryShows) {
-	params := map[string]interface{}{"properties": []interface{}{"imdbnumber"}}
+	params := map[string]interface{}{"properties": []interface{}{"imdbnumber", "episode"}}
 	err := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
 	if err != nil {
 		log.Error(err)

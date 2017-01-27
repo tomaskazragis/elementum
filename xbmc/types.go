@@ -130,7 +130,8 @@ type VideoLibraryShows struct {
 	Shows []*struct {
 		ID         int    `json:"tvshowid"`
 		Title      string `json:"label"`
-		IMDBNumber string `json:"imdbnumber"`
+		ScraperID  string `json:"imdbnumber"`
+		Episodes   int    `json:"episode"`
 	} `json:"tvshows"`
 }
 

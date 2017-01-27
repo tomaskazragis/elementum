@@ -133,7 +133,7 @@ func main() {
 		xbmc.ResetRPC()
 	}()
 
-	go api.LibraryUpdateLoop()
+	go api.LibraryUpdate()
 
 	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)
 }
