@@ -1177,7 +1177,6 @@ func Notification(ctx *gin.Context) {
 						}
 						libraryLog.Warning("No matching episode to remove (%s)", episode.UniqueIDs.ID)
 						return
-						tmdbId = strconv.Itoa(traktEpisode.IDs.Trakt)
 					}
 
 					if err := removeEpisode(tmdbId, showId, scraperId, episode.Season, episode.Episode); err != nil {
