@@ -15,9 +15,19 @@ import (
 
 // Fill fanart from TMDB
 func setShowFanart(show *Show) *Show {
+	if show.IDs == nil || show.IDs.TMDB == 0 {
+		return show
+	}
 	tmdbImages := tmdb.GetShowImages(show.IDs.TMDB)
 	if tmdbImages == nil {
 		return show
+	}
+	if show.Images == nil {
+		show.Images = &Images{}
+		show.Images.Poster = &Sizes{}
+		show.Images.Thumbnail = &Sizes{}
+		show.Images.FanArt = &Sizes{}
+		show.Images.Banner = &Sizes{}
 	}
 	if len(tmdbImages.Posters) > 0 {
 		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
@@ -61,6 +71,7 @@ func GetShow(Id string) (show *Show) {
 	if err != nil {
 		log.Error(err.Error())
 		xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
+		return
 	}
 
 	resp.Unmarshal(&show)
@@ -75,10 +86,24 @@ func GetShowByTMDB(tmdbId string) (show *Show) {
 	resp, err := Get(endPoint, params)
 	if err != nil {
 		log.Error(err.Error())
-		xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
+		xbmc.Notify("Quasar", "GetShowByTMDB failed, check your logs.", config.AddonIcon())
+		return
 	}
 	resp.Unmarshal(&show)
 	return show
+}
+
+func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
+	endPoint := fmt.Sprintf("search/tmdb/%s?type=episode", tmdbId)
+	params := napping.Params{}.AsUrlValues()
+	resp, err := Get(endPoint, params)
+	if err != nil {
+		log.Error(err.Error())
+		xbmc.Notify("Quasar", "GetEpisodeByTMDB failed, check your logs.", config.AddonIcon())
+		return
+	}
+	resp.Unmarshal(&episode)
+	return
 }
 
 func SearchShows(query string, page string) (shows []*Shows, err error) {
@@ -252,7 +277,9 @@ func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
 	}
 	shows = showListing
 
-	shows = setShowsFanart(shows)
+	if page != "0" {
+		shows = setShowsFanart(shows)
+	}
 
 	return shows, err
 }

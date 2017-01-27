@@ -51,6 +51,7 @@ type Configuration struct {
 	TraktUsername       string
 	TraktToken          string
 	TraktRefreshToken   string
+	TraktSyncFrequency  int
 	UpdateFrequency     int
 	UpdateDelay         int
 	TvScraper           int
@@ -171,6 +172,7 @@ func Reload() *Configuration {
 		TraktUsername:       settings["trakt_username"].(string),
 		TraktToken:          settings["trakt_token"].(string),
 		TraktRefreshToken:   settings["trakt_refresh_token"].(string),
+		TraktSyncFrequency:  settings["trakt_sync"].(int),
 		UpdateFrequency:     settings["library_update_frequency"].(int),
 		UpdateDelay:         settings["library_update_delay"].(int),
 		TvScraper:           settings["library_tv_scraper"].(int),

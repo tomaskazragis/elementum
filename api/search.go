@@ -18,7 +18,7 @@ var searchHistory []string
 func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		query := ctx.Request.URL.Query().Get("q")
+		query := ctx.Query("q")
 
 		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
 			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)

@@ -44,7 +44,7 @@ func GetShowImages(showId int) *Images {
 				log.Error(err.Error())
 				xbmc.Notify("Quasar", "GetImages failed, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				log.Warningf("GetImages bad status: %d", resp.Status())
+				log.Warningf("Bad status in GetImages for %d: %d", showId, resp.Status())
 			}
 			if images != nil {
 				cacheStore.Set(key, images, cacheTime)
@@ -59,8 +59,10 @@ func GetShowById(tmdbId string, language string) *Show {
 	return GetShow(id, language)
 }
 
-func GetShow(showId int, language string) *Show {
-	var show *Show
+func GetShow(showId int, language string) (show *Show) {
+	if showId == 0 {
+		return
+	}
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.show.%d.%s", showId, language)
 	if err := cacheStore.Get(key, &show); err != nil {
@@ -88,8 +90,8 @@ func GetShow(showId int, language string) *Show {
 				LogError(err)
 				xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("GetShow bad status for %d: %d", showId, resp.Status())
-				log.Error(message)
+				message := fmt.Sprintf("Bad status in GetShow for %d: %d", showId, resp.Status())
+				log.Warning(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
 		})

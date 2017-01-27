@@ -41,7 +41,7 @@ func GetImages(movieId int) *Images {
 				log.Error(err.Error())
 				xbmc.Notify("Quasar", "GetImages failed, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				log.Warningf("GetImages bad status: %d", resp.Status())
+				log.Warningf("Bad status in GetImages for %d: %d", movieId, resp.Status())
 			}
 			if images != nil {
 				cacheStore.Set(key, images, cacheTime)
@@ -76,7 +76,7 @@ func GetMovieById(movieId string, language string) *Movie {
 				log.Error(err.Error())
 				xbmc.Notify("Quasar", "GetMovie failed, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("GetMovie bad status: %d", resp.Status())
+				message := fmt.Sprintf("Bad status in GetMovie for %s: %d", movieId, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}

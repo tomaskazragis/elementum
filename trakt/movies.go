@@ -15,9 +15,19 @@ import (
 
 // Fill fanart from TMDB
 func setFanart(movie *Movie) *Movie {
+	if movie.IDs == nil || movie.IDs.TMDB == 0 {
+		return movie
+	}
 	tmdbImages := tmdb.GetImages(movie.IDs.TMDB)
 	if tmdbImages == nil {
 		return movie
+	}
+	if movie.Images == nil {
+		movie.Images = &Images{}
+		movie.Images.Poster = &Sizes{}
+		movie.Images.Thumbnail = &Sizes{}
+		movie.Images.FanArt = &Sizes{}
+		movie.Images.Banner = &Sizes{}
 	}
 	if len(tmdbImages.Posters) > 0 {
 		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
@@ -270,7 +280,9 @@ func ListItemsMovies(listId string, page string) (movies []*Movies, err error) {
 	}
 	movies = movieListing
 
-	movies = setFanarts(movies)
+	if page != "0" {
+		movies = setFanarts(movies)
+	}
 
 	return movies, err
 }

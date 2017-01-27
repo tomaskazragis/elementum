@@ -77,7 +77,7 @@ func TVTraktLists(ctx *gin.Context) {
 			Path: UrlForXBMC("/shows/trakt/lists/watchlist"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/watchlist/add"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/list/add/watchlist"))},
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TVTraktLists(ctx *gin.Context) {
 			Path: UrlForXBMC("/shows/trakt/lists/collection"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/collection/add"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/list/add/collection"))},
 			},
 		},
 	}
@@ -122,15 +122,15 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 		if err := isDuplicateShow(strconv.Itoa(show.Id)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.Id))}
 		}
-		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/merge/%d", show.Id))}
+		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d?merge=true", show.Id))}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/add", show.Id))}
-		if InShowsWatchlist(show.Id) {
+		if inShowsWatchlist(show.Id) {
 			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/remove", show.Id))}
 		}
 
 		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/collection/add", show.Id))}
-		if InShowsCollection(show.Id) {
+		if inShowsCollection(show.Id) {
 			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/collection/remove", show.Id))}
 		}
 
@@ -199,7 +199,7 @@ func TVMostVoted(ctx *gin.Context) {
 
 func SearchShows(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	query := ctx.Request.URL.Query().Get("q")
+	query := ctx.Query("q")
 	if query == "" {
 		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
 			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)
@@ -267,24 +267,31 @@ func ShowEpisodes(ctx *gin.Context) {
 	items := season.Episodes.ToListItems(show, season)
 
 	for _, item := range items {
-		playUrl := UrlForXBMC("/show/%d/season/%d/episode/%d/play",
+		playLabel := "LOCALIZE[30023]"
+		playURL := UrlForXBMC("/show/%d/season/%d/episode/%d/play",
 			show.Id,
 			seasonNumber,
 			item.Info.Episode,
 		)
-		episodeLinksUrl := UrlForXBMC("/show/%d/season/%d/episode/%d/links",
+		linksLabel := "LOCALIZE[30202]"
+		linksURL := UrlForXBMC("/show/%d/season/%d/episode/%d/links",
 			show.Id,
 			seasonNumber,
 			item.Info.Episode,
 		)
-		if config.Get().ChooseStreamAuto == true {
-			item.Path = playUrl
-		} else {
-			item.Path = episodeLinksUrl
+
+		defaultURL := playURL
+		contextLabel := linksLabel
+		contextURL := linksURL
+		if config.Get().ChooseStreamAuto == false {
+			defaultURL = linksURL
+			contextLabel = playLabel
+			contextURL = playURL
 		}
+
+		item.Path = defaultURL
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", episodeLinksUrl)},
-			[]string{"LOCALIZE[30023]", fmt.Sprintf("XBMC.PlayMedia(%s)", playUrl)},
+			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
 			[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
 			[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/episodes"))},
@@ -321,7 +328,7 @@ func showSeasonLinks(showId int, seasonNumber int) ([]*bittorrent.Torrent, error
 func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Request.URL.Query().Get("external")
+		external := ctx.Query("external")
 		showId, _ := strconv.Atoi(ctx.Params.ByName("showId"))
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 
@@ -468,7 +475,7 @@ func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bitto
 func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Request.URL.Query().Get("external")
+		external := ctx.Query("external")
 		tmdbId := ctx.Params.ByName("showId")
 		showId, _ := strconv.Atoi(tmdbId)
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
@@ -595,7 +602,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Request.URL.Query().Get("external")
+		external := ctx.Query("external")
 		tmdbId := ctx.Params.ByName("showId")
 		showId, _ := strconv.Atoi(tmdbId)
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))

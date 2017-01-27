@@ -54,7 +54,16 @@ func GetSeason(showId int, seasonNumber int, language string) *Season {
 		}
 
 		if season != nil {
-			cacheStore.Set(key, season, cacheTime)
+			updateFrequency := config.Get().UpdateFrequency * 60
+			traktFrequency := config.Get().TraktSyncFrequency * 60
+			if updateFrequency == 0 && traktFrequency == 0 {
+				updateFrequency = 1440
+			} else if updateFrequency > traktFrequency  && traktFrequency != 0 {
+				updateFrequency = traktFrequency - 1
+			} else {
+				updateFrequency = updateFrequency - 1
+			}
+			cacheStore.Set(key, season, time.Duration(updateFrequency) * time.Minute)
 		}
 	}
 	return season
@@ -73,9 +82,11 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 		if season.EpisodeCount == 0 {
 			continue
 		}
-		firstAired, _ := time.Parse("2006-01-02", season.AirDate)
-		if firstAired.After(now) {
-			continue
+		if config.Get().ShowUnairedSeasons == false {
+			firstAired, _ := time.Parse("2006-01-02", season.AirDate)
+			if firstAired.After(now) {
+				continue
+			}
 		}
 
 		item := season.ToListItem(show)

@@ -27,7 +27,7 @@ func ProviderGetMovie(ctx *gin.Context) {
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchMovieLinks(movie)
-	if ctx.Request.URL.Query().Get("resolve") == "true" {
+	if ctx.Query("resolve") == "true" {
 		for _, torrent := range torrents {
 			torrent.Resolve()
 		}
@@ -63,7 +63,7 @@ func ProviderGetEpisode(ctx *gin.Context) {
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchEpisodeLinks(show, episode)
-	if ctx.Request.URL.Query().Get("resolve") == "true" {
+	if ctx.Query("resolve") == "true" {
 		for _, torrent := range torrents {
 			torrent.Resolve()
 		}

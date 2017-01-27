@@ -11,7 +11,7 @@ func init() {
 }
 
 func Index(ctx *gin.Context) {
-	action := ctx.Request.URL.Query().Get("action")
+	action := ctx.Query("action")
 	if action == "search" || action == "manualsearch" {
 		SubtitlesIndex(ctx)
 		return

@@ -25,14 +25,10 @@ const (
 	IndexCacheTime      = 15 * 24 * time.Hour // 15 days caching for index
 )
 
-func GinLogger(exclude string) gin.HandlerFunc {
-	return gin.LoggerWithWriter(gin.DefaultWriter, exclude)
-}
-
 func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(GinLogger("/torrents/list"))
+	r.Use(gin.LoggerWithWriter(gin.DefaultWriter, "/torrents/list", "/notification"))
 
 	gin.SetMode(gin.ReleaseMode)
 
@@ -164,15 +160,10 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	{
 		library.GET("/movie/add/:tmdbId", AddMovie)
 		library.GET("/movie/remove/:tmdbId", RemoveMovie)
-		library.GET("/movie/list/add/:listId", AddMovieList)
-		library.GET("/movie/watchlist/add", AddMovieWatchlist)
-		library.GET("/movie/collection/add", AddMovieCollection)
+		library.GET("/movie/list/add/:listId", AddMoviesList)
 		library.GET("/show/add/:tmdbId", AddShow)
 		library.GET("/show/remove/:tmdbId", RemoveShow)
-		library.GET("/show/merge/:tmdbId", MergeShow)
-		library.GET("/show/list/add/:listId", AddShowList)
-		library.GET("/show/watchlist/add", AddShowWatchlist)
-		library.GET("/show/collection/add", AddShowCollection)
+		library.GET("/show/list/add/:listId", AddShowsList)
 		library.GET("/update", UpdateLibrary)
 
 		// DEPRECATED
@@ -221,6 +212,8 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r.GET("/playuri", PlayURI)
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
+
+	r.GET("/notification", Notification)
 
 	cmd := r.Group("/cmd")
 	{

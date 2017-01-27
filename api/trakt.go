@@ -211,7 +211,7 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 // 	}
 // }
 
-func InMoviesWatchlist(tmdbId int) bool {
+func inMoviesWatchlist(tmdbId int) bool {
 	if config.Get().TraktToken == "" {
 		return false
 	}
@@ -233,7 +233,7 @@ func InMoviesWatchlist(tmdbId int) bool {
 	return false
 }
 
-func InShowsWatchlist(tmdbId int) bool {
+func inShowsWatchlist(tmdbId int) bool {
 	if config.Get().TraktToken == "" {
 		return false
 	}
@@ -255,7 +255,7 @@ func InShowsWatchlist(tmdbId int) bool {
 	return false
 }
 
-func InMoviesCollection(tmdbId int) bool {
+func inMoviesCollection(tmdbId int) bool {
 	if config.Get().TraktToken == "" {
 		return false
 	}
@@ -277,7 +277,7 @@ func InMoviesCollection(tmdbId int) bool {
 	return false
 }
 
-func InShowsCollection(tmdbId int) bool {
+func inShowsCollection(tmdbId int) bool {
 	if config.Get().TraktToken == "" {
 		return false
 	}
@@ -313,13 +313,22 @@ func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
 			continue
 		}
 		item := movie.ToListItem()
-		playUrl := UrlForXBMC("/movie/%d/play", movie.IDs.TMDB)
-		movieLinksUrl := UrlForXBMC("/movie/%d/links", movie.IDs.TMDB)
-		if config.Get().ChooseStreamAuto == true {
-			item.Path = playUrl
-		} else {
-			item.Path = movieLinksUrl
+
+		playLabel := "LOCALIZE[30023]"
+		playURL := UrlForXBMC("/movie/%d/play", movie.IDs.TMDB)
+		linksLabel := "LOCALIZE[30202]"
+		linksURL := UrlForXBMC("/movie/%d/links", movie.IDs.TMDB)
+
+		defaultURL := playURL
+		contextLabel := linksLabel
+		contextURL := linksURL
+		if config.Get().ChooseStreamAuto == false {
+			defaultURL = linksURL
+			contextLabel = playLabel
+			contextURL = playURL
 		}
+
+		item.Path = defaultURL
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
 		if err := isDuplicateMovie(strconv.Itoa(movie.IDs.TMDB)); err != nil {
@@ -327,24 +336,23 @@ func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
 		}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/add", movie.IDs.TMDB))}
-		if InMoviesWatchlist(movie.IDs.TMDB) {
+		if inMoviesWatchlist(movie.IDs.TMDB) {
 			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/remove", movie.IDs.TMDB))}
 		}
 
 		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/add", movie.IDs.TMDB))}
-		if InMoviesCollection(movie.IDs.TMDB) {
+		if inMoviesCollection(movie.IDs.TMDB) {
 			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/remove", movie.IDs.TMDB))}
 		}
 
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", movieLinksUrl)},
-			[]string{"LOCALIZE[30023]", fmt.Sprintf("XBMC.PlayMedia(%s)", playUrl)},
+			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
 			[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+			[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
 			libraryAction,
 			watchlistAction,
 			collectionAction,
-			[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
 		}
 		// item.Info.Trailer = UrlForHTTP("/youtube/%s", movie.Trailer)
 		item.IsPlayable = true
@@ -451,15 +459,15 @@ func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
 		if err := isDuplicateShow(strconv.Itoa(show.IDs.TMDB)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
-		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/merge/%d", show.IDs.TMDB))}
+		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d?merge=true", show.IDs.TMDB))}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/add", show.IDs.TMDB))}
-		if InShowsWatchlist(show.IDs.TMDB) {
+		if inShowsWatchlist(show.IDs.TMDB) {
 			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/watchlist/remove", show.IDs.TMDB))}
 		}
 
 		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/collection/add", show.IDs.TMDB))}
-		if InShowsCollection(show.IDs.TMDB) {
+		if inShowsCollection(show.IDs.TMDB) {
 			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/show/%d/collection/remove", show.IDs.TMDB))}
 		}
 

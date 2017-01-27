@@ -78,7 +78,7 @@ type Show struct {
 	Language      string      `json:"language"`
 	Translations  []string    `json:"available_translations"`
 
-	Images        *Images `json:"images"`
+	Images        *Images     `json:"images"`
 }
 
 type Season struct {

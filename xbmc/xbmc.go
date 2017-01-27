@@ -36,20 +36,29 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
 
 func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 	params := map[string]interface{}{"properties": []interface{}{"imdbnumber"}}
-	ret := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
-	if ret != nil {
-		log.Error(ret)
+	err := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+	if err != nil {
+		log.Error(err)
 	}
-	return shows
+	return
 }
 
 func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
-	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{"uniqueid", "season", "episode"}}
-	ret := executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
-	if ret != nil {
-		log.Error(ret)
+	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{"tvshowid", "uniqueid", "season", "episode"}}
+	err := executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+	if err != nil {
+		log.Error(err)
 	}
-	return episodes
+	return
+}
+
+func VideoLibraryGetEpisodeDetails(episodeId int) (episode *VideoLibraryEpisode, err error) {
+	params := map[string]interface{}{"episodeid": episodeId, "properties": []interface{}{"tvshowid", "uniqueid", "season", "episode"}}
+	err = executeJSONRPCO("VideoLibrary.GetEpisodeDetails", &episode, params)
+	if err != nil {
+		return nil, err
+	}
+	return episode, nil
 }
 
 func TranslatePath(path string) (retVal string) {

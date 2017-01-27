@@ -117,10 +117,10 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 	repository := ctx.Params.ByName("repository")
 	addons, err := getAddons(user, repository)
 	if len(addons.Addons) > 0 {
-		log.Infof("Last release of %s: v%s", repository, addons.Addons[0].Version)
+		log.Infof("Last available release of %s: v%s", repository, addons.Addons[0].Version)
 	}
 	if len(addons.Addons) > 1 {
-		log.Infof("Last release of script.quasar.burst: v%s", addons.Addons[1].Version)
+		log.Infof("Last available release of script.quasar.burst: v%s", addons.Addons[1].Version)
 	}
 	if err != nil {
 		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file."))

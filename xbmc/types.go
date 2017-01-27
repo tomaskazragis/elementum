@@ -135,13 +135,20 @@ type VideoLibraryShows struct {
 }
 
 type VideoLibraryEpisodes struct {
-	Episodes []*struct {
-		ID         int       `json:"episodeid"`
-		Title      string    `json:"label"`
-		Season     int       `json:"season"`
-		Episode    int       `json:"episode"`
-		UniqueIDs  UniqueIDs `json:"uniqueid"`
-	} `json:"episodes"`
+	Episodes []*VideoLibraryEpisodeItem `json:"episodes"`
+}
+
+type VideoLibraryEpisode struct {
+	Episode *VideoLibraryEpisodeItem `json:"episodedetails"`
+}
+
+type VideoLibraryEpisodeItem struct {
+	ID         int       `json:"episodeid"`
+	Title      string    `json:"label"`
+	Season     int       `json:"season"`
+	Episode    int       `json:"episode"`
+	TVShowID   int       `json:"tvshowid"`
+	UniqueIDs  UniqueIDs `json:"uniqueid"`
 }
 
 type UniqueIDs struct {

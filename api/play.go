@@ -13,12 +13,12 @@ import (
 
 func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		uri := ctx.Request.URL.Query().Get("uri")
-		index := ctx.Request.URL.Query().Get("index")
-		resume := ctx.Request.URL.Query().Get("resume")
-		contentType := ctx.Request.URL.Query().Get("type")
-		tmdb := ctx.Request.URL.Query().Get("tmdb")
-		runtime := ctx.Request.URL.Query().Get("runtime")
+		uri := ctx.Query("uri")
+		index := ctx.Query("index")
+		resume := ctx.Query("resume")
+		contentType := ctx.Query("type")
+		tmdb := ctx.Query("tmdb")
+		runtime := ctx.Query("runtime")
 
 		if uri == "" && resume == "" {
 			return
@@ -85,8 +85,8 @@ func PlayTorrent(ctx *gin.Context) {
 
 func PlayURI(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	uri := ctx.Request.URL.Query().Get("uri")
-	resume := ctx.Request.URL.Query().Get("resume")
+	uri := ctx.Query("uri")
+	resume := ctx.Query("resume")
 
 	if uri == "" && resume == "" {
 		return

@@ -59,12 +59,14 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 
 	now := time.Now().UTC()
 	for _, episode := range episodes {
-		if episode.AirDate == "" {
-			continue
-		}
-		firstAired, _ := time.Parse("2006-01-02", episode.AirDate)
-		if firstAired.After(now) {
-			continue
+		if config.Get().ShowUnairedEpisodes == false {
+			if episode.AirDate == "" {
+				continue
+			}
+			firstAired, _ := time.Parse("2006-01-02", episode.AirDate)
+			if firstAired.After(now) {
+				continue
+			}
 		}
 
 		item := episode.ToListItem(show)

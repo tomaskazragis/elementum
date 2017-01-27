@@ -283,7 +283,7 @@ func ResumeSession(btService *bittorrent.BTService) gin.HandlerFunc {
 
 func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		uri := ctx.Request.URL.Query().Get("uri")
+		uri := ctx.Query("uri")
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 		if uri == "" {
@@ -440,7 +440,7 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		btService.Session.GetHandle().GetTorrents()
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
 		torrentId := ctx.Params.ByName("torrentId")
-		deleteFiles := ctx.Request.URL.Query().Get("files")
+		deleteFiles := ctx.Query("files")
 		torrentIndex, _ := strconv.Atoi(torrentId)
 		torrentHandle := torrentsVector.Get(torrentIndex)
 		if torrentHandle.IsValid() == false {

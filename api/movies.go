@@ -95,7 +95,7 @@ func MoviesTraktLists(ctx *gin.Context) {
 			Path: UrlForXBMC("/movies/trakt/lists/watchlist"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/watchlist/add"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/watchlist"))},
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func MoviesTraktLists(ctx *gin.Context) {
 			Path: UrlForXBMC("/movies/trakt/lists/collection"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/collection/add"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/collection"))},
 			},
 		},
 	}
@@ -134,13 +134,22 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 			continue
 		}
 		item := movie.ToListItem()
-		playUrl := UrlForXBMC("/movie/%d/play", movie.Id)
-		movieLinksUrl := UrlForXBMC("/movie/%d/links", movie.Id)
-		if config.Get().ChooseStreamAuto == true {
-			item.Path = playUrl
-		} else {
-			item.Path = movieLinksUrl
+
+		playLabel := "LOCALIZE[30023]"
+		playURL := UrlForXBMC("/movie/%d/play", movie.Id)
+		linksLabel := "LOCALIZE[30202]"
+		linksURL := UrlForXBMC("/movie/%d/links", movie.Id)
+
+		defaultURL := playURL
+		contextLabel := linksLabel
+		contextURL := linksURL
+		if config.Get().ChooseStreamAuto == false {
+			defaultURL = linksURL
+			contextLabel = playLabel
+			contextURL = playURL
 		}
+
+		item.Path = defaultURL
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.Id))}
 		if err := isDuplicateMovie(strconv.Itoa(movie.Id)); err != nil {
@@ -148,24 +157,23 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 		}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/add", movie.Id))}
-		if InMoviesWatchlist(movie.Id) {
+		if inMoviesWatchlist(movie.Id) {
 			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/remove", movie.Id))}
 		}
 
 		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/add", movie.Id))}
-		if InMoviesCollection(movie.Id) {
+		if inMoviesCollection(movie.Id) {
 			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/remove", movie.Id))}
 		}
 
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", movieLinksUrl)},
-			[]string{"LOCALIZE[30023]", fmt.Sprintf("XBMC.PlayMedia(%s)", playUrl)},
+			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
 			[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+			[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
 			libraryAction,
 			watchlistAction,
 			collectionAction,
-			[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
 		}
 		item.Info.Trailer = UrlForHTTP("/youtube/%s", item.Info.Trailer)
 		item.IsPlayable = true
@@ -226,7 +234,7 @@ func MoviesMostVoted(ctx *gin.Context) {
 
 func SearchMovies(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	query := ctx.Request.URL.Query().Get("q")
+	query := ctx.Query("q")
 	if query == "" {
 		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
 			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)
@@ -277,7 +285,7 @@ func movieLinks(tmdbId string) []*bittorrent.Torrent {
 func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Request.URL.Query().Get("external")
+		external := ctx.Query("external")
 		tmdbId := ctx.Params.ByName("tmdbId")
 
 		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
@@ -384,7 +392,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Request.URL.Query().Get("external")
+		external := ctx.Query("external")
 		tmdbId := ctx.Params.ByName("tmdbId")
 
 		movie := tmdb.GetMovieById(tmdbId, "")

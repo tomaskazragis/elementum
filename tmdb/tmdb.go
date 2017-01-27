@@ -253,7 +253,7 @@ const (
 	burstRate               = 40
 	burstTime               = 15 * time.Second
 	simultaneousConnections = 20
-	cacheTime               = 60 * 24 * time.Hour
+	cacheTime               = 7 * 24 * time.Hour
 )
 
 var (
