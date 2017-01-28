@@ -152,7 +152,7 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 		item.Path = defaultURL
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.Id))}
-		if err := isDuplicateMovie(strconv.Itoa(movie.Id)); err != nil {
+		if _, err := isDuplicateMovie(strconv.Itoa(movie.Id)); err != nil {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.Id))}
 		}
 

@@ -158,25 +158,25 @@ func updateLibraryEpisodes(showId int) {
 //
 // Duplicate handling
 //
-func isDuplicateMovie(tmdbId string) error {
+func isDuplicateMovie(tmdbId string) (*tmdb.Movie, error) {
 	movie := tmdb.GetMovieById(tmdbId, "en")
 	if movie == nil || movie.IMDBId == "" {
-		return nil
+		return movie, nil
 	}
 	for _, existingMovie := range libraryMovies.Movies {
 		if existingMovie.IMDBNumber != "" {
 			if existingMovie.IMDBNumber == movie.IMDBId {
-				return errors.New(fmt.Sprintf("%s already in library", movie.Title))
+				return movie, errors.New(fmt.Sprintf("%s already in library", movie.Title))
 			}
 		}
 	}
-	return nil
+	return movie, nil
 }
 
-func isDuplicateShow(tmdbId string) error {
+func isDuplicateShow(tmdbId string) (*tmdb.Show, error) {
 	show := tmdb.GetShowById(tmdbId, "en")
 	if show == nil || show.ExternalIDs == nil {
-		return nil
+		return show, nil
 	}
 	var showId string
 	switch config.Get().TvScraper {
@@ -184,7 +184,7 @@ func isDuplicateShow(tmdbId string) error {
 		showId = tmdbId
 	case TVDBScraper:
 		if show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
-			return nil
+			return show, nil
 		}
 		showId = strconv.Itoa(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
 	case TraktScraper:
@@ -194,10 +194,10 @@ func isDuplicateShow(tmdbId string) error {
 	for _, existingShow := range libraryShows.Shows {
 		// TODO Aho-Corasick name matching to allow mixed scraper sources
 		if existingShow.ScraperID == showId {
-			return errors.New(fmt.Sprintf("%s already in library", show.Name))
+			return show, errors.New(fmt.Sprintf("%s already in library", show.Name))
 		}
 	}
-	return nil
+	return show, nil
 }
 
 func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) error {
@@ -322,14 +322,20 @@ func wasRemoved(id string, removedType int) (wasRemoved bool) {
 	DB.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte(bucket)).Cursor()
 		prefix := []byte(fmt.Sprintf("%d_", removedType))
-		suffix := []byte(fmt.Sprintf("_%s", id))
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix) && bytes.HasSuffix(k, suffix); k, _ = c.Next() {
-			wasRemoved = true
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			var item *DBItem
+			if err := json.Unmarshal(v, &item); err != nil {
+				return err
+			}
+			if item.ID == id {
+				wasRemoved = true
+				return nil
+			}
 			return nil
 		}
 		return nil
 	})
-	return wasRemoved
+	return
 }
 
 //
@@ -436,7 +442,7 @@ func syncMoviesList(listId string, updating bool) (err error) {
 			continue
 		}
 
-		if err := isDuplicateMovie(tmdbId); err != nil {
+		if _, err := isDuplicateMovie(tmdbId); err != nil {
 			if !updating {
 				libraryLog.Warning(err)
 			}
@@ -485,6 +491,9 @@ func writeMovieStrm(tmdbId string) (*tmdb.Movie, error) {
 	playLink := UrlForXBMC("/movie/%s/play", tmdbId)
 	if config.Get().ChooseStreamAuto == false {
 		playLink = strings.Replace(playLink, "/play", "/links", 1)
+	}
+	if _, err := os.Stat(movieStrmPath); err == nil {
+		return movie, errors.New(fmt.Sprintf("LOCALIZE[30287];;%s", movie.Title))
 	}
 	if err := ioutil.WriteFile(movieStrmPath, []byte(playLink), 0644); err != nil {
 		libraryLog.Error(err)
@@ -568,7 +577,7 @@ func syncShowsList(listId string, updating bool) (err error) {
 		}
 
 		if !updating {
-			if err := isDuplicateShow(tmdbId); err != nil {
+			if _, err := isDuplicateShow(tmdbId); err != nil {
 				libraryLog.Warning(err)
 				continue
 			}
@@ -664,6 +673,10 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 
 			episodeStrmPath := filepath.Join(showPath, fmt.Sprintf("%s S%02dE%02d.strm", showStrm, season.Season, episode.EpisodeNumber))
 			playLink := UrlForXBMC("/show/%d/season/%d/episode/%d/%s", Id, season.Season, episode.EpisodeNumber, playSuffix)
+			if _, err := os.Stat(episodeStrmPath); err == nil {
+				libraryLog.Warningf("%s already exists, skipping", episodeStrmPath)
+				continue
+			}
 			if err := ioutil.WriteFile(episodeStrmPath, []byte(playLink), 0644); err != nil {
 				libraryLog.Error(err)
 				return show, err
@@ -770,9 +783,9 @@ func AddMovie(ctx *gin.Context) {
 	}
 	tmdbId := ctx.Params.ByName("tmdbId")
 
-	if err := isDuplicateMovie(tmdbId); err != nil {
+	if movie, err := isDuplicateMovie(tmdbId); err != nil {
 		libraryLog.Warningf(err.Error())
-		xbmc.Notify("Quasar", "LOCALIZE[30265]", config.AddonIcon())
+		xbmc.Notify("Quasar", fmt.Sprintf("LOCALIZE[30287];;%s", movie.Title), config.AddonIcon())
 		return
 	}
 
@@ -831,9 +844,9 @@ func AddShow(ctx *gin.Context) {
 	label := "LOCALIZE[30277]"
 	logMsg := "%s (%s) added to library"
 	if merge == "false" {
-		if err := isDuplicateShow(tmdbId); err != nil {
+		if show, err := isDuplicateShow(tmdbId); err != nil {
 			libraryLog.Warning(err)
-			xbmc.Notify("Quasar", "LOCALIZE[30265]", config.AddonIcon())
+			xbmc.Notify("Quasar", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
 			return
 		}
 	} else {
@@ -1075,7 +1088,6 @@ func LibraryUpdate() {
 				}
 			}
 		case <- closing:
-			libraryLog.Info("Closing library...")
 			close(removedEpisodes)
 			return
 		}
@@ -1089,6 +1101,7 @@ func UpdateLibrary(ctx *gin.Context) {
 }
 
 func CloseLibrary() {
+	libraryLog.Info("Closing library...")
 	close(closing)
 }
 
