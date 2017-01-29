@@ -184,11 +184,16 @@ func isDuplicateShow(tmdbId string) (*tmdb.Show, error) {
 		showId = tmdbId
 	case TVDBScraper:
 		if show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
+			libraryLog.Warningf("No external IDs for TVDB show from TMDB ID %s", tmdbId)
 			return show, nil
 		}
 		showId = strconv.Itoa(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktShow := trakt.GetShowByTMDB(tmdbId)
+		if traktShow == nil || traktShow.IDs == nil || traktShow.IDs.Trakt == 0 {
+			libraryLog.Warningf("No external IDs from Trakt show for TMDB ID %s", tmdbId)
+			return show, nil
+		}
 		showId = strconv.Itoa(traktShow.IDs.Trakt)
 	}
 	for _, existingShow := range libraryShows.Shows {
@@ -202,8 +207,9 @@ func isDuplicateShow(tmdbId string) (*tmdb.Show, error) {
 
 func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) error {
 	episode := tmdb.GetEpisode(tmdbShowId, seasonNumber, episodeNumber, "en")
+	noExternalIDs := fmt.Sprintf("No external IDs found for S%02dE%02d (%d)", seasonNumber, episodeNumber, tmdbShowId)
 	if episode == nil || episode.ExternalIDs == nil {
-		libraryLog.Warningf("No external IDs found for S%02dE%02d (%d)", seasonNumber, episodeNumber, tmdbShowId)
+		libraryLog.Warning(noExternalIDs)
 		return nil
 	}
 
@@ -215,6 +221,10 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 		episodeId = strconv.Itoa(util.StrInterfaceToInt(episode.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktEpisode := trakt.GetEpisodeByTMDB(episodeId)
+		if traktEpisode == nil || traktEpisode.IDs == nil || traktEpisode.IDs.Trakt == 0 {
+			libraryLog.Warning(noExternalIDs + " from Trakt episode")
+			return nil
+		}
 		episodeId = strconv.Itoa(traktEpisode.IDs.Trakt)
 	}
 
@@ -225,11 +235,16 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 	case TVDBScraper:
 		show := tmdb.GetShowById(strconv.Itoa(tmdbShowId), "en")
 		if show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
+			libraryLog.Warning(noExternalIDs + " for TVDB show")
 			return nil
 		}
 		showId = strconv.Itoa(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktShow := trakt.GetShowByTMDB(strconv.Itoa(tmdbShowId))
+		if traktShow == nil || traktShow.IDs == nil || traktShow.IDs.Trakt == 0 {
+			libraryLog.Warning(noExternalIDs + " from Trakt show")
+			return nil
+		}
 		showId = strconv.Itoa(traktShow.IDs.Trakt)
 	}
 
