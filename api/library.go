@@ -1092,6 +1092,10 @@ func LibraryUpdate() {
 				if err := doUpdateLibrary(); err != nil {
 					libraryLog.Warning(err)
 				}
+				if config.Get().UpdateAutoScan && scanning == false {
+					scanning = true
+					xbmc.VideoLibraryScan()
+				}
 			}
 		}()
 	}
