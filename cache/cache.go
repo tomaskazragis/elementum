@@ -52,7 +52,12 @@ type cachedWriter struct {
 }
 
 func cacheKey(prefix string, u string) string {
-	return prefix + "." + util.ToFileName(strings.Replace(strings.Replace(strings.Trim(u, "/"), "/", ".", -1), "=", ".", -1))
+	u = strings.Trim(u, "/")
+	dotted := []string{"/", "=", "?", "&"}
+	for _, dottedChar := range dotted {
+		u = strings.Replace(u, dottedChar, ".", -1)
+	}
+	return prefix + "." + util.ToFileName(u)
 }
 
 func newCachedWriter(store CacheStore, expire time.Duration, writer gin.ResponseWriter, key string) *cachedWriter {
