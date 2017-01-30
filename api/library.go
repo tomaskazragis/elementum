@@ -155,6 +155,9 @@ func isDuplicateMovie(tmdbId string) (*tmdb.Movie, error) {
 	if movie == nil || movie.IMDBId == "" {
 		return movie, nil
 	}
+	if libraryMovies == nil {
+		return movie, nil
+	}
 	for _, existingMovie := range libraryMovies.Movies {
 		if existingMovie.IMDBNumber != "" {
 			if existingMovie.IMDBNumber == movie.IMDBId {
@@ -188,6 +191,9 @@ func isDuplicateShow(tmdbId string) (*tmdb.Show, error) {
 		}
 		showId = strconv.Itoa(traktShow.IDs.Trakt)
 	}
+	if libraryShows == nil {
+		return show, nil
+	}
 	for _, existingShow := range libraryShows.Shows {
 		// TODO Aho-Corasick name matching to allow mixed scraper sources
 		if existingShow.ScraperID == showId {
@@ -210,6 +216,10 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 	case TMDBScraper:
 		break
 	case TVDBScraper:
+		if episode.ExternalIDs == nil || episode.ExternalIDs.TVDBID == nil {
+			libraryLog.Warningf(noExternalIDs)
+			return nil
+		}
 		episodeId = strconv.Itoa(util.StrInterfaceToInt(episode.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktEpisode := trakt.GetEpisodeByTMDB(episodeId)
@@ -241,6 +251,9 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 	}
 
 	var tvshowId int
+	if libraryShows == nil {
+		return nil
+	}
 	for _, existingShow := range libraryShows.Shows {
 		if existingShow.ScraperID == showId {
 			tvshowId = existingShow.ID
@@ -251,6 +264,9 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 		return nil
 	}
 
+	if libraryEpisodes == nil {
+		return nil
+	}
 	if episodes, exists := libraryEpisodes[tvshowId]; exists {
 		for _, existingEpisode := range episodes.Episodes {
 			if existingEpisode.UniqueIDs.ID == episodeId ||
