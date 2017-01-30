@@ -155,7 +155,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause/%d", i))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause"))}
 
-			if torrentStatus.GetPaused() {
+			if torrentStatus.GetPaused() && status != "Finished" {
 				status = "Paused"
 				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume/%d", i))}
 			}
@@ -207,7 +207,7 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			progress := float64(torrentStatus.GetProgress()) * 100
 
 			status := bittorrent.StatusStrings[int(torrentStatus.GetState())]
-			if torrentStatus.GetPaused() {
+			if torrentStatus.GetPaused() && status != "Finished" {
 				status = "Paused"
 			}
 			if btService.Session.GetHandle().IsPaused() {
@@ -472,7 +472,7 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 		}
 
-		if config.Get().KeepFilesAfterStop == false || askedToDelete == true || deleteFiles != "" {
+		if config.Get().KeepFilesAfterStop == false || askedToDelete == true || deleteFiles == "true" {
 			torrentsLog.Info("Removing the torrent and deleting files...")
 			btService.Session.GetHandle().RemoveTorrent(torrentHandle, int(libtorrent.SessionHandleDeleteFiles))
 		} else {

@@ -303,11 +303,20 @@ func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
 	hasNextPage := 0
 	if page > 0 {
 		hasNextPage = 1
+
+		resultsPerPage := config.Get().ResultsPerPage
+		if len(movies) > resultsPerPage {
+			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
+			movies = movies[start:start + resultsPerPage]
+		}
 	}
 
 	items := make(xbmc.ListItems, 0, len(movies) + hasNextPage)
 
 	for _, movieListing := range movies {
+		if movieListing == nil {
+			continue
+		}
     movie := movieListing.Movie
 		if movie == nil {
 			continue
@@ -443,11 +452,20 @@ func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
 	hasNextPage := 0
 	if page > 0 {
 		hasNextPage = 1
+
+		resultsPerPage := config.Get().ResultsPerPage
+		if len(shows) >= resultsPerPage {
+			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
+			shows = shows[start:start + resultsPerPage]
+		}
 	}
 
 	items := make(xbmc.ListItems, 0, len(shows) + hasNextPage)
 
 	for _, showListing := range shows {
+		if showListing == nil {
+			continue
+		}
     show := showListing.Show
 		if show == nil {
 			continue

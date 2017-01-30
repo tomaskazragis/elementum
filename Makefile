@@ -113,7 +113,9 @@ $(BUILD_PATH)/$(OUTPUT_NAME): $(BUILD_PATH) force
 		-gcflags '$(GO_GCFLAGS)' \
 		-ldflags '$(GO_LDFLAGS)' \
 		-o '$(BUILD_PATH)/$(OUTPUT_NAME)' \
-		$(PKGDIR)
+		$(PKGDIR) && \
+	set -x && \
+	$(GO) tool vet -unsafeptr=false .
 
 vendor_darwin vendor_linux:
 

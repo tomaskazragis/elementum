@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	MaxPages  = 20
-	startPage = 1
-	resultsPerPage = 20
+	PagesAtOnce    = 5
+	ResultsPerPage = 20
 )
 
 var (
@@ -251,9 +250,10 @@ const (
 	tmdbEndpoint            = "https://api.themoviedb.org/3/"
 	imageEndpoint           = "http://image.tmdb.org/t/p/"
 	burstRate               = 40
-	burstTime               = 15 * time.Second
+	burstTime               = 20 * time.Second
 	simultaneousConnections = 20
-	cacheTime               = 7 * 24 * time.Hour
+	cacheExpiration         = 6 * 24 * time.Hour
+	imagesCacheExpiration   = 14 * 24 * time.Hour
 )
 
 var (
@@ -328,19 +328,21 @@ func ImageURL(uri string, size string) string {
 	return imageEndpoint + size + uri
 }
 
+// TODO Unused...
 func ListEntities(endpoint string, params napping.Params) []*Entity {
 	var wg sync.WaitGroup
-	entities := make([]*Entity, MaxPages * resultsPerPage)
+	resultsPerPage := config.Get().ResultsPerPage
+	entities := make([]*Entity, PagesAtOnce * resultsPerPage)
 	params["api_key"] = apiKey
 	params["language"] = "en"
 
-	wg.Add(MaxPages)
-	for i := 0; i < MaxPages; i++ {
+	wg.Add(PagesAtOnce)
+	for i := 0; i < PagesAtOnce; i++ {
 		go func(page int) {
 			defer wg.Done()
 			var tmp *EntityList
 			tmpParams := napping.Params{
-				"page": strconv.Itoa(startPage + page),
+				"page": strconv.Itoa(page),
 			}
 			for k, v := range params {
 				tmpParams[k] = v
@@ -355,9 +357,9 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 				)
 				if err != nil {
 					log.Error(err.Error())
-					xbmc.Notify("Quasar", "ListEntities failed, check your logs.", config.AddonIcon())
+					xbmc.Notify("Quasar", "Failed listing entities, check your logs.", config.AddonIcon())
 				} else if resp.Status() != 200 {
-					message := fmt.Sprintf("ListEntities bad status: %d", resp.Status())
+					message := fmt.Sprintf("Bad status listing entities: %d", resp.Status())
 					log.Error(message)
 					xbmc.Notify("Quasar", message, config.AddonIcon())
 				}
@@ -372,6 +374,7 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 	return entities
 }
 
+// TODO Actually use this somewhere?
 func Find(externalId string, externalSource string) *FindResult {
 	var result *FindResult
 
@@ -397,7 +400,7 @@ func Find(externalId string, externalSource string) *FindResult {
 				log.Error(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
-			cacheStore.Set(key, result, 365 * 24 * time.Hour)
+			cacheStore.Set(key, result, 15 * time.Minute)
 		})
 	}
 

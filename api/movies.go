@@ -127,6 +127,12 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 	nextPage := 0
 	if page >= 0 {
 		nextPage = 1
+
+		resultsPerPage := config.Get().ResultsPerPage
+		if len(movies) >= resultsPerPage {
+			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
+			movies = movies[start:start + resultsPerPage]
+		}
 	}
 	items := make(xbmc.ListItems, 0, len(movies) + nextPage)
 	for _, movie := range movies {
@@ -200,7 +206,7 @@ func PopularMovies(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.PopularMovies(genre, config.Get().Language, page), ctx, page, "")
 }
 
@@ -209,7 +215,7 @@ func RecentMovies(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.RecentMovies(genre, config.Get().Language, page), ctx, page, "")
 }
 
@@ -218,17 +224,17 @@ func TopRatedMovies(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.TopRatedMovies(genre, config.Get().Language, page), ctx, page, "")
 }
 
 func IMDBTop250(ctx *gin.Context) {
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
-	renderMovies(tmdb.GetList("522effe419c2955e9922fcf3", config.Get().Language, page), ctx, page, "")
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	renderMovies(tmdb.GetIMDBList("522effe419c2955e9922fcf3", config.Get().Language, page), ctx, page, "")
 }
 
 func MoviesMostVoted(ctx *gin.Context) {
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.MostVotedMovies("", config.Get().Language, page), ctx, page, "")
 }
 
@@ -250,7 +256,7 @@ func SearchMovies(ctx *gin.Context) {
 	if query == "" {
 		return
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.SearchMovies(query, config.Get().Language, page), ctx, page, query)
 }
 

@@ -23,7 +23,7 @@ const (
 	burstRate               = 30
 	burstTime               = 1 * time.Second
 	simultaneousConnections = 20
-	cacheTime               = 2 * time.Hour
+	cacheExpiration         = 2 * time.Hour
 )
 
 type SeasonList []*Season
@@ -203,7 +203,7 @@ func GetShow(tvdbId int, language string) (*Show, error) {
 			return nil, err
 		}
 		if newShow != nil {
-			cacheStore.Set(key, newShow, cacheTime)
+			cacheStore.Set(key, newShow, cacheExpiration)
 		}
 		show = newShow
 	}

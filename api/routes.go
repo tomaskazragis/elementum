@@ -18,11 +18,10 @@ import (
 )
 
 const (
-	DefaultCacheTime    = 6 * time.Hour
-	EpisodesCacheTime   = 15 * time.Minute
-	RepositoryCacheTime = 20 * time.Minute
-	RecentCacheTime     = 30 * time.Minute
-	IndexCacheTime      = 15 * 24 * time.Hour // 15 days caching for index
+	DefaultCacheExpiration    = 6 * time.Hour
+	RecentCacheExpiration     = 5 * time.Minute
+	RepositoryCacheExpiration = 20 * time.Minute
+	IndexCacheExpiration      = 15 * 24 * time.Hour // 15 days caching for index
 )
 
 func Routes(btService *bittorrent.BTService) *gin.Engine {
@@ -64,31 +63,31 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	movies := r.Group("/movies")
 	{
-		movies.GET("/", cache.Cache(store, IndexCacheTime), MoviesIndex)
+		movies.GET("/", cache.Cache(store, IndexCacheExpiration), MoviesIndex)
 		movies.GET("/search", SearchMovies)
-		movies.GET("/popular", cache.Cache(store, RecentCacheTime), PopularMovies)
-		movies.GET("/popular/:genre", cache.Cache(store, RecentCacheTime), PopularMovies)
-		movies.GET("/recent", cache.Cache(store, RecentCacheTime), RecentMovies)
-		movies.GET("/recent/:genre", cache.Cache(store, RecentCacheTime), RecentMovies)
-		movies.GET("/top", cache.Cache(store, DefaultCacheTime), TopRatedMovies)
-		movies.GET("/imdb250", cache.Cache(store, DefaultCacheTime), IMDBTop250)
-		movies.GET("/mostvoted", cache.Cache(store, DefaultCacheTime), MoviesMostVoted)
-		movies.GET("/genres", cache.Cache(store, IndexCacheTime), MovieGenres)
+		movies.GET("/popular", cache.Cache(store, RecentCacheExpiration), PopularMovies)
+		movies.GET("/popular/:genre", cache.Cache(store, RecentCacheExpiration), PopularMovies)
+		movies.GET("/recent", cache.Cache(store, RecentCacheExpiration), RecentMovies)
+		movies.GET("/recent/:genre", cache.Cache(store, RecentCacheExpiration), RecentMovies)
+		movies.GET("/top", cache.Cache(store, DefaultCacheExpiration), TopRatedMovies)
+		movies.GET("/imdb250", cache.Cache(store, DefaultCacheExpiration), IMDBTop250)
+		movies.GET("/mostvoted", cache.Cache(store, DefaultCacheExpiration), MoviesMostVoted)
+		movies.GET("/genres", cache.Cache(store, IndexCacheExpiration), MovieGenres)
 
 		trakt := movies.Group("/trakt")
 		{
-			trakt.GET("/", cache.Cache(store, IndexCacheTime), MoviesTrakt)
-			trakt.GET("/popular", cache.Cache(store, DefaultCacheTime), TraktPopularMovies)
-			trakt.GET("/trending", cache.Cache(store, RecentCacheTime), TraktTrendingMovies)
-			trakt.GET("/played", cache.Cache(store, DefaultCacheTime), TraktMostPlayedMovies)
-			trakt.GET("/watched", cache.Cache(store, DefaultCacheTime), TraktMostWatchedMovies)
-			trakt.GET("/collected", cache.Cache(store, DefaultCacheTime), TraktMostCollectedMovies)
-			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheTime), TraktMostAnticipatedMovies)
-			trakt.GET("/boxoffice", cache.Cache(store, DefaultCacheTime), TraktBoxOffice)
+			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), MoviesTrakt)
+			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularMovies)
+			trakt.GET("/trending", cache.Cache(store, RecentCacheExpiration), TraktTrendingMovies)
+			trakt.GET("/played", cache.Cache(store, DefaultCacheExpiration), TraktMostPlayedMovies)
+			trakt.GET("/watched", cache.Cache(store, DefaultCacheExpiration), TraktMostWatchedMovies)
+			trakt.GET("/collected", cache.Cache(store, DefaultCacheExpiration), TraktMostCollectedMovies)
+			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheExpiration), TraktMostAnticipatedMovies)
+			trakt.GET("/boxoffice", cache.Cache(store, DefaultCacheExpiration), TraktBoxOffice)
 
 			lists := trakt.Group("/lists")
 			{
-				lists.GET("/", cache.Cache(store, RecentCacheTime), MoviesTraktLists)
+				lists.GET("/", cache.Cache(store, RecentCacheExpiration), MoviesTraktLists)
 				lists.GET("/watchlist", WatchlistMovies)
 				lists.GET("/collection", CollectionMovies)
 				lists.GET("/id/:listId", UserlistMovies)
@@ -107,31 +106,31 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	shows := r.Group("/shows")
 	{
-		shows.GET("/", cache.Cache(store, IndexCacheTime), TVIndex)
+		shows.GET("/", cache.Cache(store, IndexCacheExpiration), TVIndex)
 		shows.GET("/search", SearchShows)
-		shows.GET("/popular", cache.Cache(store, RecentCacheTime), PopularShows)
-		shows.GET("/popular/:genre", cache.Cache(store, RecentCacheTime), PopularShows)
-		shows.GET("/recent/shows", cache.Cache(store, DefaultCacheTime), RecentShows)
-		shows.GET("/recent/shows/:genre", cache.Cache(store, DefaultCacheTime), RecentShows)
-		shows.GET("/recent/episodes", cache.Cache(store, EpisodesCacheTime), RecentEpisodes)
-		shows.GET("/recent/episodes/:genre", cache.Cache(store, EpisodesCacheTime), RecentEpisodes)
-		shows.GET("/top", cache.Cache(store, DefaultCacheTime), TopRatedShows)
-		shows.GET("/mostvoted", cache.Cache(store, DefaultCacheTime), TVMostVoted)
-		shows.GET("/genres", cache.Cache(store, IndexCacheTime), TVGenres)
+		shows.GET("/popular", cache.Cache(store, RecentCacheExpiration), PopularShows)
+		shows.GET("/popular/:genre", cache.Cache(store, RecentCacheExpiration), PopularShows)
+		shows.GET("/recent/shows", cache.Cache(store, DefaultCacheExpiration), RecentShows)
+		shows.GET("/recent/shows/:genre", cache.Cache(store, DefaultCacheExpiration), RecentShows)
+		shows.GET("/recent/episodes", cache.Cache(store, RecentCacheExpiration), RecentEpisodes)
+		shows.GET("/recent/episodes/:genre", cache.Cache(store, RecentCacheExpiration), RecentEpisodes)
+		shows.GET("/top", cache.Cache(store, DefaultCacheExpiration), TopRatedShows)
+		shows.GET("/mostvoted", cache.Cache(store, DefaultCacheExpiration), TVMostVoted)
+		shows.GET("/genres", cache.Cache(store, IndexCacheExpiration), TVGenres)
 
 		trakt := shows.Group("/trakt")
 		{
-			trakt.GET("/", cache.Cache(store, IndexCacheTime), TVTrakt)
-			trakt.GET("/popular", cache.Cache(store, DefaultCacheTime), TraktPopularShows)
-			trakt.GET("/trending", cache.Cache(store, RecentCacheTime), TraktTrendingShows)
-			trakt.GET("/played", cache.Cache(store, DefaultCacheTime), TraktMostPlayedShows)
-			trakt.GET("/watched", cache.Cache(store, DefaultCacheTime), TraktMostWatchedShows)
-			trakt.GET("/collected", cache.Cache(store, DefaultCacheTime), TraktMostCollectedShows)
-			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheTime), TraktMostAnticipatedShows)
+			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), TVTrakt)
+			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularShows)
+			trakt.GET("/trending", cache.Cache(store, RecentCacheExpiration), TraktTrendingShows)
+			trakt.GET("/played", cache.Cache(store, DefaultCacheExpiration), TraktMostPlayedShows)
+			trakt.GET("/watched", cache.Cache(store, DefaultCacheExpiration), TraktMostWatchedShows)
+			trakt.GET("/collected", cache.Cache(store, DefaultCacheExpiration), TraktMostCollectedShows)
+			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheExpiration), TraktMostAnticipatedShows)
 
 			lists := trakt.Group("/lists")
 			{
-				lists.GET("/", cache.Cache(store, RecentCacheTime), TVTraktLists)
+				lists.GET("/", cache.Cache(store, RecentCacheExpiration), TVTraktLists)
 				lists.GET("/watchlist", WatchlistShows)
 				lists.GET("/collection", CollectionShows)
 				lists.GET("/id/:listId", UserlistShows)
@@ -140,9 +139,9 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	}
 	show := r.Group("/show")
 	{
-		show.GET("/:showId/seasons", cache.Cache(store, DefaultCacheTime), ShowSeasons)
+		show.GET("/:showId/seasons", cache.Cache(store, DefaultCacheExpiration), ShowSeasons)
 		show.GET("/:showId/season/:season/links", ShowSeasonLinks(btService))
-		show.GET("/:showId/season/:season/episodes", cache.Cache(store, EpisodesCacheTime), ShowEpisodes)
+		show.GET("/:showId/season/:season/episodes", cache.Cache(store, RecentCacheExpiration), ShowEpisodes)
 		show.GET("/:showId/season/:season/episode/:episode/play", ShowEpisodePlay(btService))
 		show.GET("/:showId/season/:season/episode/:episode/links", ShowEpisodeLinks(btService))
 		show.GET("/:showId/watchlist/add", AddShowToWatchlist)

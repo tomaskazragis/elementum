@@ -79,18 +79,10 @@ type removedEpisode struct {
 
 func clearPageCache(ctx *gin.Context) {
 	ctx.Abort()
-	files, _ := filepath.Glob(filepath.Join(config.Get().Info.Profile, "cache", "quasar.page.cache:*"))
+	files, _ := filepath.Glob(filepath.Join(config.Get().Info.Profile, "cache", "page.*"))
 	for _, file := range files {
 		os.Remove(file)
 	}
-}
-
-func toFileName(filename string) string {
-	reserved := []string{"<", ">", ":", "\"", "/", "\\", "|", "?", "*", "%", "+"}
-	for _, reservedchar := range reserved {
-		filename = strings.Replace(filename, reservedchar, "", -1)
-	}
-	return filename
 }
 
 //
@@ -491,7 +483,7 @@ func writeMovieStrm(tmdbId string) (*tmdb.Movie, error) {
 		return movie, errors.New(fmt.Sprintf("Unable to get movie (%s)", tmdbId))
 	}
 
-	movieStrm := toFileName(fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0]))
+	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0]))
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); os.IsNotExist(err) {
@@ -524,7 +516,7 @@ func removeMovie(tmdbId string) error {
 	}
 	movie := tmdb.GetMovieById(tmdbId, "en")
 	movieName := fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0])
-	movieStrm := toFileName(movieName)
+	movieStrm := util.ToFileName(movieName)
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); err != nil {
@@ -625,7 +617,7 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 	if show == nil {
 		return nil, errors.New(fmt.Sprintf("Unable to get show (%s)", showId))
 	}
-	showStrm := toFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
 	playSuffix := "play"
 	if config.Get().ChooseStreamAuto == false {
@@ -718,7 +710,7 @@ func removeShow(tmdbId string) error {
 		return errors.New("Unable to find show to remove")
 	}
 
-	showStrm := toFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); err != nil {
@@ -756,7 +748,7 @@ func removeEpisode(tmdbId string, showId string, scraperId string, seasonNumber 
 		return errors.New("Unable to find show to remove episode")
 	}
 
-	showPath := toFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+	showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
 	episodeStrm := fmt.Sprintf("%s S%02dE%02d.strm", showPath, seasonNumber, episodeNumber)
 	episodePath := filepath.Join(showsLibraryPath, showPath, episodeStrm)
 
@@ -976,6 +968,21 @@ func LibraryUpdate() {
 		time.Sleep(5 * time.Second)
 		updateLibraryMovies()
 		updateLibraryShows()
+	}()
+
+	// Start warming caches by pre-fetching popular/trending lists
+	go func() {
+		libraryLog.Notice("Warming up caches...")
+		language := config.Get().Language
+		tmdb.PopularMovies("", language, 1)
+		tmdb.PopularShows("", language, 1)
+		if _, err := trakt.TopMovies("trending", "1"); err != nil {
+			libraryLog.Warning(err)
+		}
+		if _, err := trakt.TopShows("trending", "1"); err != nil {
+			libraryLog.Warning(err)
+		}
+		libraryLog.Notice("Caches warmed up")
 	}()
 
 	// Removed episodes debouncer

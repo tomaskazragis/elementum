@@ -88,13 +88,13 @@ func (c *FileStore) Delete(key string) error {
 }
 
 func (c *FileStore) Increment(key string, delta uint64) (uint64, error) {
-	return 0, ErrNotSupport
+	return 0, errNotSupported
 }
 
 func (c *FileStore) Decrement(key string, delta uint64) (uint64, error) {
-	return 0, ErrNotSupport
+	return 0, errNotSupported
 }
 
 func (c *FileStore) Flush() error {
-	return ErrNotSupport
+	return errNotSupported
 }

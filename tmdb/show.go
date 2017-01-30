@@ -41,13 +41,13 @@ func GetShowImages(showId int) *Images {
 				nil,
 			)
 			if err != nil {
-				log.Error(err.Error())
-				xbmc.Notify("Quasar", "GetImages failed, check your logs.", config.AddonIcon())
+				log.Error(err)
+				xbmc.Notify("Quasar", "Failed getting images, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				log.Warningf("Bad status in GetImages for %d: %d", showId, resp.Status())
+				log.Warningf("Bad status getting images for %d: %d", showId, resp.Status())
 			}
 			if images != nil {
-				cacheStore.Set(key, images, cacheTime)
+				cacheStore.Set(key, images, imagesCacheExpiration)
 			}
 		})
 	}
@@ -85,18 +85,18 @@ func GetShow(showId int, language string) (show *Show) {
 					case *json.InvalidUnmarshalError:
 						log.Errorf("InvalidUnmarshalError: Type[%v]", e.Type)
 					default:
-						log.Error(err.Error())
+						log.Error(err)
 				}
 				LogError(err)
-				xbmc.Notify("Quasar", "GetShow failed, check your logs.", config.AddonIcon())
+				xbmc.Notify("Quasar", "Failed getting show, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status in GetShow for %d: %d", showId, resp.Status())
+				message := fmt.Sprintf("Bad status getting show for %d: %d", showId, resp.Status())
 				log.Warning(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
 		})
 		if show != nil {
-			cacheStore.Set(key, show, cacheTime)
+			cacheStore.Set(key, show, cacheExpiration)
 		}
 	}
 	if show == nil {
@@ -135,7 +135,7 @@ func SearchShows(query string, language string, page int) Shows {
 		urlValues := napping.Params{
 			"api_key": apiKey,
 			"query": query,
-			"page": strconv.Itoa(startPage + page),
+			"page": strconv.Itoa(page),
 		}.AsUrlValues()
 		resp, err := napping.Get(
 			tmdbEndpoint + "search/tv",
@@ -144,10 +144,10 @@ func SearchShows(query string, language string, page int) Shows {
 			nil,
 		)
 		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "SearchShows failed, check your logs.", config.AddonIcon())
+			log.Error(err)
+			xbmc.Notify("Quasar", "Failed searching shows check your logs.", config.AddonIcon())
 		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("SearchShows bad status: %d", resp.Status())
+			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
 			log.Error(message)
 			xbmc.Notify("Quasar", message, config.AddonIcon())
 		}
@@ -159,33 +159,62 @@ func SearchShows(query string, language string, page int) Shows {
 	return GetShows(tmdbIds, language)
 }
 
-func ListShows(endpoint string, params napping.Params, page int) (shows Shows) {
-	var results *EntityList
-
-	params["page"] = strconv.Itoa(startPage + page)
+func listShows(endpoint string, cacheKey string, params napping.Params, page int) Shows {
 	params["api_key"] = apiKey
-	p := params.AsUrlValues()
+	genre := params["with_genres"]
+	if params["with_genres"] == "" {
+		genre = "all"
+	}
+	limit := ResultsPerPage * PagesAtOnce
+	pageGroup := (page - 1) * ResultsPerPage / limit + 1
 
-	rateLimiter.Call(func() {
-		resp, err := napping.Get(
-			tmdbEndpoint + endpoint,
-			&p,
-			&results,
-			nil,
-		)
-		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "ListShows failed, check your logs.", config.AddonIcon())
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("ListShows bad status: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+	shows := make(Shows, limit)
+
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.tmdb.topshows.%s.%s.%d", cacheKey, genre, pageGroup)
+	if err := cacheStore.Get(key, &shows); err != nil {
+		wg := sync.WaitGroup{}
+		for p := 0; p < PagesAtOnce; p++ {
+			wg.Add(1)
+			currentPage := (pageGroup - 1) * ResultsPerPage + p + 1
+			go func(p int) {
+				defer wg.Done()
+				var results *EntityList
+				pageParams := napping.Params{
+					"page": strconv.Itoa(currentPage),
+				}
+				for k, v := range params {
+					pageParams[k] = v
+				}
+				urlParams := pageParams.AsUrlValues()
+				rateLimiter.Call(func() {
+					resp, err := napping.Get(
+						tmdbEndpoint + endpoint,
+						&urlParams,
+						&results,
+						nil,
+					)
+					if err != nil {
+						log.Error(err)
+						xbmc.Notify("Quasar", "Failed while listing shows, check your logs.", config.AddonIcon())
+					} else if resp.Status() != 200 {
+						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
+						log.Error(message)
+						xbmc.Notify("Quasar", message, config.AddonIcon())
+					}
+				})
+				if results != nil {
+					for s, show := range results.Results {
+						if s >= ResultsPerPage - 1 {
+							break
+						}
+						shows[p * ResultsPerPage + s] = GetShow(show.Id, params["language"])
+					}
+				}
+			}(p)
 		}
-	})
-	if results != nil {
-		for _, show := range results.Results {
-			shows = append(shows, GetShow(show.Id, params["language"]))
-		}
+		wg.Wait()
+		cacheStore.Set(key, shows, 15 * time.Minute)
 	}
 	return shows
 }
@@ -206,7 +235,7 @@ func PopularShows(genre string, language string, page int) Shows {
 			"with_genres":        genre,
 		}
 	}
-	return ListShows("discover/tv", p, page)
+	return listShows("discover/tv", "popular", p, page)
 }
 
 func RecentShows(genre string, language string, page int) Shows {
@@ -225,7 +254,7 @@ func RecentShows(genre string, language string, page int) Shows {
 			"with_genres":        genre,
 		}
 	}
-	return ListShows("discover/tv", p, page)
+	return listShows("discover/tv", "recent.shows", p, page)
 }
 
 func RecentEpisodes(genre string, language string, page int) Shows {
@@ -245,15 +274,15 @@ func RecentEpisodes(genre string, language string, page int) Shows {
 			"with_genres":        genre,
 		}
 	}
-	return ListShows("discover/tv", p, page)
+	return listShows("discover/tv", "recent.episodes", p, page)
 }
 
 func TopRatedShows(genre string, language string, page int) Shows {
-	return ListShows("tv/top_rated", napping.Params{"language": language}, page)
+	return listShows("tv/top_rated", "toprated", napping.Params{"language": language}, page)
 }
 
 func MostVotedShows(genre string, language string, page int) Shows {
-	return ListShows("discover/tv", napping.Params{
+	return listShows("discover/tv", "mostvoted", napping.Params{
 		"language":           language,
 		"sort_by":            "vote_count.desc",
 		"first_air_date.lte": time.Now().UTC().Format("2006-01-02"),
@@ -263,26 +292,34 @@ func MostVotedShows(genre string, language string, page int) Shows {
 
 func GetTVGenres(language string) []*Genre {
 	genres := GenreList{}
-	rateLimiter.Call(func() {
-		urlValues := napping.Params{
-			"api_key": apiKey,
-			"language": language,
-		}.AsUrlValues()
-		resp, err := napping.Get(
-			tmdbEndpoint + "genre/tv/list",
-			&urlValues,
-			&genres,
-			nil,
-		)
-		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "GetTVGenres failed, check your logs.", config.AddonIcon())
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("GetTVGenres bad status: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.tmdb.genres.shows.%s", language)
+	if err := cacheStore.Get(key, &genres); err != nil {
+		rateLimiter.Call(func() {
+			urlValues := napping.Params{
+				"api_key": apiKey,
+				"language": language,
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint + "genre/tv/list",
+				&urlValues,
+				&genres,
+				nil,
+			)
+			if err != nil {
+				log.Error(err)
+				xbmc.Notify("Quasar", "Failed getting TV genres, check your logs.", config.AddonIcon())
+			} else if resp.Status() != 200 {
+				message := fmt.Sprintf("Bad status getting TV genres: %d", resp.Status())
+				log.Error(message)
+				xbmc.Notify("Quasar", message, config.AddonIcon())
+			}
+		})
+		if genres.Genres != nil && len(genres.Genres) > 0 {
+			cacheStore.Set(key, genres, cacheExpiration)
 		}
-	})
+	}
 	return genres.Genres
 }
 

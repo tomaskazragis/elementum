@@ -38,13 +38,13 @@ func GetImages(movieId int) *Images {
 				nil,
 			)
 			if err != nil {
-				log.Error(err.Error())
-				xbmc.Notify("Quasar", "GetImages failed, check your logs.", config.AddonIcon())
+				log.Error(err)
+				xbmc.Notify("Quasar", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieId), config.AddonIcon())
 			} else if resp.Status() != 200 {
-				log.Warningf("Bad status in GetImages for %d: %d", movieId, resp.Status())
+				log.Warningf("Bad status getting images for %d: %d", movieId, resp.Status())
 			}
 			if images != nil {
-				cacheStore.Set(key, images, cacheTime)
+				cacheStore.Set(key, images, imagesCacheExpiration)
 			}
 		})
 	}
@@ -73,15 +73,15 @@ func GetMovieById(movieId string, language string) *Movie {
 				nil,
 			)
 			if err != nil {
-				log.Error(err.Error())
-				xbmc.Notify("Quasar", "GetMovie failed, check your logs.", config.AddonIcon())
+				log.Error(err)
+				xbmc.Notify("Quasar", fmt.Sprintf("Failed getting movie %s, check your logs.", movieId), config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status in GetMovie for %s: %d", movieId, resp.Status())
+				message := fmt.Sprintf("Bad status getting movie %s: %d", movieId, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
 			if movie != nil {
-				cacheStore.Set(key, movie, cacheTime)
+				cacheStore.Set(key, movie, cacheExpiration)
 			}
 		})
 	}
@@ -114,26 +114,34 @@ func GetMovies(tmdbIds []int, language string) Movies {
 
 func GetMovieGenres(language string) []*Genre {
 	genres := GenreList{}
-	rateLimiter.Call(func() {
-		urlValues := napping.Params{
-			"api_key": apiKey,
-			"language": language,
-		}.AsUrlValues()
-		resp, err := napping.Get(
-			tmdbEndpoint + "genre/movie/list",
-			&urlValues,
-			&genres,
-			nil,
-		)
-		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "GetMovieGenres failed, check your logs.", config.AddonIcon())
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("GetMovieGenres bad status: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.tmdb.genres.movies.%s", language)
+	if err := cacheStore.Get(key, &genres); err != nil {
+		rateLimiter.Call(func() {
+			urlValues := napping.Params{
+				"api_key": apiKey,
+				"language": language,
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint + "genre/movie/list",
+				&urlValues,
+				&genres,
+				nil,
+			)
+			if err != nil {
+				log.Error(err)
+				xbmc.Notify("Quasar", "Failed getting movie genres, check your logs.", config.AddonIcon())
+			} else if resp.Status() != 200 {
+				message := fmt.Sprintf("Bad status getting movie genres: %d", resp.Status())
+				log.Error(message)
+				xbmc.Notify("Quasar", message, config.AddonIcon())
+			}
+		})
+		if genres.Genres != nil && len(genres.Genres) > 0 {
+			cacheStore.Set(key, genres, cacheExpiration)
 		}
-	})
+	}
 	return genres.Genres
 }
 
@@ -144,7 +152,7 @@ func SearchMovies(query string, language string, page int) Movies {
 		urlValues := napping.Params{
 			"api_key": apiKey,
 			"query": query,
-			"page": strconv.Itoa(startPage + page),
+			"page": strconv.Itoa(page),
 		}.AsUrlValues()
 		resp, err := napping.Get(
 			tmdbEndpoint + "search/movie",
@@ -153,10 +161,10 @@ func SearchMovies(query string, language string, page int) Movies {
 			nil,
 		)
 		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "SearchMovies failed, check your logs.", config.AddonIcon())
+			log.Error(err)
+			xbmc.Notify("Quasar", "Failed searching movies, check your logs.", config.AddonIcon())
 		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("SearchMovies bad status: %d", resp.Status())
+			message := fmt.Sprintf("Bad status searching movies: %d", resp.Status())
 			log.Error(message)
 			xbmc.Notify("Quasar", message, config.AddonIcon())
 		}
@@ -168,69 +176,106 @@ func SearchMovies(query string, language string, page int) Movies {
 	return GetMovies(tmdbIds, language)
 }
 
-func GetList(listId string, language string, page int) Movies {
+func GetIMDBList(listId string, language string, page int) (movies Movies) {
 	var results *List
 	listResultsPerPage := config.Get().ResultsPerPage
 
-	rateLimiter.Call(func() {
-		urlValues := napping.Params{
-			"api_key": apiKey,
-		}.AsUrlValues()
-		resp, err := napping.Get(
-			tmdbEndpoint + "list/" + listId,
-			&urlValues,
-			&results,
-			nil,
-		)
-		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "GetList failed, check your logs.", config.AddonIcon())
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("GetList bad status: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.imdb.list.%s.%d", listId, page)
+	if err := cacheStore.Get(key, &movies); err != nil {
+		rateLimiter.Call(func() {
+			urlValues := napping.Params{
+				"api_key": apiKey,
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint + "list/" + listId,
+				&urlValues,
+				&results,
+				nil,
+			)
+			if err != nil {
+				log.Error(err)
+				xbmc.Notify("Quasar", "Failed getting IMDb list, check your logs.", config.AddonIcon())
+			} else if resp.Status() != 200 {
+				message := fmt.Sprintf("Bad status getting IMDb list: %d", resp.Status())
+				log.Error(message + fmt.Sprintf(" (%s)", listId))
+				xbmc.Notify("Quasar", message, config.AddonIcon())
+			}
+		})
+		tmdbIds := make([]int, 0, listResultsPerPage)
+		for i, movie := range results.Items {
+			if i < page * listResultsPerPage {
+				continue
+			}
+			tmdbIds = append(tmdbIds, movie.Id)
+			if i >= (page) * listResultsPerPage - 1 {
+				break
+			}
 		}
-	})
-	tmdbIds := make([]int, 0, listResultsPerPage)
-	for i, movie := range results.Items {
-		if i < page * listResultsPerPage {
-			continue
-		}
-		tmdbIds = append(tmdbIds, movie.Id)
-		if i >= (startPage + page) * listResultsPerPage - 1 {
-			break
+		movies = GetMovies(tmdbIds, language)
+		if movies != nil && len(movies) > 0 {
+			cacheStore.Set(key, movies, cacheExpiration * 4)
 		}
 	}
-	return GetMovies(tmdbIds, language)
+	return
 }
 
-func ListMovies(endpoint string, params napping.Params, page int) (movies Movies) {
-	var results *EntityList
-
-	params["page"] = strconv.Itoa(startPage + page)
+func listMovies(endpoint string, cacheKey string, params napping.Params, page int) Movies {
 	params["api_key"] = apiKey
-	p := params.AsUrlValues()
+	genre := params["with_genres"]
+	if params["with_genres"] == "" {
+		genre = "all"
+	}
+	limit := ResultsPerPage * PagesAtOnce
+	pageGroup := (page - 1) * ResultsPerPage / limit + 1
 
-	rateLimiter.Call(func() {
-		resp, err := napping.Get(
-			tmdbEndpoint + endpoint,
-			&p,
-			&results,
-			nil,
-		)
-		if err != nil {
-			log.Error(err.Error())
-			xbmc.Notify("Quasar", "ListMovies failed, check your logs.", config.AddonIcon())
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("ListMovies bad status: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+	movies := make(Movies, limit)
+
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%d", cacheKey, genre, pageGroup)
+	if err := cacheStore.Get(key, &movies); err != nil {
+		wg := sync.WaitGroup{}
+		for p := 0; p < PagesAtOnce; p++ {
+			wg.Add(1)
+			currentPage := (pageGroup - 1) * ResultsPerPage + p + 1
+			go func(p int) {
+				defer wg.Done()
+				var results *EntityList
+				pageParams := napping.Params{
+					"page": strconv.Itoa(currentPage),
+				}
+				for k, v := range params {
+					pageParams[k] = v
+				}
+				urlParams := pageParams.AsUrlValues()
+				rateLimiter.Call(func() {
+					resp, err := napping.Get(
+						tmdbEndpoint + endpoint,
+						&urlParams,
+						&results,
+						nil,
+					)
+					if err != nil {
+						log.Error(err)
+						xbmc.Notify("Quasar", "Failed while listing movies, check your logs.", config.AddonIcon())
+					} else if resp.Status() != 200 {
+						message := fmt.Sprintf("Bad status while listing movies: %d", resp.Status())
+						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
+						xbmc.Notify("Quasar", message, config.AddonIcon())
+					}
+				})
+				if results != nil {
+					for m, movie := range results.Results {
+						if m >= ResultsPerPage - 1 {
+							break
+						}
+						movies[p * ResultsPerPage + m] = GetMovie(movie.Id, params["language"])
+					}
+				}
+			}(p)
 		}
-	})
-	if results != nil {
-		for _, movie := range results.Results {
-			movies = append(movies, GetMovie(movie.Id, params["language"]))
-		}
+		wg.Wait()
+		cacheStore.Set(key, movies, 15 * time.Minute)
 	}
 	return movies
 }
@@ -251,7 +296,7 @@ func PopularMovies(genre string, language string, page int) Movies {
 			"with_genres":              genre,
 		}
 	}
-	return ListMovies("discover/movie", p, page)
+	return listMovies("discover/movie", "popular", p, page)
 }
 
 func RecentMovies(genre string, language string, page int) Movies {
@@ -272,11 +317,11 @@ func RecentMovies(genre string, language string, page int) Movies {
 			"with_genres":              genre,
 		}
 	}
-	return ListMovies("discover/movie", p, page)
+	return listMovies("discover/movie", "recent", p, page)
 }
 
 func TopRatedMovies(genre string, language string, page int) Movies {
-	return ListMovies("movie/top_rated", napping.Params{"language": language}, page)
+	return listMovies("movie/top_rated", "toprated", napping.Params{"language": language}, page)
 }
 
 func MostVotedMovies(genre string, language string, page int) Movies {
@@ -295,7 +340,7 @@ func MostVotedMovies(genre string, language string, page int) Movies {
 			"with_genres":              genre,
 		}
 	}
-	return ListMovies("discover/movie", p, page)
+	return listMovies("discover/movie", "mostvoted", p, page)
 }
 
 func (movie *Movie) ToListItem() *xbmc.ListItem {

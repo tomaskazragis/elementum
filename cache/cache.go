@@ -1,15 +1,14 @@
 package cache
 
 import (
-	"io"
 	"time"
 	"errors"
+	"strings"
 	"net/http"
-	"crypto/sha1"
-	"encoding/hex"
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
+	"github.com/scakemyer/quasar/util"
 )
 
 const (
@@ -19,10 +18,10 @@ const (
 )
 
 var (
-	PageCachePrefix = "quasar.page.cache"
-	ErrCacheMiss    = errors.New("cache: key not found")
-	ErrNotStored    = errors.New("cache: not stored")
-	ErrNotSupport   = errors.New("cache: not supported")
+	pageCachePrefix = "page"
+	errCacheMiss    = errors.New("cache: key not found")
+	errNotStored    = errors.New("cache: not stored")
+	errNotSupported = errors.New("cache: not supported")
 	log             = logging.MustGetLogger("cache")
 )
 
@@ -53,9 +52,7 @@ type cachedWriter struct {
 }
 
 func cacheKey(prefix string, u string) string {
-	h := sha1.New()
-	io.WriteString(h, u)
-	return prefix + ":" + hex.EncodeToString(h.Sum(nil))
+	return prefix + "." + util.ToFileName(strings.Replace(strings.Replace(strings.Trim(u, "/"), "/", ".", -1), "=", ".", -1))
 }
 
 func newCachedWriter(store CacheStore, expire time.Duration, writer gin.ResponseWriter, key string) *cachedWriter {
@@ -98,7 +95,7 @@ func (w *cachedWriter) Write(data []byte) (int, error) {
 func Cache(store CacheStore, expire time.Duration) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var cache responseCache
-		key := cacheKey(PageCachePrefix, ctx.Request.URL.RequestURI())
+		key := cacheKey(pageCachePrefix, ctx.Request.URL.RequestURI())
 		if err := store.Get(key, &cache); err == nil {
 			for k, vals := range cache.Header {
 				for _, v := range vals {

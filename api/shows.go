@@ -109,6 +109,12 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 	nextPage := 0
 	if page >= 0 {
 		nextPage = 1
+
+		resultsPerPage := config.Get().ResultsPerPage
+		if len(shows) >= resultsPerPage {
+			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
+			shows = shows[start:start + resultsPerPage]
+		}
 	}
 	items := make(xbmc.ListItems, 0, len(shows) + nextPage)
 	for _, show := range shows {
@@ -165,7 +171,7 @@ func PopularShows(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.PopularShows(genre, config.Get().Language, page), ctx, page, "")
 }
 
@@ -174,7 +180,7 @@ func RecentShows(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.RecentShows(genre, config.Get().Language, page), ctx, page, "")
 }
 
@@ -183,17 +189,17 @@ func RecentEpisodes(ctx *gin.Context) {
 	if genre == "0" {
 		genre = ""
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.RecentEpisodes(genre, config.Get().Language, page), ctx, page, "")
 }
 
 func TopRatedShows(ctx *gin.Context) {
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.TopRatedShows("", config.Get().Language, page), ctx, page, "")
 }
 
 func TVMostVoted(ctx *gin.Context) {
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.MostVotedShows("", config.Get().Language, page), ctx, page, "")
 }
 
@@ -215,7 +221,7 @@ func SearchShows(ctx *gin.Context) {
 	if query == "" {
 		return
 	}
-	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "0"))
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderShows(tmdb.SearchShows(query, config.Get().Language, page), ctx, page, query)
 }
 

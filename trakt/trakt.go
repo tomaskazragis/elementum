@@ -14,6 +14,7 @@ import (
 	"github.com/jmcvetta/napping"
 	"github.com/scakemyer/quasar/cloudhole"
 	"github.com/scakemyer/quasar/config"
+	"github.com/scakemyer/quasar/util"
 	"github.com/scakemyer/quasar/xbmc"
 )
 
@@ -27,11 +28,20 @@ const (
 var log = logging.MustGetLogger("trakt")
 
 var (
-	clearance, _ = cloudhole.GetClearance()
-	retries      = 3
-	scrobbleTime = float64(0)
-	scrobbleEnd  = float64(0)
+	clearance, _            = cloudhole.GetClearance()
+	retriesLeft             = 3
+	scrobbleTime            = float64(0)
+	scrobbleEnd             = float64(0)
+	PagesAtOnce             = 5
+	burstRate               = 50
+	burstTime               = 10 * time.Second
+	simultaneousConnections = 25
+	cacheExpiration         = 6 * 24 * time.Hour
+	recentExpiration        = 15 * time.Minute
+	userlistExpiration      = 1 * time.Minute
 )
+
+var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 type Object struct {
 	Title string `json:"title"`
@@ -61,14 +71,14 @@ type Movie struct {
 type Show struct {
 	Object
 
-	FirstAired    int         `json:"first_aired"`
+	FirstAired    string      `json:"first_aired"`
 	URL           string      `json:"homepage"`
 	Trailer       string      `json:"trailer"`
 	Runtime       int         `json:"runtime"`
 	Overview      string      `json:"overview"`
 	Certification string      `json:"certification"`
 	Status        string      `json:"status"`
-	Network       int         `json:"network"`
+	Network       string      `json:"network"`
 	AiredEpisodes int         `json:"aired_episodes"`
 	Airs          *Airs       `json:"airs"`
 	Rating        float32     `json:"rating"`
@@ -251,11 +261,11 @@ type ListItem struct {
 }
 
 func newClearance() (err error) {
-	retries -= 1
+	retriesLeft -= 1
 	log.Warningf("CloudFlared! User-Agent: %s - Cookies: %s", clearance.UserAgent, clearance.Cookies)
 
 	if config.Get().UseCloudHole == false {
-		retries = 0
+		retriesLeft = 0
 		return errors.New("CloudFlared! Enable CloudHole in the add-on's settings.")
 	}
 
@@ -263,7 +273,7 @@ func newClearance() (err error) {
 	if err == nil {
 		log.Noticef("New clearance: %s - %s", clearance.UserAgent, clearance.Cookies)
 	} else {
-		retries = 0
+		retriesLeft = 0
 	}
 
 	return err
@@ -285,13 +295,15 @@ func Get(endPoint string, params url.Values) (resp *napping.Response, err error)
 		Header: &header,
 	}
 
-	resp, err = napping.Send(&req)
-	if err == nil && resp.Status() == 403 && retries > 0 {
-		err = newClearance()
-		if err == nil {
-			resp, err = Get(endPoint, params)
+	rateLimiter.Call(func() {
+		resp, err = napping.Send(&req)
+		if err == nil && resp.Status() == 403 && retriesLeft > 0 {
+			err = newClearance()
+			if err == nil {
+				resp, err = Get(endPoint, params)
+			}
 		}
-	}
+	})
 
 	return resp, err
 }
@@ -313,13 +325,15 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		Header: &header,
 	}
 
-	resp, err = napping.Send(&req)
-	if err == nil && resp.Status() == 403 && retries > 0 {
-		err = newClearance()
-		if err == nil {
-			resp, err = GetWithAuth(endPoint, params)
+	rateLimiter.Call(func() {
+		resp, err = napping.Send(&req)
+		if err == nil && resp.Status() == 403 && retriesLeft > 0 {
+			err = newClearance()
+			if err == nil {
+				resp, err = GetWithAuth(endPoint, params)
+			}
 		}
-	}
+	})
 
 	return resp, err
 }
@@ -342,13 +356,15 @@ func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err e
 		Header: &header,
 	}
 
-	resp, err = napping.Send(&req)
-	if err == nil && resp.Status() == 403 && retries > 0 {
-		err = newClearance()
-		if err == nil {
-			resp, err = Post(endPoint, payload)
+	rateLimiter.Call(func() {
+		resp, err = napping.Send(&req)
+		if err == nil && resp.Status() == 403 && retriesLeft > 0 {
+			err = newClearance()
+			if err == nil {
+				resp, err = Post(endPoint, payload)
+			}
 		}
-	}
+	})
 
 	return resp, err
 }
@@ -371,15 +387,18 @@ func GetCode() (code *Code, err error) {
 		Header: &header,
 	}
 
-	resp, err := napping.Send(&req)
-	if err == nil && resp.Status() == 403 && retries > 0 {
-		err = newClearance()
-		if err == nil {
-			code, err = GetCode()
+	var resp *napping.Response
+	rateLimiter.Call(func() {
+		resp, err = napping.Send(&req)
+		if err == nil && resp.Status() == 403 && retriesLeft > 0 {
+			err = newClearance()
+			if err == nil {
+				code, err = GetCode()
+			}
+		} else {
+			resp.Unmarshal(&code)
 		}
-	} else {
-		resp.Unmarshal(&code)
-	}
+	})
 
 	if err == nil && resp.Status() != 200 {
 		err = errors.New(fmt.Sprintf("Unable to get Trakt code: %d", resp.Status()))
@@ -408,13 +427,16 @@ func GetToken(code string) (resp *napping.Response, err error) {
 		Header: &header,
 	}
 
-	resp, err = napping.Send(&req)
-	if err == nil && resp.Status() == 403 && retries > 0 {
-		err = newClearance()
-		if err == nil {
-			resp, err = GetToken(code)
+
+	rateLimiter.Call(func() {
+		resp, err = napping.Send(&req)
+		if err == nil && resp.Status() == 403 && retriesLeft > 0 {
+			err = newClearance()
+			if err == nil {
+				resp, err = GetToken(code)
+			}
 		}
-	}
+	})
 
 	return resp, err
 }

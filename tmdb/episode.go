@@ -31,16 +31,16 @@ func GetEpisode(showId int, seasonNumber int, episodeNumber int, language string
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Quasar", "GetEpisode failed, check your logs.", config.AddonIcon())
+				xbmc.Notify("Quasar", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showId), config.AddonIcon())
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("GetEpisode bad status: %d", resp.Status())
+				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showId, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
 		})
 
 		if episode != nil {
-			cacheStore.Set(key, episode, cacheTime)
+			cacheStore.Set(key, episode, cacheExpiration)
 		}
 	}
 	return episode
