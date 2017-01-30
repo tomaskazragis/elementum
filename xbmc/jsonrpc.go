@@ -39,8 +39,9 @@ func executeJSONRPC(method string, retVal interface{}, args Args) error {
 	}
 	conn, err := getConnection(XBMCJSONRPCHosts...)
 	if err != nil {
-		log.Error(err.Error())
-		Notify("Quasar", "executeJSONRPC failed, check your logs.", "")
+		log.Error(err)
+		log.Critical("No available JSON-RPC connection to Kodi")
+		return err
 	}
 	defer conn.Close()
 
@@ -54,8 +55,9 @@ func executeJSONRPCO(method string, retVal interface{}, args Object) error {
 	}
 	conn, err := getConnection(XBMCJSONRPCHosts...)
 	if err != nil {
-		log.Error(err.Error())
-		Notify("Quasar", "executeJSONRPCO failed, check your logs.", "")
+		log.Error(err)
+		log.Critical("No available JSON-RPC connection to Kodi")
+		return err
 	}
 	defer conn.Close()
 
@@ -69,8 +71,9 @@ func executeJSONRPCEx(method string, retVal interface{}, args Args) error {
 	}
 	conn, err := getConnection(XBMCExJSONRPCHosts...)
 	if err != nil {
-		log.Error(err.Error())
-		Notify("Quasar", "executeJSONRPCEx failed, check your logs.", "")
+		log.Error(err)
+		log.Critical("No available JSON-RPC connection to the add-on.")
+		return err
 	}
 	defer conn.Close()
 
