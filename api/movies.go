@@ -51,15 +51,21 @@ var genreSlugs = map[int]string{
 
 func MoviesIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/movies/search"), Thumbnail: config.AddonResource("img", "search.png")},
 		{Label: "LOCALIZE[30056]", Path: UrlForXBMC("/movies/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/movies/search"), Thumbnail: config.AddonResource("img", "search.png")},
 		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/movies/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30211]", Path: UrlForXBMC("/movies/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
 		{Label: "LOCALIZE[30212]", Path: UrlForXBMC("/movies/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
 		{Label: "LOCALIZE[30236]", Path: UrlForXBMC("/movies/recent"), Thumbnail: config.AddonResource("img", "clock.png")},
 		{Label: "LOCALIZE[30213]", Path: UrlForXBMC("/movies/imdb250"), Thumbnail: config.AddonResource("img", "imdb.png")},
+		{Label: "LOCALIZE[30289]", Path: UrlForXBMC("/movies/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 	}
+	ctx.JSON(200, xbmc.NewView("", items))
+}
+
+func MovieGenres(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
 	for _, genre := range tmdb.GetMovieGenres(config.Get().Language) {
 		slug, _ := genreSlugs[genre.Id]
 		items = append(items, &xbmc.ListItem{
@@ -71,6 +77,7 @@ func MoviesIndex(ctx *gin.Context) {
 			},
 		})
 	}
+
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 
@@ -258,19 +265,6 @@ func SearchMovies(ctx *gin.Context) {
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	renderMovies(tmdb.SearchMovies(query, config.Get().Language, page), ctx, page, query)
-}
-
-func MovieGenres(ctx *gin.Context) {
-	genres := tmdb.GetMovieGenres(config.Get().Language)
-	items := make(xbmc.ListItems, 0, len(genres))
-	for _, genre := range genres {
-		items = append(items, &xbmc.ListItem{
-			Label: genre.Name,
-			Path:  UrlForXBMC("/movies/popular/%s", strconv.Itoa(genre.Id)),
-		})
-	}
-
-	ctx.JSON(200, xbmc.NewView("", items))
 }
 
 func movieLinks(tmdbId string) []*bittorrent.Torrent {

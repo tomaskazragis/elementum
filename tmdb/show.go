@@ -5,11 +5,11 @@ import (
 	"path"
 	"sync"
 	"time"
+	"runtime"
 	"strconv"
 	"strings"
 	"math/rand"
 	"encoding/json"
-	"runtime"
 
 	"github.com/jmcvetta/napping"
 	"github.com/scakemyer/quasar/config"

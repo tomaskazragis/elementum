@@ -178,10 +178,12 @@ func SearchMovies(query string, language string, page int) Movies {
 
 func GetIMDBList(listId string, language string, page int) (movies Movies) {
 	var results *List
-	listResultsPerPage := config.Get().ResultsPerPage
+	resultsPerPage := config.Get().ResultsPerPage
+	limit := resultsPerPage * PagesAtOnce
+	pageGroup := (page - 1) * resultsPerPage / limit + 1
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.imdb.list.%s.%d", listId, page)
+	key := fmt.Sprintf("com.imdb.list.%s.%d", listId, pageGroup)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
@@ -202,15 +204,12 @@ func GetIMDBList(listId string, language string, page int) (movies Movies) {
 				xbmc.Notify("Quasar", message, config.AddonIcon())
 			}
 		})
-		tmdbIds := make([]int, 0, listResultsPerPage)
+		tmdbIds := make([]int, 0)
 		for i, movie := range results.Items {
-			if i < page * listResultsPerPage {
-				continue
-			}
-			tmdbIds = append(tmdbIds, movie.Id)
-			if i >= (page) * listResultsPerPage - 1 {
+			if i >= limit {
 				break
 			}
+			tmdbIds = append(tmdbIds, movie.Id)
 		}
 		movies = GetMovies(tmdbIds, language)
 		if movies != nil && len(movies) > 0 {

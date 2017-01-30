@@ -19,15 +19,21 @@ import (
 
 func TVIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/shows/search"), Thumbnail: config.AddonResource("img", "search.png")},
 		{Label: "LOCALIZE[30056]", Path: UrlForXBMC("/shows/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/shows/search"), Thumbnail: config.AddonResource("img", "search.png")},
 		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/shows/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30238]", Path: UrlForXBMC("/shows/recent/episodes"), Thumbnail: config.AddonResource("img", "fresh.png")},
 		{Label: "LOCALIZE[30237]", Path: UrlForXBMC("/shows/recent/shows"), Thumbnail: config.AddonResource("img", "clock.png")},
 		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/shows/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30211]", Path: UrlForXBMC("/shows/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
 		{Label: "LOCALIZE[30212]", Path: UrlForXBMC("/shows/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
+		{Label: "LOCALIZE[30289]", Path: UrlForXBMC("/shows/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 	}
+	ctx.JSON(200, xbmc.NewView("", items))
+}
+
+func TVGenres(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
 	for _, genre := range tmdb.GetTVGenres(config.Get().Language) {
 		slug, _ := genreSlugs[genre.Id]
 		items = append(items, &xbmc.ListItem{
@@ -40,20 +46,6 @@ func TVIndex(ctx *gin.Context) {
 			},
 		})
 	}
-
-	ctx.JSON(200, xbmc.NewView("", items))
-}
-
-func TVGenres(ctx *gin.Context) {
-	genres := tmdb.GetTVGenres(config.Get().Language)
-	items := make(xbmc.ListItems, 0, len(genres))
-	for _, genre := range genres {
-		items = append(items, &xbmc.ListItem{
-			Label: genre.Name,
-			Path:  UrlForXBMC("/shows/popular/%s", strconv.Itoa(genre.Id)),
-		})
-	}
-
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 
