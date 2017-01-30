@@ -60,6 +60,7 @@ var (
 	bucket            = "Library"
 	closing           = make(chan struct{})
 	removedEpisodes   = make(chan *removedEpisode)
+	scanning          = false
 )
 
 type DBItem struct {
@@ -1118,11 +1119,19 @@ func LibraryUpdate() {
 				if err := doUpdateLibrary(); err != nil {
 					libraryLog.Warning(err)
 				}
+				if config.Get().UpdateAutoScan && scanning == false && updateFrequency != traktFrequency {
+					scanning = true
+					xbmc.VideoLibraryScan()
+				}
 			}
 		case <- traktSyncTicker.C:
 			if config.Get().TraktSyncFrequency > 0 {
 				if err := doSyncTrakt(); err != nil {
 					libraryLog.Warning(err)
+				}
+				if config.Get().UpdateAutoScan && scanning == false {
+					scanning = true
+					xbmc.VideoLibraryScan()
 				}
 			}
 		case <- closing:
@@ -1254,6 +1263,7 @@ func Notification(ctx *gin.Context) {
 				}
 			}
 		case "VideoLibrary.OnScanFinished":
+			scanning = false
 			fallthrough
 		case "VideoLibrary.OnCleanFinished":
 			updateLibraryMovies()

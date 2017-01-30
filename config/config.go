@@ -54,6 +54,7 @@ type Configuration struct {
 	TraktSyncFrequency  int
 	UpdateFrequency     int
 	UpdateDelay         int
+	UpdateAutoScan      bool
 	TvScraper           int
 	UseCloudHole        bool
 	CloudHoleKey        string
@@ -175,6 +176,7 @@ func Reload() *Configuration {
 		TraktSyncFrequency:  settings["trakt_sync"].(int),
 		UpdateFrequency:     settings["library_update_frequency"].(int),
 		UpdateDelay:         settings["library_update_delay"].(int),
+		UpdateAutoScan:      settings["library_auto_scan"].(bool),
 		TvScraper:           settings["library_tv_scraper"].(int),
 		UseCloudHole:        settings["use_cloudhole"].(bool),
 		CloudHoleKey:        settings["cloudhole_key"].(string),
