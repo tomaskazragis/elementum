@@ -60,16 +60,16 @@ func (c *FileStore) Replace(key string, value interface{}, expires time.Duration
 
 func (c *FileStore) Get(key string, value interface{}) error {
 	file, err := os.Open(path.Join(c.path, key))
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	gzReader, err := gzip.NewReader(file)
-	defer gzReader.Close()
 	if err != nil {
 		return err
 	}
+	defer gzReader.Close()
 
 	item := fileStoreItem{
 		Value: value,
