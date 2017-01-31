@@ -84,6 +84,23 @@ func MovieGenres(ctx *gin.Context) {
 func MoviesTrakt(ctx *gin.Context) {
 	items := xbmc.ListItems{
 		{Label: "LOCALIZE[30263]", Path: UrlForXBMC("/movies/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{
+			Label: "LOCALIZE[30254]",
+			Path: UrlForXBMC("/movies/trakt/watchlist"),
+			Thumbnail: config.AddonResource("img", "trakt.png"),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/watchlist"))},
+			},
+		},
+		{
+			Label: "LOCALIZE[30257]",
+			Path: UrlForXBMC("/movies/trakt/collection"),
+			Thumbnail: config.AddonResource("img", "trakt.png"),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/collection"))},
+			},
+		},
+		{Label: "LOCALIZE[30290]", Path: UrlForXBMC("/movies/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
 		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/movies/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30247]", Path: UrlForXBMC("/movies/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
@@ -96,24 +113,7 @@ func MoviesTrakt(ctx *gin.Context) {
 }
 
 func MoviesTraktLists(ctx *gin.Context) {
-	items := xbmc.ListItems{
-		{
-			Label: "LOCALIZE[30254]",
-			Path: UrlForXBMC("/movies/trakt/lists/watchlist"),
-			Thumbnail: config.AddonResource("img", "trakt.png"),
-			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/watchlist"))},
-			},
-		},
-		{
-			Label: "LOCALIZE[30257]",
-			Path: UrlForXBMC("/movies/trakt/lists/collection"),
-			Thumbnail: config.AddonResource("img", "trakt.png"),
-			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/collection"))},
-			},
-		},
-	}
+	items := xbmc.ListItems{}
 
 	for _, list := range trakt.Userlists() {
 		item := &xbmc.ListItem{
@@ -127,6 +127,16 @@ func MoviesTraktLists(ctx *gin.Context) {
 		items = append(items, item)
 	}
 
+	ctx.JSON(200, xbmc.NewView("", items))
+}
+
+func CalendarMovies(ctx *gin.Context) {
+	items := xbmc.ListItems{
+		{Label: "LOCALIZE[30291]", Path: UrlForXBMC("/movies/trakt/calendars/movies"), Thumbnail: config.AddonResource("img", "box_office.png")},
+		{Label: "LOCALIZE[30292]", Path: UrlForXBMC("/movies/trakt/calendars/releases"), Thumbnail: config.AddonResource("img", "tv.png")},
+		{Label: "LOCALIZE[30293]", Path: UrlForXBMC("/movies/trakt/calendars/allmovies"), Thumbnail: config.AddonResource("img", "box_office.png")},
+		{Label: "LOCALIZE[30294]", Path: UrlForXBMC("/movies/trakt/calendars/allreleases"), Thumbnail: config.AddonResource("img", "tv.png")},
+	}
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 

@@ -77,6 +77,8 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		trakt := movies.Group("/trakt")
 		{
 			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), MoviesTrakt)
+			trakt.GET("/watchlist", WatchlistMovies)
+			trakt.GET("/collection", CollectionMovies)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularMovies)
 			trakt.GET("/trending", cache.Cache(store, RecentCacheExpiration), TraktTrendingMovies)
 			trakt.GET("/played", cache.Cache(store, DefaultCacheExpiration), TraktMostPlayedMovies)
@@ -88,9 +90,16 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			lists := trakt.Group("/lists")
 			{
 				lists.GET("/", cache.Cache(store, RecentCacheExpiration), MoviesTraktLists)
-				lists.GET("/watchlist", WatchlistMovies)
-				lists.GET("/collection", CollectionMovies)
 				lists.GET("/id/:listId", UserlistMovies)
+			}
+
+			calendars := trakt.Group("/calendars")
+			{
+				calendars.GET("/", cache.Cache(store, IndexCacheExpiration), CalendarMovies)
+				calendars.GET("/movies", cache.Cache(store, RecentCacheExpiration), TraktMyMovies)
+				calendars.GET("/releases", cache.Cache(store, RecentCacheExpiration), TraktMyReleases)
+				calendars.GET("/allmovies", cache.Cache(store, RecentCacheExpiration), TraktAllMovies)
+				calendars.GET("/allreleases", cache.Cache(store, RecentCacheExpiration), TraktAllReleases)
 			}
 		}
 	}
@@ -121,6 +130,8 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		trakt := shows.Group("/trakt")
 		{
 			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), TVTrakt)
+			trakt.GET("/watchlist", WatchlistShows)
+			trakt.GET("/collection", CollectionShows)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularShows)
 			trakt.GET("/trending", cache.Cache(store, RecentCacheExpiration), TraktTrendingShows)
 			trakt.GET("/played", cache.Cache(store, DefaultCacheExpiration), TraktMostPlayedShows)
@@ -131,9 +142,18 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			lists := trakt.Group("/lists")
 			{
 				lists.GET("/", cache.Cache(store, RecentCacheExpiration), TVTraktLists)
-				lists.GET("/watchlist", WatchlistShows)
-				lists.GET("/collection", CollectionShows)
 				lists.GET("/id/:listId", UserlistShows)
+			}
+
+			calendars := trakt.Group("/calendars")
+			{
+				calendars.GET("/", cache.Cache(store, IndexCacheExpiration), CalendarShows)
+				calendars.GET("/shows", cache.Cache(store, RecentCacheExpiration), TraktMyShows)
+				calendars.GET("/newshows", cache.Cache(store, RecentCacheExpiration), TraktMyNewShows)
+				calendars.GET("/premieres", cache.Cache(store, RecentCacheExpiration), TraktMyPremieres)
+				calendars.GET("/allshows", cache.Cache(store, RecentCacheExpiration), TraktAllShows)
+				calendars.GET("/allnewshows", cache.Cache(store, RecentCacheExpiration), TraktAllNewShows)
+				calendars.GET("/allpremieres", cache.Cache(store, RecentCacheExpiration), TraktAllPremieres)
 			}
 		}
 	}

@@ -260,6 +260,17 @@ type ListItem struct {
 	// Episode   *Episode `json:"episode"`
 }
 
+type CalendarShow struct {
+	FirstAired  string   `json:"first_aired"`
+	Episode     *Episode `json:"episode"`
+	Show        *Show    `json:"show"`
+}
+
+type CalendarMovie struct {
+	Released   string `json:"released"`
+	Movie      *Movie `json:"movie"`
+}
+
 func newClearance() (err error) {
 	retriesLeft -= 1
 	log.Warningf("CloudFlared! User-Agent: %s - Cookies: %s", clearance.UserAgent, clearance.Cookies)

@@ -62,6 +62,13 @@ func setShowsFanart(shows []*Shows) []*Shows {
 	return shows
 }
 
+func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
+	for i, show := range shows {
+		shows[i].Show = setShowFanart(show.Show)
+	}
+	return shows
+}
+
 func GetShow(Id string) (show *Show) {
 	endPoint := fmt.Sprintf("shows/%s", Id)
 
@@ -212,7 +219,7 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 	resp, err := Get(endPoint, params)
 
 	if err != nil {
-		return shows, err
+		return
 	} else if resp.Status() != 200 {
 		log.Error(err)
 		return shows, errors.New(fmt.Sprintf("Bad status searching Trakt shows: %d", resp.Status()))
@@ -223,7 +230,7 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 	}
 	shows = setShowsFanart(shows)
 
-	return shows, err
+	return
 }
 
 func TopShows(topCategory string, page string) (shows []*Shows, err error) {
@@ -280,7 +287,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, err error) {
 		cacheStore.Set(key, shows, recentExpiration)
 	}
 
-	return shows, err
+	return
 }
 
 func WatchlistShows() (shows []*Shows, err error) {
@@ -325,7 +332,7 @@ func WatchlistShows() (shows []*Shows, err error) {
 		cacheStore.Set(key, shows, 1 * time.Minute)
 	}
 
-	return shows, err
+	return
 }
 
 func CollectionShows() (shows []*Shows, err error) {
@@ -369,7 +376,7 @@ func CollectionShows() (shows []*Shows, err error) {
 		cacheStore.Set(key, shows, 1 * time.Minute)
 	}
 
-	return shows, err
+	return
 }
 
 func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
@@ -421,7 +428,46 @@ func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
 		cacheStore.Set(key, shows, 1 * time.Minute)
 	}
 
-	return shows, err
+	return
+}
+
+func CalendarShows(endPoint string, page string) (shows []*CalendarShow, err error) {
+	resultsPerPage := config.Get().ResultsPerPage
+	limit := resultsPerPage * PagesAtOnce
+	pageInt, err := strconv.Atoi(page)
+	if err != nil {
+		return
+	}
+	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
+	params := napping.Params{
+		"page": page,
+		"limit": strconv.Itoa(limit),
+		"extended": "full,images",
+	}.AsUrlValues()
+
+	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	key := fmt.Sprintf("com.trakt.myshows.%s.%s", strings.Replace(endPoint, "/", ".", -1), page)
+	if err := cacheStore.Get(key, &shows); err != nil {
+		resp, err := GetWithAuth("calendars/" + endPoint, params)
+
+		if err != nil {
+			return shows, err
+		} else if resp.Status() != 200 {
+			return shows, errors.New(fmt.Sprintf("Bad status getting %s Trakt shows: %d", endPoint, resp.Status()))
+		}
+
+		if err := resp.Unmarshal(&shows); err != nil {
+			log.Warning(err)
+		}
+
+		if page != "0" {
+			shows = setCalendarShowsFanart(shows)
+		}
+
+		cacheStore.Set(key, shows, recentExpiration)
+	}
+
+	return
 }
 
 func (show *Show) ToListItem() *xbmc.ListItem {
