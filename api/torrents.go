@@ -18,6 +18,7 @@ import (
 	"github.com/scakemyer/libtorrent-go"
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
+	"github.com/scakemyer/quasar/util"
 	"github.com/scakemyer/quasar/xbmc"
 	"github.com/zeebo/bencode"
 )
@@ -483,5 +484,22 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		xbmc.Refresh()
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		ctx.String(200, "")
+	}
+}
+
+func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		type Versions struct {
+			Version    string `json:"version"`
+			Libtorrent string `json:"libtorrent"`
+			UserAgent  string `json:"user-agent"`
+		}
+		versions := Versions{
+			Version:    util.Version[1:len(util.Version) - 1],
+			Libtorrent: libtorrent.Version(),
+			UserAgent:  btService.UserAgent,
+		}
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		ctx.JSON(200, versions)
 	}
 }

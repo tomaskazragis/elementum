@@ -116,6 +116,7 @@ type BTService struct {
 	dialogProgressBG  *xbmc.DialogProgressBG
 	packSettings      libtorrent.SettingsPack
 	SpaceChecked      map[string]bool
+	UserAgent         string
 	closing           chan interface{}
 }
 
@@ -231,6 +232,7 @@ func (s *BTService) configure() {
 	}
 
 	if userAgent != "" {
+		s.UserAgent = userAgent
 		settings.SetStr(libtorrent.SettingByName("user_agent"), userAgent)
 	}
 	settings.SetInt(libtorrent.SettingByName("request_timeout"), 2)
