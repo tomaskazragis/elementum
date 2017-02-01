@@ -239,7 +239,6 @@ func (s *BTService) configure() {
 	settings.SetBool(libtorrent.SettingByName("announce_to_all_trackers"), true)
 	settings.SetBool(libtorrent.SettingByName("announce_to_all_tiers"), true)
 	settings.SetInt(libtorrent.SettingByName("connection_speed"), 500)
-	settings.SetInt(libtorrent.SettingByName("connections_limit"), 0)
 	settings.SetInt(libtorrent.SettingByName("download_rate_limit"), 0)
 	settings.SetInt(libtorrent.SettingByName("upload_rate_limit"), 0)
 	settings.SetInt(libtorrent.SettingByName("choking_algorithm"), 0)
