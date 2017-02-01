@@ -99,6 +99,8 @@ type BTConfiguration struct {
 	EncryptionPolicy    int
 	LowerListenPort     int
 	UpperListenPort     int
+	ListenInterfaces    string
+	OutgoingInterfaces  string
 	TunedStorage        bool
 	DownloadPath        string
 	TorrentsPath        string
@@ -374,11 +376,24 @@ func (s *BTService) startServices() {
 		listenPorts = append(listenPorts, strconv.Itoa(p))
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
-	listenInterfaces := "0.0.0.0:" + listenPorts[rand.Intn(len(listenPorts))]
-	if len(listenPorts) > 1 {
-		listenInterfaces += ",0.0.0.0:" + listenPorts[rand.Intn(len(listenPorts))]
+
+	listenInterfaces := []string{"0.0.0.0"}
+	if strings.TrimSpace(s.config.ListenInterfaces) != "" {
+		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
 	}
-	s.packSettings.SetStr(libtorrent.SettingByName("listen_interfaces"), listenInterfaces)
+
+	listenInterfacesStrings := make([]string, 0)
+	for _, listenInterface := range listenInterfaces {
+		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface + ":" + listenPorts[rand.Intn(len(listenPorts))])
+		if len(listenPorts) > 1 {
+			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface + ":" + listenPorts[rand.Intn(len(listenPorts))])
+		}
+	}
+	s.packSettings.SetStr(libtorrent.SettingByName("listen_interfaces"), strings.Join(listenInterfacesStrings, ","))
+
+	if strings.TrimSpace(s.config.OutgoingInterfaces) != "" {
+		s.packSettings.SetStr(libtorrent.SettingByName("outgoing_interfaces"), strings.Replace(strings.TrimSpace(s.config.OutgoingInterfaces), " ", "", -1))
+	}
 
 	s.log.Info("Starting LSD...")
 	s.packSettings.SetBool(libtorrent.SettingByName("enable_lsd"), true)

@@ -46,6 +46,8 @@ type Configuration struct {
 	EncryptionPolicy    int
 	BTListenPortMin     int
 	BTListenPortMax     int
+	ListenInterfaces    string
+	OutgoingInterfaces  string
 	TunedStorage        bool
 	Scrobble            bool
 	TraktUsername       string
@@ -166,6 +168,8 @@ func Reload() *Configuration {
 		EncryptionPolicy:    settings["encryption_policy"].(int),
 		BTListenPortMin:     settings["listen_port_min"].(int),
 		BTListenPortMax:     settings["listen_port_max"].(int),
+		ListenInterfaces:    settings["listen_interfaces"].(string),
+		OutgoingInterfaces:  settings["outgoing_interfaces"].(string),
 		TunedStorage:        settings["tuned_storage"].(bool),
 		ConnectionsLimit:    settings["connections_limit"].(int),
 		SessionSave:         settings["session_save"].(int),

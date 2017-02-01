@@ -51,6 +51,8 @@ func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration
 		EncryptionPolicy:    conf.EncryptionPolicy,
 		LowerListenPort:     conf.BTListenPortMin,
 		UpperListenPort:     conf.BTListenPortMax,
+		ListenInterfaces:    conf.ListenInterfaces,
+		OutgoingInterfaces:  conf.OutgoingInterfaces,
 		TunedStorage:        conf.TunedStorage,
 		DownloadPath:        conf.DownloadPath,
 		TorrentsPath:        conf.TorrentsPath,
