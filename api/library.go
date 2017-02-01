@@ -140,6 +140,9 @@ func updateLibraryMovies() {
 }
 func updateLibraryShows() {
 	libraryShows = xbmc.VideoLibraryGetShows()
+	if libraryShows == nil {
+		return
+	}
 	for _, tvshow := range libraryShows.Shows {
 		updateLibraryEpisodes(tvshow.ID)
 	}
@@ -1022,6 +1025,9 @@ func LibraryUpdate() {
 				if len(episodes) > 1 {
 					for showName, showEpisodes := range shows {
 						var libraryTotal int
+						if libraryShows == nil {
+							break
+						}
 						for _, libraryShow := range libraryShows.Shows {
 							if libraryShow.ScraperID == showEpisodes[0].ScraperID {
 								libraryLog.Warningf("Library removed %d episodes for %s", libraryShow.Episodes, libraryShow.Title)
@@ -1188,6 +1194,9 @@ func Notification(ctx *gin.Context) {
 			switch item.Type {
 			case "episode":
 				var episode *xbmc.VideoLibraryEpisodeItem
+				if libraryEpisodes == nil {
+					break
+				}
 				for _, episodes := range libraryEpisodes {
 					for _, existingEpisode := range episodes.Episodes {
 						if existingEpisode.ID == item.ID {
@@ -1202,6 +1211,9 @@ func Notification(ctx *gin.Context) {
 				}
 
 				var scraperId string
+				if libraryShows == nil {
+					break
+				}
 				for _, tvshow := range libraryShows.Shows {
 					if tvshow.ID == episode.TVShowID {
 						scraperId = tvshow.ScraperID
@@ -1253,6 +1265,9 @@ func Notification(ctx *gin.Context) {
 					libraryLog.Warning("Missing episodeid or tvshowid, nothing to remove")
 				}
 			case "movie":
+				if libraryMovies == nil {
+					break
+				}
 				for _, movie := range libraryMovies.Movies {
 					if movie.ID == item.ID {
 						tmdbMovie := tmdb.GetMovieById(movie.IMDBNumber, "en")

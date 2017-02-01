@@ -91,11 +91,14 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	}
 
 	addon := xbmc.Addon{}
-	burst := xbmc.Addon{}
 	xml.NewDecoder(resp.Body).Decode(&addon)
-	xml.NewDecoder(respBurst.Body).Decode(&burst)
 	addons = append(addons, addon)
-	addons = append(addons, burst)
+
+	if errBurst == nil {
+		burst := xbmc.Addon{}
+		xml.NewDecoder(respBurst.Body).Decode(&burst)
+		addons = append(addons, burst)
+	}
 
 	return &xbmc.AddonList{
 		Addons: addons,
