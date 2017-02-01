@@ -2,6 +2,7 @@ package xbmc
 
 import (
 	"net"
+	"errors"
 
 	"github.com/scakemyer/quasar/jsonrpc"
 )
@@ -43,10 +44,12 @@ func executeJSONRPC(method string, retVal interface{}, args Args) error {
 		log.Critical("No available JSON-RPC connection to Kodi")
 		return err
 	}
-	defer conn.Close()
-
-	client := jsonrpc.NewClient(conn)
-	return client.Call(method, args, retVal)
+	if conn != nil {
+		defer conn.Close()
+		client := jsonrpc.NewClient(conn)
+		return client.Call(method, args, retVal)
+	}
+	return errors.New("No available JSON-RPC connection to Kodi")
 }
 
 func executeJSONRPCO(method string, retVal interface{}, args Object) error {
@@ -59,10 +62,12 @@ func executeJSONRPCO(method string, retVal interface{}, args Object) error {
 		log.Critical("No available JSON-RPC connection to Kodi")
 		return err
 	}
-	defer conn.Close()
-
-	client := jsonrpc.NewClient(conn)
-	return client.Call(method, args, retVal)
+	if conn != nil {
+		defer conn.Close()
+		client := jsonrpc.NewClient(conn)
+		return client.Call(method, args, retVal)
+	}
+	return errors.New("No available JSON-RPC connection to Kodi")
 }
 
 func executeJSONRPCEx(method string, retVal interface{}, args Args) error {
@@ -72,11 +77,13 @@ func executeJSONRPCEx(method string, retVal interface{}, args Args) error {
 	conn, err := getConnection(XBMCExJSONRPCHosts...)
 	if err != nil {
 		log.Error(err)
-		log.Critical("No available JSON-RPC connection to the add-on.")
+		log.Critical("No available JSON-RPC connection to the add-on")
 		return err
 	}
-	defer conn.Close()
-
-	client := jsonrpc.NewClient(conn)
-	return client.Call(method, args, retVal)
+	if conn != nil {
+		defer conn.Close()
+		client := jsonrpc.NewClient(conn)
+		return client.Call(method, args, retVal)
+	}
+	return errors.New("No available JSON-RPC connection to the add-on")
 }
