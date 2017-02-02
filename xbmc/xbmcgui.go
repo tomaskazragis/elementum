@@ -46,9 +46,9 @@ func (dp *DialogProgress) Close() {
 }
 
 
-func NewDialogProgressBG(title, message string) *DialogProgressBG {
+func NewDialogProgressBG(title, message string, translations ...string) *DialogProgressBG {
 	retVal := int64(-1)
-	executeJSONRPCEx("DialogProgressBG_Create", &retVal, Args{title, message})
+	executeJSONRPCEx("DialogProgressBG_Create", &retVal, Args{title, message, translations})
 	if retVal < 0 {
 		return nil
 	}
@@ -59,7 +59,7 @@ func NewDialogProgressBG(title, message string) *DialogProgressBG {
 
 func (dp *DialogProgressBG) Update(percent int, heading string, message string) {
 	retVal := -1
-	executeJSONRPCEx("DialogProgress_Update", &retVal, Args{dp.hWnd, percent, heading, message})
+	executeJSONRPCEx("DialogProgressBG_Update", &retVal, Args{dp.hWnd, percent, heading, message})
 }
 
 func (dp *DialogProgressBG) IsFinished() bool {

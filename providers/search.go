@@ -9,6 +9,7 @@ import (
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
 	"github.com/scakemyer/quasar/tmdb"
+	"github.com/scakemyer/quasar/xbmc"
 )
 
 const (
@@ -121,17 +122,29 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	torrents := make([]*bittorrent.Torrent, 0)
 
 	log.Info("Resolving torrent files...")
+	progress := 0
+	progressTotal := 1
+	var dialogProgressBG *xbmc.DialogProgressBG
+
 	wg := sync.WaitGroup{}
 	for torrent := range torrentsChan {
-		torrents = append(torrents, torrent)
 		wg.Add(1)
+		progressTotal += 2
+		torrents = append(torrents, torrent)
 		go func(torrent *bittorrent.Torrent) {
 			defer wg.Done()
+			defer func() {
+				progress += 1
+				if dialogProgressBG != nil {
+					dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", "LOCALIZE[30117]")
+				}
+			}()
 			if err := torrent.Resolve(); err != nil {
 				log.Errorf("Unable to resolve .torrent file at: %s | %s", torrent.URI, err.Error())
 			}
 		}(torrent)
 	}
+	dialogProgressBG = xbmc.NewDialogProgressBG("Quasar", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
 	wg.Wait()
 
 	for _, torrent := range torrents {
@@ -193,10 +206,15 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	log.Infof("Received %d unique links.", len(torrents))
 
 	if len(torrents) == 0 {
+		dialogProgressBG.Close()
 		return torrents
 	}
 
 	log.Infof("Scraping torrent metrics from %d trackers...\n", len(trackers))
+
+	newProgressTotal := len(trackers) * 2 + 1
+	progress = newProgressTotal / 2
+	dialogProgressBG.Update(progress * 100 / newProgressTotal, "Quasar", "LOCALIZE[30118]")
 
 	scrapeResults := make(chan []bittorrent.ScrapeResponseEntry, len(trackers))
 	failedConnect := 0
@@ -208,6 +226,10 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 			wg.Add(1)
 			go func(tracker *bittorrent.Tracker) {
 				defer wg.Done()
+				defer func() {
+					progress += 2
+					dialogProgressBG.Update(progress * 100 / newProgressTotal, "Quasar", "LOCALIZE[30118]")
+				}()
 
 				connected := make(chan struct{})
 				var scrapeResult []bittorrent.ScrapeResponseEntry
@@ -252,6 +274,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		if failedConnect == 0 && failedScrape == 0 {
 			log.Notice("Scraped all trackers successfully.")
 		}
+		dialogProgressBG.Close()
 		close(scrapeResults)
 	}()
 
