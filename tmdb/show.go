@@ -43,6 +43,9 @@ func GetShowImages(showId int) *Images {
 			if err != nil {
 				log.Error(err)
 				xbmc.Notify("Quasar", "Failed getting images, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showId)
+				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				log.Warningf("Bad status getting images for %d: %d", showId, resp.Status())
 			}
@@ -89,6 +92,9 @@ func GetShow(showId int, language string) (show *Show) {
 				}
 				LogError(err)
 				xbmc.Notify("Quasar", "Failed getting show, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showId)
+				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting show for %d: %d", showId, resp.Status())
 				log.Warning(message)
@@ -146,6 +152,9 @@ func SearchShows(query string, language string, page int) Shows {
 		if err != nil {
 			log.Error(err)
 			xbmc.Notify("Quasar", "Failed searching shows check your logs.", config.AddonIcon())
+		} else if resp.Status() == 429 {
+			log.Warningf("Rate limit exceeded searching shows for %s, cooling down...", query)
+			rateLimiter.CoolDown(resp.HttpResponse().Header)
 		} else if resp.Status() != 200 {
 			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
 			log.Error(message)
@@ -197,6 +206,9 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					if err != nil {
 						log.Error(err)
 						xbmc.Notify("Quasar", "Failed while listing shows, check your logs.", config.AddonIcon())
+					} else if resp.Status() == 429 {
+						log.Warningf("Rate limit exceeded while listing shows from %s, cooling down...", endpoint)
+						rateLimiter.CoolDown(resp.HttpResponse().Header)
 					} else if resp.Status() != 200 {
 						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
 						log.Error(message)
@@ -310,6 +322,9 @@ func GetTVGenres(language string) []*Genre {
 			if err != nil {
 				log.Error(err)
 				xbmc.Notify("Quasar", "Failed getting TV genres, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warning("Rate limit exceeded getting TV genres, cooling down...")
+				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting TV genres: %d", resp.Status())
 				log.Error(message)

@@ -249,8 +249,8 @@ type ReleaseDate struct {
 const (
 	tmdbEndpoint            = "https://api.themoviedb.org/3/"
 	imageEndpoint           = "http://image.tmdb.org/t/p/"
-	burstRate               = 40
-	burstTime               = 20 * time.Second
+	burstRate               = 35
+	burstTime               = 15 * time.Second
 	simultaneousConnections = 20
 	cacheExpiration         = 6 * 24 * time.Hour
 	imagesCacheExpiration   = 14 * 24 * time.Hour
