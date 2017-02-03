@@ -189,14 +189,24 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/remove", movie.Id))}
 		}
 
-		item.ContextMenu = [][]string{
-			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
-			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
-			[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
-			[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
-			libraryAction,
-			watchlistAction,
-			collectionAction,
+		if config.Get().Platform.Kodi < 17 {
+			item.ContextMenu = [][]string{
+				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
+				libraryAction,
+				watchlistAction,
+				collectionAction,
+			}
+		} else {
+			item.ContextMenu = [][]string{
+				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+				libraryAction,
+				watchlistAction,
+				collectionAction,
+				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
+			}
 		}
 		item.Info.Trailer = UrlForHTTP("/youtube/%s", item.Info.Trailer)
 		item.IsPlayable = true

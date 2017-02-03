@@ -149,8 +149,10 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 			mergeAction,
 			watchlistAction,
 			collectionAction,
-			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
 			[]string{"LOCALIZE[30035]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/tvshows"))},
+		}
+		if config.Get().Platform.Kodi < 17 {
+			item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30203]", "XBMC.Action(Info)"})
 		}
 		items = append(items, item)
 	}
@@ -300,11 +302,19 @@ func ShowEpisodes(ctx *gin.Context) {
 		}
 
 		item.Path = defaultURL
-		item.ContextMenu = [][]string{
-			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
-			[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
-			[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
-			[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/episodes"))},
+
+		if config.Get().Platform.Kodi < 17 {
+			item.ContextMenu = [][]string{
+				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+				[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/episodes"))},
+			}
+		} else {
+			item.ContextMenu = [][]string{
+				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+				[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/episodes"))},
+			}
 		}
 		item.IsPlayable = true
 	}
