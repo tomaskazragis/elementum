@@ -170,6 +170,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	}()
 
 	wg.Wait()
+	dialogProgressBG.Update(100, "Quasar", "LOCALIZE[30117]")
 
 	for _, torrent := range torrents {
 		if torrent.InfoHash == "" {
@@ -249,13 +250,20 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 			wg.Add(1)
 			go func(tracker *bittorrent.Tracker) {
 				defer wg.Done()
+				defer func() {
+					progress += 1
+					progressUpdate <- progressMsg
+				}()
 
+				failed := make(chan bool)
 				connected := make(chan bool)
 				var scrapeResult []bittorrent.ScrapeResponseEntry
 
 				go func(tracker *bittorrent.Tracker) {
 					if err := tracker.Connect(); err != nil {
 						log.Warningf("Tracker %s failed: %s", tracker, err)
+						failedConnect += 1
+						close(failed)
 						return
 					}
 					close(connected)
@@ -263,10 +271,10 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 
 				for {
 					select {
+					case <- failed:
+						return
 					case <-time.After(trackerTimeout): // Connect timeout...
 						failedConnect += 1
-						progress += 2
-						progressUpdate <- progressMsg
 						return
 					case <- connected:
 						scraped := make(chan bool)
@@ -279,13 +287,9 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 							select {
 							case <-time.After(trackerTimeout): // Scrape timeout...
 								failedScrape += 1
-								progress += 1
-								progressUpdate <- progressMsg
 								return
 							case <-scraped:
 								scrapeResults <- scrapeResult
-								progress += 1
-								progressUpdate <- progressMsg
 								return
 							}
 						}
@@ -298,13 +302,14 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		dialogProgressBG.Update(100, "Quasar", progressMsg)
 
 		if failedConnect > 0 {
-			log.Warningf("Failed to connect to %d tracker(s).", failedConnect)
+			log.Warningf("Failed to connect to %d tracker(s)", failedConnect)
 		}
 		if failedScrape > 0 {
-			log.Warningf("Failed to scrape results from %d tracker(s).", failedScrape)
-		}
-		if failedConnect == 0 && failedScrape == 0 {
-			log.Notice("Scraped all trackers successfully.")
+			log.Warningf("Failed to scrape results from %d tracker(s)", failedScrape)
+		} else if failedConnect > 0 {
+			log.Notice("Scraped all other trackers successfully")
+		} else {
+			log.Notice("Scraped all trackers successfully")
 		}
 
 		dialogProgressBG.Close()
