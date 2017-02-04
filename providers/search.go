@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/op/go-logging"
 	"github.com/scakemyer/quasar/bittorrent"
@@ -31,7 +32,7 @@ const (
 )
 
 var (
-	trackerTimeout = time.Duration(3) * time.Second
+	trackerTimeout = 3100 * time.Millisecond
 	log = logging.MustGetLogger("linkssearch")
 )
 
@@ -124,32 +125,54 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	log.Info("Resolving torrent files...")
 	progress := 0
 	progressTotal := 1
-	var dialogProgressBG *xbmc.DialogProgressBG
+	progressUpdate := make(chan string)
 
 	wg := sync.WaitGroup{}
 	for torrent := range torrentsChan {
 		wg.Add(1)
-		progressTotal += 2
+		if !strings.HasPrefix(torrent.URI, "magnet") {
+			progressTotal += 1
+		}
 		torrents = append(torrents, torrent)
 		go func(torrent *bittorrent.Torrent) {
 			defer wg.Done()
-			defer func() {
-				progress += 1
-				if dialogProgressBG != nil {
-					dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", "LOCALIZE[30117]")
-				}
-			}()
 			if err := torrent.Resolve(); err != nil {
-				log.Errorf("Unable to resolve .torrent file at: %s | %s", torrent.URI, err.Error())
+				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
+			}
+			if !strings.HasPrefix(torrent.URI, "magnet") {
+				progress += 1
+				progressUpdate <- "LOCALIZE[30117]"
+			} else {
+				progressUpdate <- "skip"
 			}
 		}(torrent)
 	}
-	dialogProgressBG = xbmc.NewDialogProgressBG("Quasar", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
+
+	dialogProgressBG := xbmc.NewDialogProgressBG("Quasar", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
+	go func() {
+		for {
+			select {
+			case <-time.After(trackerTimeout * 2):
+				return
+			case msg, ok := <-progressUpdate:
+				if !ok {
+					return
+				}
+				if dialogProgressBG != nil {
+					if msg != "skip" {
+						dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", msg)
+					}
+				} else {
+					return
+				}
+			}
+		}
+	}()
+
 	wg.Wait()
 
 	for _, torrent := range torrents {
-		if torrent.InfoHash == "" { // ignore torrents whose infohash is empty
-			log.Errorf("InfoHash is empty for %s", torrent.URI)
+		if torrent.InfoHash == "" {
 			continue
 		}
 
@@ -212,26 +235,22 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 
 	log.Infof("Scraping torrent metrics from %d trackers...\n", len(trackers))
 
-	newProgressTotal := len(trackers) * 2 + 1
-	progress = newProgressTotal / 2
-	dialogProgressBG.Update(progress * 100 / newProgressTotal, "Quasar", "LOCALIZE[30118]")
+	progressTotal = len(trackers)
+	progress = 0
+	progressMsg := "LOCALIZE[30118]"
+	dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", progressMsg)
 
 	scrapeResults := make(chan []bittorrent.ScrapeResponseEntry, len(trackers))
 	failedConnect := 0
 	failedScrape := 0
-
 	go func() {
 		wg := sync.WaitGroup{}
 		for _, tracker := range trackers {
 			wg.Add(1)
 			go func(tracker *bittorrent.Tracker) {
 				defer wg.Done()
-				defer func() {
-					progress += 2
-					dialogProgressBG.Update(progress * 100 / newProgressTotal, "Quasar", "LOCALIZE[30118]")
-				}()
 
-				connected := make(chan struct{})
+				connected := make(chan bool)
 				var scrapeResult []bittorrent.ScrapeResponseEntry
 
 				go func(tracker *bittorrent.Tracker) {
@@ -242,39 +261,56 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 					close(connected)
 				}(tracker)
 
-				select {
-				case <- connected:
-					scraped := make(chan struct{})
-					go func(tracker *bittorrent.Tracker) {
-						scrapeResult = tracker.Scrape(torrents)
-						close(scraped)
-					}(tracker)
-
+				for {
 					select {
-					case <-scraped:
-						scrapeResults <- scrapeResult
+					case <-time.After(trackerTimeout): // Connect timeout...
+						failedConnect += 1
+						progress += 2
+						progressUpdate <- progressMsg
 						return
-					case <-time.After(trackerTimeout): // Scrape timeout...
-						failedScrape += 1
-						return
+					case <- connected:
+						scraped := make(chan bool)
+						go func(tracker *bittorrent.Tracker) {
+							scrapeResult = tracker.Scrape(torrents)
+							close(scraped)
+						}(tracker)
+
+						for {
+							select {
+							case <-time.After(trackerTimeout): // Scrape timeout...
+								failedScrape += 1
+								progress += 1
+								progressUpdate <- progressMsg
+								return
+							case <-scraped:
+								scrapeResults <- scrapeResult
+								progress += 1
+								progressUpdate <- progressMsg
+								return
+							}
+						}
 					}
-				case <-time.After(trackerTimeout): // Connect timeout...
-					failedConnect += 1
-					return
 				}
 			}(tracker)
 		}
 		wg.Wait()
+
+		dialogProgressBG.Update(100, "Quasar", progressMsg)
+
 		if failedConnect > 0 {
-			log.Warningf("Failed to connect to %d trackers.", failedConnect)
+			log.Warningf("Failed to connect to %d tracker(s).", failedConnect)
 		}
 		if failedScrape > 0 {
-			log.Warningf("Failed to scrape results from %d trackers.", failedScrape)
+			log.Warningf("Failed to scrape results from %d tracker(s).", failedScrape)
 		}
 		if failedConnect == 0 && failedScrape == 0 {
 			log.Notice("Scraped all trackers successfully.")
 		}
+
 		dialogProgressBG.Close()
+		dialogProgressBG = nil
+
+		close(progressUpdate)
 		close(scrapeResults)
 	}()
 

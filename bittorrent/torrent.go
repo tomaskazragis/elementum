@@ -4,12 +4,12 @@ import (
 	"os"
 	"io"
 	"fmt"
+	"time"
 	"bytes"
 	"regexp"
 	"strings"
 	"net/url"
 	"net/http"
-	"crypto/tls"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
@@ -150,9 +150,7 @@ var (
 
 var (
 	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout: 7 * time.Second,
 	}
 )
 

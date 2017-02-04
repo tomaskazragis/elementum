@@ -1,23 +1,23 @@
 package bittorrent
 
 import (
+	"net"
+	"time"
 	"bufio"
 	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
-	"math/rand"
-	"net"
-	"net/url"
 	"strings"
-	"time"
+	"net/url"
+	"math/rand"
+	"encoding/hex"
+	"encoding/binary"
 )
 
 const (
-	ConnectionRequestInitialId int64 = 0x041727101980
-	DefaultTimeout                   = 3 * time.Second
-	DefaultBufferSize                = 2048 // must be bigger than MTU, which is 1500 most of the time
-	MaxScrapeHashes                  = 70
+	connectionRequestInitialId int64 = 0x041727101980
+	defaultTimeout                   = 3 * time.Second
+	defaultBufferSize                = 2048 // must be bigger than MTU, which is 1500 most of the time
+	maxScrapedHashes                 = 70
 )
 
 const (
@@ -92,7 +92,7 @@ func NewTracker(trackerUrl string) (tracker *Tracker, err error) {
 		return
 	}
 	tracker = &Tracker{
-		connectionId: ConnectionRequestInitialId,
+		connectionId: connectionRequestInitialId,
 		URL:          tURL,
 	}
 	return
@@ -117,7 +117,7 @@ func (tracker *Tracker) sendRequest(action Action, request interface{}) error {
 		result <- binary.Read(tracker.reader, binary.BigEndian, &trackerResponse)
 	}()
 	select {
-	case <-time.After(DefaultTimeout):
+	case <-time.After(defaultTimeout):
 		return errors.New("Request timed out.")
 	case err := <-result:
 		if err != nil {
@@ -126,7 +126,7 @@ func (tracker *Tracker) sendRequest(action Action, request interface{}) error {
 	}
 
 	if trackerResponse.TransactionId != trackerRequest.TransactionId {
-		return errors.New("Request/Response Transaction missmatch.")
+		return errors.New("Request/Response transaction missmatch.")
 	}
 	if trackerResponse.Action == ActionError {
 		msg, err := tracker.reader.ReadString(0)
@@ -144,12 +144,12 @@ func (tracker *Tracker) Connect() error {
 		tracker.URL.Host += ":80"
 	}
 	var err error
-	tracker.connection, err = net.DialTimeout("udp", tracker.URL.Host, DefaultTimeout)
+	tracker.connection, err = net.DialTimeout("udp", tracker.URL.Host, defaultTimeout)
 	if err != nil {
 		return err
 	}
-	tracker.reader = bufio.NewReaderSize(tracker.connection, DefaultBufferSize)
-	tracker.writer = bufio.NewWriterSize(tracker.connection, DefaultBufferSize)
+	tracker.reader = bufio.NewReaderSize(tracker.connection, defaultBufferSize)
+	tracker.writer = bufio.NewWriterSize(tracker.connection, defaultBufferSize)
 	if err := tracker.sendRequest(ActionConnect, nil); err != nil {
 		return err
 	}
@@ -175,9 +175,9 @@ func (tracker *Tracker) Scrape(torrents []*Torrent) []ScrapeResponseEntry {
 		infoHashes = append(infoHashes, bhash)
 	}
 
-	for i := 0; i <= len(infoHashes)/MaxScrapeHashes; i++ {
-		idx := i * MaxScrapeHashes
-		max := idx + MaxScrapeHashes
+	for i := 0; i <= len(infoHashes) / maxScrapedHashes; i++ {
+		idx := i * maxScrapedHashes
+		max := idx + maxScrapedHashes
 		if max > len(infoHashes) {
 			max = len(infoHashes)
 		}
