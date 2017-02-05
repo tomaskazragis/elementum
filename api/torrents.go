@@ -85,8 +85,6 @@ func nameMatch(torrentName string, itemName string) bool {
 		return false
 	})
 
-	torrentsLog.Infof("Patterns from %s: %+v", itemName, patterns)
-
 	m := ahocorasick.NewStringMatcher(patterns)
 
 	found := m.Match([]byte(strings.ToLower(torrentName)))
