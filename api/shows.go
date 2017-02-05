@@ -29,7 +29,15 @@ func TVIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30212]", Path: UrlForXBMC("/shows/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
 		{Label: "LOCALIZE[30289]", Path: UrlForXBMC("/shows/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	itemsWithContext := make(xbmc.ListItems, 0)
+	for _, item := range items {
+		item.ContextMenu = [][]string{
+			[]string{"LOCALIZE[30143]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_tvshows"))},
+		}
+		itemsWithContext = append(itemsWithContext, item)
+	}
+
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", itemsWithContext))
 }
 
 func TVGenres(ctx *gin.Context) {
@@ -43,10 +51,11 @@ func TVGenres(ctx *gin.Context) {
 			ContextMenu: [][]string{
 				[]string{"LOCALIZE[30237]", fmt.Sprintf("Container.Update(%s)", UrlForXBMC("/shows/recent/shows/%s", strconv.Itoa(genre.Id)))},
 				[]string{"LOCALIZE[30238]", fmt.Sprintf("Container.Update(%s)", UrlForXBMC("/shows/recent/episodes/%s", strconv.Itoa(genre.Id)))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_tvshows_genres"))},
 			},
 		})
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows_genres", items))
 }
 
 func TVTrakt(ctx *gin.Context) {
@@ -76,7 +85,7 @@ func TVTrakt(ctx *gin.Context) {
 		{Label: "LOCALIZE[30249]", Path: UrlForXBMC("/shows/trakt/collected"), Thumbnail: config.AddonResource("img", "most_collected.png")},
 		{Label: "LOCALIZE[30250]", Path: UrlForXBMC("/shows/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
 }
 
 func TVTraktLists(ctx *gin.Context) {
@@ -94,7 +103,7 @@ func TVTraktLists(ctx *gin.Context) {
 		items = append(items, item)
 	}
 
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
 }
 
 func CalendarShows(ctx *gin.Context) {
@@ -106,7 +115,7 @@ func CalendarShows(ctx *gin.Context) {
 		{Label: "LOCALIZE[30299]", Path: UrlForXBMC("/shows/trakt/calendars/allnewshows"), Thumbnail: config.AddonResource("img", "fresh.png")},
 		{Label: "LOCALIZE[30300]", Path: UrlForXBMC("/shows/trakt/calendars/allpremieres"), Thumbnail: config.AddonResource("img", "box_office.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
 }
 
 func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {

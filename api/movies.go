@@ -61,7 +61,14 @@ func MoviesIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30213]", Path: UrlForXBMC("/movies/imdb250"), Thumbnail: config.AddonResource("img", "imdb.png")},
 		{Label: "LOCALIZE[30289]", Path: UrlForXBMC("/movies/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	itemsWithContext := make(xbmc.ListItems, 0)
+	for _, item := range items {
+		item.ContextMenu = [][]string{
+			[]string{"LOCALIZE[30142]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_movies"))},
+		}
+		itemsWithContext = append(itemsWithContext, item)
+	}
+	ctx.JSON(200, xbmc.NewView("menus_movies", itemsWithContext))
 }
 
 func MovieGenres(ctx *gin.Context) {
@@ -74,11 +81,12 @@ func MovieGenres(ctx *gin.Context) {
 			Thumbnail: config.AddonResource("img", fmt.Sprintf("genre_%s.png", slug)),
 			ContextMenu: [][]string{
 				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", UrlForXBMC("/movies/recent/%s", strconv.Itoa(genre.Id)))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_movies_genres"))},
 			},
 		})
 	}
 
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_movies_genres", items))
 }
 
 func MoviesTrakt(ctx *gin.Context) {
@@ -109,7 +117,7 @@ func MoviesTrakt(ctx *gin.Context) {
 		{Label: "LOCALIZE[30250]", Path: UrlForXBMC("/movies/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
 		{Label: "LOCALIZE[30251]", Path: UrlForXBMC("/movies/trakt/boxoffice"), Thumbnail: config.AddonResource("img", "box_office.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
 func MoviesTraktLists(ctx *gin.Context) {
@@ -127,7 +135,7 @@ func MoviesTraktLists(ctx *gin.Context) {
 		items = append(items, item)
 	}
 
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
 func CalendarMovies(ctx *gin.Context) {
@@ -137,7 +145,7 @@ func CalendarMovies(ctx *gin.Context) {
 		{Label: "LOCALIZE[30293]", Path: UrlForXBMC("/movies/trakt/calendars/allmovies"), Thumbnail: config.AddonResource("img", "box_office.png")},
 		{Label: "LOCALIZE[30294]", Path: UrlForXBMC("/movies/trakt/calendars/allreleases"), Thumbnail: config.AddonResource("img", "tv.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("", items))
+	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
 func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) {
