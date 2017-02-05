@@ -65,11 +65,11 @@ const (
 
 var (
 	resolutionTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+(480p|xvid|dvd|hdtv)\W*`): Resolution480p,
-		regexp.MustCompile(`\W+(720p|hdrip)\W*`):         Resolution720p,
-		regexp.MustCompile(`\W+1080p\W*`):                Resolution1080p,
-		regexp.MustCompile(`\W+1440p\W*`):                Resolution1440p,
-		regexp.MustCompile(`\W+(4K|2160p)\W*`):           Resolution4k2k,
+		regexp.MustCompile(`\W+(480p|xvid|dvd|hdtv)\W*`):         Resolution480p,
+		regexp.MustCompile(`\W+(720p|hdrip|bluray|b[rd]rip)\W*`): Resolution720p,
+		regexp.MustCompile(`\W+1080p\W*`):                        Resolution1080p,
+		regexp.MustCompile(`\W+1440p\W*`):                        Resolution1440p,
+		regexp.MustCompile(`\W+(4K|2160p)\W*`):                   Resolution4k2k,
 	}
 	Resolutions = []string{"", "480p", "720p", "1080p", "1440p", "4K"}
 	Colors = []string{"", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
@@ -133,9 +133,9 @@ const (
 
 var (
 	videoTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+xvid\W*`):                  CodecXVid,
-		regexp.MustCompile(`\W+([hx]264|1080p|hdrip)\W*`): CodecH264,
-		regexp.MustCompile(`\W+([hx]265|hevc)\W*`):        CodecH265,
+		regexp.MustCompile(`\W+xvid\W*`):           CodecXVid,
+		regexp.MustCompile(`\W+([hx]264)\W*`):      CodecH264,
+		regexp.MustCompile(`\W+([hx]265|hevc)\W*`): CodecH265,
 	}
 	audioTags = map[*regexp.Regexp]int{
 		regexp.MustCompile(`\W+mp3\W*`):              CodecMp3,
@@ -235,6 +235,9 @@ func (t *Torrent) initialize() {
 
 	if t.Resolution == ResolutionUnknown {
 		t.Resolution = matchTags(t, resolutionTags)
+		if t.Resolution == 0 {
+			t.Resolution = 1
+		}
 	}
 	if t.VideoCodec == CodecUnknown {
 		t.VideoCodec = matchTags(t, videoTags)
