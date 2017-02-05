@@ -307,13 +307,6 @@ func (t *Torrent) Resolve() error {
 		return nil
 	}
 
-	// We don't need trackers for public torrents since we'll find them on the
-	// DHT or public trackers
-	if (t.InfoHash != "" && t.Name != "" && t.Peers > 0 && t.Seeds > 0) && (t.IsPrivate == false || len(t.Trackers) > 0) {
-		log.Noticef("Skipping torrent resolving for %s from %s (private: %t)", t.Name, t.Provider, t.IsPrivate)
-		return nil
-	}
-
 	parts := strings.Split(t.URI, "|")
 	uri := parts[0]
 	req, err := http.NewRequest("GET", uri, nil)
