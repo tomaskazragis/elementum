@@ -414,9 +414,13 @@ func (btp *BTPlayer) onMetadataReceived() {
 }
 
 func (btp *BTPlayer) statusStrings(progress float64, status libtorrent.TorrentStatus) (string, string, string) {
-	line1 := fmt.Sprintf("%s (%.2f%%)", StatusStrings[int(status.GetState())], progress*100)
+	line1 := fmt.Sprintf("%s (%.2f%%)", StatusStrings[int(status.GetState())], progress * 100)
 	if btp.torrentInfo != nil && btp.torrentInfo.Swigcptr() != 0 {
-		line1 += " - " + humanize.Bytes(uint64(btp.torrentInfo.TotalSize()))
+		totalSize := btp.torrentInfo.TotalSize()
+		if btp.fileSize > 0 {
+			totalSize = btp.fileSize
+		}
+		line1 += " - " + humanize.Bytes(uint64(totalSize))
 	}
 	seeders := status.GetNumSeeds()
 	line2 := fmt.Sprintf("D:%.0fkB/s U:%.0fkB/s S:%d/%d P:%d/%d",
