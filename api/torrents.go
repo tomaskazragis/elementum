@@ -162,11 +162,31 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 				status = "Paused"
 				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume"))}
 			}
+			color := "white"
+			switch (status) {
+			case "Paused":
+				fallthrough
+			case "Finished":
+				color = "grey"
+			case "Seeding":
+				color = "green"
+			case "Buffering":
+				color = "blue"
+			case "Finding":
+				color = "orange"
+			case "Checking":
+				color = "teal"
+			case "Queued":
+			case "Allocating":
+				color = "black"
+			case "Stalled":
+				color = "red"
+			}
 			torrentsLog.Infof("- %.2f%% - %s - %.2f:1 / %.2f:1 (%s) - %s", progress, status, ratio, timeRatio, seedingTime.String(), torrentName)
 
 			playUrl := UrlQuery(UrlForXBMC("/play"), "resume", fmt.Sprintf("%d", i))
 			item := xbmc.ListItem{
-				Label: fmt.Sprintf("%.2f%% - %s - %.2f:1 / %.2f:1 (%s) - %s", progress, status, ratio, timeRatio, seedingTime.String(), torrentName),
+				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %.2f:1 / %.2f:1 (%s) - %s", progress, color, status, ratio, timeRatio, seedingTime.String(), torrentName),
 				Path: playUrl,
 				Info: &xbmc.ListItemInfo{
 					Title: torrentName,
