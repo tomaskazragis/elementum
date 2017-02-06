@@ -236,7 +236,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 
 	log.Infof("Scraping torrent metrics from %d trackers...\n", len(trackers))
 
-	progressTotal = len(trackers)
+	progressTotal = len(trackers) * 2 + 1
 	progress = 0
 	progressMsg := "LOCALIZE[30118]"
 	dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", progressMsg)
@@ -251,7 +251,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 			go func(tracker *bittorrent.Tracker) {
 				defer wg.Done()
 				defer func() {
-					progress += 1
+					progress += 2
 					progressUpdate <- progressMsg
 				}()
 
