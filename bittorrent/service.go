@@ -747,6 +747,7 @@ func (s *BTService) alertsConsumer() {
 				ltAlert := alerts.Get(i)
 				alertType := ltAlert.Type()
 				alertPtr := ltAlert.Swigcptr()
+				alertMessage := ltAlert.Message()
 				switch alertType {
 					case libtorrent.SaveResumeDataAlertAlertType:
 						saveResumeData := libtorrent.SwigcptrSaveResumeDataAlert(alertPtr)
@@ -756,12 +757,16 @@ func (s *BTService) alertsConsumer() {
 						shaHash := torrentStatus.GetInfoHash().ToString()
 						infoHash = hex.EncodeToString([]byte(shaHash))
 						entry = saveResumeData.ResumeData()
+					case libtorrent.ExternalIpAlertAlertType:
+						splitMessage := strings.Split(alertMessage, ":")
+						splitIP := strings.Split(splitMessage[len(splitMessage) - 1], ".")
+						alertMessage = strings.Join(splitMessage[:len(splitMessage) - 1], ":") + splitIP[0] + ".XX.XX.XX"
 				}
 				alert := &Alert{
 					Type: alertType,
 					Category: ltAlert.Category(),
 					What: ltAlert.What(),
-					Message: ltAlert.Message(),
+					Message: alertMessage,
 					Pointer: alertPtr,
 					Name: name,
 					Entry: entry,
