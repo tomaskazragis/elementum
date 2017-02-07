@@ -272,6 +272,9 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 		return nil
 	}
 	if episodes, exists := libraryEpisodes[tvshowId]; exists {
+		if episodes == nil {
+			return nil
+		}
 		for _, existingEpisode := range episodes.Episodes {
 			if existingEpisode.UniqueIDs.ID == episodeId ||
 				 (existingEpisode.Season == seasonNumber && existingEpisode.Episode == episodeNumber) {
