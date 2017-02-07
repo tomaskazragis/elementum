@@ -60,16 +60,16 @@ const (
 	Resolution720p
 	Resolution1080p
 	Resolution1440p
-	Resolution4k2k
+	Resolution4k
 )
 
 var (
 	resolutionTags = map[*regexp.Regexp]int{
 		regexp.MustCompile(`\W+(480p|xvid|dvd|hdtv)\W*`):         Resolution480p,
 		regexp.MustCompile(`\W+(720p|hdrip|bluray|b[rd]rip)\W*`): Resolution720p,
-		regexp.MustCompile(`\W+1080p\W*`):                        Resolution1080p,
+		regexp.MustCompile(`\W+(1080p|fullhd|fhd)\W*`):           Resolution1080p,
 		regexp.MustCompile(`\W+1440p\W*`):                        Resolution1440p,
-		regexp.MustCompile(`\W+(4K|2160p)\W*`):                   Resolution4k2k,
+		regexp.MustCompile(`\W+(4K|2160p)\W*`):                   Resolution4k,
 	}
 	Resolutions = []string{"", "480p", "720p", "1080p", "1440p", "4K"}
 	Colors = []string{"", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
@@ -438,8 +438,8 @@ func (t *Torrent) StreamInfo() *xbmc.StreamInfo {
 		sie.Video.Width = 2560
 		sie.Video.Height = 1440
 		break
-	case Resolution4k2k:
-		sie.Video.Width = 3840
+	case Resolution4k:
+		sie.Video.Width = 4096
 		sie.Video.Height = 2160
 		break
 	}
