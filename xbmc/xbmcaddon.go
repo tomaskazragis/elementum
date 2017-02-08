@@ -21,9 +21,10 @@ type AddonInfo struct {
 }
 
 type Setting struct {
-	Key   string `json:"key"`
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Key    string `json:"key"`
+	Type   string `json:"type"`
+	Value  string `json:"value"`
+	Option string `json:"option"`
 }
 
 func GetAddonInfo() *AddonInfo {

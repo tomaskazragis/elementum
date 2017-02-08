@@ -148,6 +148,24 @@ func Reload() *Configuration {
 		case "number":
 			value, _ := strconv.Atoi(setting.Value)
 			settings[setting.Key] = value
+		case "slider":
+			var valueInt int
+			var valueFloat float32
+			switch setting.Option {
+			case "percent":
+				fallthrough
+			case "int":
+				floated, _ := strconv.ParseFloat(setting.Value, 32)
+				valueInt = int(floated)
+			case "float":
+				floated, _ := strconv.ParseFloat(setting.Value, 32)
+				valueFloat = float32(floated)
+			}
+			if valueFloat > 0 {
+				settings[setting.Key] = valueFloat
+			} else {
+				settings[setting.Key] = valueInt
+			}
 		case "bool":
 			settings[setting.Key] = (setting.Value == "true")
 		default:
