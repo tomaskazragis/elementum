@@ -84,7 +84,6 @@ type ProxySettings struct {
 
 type BTConfiguration struct {
 	SpoofUserAgent      int
-	BackgroundHandling  bool
 	BufferSize          int
 	MaxUploadRate       int
 	MaxDownloadRate     int
@@ -156,10 +155,8 @@ func NewBTService(config BTConfiguration) *BTService {
 
 	tmdb.CheckApiKey()
 
-	if config.BackgroundHandling {
-		go s.loadTorrentFiles()
-		go s.downloadProgress()
-	}
+	go s.loadTorrentFiles()
+	go s.downloadProgress()
 
 	return s
 }

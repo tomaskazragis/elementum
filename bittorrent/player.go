@@ -47,7 +47,7 @@ type BTPlayer struct {
 	scrobble                 bool
 	deleteAfter              bool
 	askToDelete              bool
-	backgroundHandling       bool
+	askToKeepDownloading     bool
 	overlayStatusEnabled     bool
 	torrentHandle            libtorrent.TorrentHandle
 	torrentInfo              libtorrent.TorrentInfo
@@ -95,7 +95,7 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		fileSize:             0,
 		fileName:             "",
 		overlayStatusEnabled: config.Get().EnableOverlayStatus == true,
-		backgroundHandling:   config.Get().BackgroundHandling == true,
+		askToKeepDownloading: config.Get().BackgroundHandling == false,
 		deleteAfter:          config.Get().KeepFilesAfterStop == false,
 		askToDelete:          config.Get().KeepFilesAsk == true,
 		scrobble:             config.Get().Scrobble == true && params.TMDBId > 0 && config.Get().TraktToken != "",
@@ -541,14 +541,21 @@ func (btp *BTPlayer) onStateChanged(stateAlert libtorrent.StateChangedAlert) {
 func (btp *BTPlayer) Close() {
 	close(btp.closing)
 
+	askedToKeepDownloading := true
+	if btp.askToKeepDownloading == true {
+		if !xbmc.DialogConfirm("Quasar", "LOCALIZE[30146]") {
+			askedToKeepDownloading = false
+		}
+	}
+
 	askedToDelete := false
-	if btp.askToDelete == true {
+	if askedToKeepDownloading == false && btp.askToDelete == true {
 		if xbmc.DialogConfirm("Quasar", "LOCALIZE[30269]") {
 			askedToDelete = true
 		}
 	}
 
-	if btp.backgroundHandling == false || askedToDelete == true || btp.notEnoughSpace {
+	if askedToKeepDownloading == false || askedToDelete == true || btp.notEnoughSpace {
 		// Delete torrent file
 		if _, err := os.Stat(btp.torrentFile); err == nil {
 			btp.log.Infof("Deleting torrent file at %s", btp.torrentFile)
@@ -560,7 +567,7 @@ func (btp *BTPlayer) Close() {
 			defer os.Remove(btp.fastResumeFile)
 		}
 
-		if btp.deleteAfter || askedToDelete == true {
+		if btp.deleteAfter || askedToDelete == true || btp.notEnoughSpace {
 			btp.log.Info("Removing the torrent and deleting files...")
 			btp.bts.Session.GetHandle().RemoveTorrent(btp.torrentHandle, int(libtorrent.SessionHandleDeleteFiles))
 		} else {
