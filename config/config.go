@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"sync"
+	"time"
 	"strings"
 	"strconv"
 	"path/filepath"
@@ -81,8 +82,16 @@ type Configuration struct {
 	SocksPassword string
 }
 
+type Addon struct {
+	ID      string
+	Name    string
+	Version string
+	Enabled bool
+}
+
 var config = &Configuration{}
 var lock = sync.RWMutex{}
+var settingsSet = false
 
 const (
 	ListenPort = 65251
@@ -115,11 +124,20 @@ func Reload() *Configuration {
 		}
 	}
 
-	downloadPath := filepath.Dir(xbmc.GetSettingString("download_path"))
+	downloadPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("download_path")))
 	if downloadPath == "." {
-		xbmc.Notify("Quasar", "LOCALIZE[30113]", filepath.Join(info.Path, "icon.png"))
+		xbmc.Dialog("Quasar", "LOCALIZE[30113]")
 		xbmc.AddonSettings("plugin.video.quasar")
+		go waitSettingsSet()
+	} else {
+		settingsSet = true
 	}
+
+	libraryPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("library_path")))
+	if libraryPath == "." {
+		libraryPath = downloadPath
+	}
+	log.Infof("Using library path: %s", libraryPath)
 
 	xbmcSettings := xbmc.GetAllSettings()
 	settings := make(map[string]interface{})
@@ -139,7 +157,7 @@ func Reload() *Configuration {
 
 	newConfig := Configuration{
 		DownloadPath:        downloadPath,
-		LibraryPath:         filepath.Dir(settings["library_path"].(string)),
+		LibraryPath:         libraryPath,
 		TorrentsPath:        filepath.Join(downloadPath, "Torrents"),
 		Info:                info,
 		Platform:            platform,
@@ -218,4 +236,61 @@ func AddonIcon() string {
 
 func AddonResource(args ...string) string {
 	return filepath.Join(Get().Info.Path, "resources", filepath.Join(args...))
+}
+
+func waitSettingsSet() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if settingsSet {
+				go CheckBurst()
+				return
+			}
+		}
+	}
+}
+
+func CheckBurst() {
+	// Check for enabled providers and Quasar Burst
+	hasBurst := false
+	enabledProviders := make([]Addon, 0)
+	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
+		if strings.HasPrefix(addon.ID, "script.quasar.") {
+			if addon.ID == "script.quasar.burst" && addon.Enabled == true {
+				hasBurst = true
+			}
+			enabledProviders = append(enabledProviders, Addon{
+				ID: addon.ID,
+				Name: addon.Name,
+				Version: addon.Version,
+				Enabled: addon.Enabled,
+			})
+		}
+	}
+	if !hasBurst {
+		log.Info("Updating Kodi add-on repositories for Burst...")
+		xbmc.UpdateLocalAddons()
+		xbmc.UpdateAddonRepos()
+		time.Sleep(10 * time.Second)
+
+		if xbmc.DialogConfirm("Quasar", "LOCALIZE[30271]") {
+			xbmc.PlayURL("plugin://script.quasar.burst/")
+			for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
+				if addon.ID == "script.quasar.burst" && addon.Enabled == true {
+					hasBurst = true
+				}
+			}
+			if hasBurst {
+				for _, addon := range enabledProviders {
+					xbmc.SetAddonEnabled(addon.ID, false)
+				}
+				xbmc.Notify("Quasar", "LOCALIZE[30272]", AddonIcon())
+			} else {
+				xbmc.Dialog("Quasar", "LOCALIZE[30273]")
+			}
+		}
+	}
 }

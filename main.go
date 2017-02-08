@@ -90,7 +90,7 @@ func main() {
 	log.Infof("Addon: %s v%s", conf.Info.Id, conf.Info.Version)
 
 	ensureSingleInstance()
-	Migrate()
+	wasFirstRun := Migrate()
 
 	btService := bittorrent.NewBTService(*makeBTConfiguration(conf))
 
@@ -129,8 +129,10 @@ func main() {
 	xbmc.Notify("Quasar", "LOCALIZE[30208]", config.AddonIcon())
 
 	go func() {
-		log.Info("Updating Kodi add-on repositories...")
-		xbmc.UpdateAddonRepos()
+		if !wasFirstRun {
+			log.Info("Updating Kodi add-on repositories...")
+			xbmc.UpdateAddonRepos()
+		}
 
 		xbmc.ResetRPC()
 	}()

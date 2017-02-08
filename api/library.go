@@ -93,8 +93,13 @@ func checkLibraryPath() error {
 	if libraryPath == "" {
 		libraryPath = config.Get().LibraryPath
 	}
-	if fileInfo, err := os.Stat(libraryPath); err != nil || fileInfo.IsDir() == false || libraryPath == "" || libraryPath == "." {
-		xbmc.Notify("Quasar", "LOCALIZE[30220]", config.AddonIcon())
+	if fileInfo, err := os.Stat(libraryPath); err != nil {
+		if fileInfo.IsDir() == false {
+			return errors.New("Libray path is not a directory")
+		}
+		if libraryPath == "" || libraryPath == "." {
+			return errors.New("LOCALIZE[30220]")
+		}
 		return err
 	}
 	return nil

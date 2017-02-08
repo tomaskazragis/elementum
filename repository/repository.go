@@ -74,6 +74,10 @@ func MakeQuasarRepositoryAddon() error {
 		return err
 	}
 
+	if err := copyFile(filepath.Join(config.Get().Info.Path, "fanart.jpg"), filepath.Join(addonPath, "fanart.jpg")); err != nil {
+		return err
+	}
+
 	addonXmlFile, err := os.Create(filepath.Join(addonPath, "addon.xml"))
 	if err != nil {
 		return err

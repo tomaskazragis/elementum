@@ -18,6 +18,16 @@ func GetAddons(args ...interface{}) *AddonsList {
 	return &addons
 }
 
+func UpdateLocalAddons() (ret string) {
+	executeJSONRPCEx("UpdateLocalAddons", &ret, nil)
+	return
+}
+
+func InstallAddon(addonId string) (ret string) {
+	executeJSONRPCEx("InstallAddon", &ret, Args{addonId})
+	return
+}
+
 func SetAddonEnabled(addonId string, enabled bool) (retval string) {
 	executeJSONRPC("Addons.SetAddonEnabled", &retval, Args{addonId, enabled})
 	return
