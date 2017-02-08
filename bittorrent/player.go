@@ -210,9 +210,6 @@ func (btp *BTPlayer) addTorrent() error {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.uri)
 	}
 
-	// Disable auto_managed
-	btp.torrentHandle.AutoManaged(false)
-
 	btp.log.Info("Enabling sequential download")
 	btp.torrentHandle.SetSequentialDownload(true)
 
@@ -240,9 +237,6 @@ func (btp *BTPlayer) resumeTorrent(torrentIndex int) error {
 	btp.log.Info("Enabling sequential download")
 	btp.torrentHandle.SetSequentialDownload(true)
 
-	// Make sure auto_managed is disabled
-	btp.torrentHandle.AutoManaged(false)
-
 	status := btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
 
 	shaHash := status.GetInfoHash().ToString()
@@ -256,7 +250,7 @@ func (btp *BTPlayer) resumeTorrent(torrentIndex int) error {
 		btp.onMetadataReceived()
 	}
 
-	btp.torrentHandle.Resume()
+	btp.torrentHandle.AutoManaged(true)
 
 	return nil
 }
@@ -294,12 +288,12 @@ func (btp *BTPlayer) Buffer() error {
 }
 
 func (btp *BTPlayer) waitCheckAvailableSpace() {
-	halfSecond := time.NewTicker(500 * time.Millisecond)
-	defer halfSecond.Stop()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-halfSecond.C:
+		case <-ticker.C:
 			if btp.hasChosenFile && btp.isDownloading {
 				btp.CheckAvailableSpace()
 				return
@@ -346,18 +340,13 @@ func (btp *BTPlayer) CheckAvailableSpace() bool {
 func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Info("Metadata received.")
 
+	btp.torrentHandle.AutoManaged(false)
+	btp.torrentHandle.Pause()
+	defer btp.torrentHandle.AutoManaged(true)
+
 	btp.torrentName = btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName)).GetName()
 
 	btp.torrentInfo = btp.torrentHandle.TorrentFile()
-
-	// Set all file priorities to 0 until chosenFile is determined
-	numFiles := btp.torrentInfo.NumFiles()
-	filesPriorities := libtorrent.NewStdVectorInt()
-	defer libtorrent.DeleteStdVectorInt(filesPriorities)
-	for i := 0; i < numFiles; i++ {
-		filesPriorities.Add(0)
-	}
-	btp.torrentHandle.PrioritizeFiles(filesPriorities)
 
 	// Save .torrent
 	btp.log.Infof("Saving %s ...", btp.torrentFile)
@@ -385,9 +374,19 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.fileName = fileName
 	btp.log.Infof("Chosen file: %s", fileName)
 
-	// Set normal file priority to chosenFile
-	btp.log.Info("Setting file priority")
-	btp.torrentHandle.FilePriority(btp.chosenFile, 4)
+	// Set all file priorities to 0 except chosen file
+	btp.log.Info("Setting file priorities")
+	numFiles := btp.torrentInfo.NumFiles()
+	filesPriorities := libtorrent.NewStdVectorInt()
+	defer libtorrent.DeleteStdVectorInt(filesPriorities)
+	for i := 0; i < numFiles; i++ {
+		if i == btp.chosenFile {
+			filesPriorities.Add(4)
+		} else {
+			filesPriorities.Add(0)
+		}
+	}
+	btp.torrentHandle.PrioritizeFiles(filesPriorities)
 
 	btp.log.Info("Setting piece priorities")
 
@@ -434,9 +433,6 @@ func (btp *BTPlayer) onMetadataReceived() {
 		piecesPriorities.Add(0)
 	}
 	btp.torrentHandle.PrioritizePieces(piecesPriorities)
-
-	// Make sure we're not paused
-	btp.torrentHandle.Resume()
 }
 
 func (btp *BTPlayer) statusStrings(progress float64, status libtorrent.TorrentStatus) (string, string, string) {
