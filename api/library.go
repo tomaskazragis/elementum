@@ -454,7 +454,7 @@ func syncMoviesList(listId string, updating bool) (err error) {
 		movies, err = trakt.CollectionMovies()
 		label = "LOCALIZE[30257]"
 	default:
-		movies, err = trakt.ListItemsMovies(listId, "0")
+		movies, err = trakt.ListItemsMovies(listId, false)
 		label = "LOCALIZE[30263]"
 	}
 
@@ -588,7 +588,7 @@ func syncShowsList(listId string, updating bool) (err error) {
 		shows, err = trakt.CollectionShows()
 		label = "LOCALIZE[30257]"
 	default:
-		shows, err = trakt.ListItemsShows(listId, "0")
+		shows, err = trakt.ListItemsShows(listId, false)
 		label = "LOCALIZE[30263]"
 	}
 
@@ -1004,10 +1004,10 @@ func LibraryUpdate() {
 		language := config.Get().Language
 		tmdb.PopularMovies("", language, 1)
 		tmdb.PopularShows("", language, 1)
-		if _, err := trakt.TopMovies("trending", "1"); err != nil {
+		if _, _, err := trakt.TopMovies("trending", "1"); err != nil {
 			libraryLog.Warning(err)
 		}
-		if _, err := trakt.TopShows("trending", "1"); err != nil {
+		if _, _, err := trakt.TopShows("trending", "1"); err != nil {
 			libraryLog.Warning(err)
 		}
 		libraryLog.Notice("Caches warmed up")

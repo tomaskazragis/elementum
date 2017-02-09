@@ -271,6 +271,20 @@ type CalendarMovie struct {
 	Movie      *Movie `json:"movie"`
 }
 
+func totalFromHeaders(headers http.Header) (total int, err error) {
+	if len(headers) > 0 {
+		if itemCount, exists := headers["X-Pagination-Item-Count"]; exists {
+			if itemCount != nil {
+				total, err = strconv.Atoi(itemCount[0])
+				return
+			}
+			return -1, errors.New("X-Pagination-Item-Count was empty")
+		}
+		return -1, errors.New("No X-Pagination-Item-Count header found")
+	}
+	return -1, errors.New("No valid headers in request")
+}
+
 func newClearance() (err error) {
 	retriesLeft -= 1
 	log.Warningf("CloudFlared! User-Agent: %s - Cookies: %s", clearance.UserAgent, clearance.Cookies)

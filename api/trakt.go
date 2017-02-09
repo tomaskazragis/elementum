@@ -124,7 +124,7 @@ func WatchlistMovies(ctx *gin.Context) {
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, 0)
+	renderTraktMovies(ctx, movies, -1, 0)
 }
 
 func WatchlistShows(ctx *gin.Context) {
@@ -132,7 +132,7 @@ func WatchlistShows(ctx *gin.Context) {
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, 0)
+	renderTraktShows(ctx, shows, -1, 0)
 }
 
 func CollectionMovies(ctx *gin.Context) {
@@ -140,7 +140,7 @@ func CollectionMovies(ctx *gin.Context) {
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, 0)
+	renderTraktMovies(ctx, movies, -1, 0)
 }
 
 func CollectionShows(ctx *gin.Context) {
@@ -148,29 +148,29 @@ func CollectionShows(ctx *gin.Context) {
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, 0)
+	renderTraktShows(ctx, shows, -1, 0)
 }
 
 func UserlistMovies(ctx *gin.Context) {
 	listId := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.ListItemsMovies(listId, pageParam)
+	movies, err := trakt.ListItemsMovies(listId, true)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, -1, page)
 }
 
 func UserlistShows(ctx *gin.Context) {
 	listId := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.ListItemsShows(listId, pageParam)
+	shows, err := trakt.ListItemsShows(listId, true)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, -1, page)
 }
 
 // func WatchlistSeasons(ctx *gin.Context) {
@@ -194,6 +194,8 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Movie added to watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -208,6 +210,8 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Movie removed from watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -222,6 +226,8 @@ func AddShowToWatchlist(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Show added to watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -236,6 +242,8 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Show removed from watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -250,6 +258,8 @@ func AddMovieToCollection(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Movie added to collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -264,6 +274,8 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Movie removed from collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -278,6 +290,8 @@ func AddShowToCollection(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Show added to collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -292,6 +306,8 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 	} else {
 		xbmc.Notify("Quasar", "Show removed from collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
+		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
+		clearPageCache(ctx)
 		xbmc.Refresh()
 	}
 }
@@ -308,12 +324,20 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 // 	}
 // }
 
-func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
+func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page int) {
 	hasNextPage := 0
 	if page > 0 {
-		hasNextPage = 1
-
 		resultsPerPage := config.Get().ResultsPerPage
+
+		if total == -1 {
+			total = len(movies)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
 		if len(movies) > resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
 			movies = movies[start:start + resultsPerPage]
@@ -400,78 +424,86 @@ func renderTraktMovies(movies []*trakt.Movies, ctx *gin.Context, page int) {
 func TraktPopularMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("popular", pageParam)
+	movies, total, err := trakt.TopMovies("popular", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktTrendingMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("trending", pageParam)
+	movies, total, err := trakt.TopMovies("trending", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktMostPlayedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("played", pageParam)
+	movies, total, err := trakt.TopMovies("played", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktMostWatchedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("watched", pageParam)
+	movies, total, err := trakt.TopMovies("watched", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktMostCollectedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("collected", pageParam)
+	movies, total, err := trakt.TopMovies("collected", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktMostAnticipatedMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.TopMovies("anticipated", pageParam)
+	movies, total, err := trakt.TopMovies("anticipated", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, page)
+	renderTraktMovies(ctx, movies, total, page)
 }
 
 func TraktBoxOffice(ctx *gin.Context) {
-	movies, err := trakt.TopMovies("boxoffice", "1")
+	movies, _, err := trakt.TopMovies("boxoffice", "1")
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktMovies(movies, ctx, 0)
+	renderTraktMovies(ctx, movies, -1, 0)
 }
 
 
-func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
+func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page int) {
 	hasNextPage := 0
 	if page > 0 {
-		hasNextPage = 1
-
 		resultsPerPage := config.Get().ResultsPerPage
+
+		if total == -1 {
+			total = len(shows)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
 		if len(shows) >= resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
 			shows = shows[start:start + resultsPerPage]
@@ -534,61 +566,61 @@ func renderTraktShows(shows []*trakt.Shows, ctx *gin.Context, page int) {
 func TraktPopularShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("popular", pageParam)
+	shows, total, err := trakt.TopShows("popular", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 func TraktTrendingShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("trending", pageParam)
+	shows, total, err := trakt.TopShows("trending", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 func TraktMostPlayedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("played", pageParam)
+	shows, total, err := trakt.TopShows("played", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 func TraktMostWatchedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("watched", pageParam)
+	shows, total, err := trakt.TopShows("watched", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 func TraktMostCollectedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("collected", pageParam)
+	shows, total, err := trakt.TopShows("collected", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 func TraktMostAnticipatedShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.TopShows("anticipated", pageParam)
+	shows, total, err := trakt.TopShows("anticipated", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderTraktShows(shows, ctx, page)
+	renderTraktShows(ctx, shows, total, page)
 }
 
 //
@@ -597,109 +629,117 @@ func TraktMostAnticipatedShows(ctx *gin.Context) {
 func TraktMyShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("my/shows", pageParam)
+	shows, total, err := trakt.CalendarShows("my/shows", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktMyNewShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("my/shows/new", pageParam)
+	shows, total, err := trakt.CalendarShows("my/shows/new", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktMyPremieres(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("my/shows/premieres", pageParam)
+	shows, total, err := trakt.CalendarShows("my/shows/premieres", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktMyMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarMovies("my/movies", pageParam)
+	movies, total, err := trakt.CalendarMovies("my/movies", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarMovies(shows, ctx, page)
+	renderCalendarMovies(ctx, movies, total, page)
 }
 
 func TraktMyReleases(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarMovies("my/dvd", pageParam)
+	movies, total, err := trakt.CalendarMovies("my/dvd", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarMovies(shows, ctx, page)
+	renderCalendarMovies(ctx, movies, total, page)
 }
 
 func TraktAllShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("all/shows", pageParam)
+	shows, total, err := trakt.CalendarShows("all/shows", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktAllNewShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("all/shows/new", pageParam)
+	shows, total, err := trakt.CalendarShows("all/shows/new", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktAllPremieres(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarShows("all/shows/premieres", pageParam)
+	shows, total, err := trakt.CalendarShows("all/shows/premieres", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarShows(shows, ctx, page)
+	renderCalendarShows(ctx, shows, total, page)
 }
 
 func TraktAllMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarMovies("all/movies", pageParam)
+	movies, total, err := trakt.CalendarMovies("all/movies", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarMovies(shows, ctx, page)
+	renderCalendarMovies(ctx, movies, total, page)
 }
 
 func TraktAllReleases(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.CalendarMovies("all/dvd", pageParam)
+	movies, total, err := trakt.CalendarMovies("all/dvd", pageParam)
 	if err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 	}
-	renderCalendarMovies(shows, ctx, page)
+	renderCalendarMovies(ctx, movies, total, page)
 }
 
-func renderCalendarMovies(movies []*trakt.CalendarMovie, ctx *gin.Context, page int) {
+func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total int, page int) {
 	hasNextPage := 0
 	if page > 0 {
-		hasNextPage = 1
-
 		resultsPerPage := config.Get().ResultsPerPage
+
+		if total == -1 {
+			total = len(movies)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
 		if len(movies) > resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
 			movies = movies[start:start + resultsPerPage]
@@ -786,12 +826,20 @@ func renderCalendarMovies(movies []*trakt.CalendarMovie, ctx *gin.Context, page 
 	ctx.JSON(200, xbmc.NewView("movies", items))
 }
 
-func renderCalendarShows(shows []*trakt.CalendarShow, ctx *gin.Context, page int) {
+func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total int, page int) {
 	hasNextPage := 0
 	if page > 0 {
-		hasNextPage = 1
-
 		resultsPerPage := config.Get().ResultsPerPage
+
+		if total == -1 {
+			total = len(shows)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
 		if len(shows) >= resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
 			shows = shows[start:start + resultsPerPage]

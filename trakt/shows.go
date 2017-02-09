@@ -233,14 +233,14 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 	return
 }
 
-func TopShows(topCategory string, page string) (shows []*Shows, err error) {
+func TopShows(topCategory string, page string) (shows []*Shows, total int, err error) {
 	endPoint := "shows/" + topCategory
 
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		return
+		return shows, 0, err
 	}
 	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
 	params := napping.Params{
@@ -251,19 +251,20 @@ func TopShows(topCategory string, page string) (shows []*Shows, err error) {
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.trakt.shows.%s.%s", topCategory, page)
+	totalKey := fmt.Sprintf("com.trakt.shows.%s.total", topCategory)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		resp, err := Get(endPoint, params)
 
 		if err != nil {
-			return shows, err
+			return shows, 0, err
 		} else if resp.Status() != 200 {
-			return shows, errors.New(fmt.Sprintf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status()))
+			return shows, 0, errors.New(fmt.Sprintf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status()))
 		}
 
 	  if topCategory == "popular" {
 			var showList []*Show
 			if err := resp.Unmarshal(&showList); err != nil {
-				return shows, err
+				return shows, 0, err
 			}
 
 			showListing := make([]*Shows, 0)
@@ -284,7 +285,18 @@ func TopShows(topCategory string, page string) (shows []*Shows, err error) {
 			shows = setShowsFanart(shows)
 		}
 
+		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		if err != nil {
+			log.Warning(err)
+		} else {
+			cacheStore.Set(totalKey, total, recentExpiration)
+		}
+
 		cacheStore.Set(key, shows, recentExpiration)
+	} else {
+		if err := cacheStore.Get(totalKey, &total); err != nil {
+			total = -1
+		}
 	}
 
 	return
@@ -379,23 +391,19 @@ func CollectionShows() (shows []*Shows, err error) {
 	return
 }
 
-func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
+func ListItemsShows(listId string, withImages bool) (shows []*Shows, err error) {
 	endPoint := fmt.Sprintf("users/%s/lists/%s/items/shows", config.Get().TraktUsername, listId)
 
 	params := napping.Params{}.AsUrlValues()
 
-	if page != "0" {
-		params = napping.Params{
-			"page": page,
-			"limit": strconv.Itoa(config.Get().ResultsPerPage),
-			"extended": "full,images",
-		}.AsUrlValues()
-	}
-
 	var resp *napping.Response
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.shows.list.%s", listId)
+	full := ""
+	if withImages {
+		full = ".full"
+	}
+	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listId, full)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		if erra := Authorized(); erra != nil {
 			resp, err = Get(endPoint, params)
@@ -421,7 +429,7 @@ func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
 		}
 		shows = showListing
 
-		if page != "0" {
+		if withImages {
 			shows = setShowsFanart(shows)
 		}
 
@@ -431,12 +439,12 @@ func ListItemsShows(listId string, page string) (shows []*Shows, err error) {
 	return
 }
 
-func CalendarShows(endPoint string, page string) (shows []*CalendarShow, err error) {
+func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total int, err error) {
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		return
+		return shows, 0, err
 	}
 	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
 	params := napping.Params{
@@ -446,14 +454,16 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, err err
 	}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.myshows.%s.%s", strings.Replace(endPoint, "/", ".", -1), page)
+	endPointKey := strings.Replace(endPoint, "/", ".", -1)
+	key := fmt.Sprintf("com.trakt.myshows.%s.%s", endPointKey, page)
+	totalKey := fmt.Sprintf("com.trakt.myshows.%s.total", endPointKey)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		resp, err := GetWithAuth("calendars/" + endPoint, params)
 
 		if err != nil {
-			return shows, err
+			return shows, 0, err
 		} else if resp.Status() != 200 {
-			return shows, errors.New(fmt.Sprintf("Bad status getting %s Trakt shows: %d", endPoint, resp.Status()))
+			return shows, 0, errors.New(fmt.Sprintf("Bad status getting %s Trakt shows: %d", endPoint, resp.Status()))
 		}
 
 		if err := resp.Unmarshal(&shows); err != nil {
@@ -464,7 +474,18 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, err err
 			shows = setCalendarShowsFanart(shows)
 		}
 
+		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		if err != nil {
+			total = -1
+		} else {
+			cacheStore.Set(totalKey, total, recentExpiration)
+		}
+
 		cacheStore.Set(key, shows, recentExpiration)
+	} else {
+		if err := cacheStore.Get(totalKey, &total); err != nil {
+			total = -1
+		}
 	}
 
 	return
