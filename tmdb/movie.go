@@ -154,7 +154,7 @@ func GetMovieGenres(language string) []*Genre {
 	return genres.Genres
 }
 
-func SearchMovies(query string, language string, page int) Movies {
+func SearchMovies(query string, language string, page int) (Movies, int) {
 	var results EntityList
 
 	rateLimiter.Call(func() {
@@ -185,17 +185,19 @@ func SearchMovies(query string, language string, page int) Movies {
 	for _, movie := range results.Results {
 		tmdbIds = append(tmdbIds, movie.Id)
 	}
-	return GetMovies(tmdbIds, language)
+	return GetMovies(tmdbIds, language), results.TotalResults
 }
 
-func GetIMDBList(listId string, language string, page int) (movies Movies) {
+func GetIMDBList(listId string, language string, page int) (movies Movies, totalResults int) {
 	var results *List
+	totalResults = -1
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
 	pageGroup := (page - 1) * resultsPerPage / limit + 1
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.imdb.list.%s.%d", listId, pageGroup)
+	totalKey := fmt.Sprintf("com.imdb.list.%s.total", listId)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
@@ -230,12 +232,19 @@ func GetIMDBList(listId string, language string, page int) (movies Movies) {
 		if movies != nil && len(movies) > 0 {
 			cacheStore.Set(key, movies, cacheExpiration * 4)
 		}
+		totalResults = results.ItemCount
+		cacheStore.Set(totalKey, totalResults, cacheExpiration * 4)
+	} else {
+		if err := cacheStore.Get(totalKey, &totalResults); err != nil {
+			totalResults = -1
+		}
 	}
 	return
 }
 
-func listMovies(endpoint string, cacheKey string, params napping.Params, page int) Movies {
+func listMovies(endpoint string, cacheKey string, params napping.Params, page int) (Movies, int) {
 	params["api_key"] = apiKey
+	totalResults := -1
 	genre := params["with_genres"]
 	if params["with_genres"] == "" {
 		genre = "all"
@@ -247,6 +256,7 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%d", cacheKey, genre, pageGroup)
+	totalKey := fmt.Sprintf("com.tmdb.topmovies.%s.%s.total", cacheKey, genre)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		wg := sync.WaitGroup{}
 		for p := 0; p < PagesAtOnce; p++ {
@@ -282,22 +292,27 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 					}
 				})
 				if results != nil {
+					if totalResults == -1 {
+						totalResults = results.TotalResults
+						cacheStore.Set(totalKey, totalResults, recentExpiration)
+					}
 					for m, movie := range results.Results {
-						if m >= ResultsPerPage - 1 {
-							break
-						}
 						movies[p * ResultsPerPage + m] = GetMovie(movie.Id, params["language"])
 					}
 				}
 			}(p)
 		}
 		wg.Wait()
-		cacheStore.Set(key, movies, 15 * time.Minute)
+		cacheStore.Set(key, movies, recentExpiration)
+	} else {
+		if err := cacheStore.Get(totalKey, &totalResults); err != nil {
+			totalResults = -1
+		}
 	}
-	return movies
+	return movies, totalResults
 }
 
-func PopularMovies(genre string, language string, page int) Movies {
+func PopularMovies(genre string, language string, page int) (Movies, int) {
 	var p napping.Params
 	if genre == "" {
 		p = napping.Params{
@@ -316,7 +331,7 @@ func PopularMovies(genre string, language string, page int) Movies {
 	return listMovies("discover/movie", "popular", p, page)
 }
 
-func RecentMovies(genre string, language string, page int) Movies {
+func RecentMovies(genre string, language string, page int) (Movies, int) {
 	var p napping.Params
 	if genre == "" {
 		p = napping.Params{
@@ -337,11 +352,11 @@ func RecentMovies(genre string, language string, page int) Movies {
 	return listMovies("discover/movie", "recent", p, page)
 }
 
-func TopRatedMovies(genre string, language string, page int) Movies {
+func TopRatedMovies(genre string, language string, page int) (Movies, int) {
 	return listMovies("movie/top_rated", "toprated", napping.Params{"language": language}, page)
 }
 
-func MostVotedMovies(genre string, language string, page int) Movies {
+func MostVotedMovies(genre string, language string, page int) (Movies, int) {
 	var p napping.Params
 	if genre == "" {
 		p = napping.Params{

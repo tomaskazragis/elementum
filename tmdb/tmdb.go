@@ -253,6 +253,7 @@ const (
 	burstTime               = 15 * time.Second
 	simultaneousConnections = 20
 	cacheExpiration         = 6 * 24 * time.Hour
+	recentExpiration        = 15 * time.Minute
 	imagesCacheExpiration   = 14 * 24 * time.Hour
 )
 

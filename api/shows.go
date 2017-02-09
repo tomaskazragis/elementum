@@ -118,18 +118,28 @@ func CalendarShows(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
 }
 
-func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
-	nextPage := 0
-	if page >= 0 {
-		nextPage = 1
-
+func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query string) {
+	hasNextPage := 0
+	if page > 0 {
 		resultsPerPage := config.Get().ResultsPerPage
-		if len(shows) >= resultsPerPage {
+
+		if total == -1 {
+			total = len(shows)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
+		if len(shows) > resultsPerPage {
 			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
 			shows = shows[start:start + resultsPerPage]
 		}
 	}
-	items := make(xbmc.ListItems, 0, len(shows) + nextPage)
+
+	items := make(xbmc.ListItems, 0, len(shows) + hasNextPage)
+
 	for _, show := range shows {
 		if show == nil {
 			continue
@@ -165,7 +175,7 @@ func renderShows(shows tmdb.Shows, ctx *gin.Context, page int, query string) {
 		}
 		items = append(items, item)
 	}
-	if page >= 0 {
+	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextPath := UrlForXBMC(fmt.Sprintf("%s?page=%d", path, page + 1))
 		if query != "" {
@@ -187,7 +197,8 @@ func PopularShows(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.PopularShows(genre, config.Get().Language, page), ctx, page, "")
+	shows, total := tmdb.PopularShows(genre, config.Get().Language, page)
+	renderShows(ctx, shows, page, total, "")
 }
 
 func RecentShows(ctx *gin.Context) {
@@ -196,7 +207,8 @@ func RecentShows(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.RecentShows(genre, config.Get().Language, page), ctx, page, "")
+	shows, total := tmdb.RecentShows(genre, config.Get().Language, page)
+	renderShows(ctx, shows, page, total, "")
 }
 
 func RecentEpisodes(ctx *gin.Context) {
@@ -205,17 +217,20 @@ func RecentEpisodes(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.RecentEpisodes(genre, config.Get().Language, page), ctx, page, "")
+	shows, total := tmdb.RecentEpisodes(genre, config.Get().Language, page)
+	renderShows(ctx, shows, page, total, "")
 }
 
 func TopRatedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.TopRatedShows("", config.Get().Language, page), ctx, page, "")
+	shows, total := tmdb.TopRatedShows("", config.Get().Language, page)
+	renderShows(ctx, shows, page, total, "")
 }
 
 func TVMostVoted(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.MostVotedShows("", config.Get().Language, page), ctx, page, "")
+	shows, total := tmdb.MostVotedShows("", config.Get().Language, page)
+	renderShows(ctx, shows, page, total, "")
 }
 
 func SearchShows(ctx *gin.Context) {
@@ -237,7 +252,8 @@ func SearchShows(ctx *gin.Context) {
 		return
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderShows(tmdb.SearchShows(query, config.Get().Language, page), ctx, page, query)
+	shows, total := tmdb.SearchShows(query, config.Get().Language, page)
+	renderShows(ctx, shows, page, total, query)
 }
 
 func ShowSeasons(ctx *gin.Context) {

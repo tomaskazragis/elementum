@@ -1,4 +1,4 @@
-image: golang:1.8-alpine
+image: docker:latest
 services:
   - docker:dind
 variables:

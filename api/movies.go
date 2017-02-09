@@ -85,7 +85,6 @@ func MovieGenres(ctx *gin.Context) {
 			},
 		})
 	}
-
 	ctx.JSON(200, xbmc.NewView("menus_movies_genres", items))
 }
 
@@ -122,7 +121,6 @@ func MoviesTrakt(ctx *gin.Context) {
 
 func MoviesTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
-
 	for _, list := range trakt.Userlists() {
 		item := &xbmc.ListItem{
 			Label: list.Name,
@@ -134,7 +132,6 @@ func MoviesTraktLists(ctx *gin.Context) {
 		}
 		items = append(items, item)
 	}
-
 	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
@@ -148,18 +145,28 @@ func CalendarMovies(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
-func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) {
-	nextPage := 0
-	if page >= 0 {
-		nextPage = 1
-
+func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, query string) {
+	hasNextPage := 0
+	if page > 0 {
 		resultsPerPage := config.Get().ResultsPerPage
-		if len(movies) >= resultsPerPage {
+
+		if total == -1 {
+			total = len(movies)
+		}
+		if total > resultsPerPage {
+			if page * resultsPerPage < total {
+				hasNextPage = 1
+			}
+		}
+
+		if len(movies) > resultsPerPage {
 			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
 			movies = movies[start:start + resultsPerPage]
 		}
 	}
-	items := make(xbmc.ListItems, 0, len(movies) + nextPage)
+
+	items := make(xbmc.ListItems, 0, len(movies) + hasNextPage)
+
 	for _, movie := range movies {
 		if movie == nil {
 			continue
@@ -220,7 +227,7 @@ func renderMovies(movies tmdb.Movies, ctx *gin.Context, page int, query string) 
 		item.IsPlayable = true
 		items = append(items, item)
 	}
-	if page >= 0 {
+	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextPath := UrlForXBMC(fmt.Sprintf("%s?page=%d", path, page + 1))
 		if query != "" {
@@ -242,7 +249,8 @@ func PopularMovies(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.PopularMovies(genre, config.Get().Language, page), ctx, page, "")
+	movies, total := tmdb.PopularMovies(genre, config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, "")
 }
 
 func RecentMovies(ctx *gin.Context) {
@@ -251,7 +259,8 @@ func RecentMovies(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.RecentMovies(genre, config.Get().Language, page), ctx, page, "")
+	movies, total := tmdb.RecentMovies(genre, config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, "")
 }
 
 func TopRatedMovies(ctx *gin.Context) {
@@ -260,17 +269,20 @@ func TopRatedMovies(ctx *gin.Context) {
 		genre = ""
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.TopRatedMovies(genre, config.Get().Language, page), ctx, page, "")
+	movies, total := tmdb.TopRatedMovies(genre, config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, "")
 }
 
 func IMDBTop250(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.GetIMDBList("522effe419c2955e9922fcf3", config.Get().Language, page), ctx, page, "")
+	movies, total := tmdb.GetIMDBList("522effe419c2955e9922fcf3", config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, "")
 }
 
 func MoviesMostVoted(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.MostVotedMovies("", config.Get().Language, page), ctx, page, "")
+	movies, total := tmdb.MostVotedMovies("", config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, "")
 }
 
 func SearchMovies(ctx *gin.Context) {
@@ -292,7 +304,8 @@ func SearchMovies(ctx *gin.Context) {
 		return
 	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	renderMovies(tmdb.SearchMovies(query, config.Get().Language, page), ctx, page, query)
+	movies, total := tmdb.SearchMovies(query, config.Get().Language, page)
+	renderMovies(ctx, movies, page, total, query)
 }
 
 func movieLinks(tmdbId string) []*bittorrent.Torrent {

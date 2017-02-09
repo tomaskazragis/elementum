@@ -135,7 +135,7 @@ func GetShows(showIds []int, language string) Shows {
 	return shows
 }
 
-func SearchShows(query string, language string, page int) Shows {
+func SearchShows(query string, language string, page int) (Shows, int) {
 	var results EntityList
 	rateLimiter.Call(func() {
 		urlValues := napping.Params{
@@ -165,11 +165,12 @@ func SearchShows(query string, language string, page int) Shows {
 	for _, entity := range results.Results {
 		tmdbIds = append(tmdbIds, entity.Id)
 	}
-	return GetShows(tmdbIds, language)
+	return GetShows(tmdbIds, language), results.TotalResults
 }
 
-func listShows(endpoint string, cacheKey string, params napping.Params, page int) Shows {
+func listShows(endpoint string, cacheKey string, params napping.Params, page int) (Shows, int) {
 	params["api_key"] = apiKey
+	totalResults := -1
 	genre := params["with_genres"]
 	if params["with_genres"] == "" {
 		genre = "all"
@@ -181,6 +182,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.topshows.%s.%s.%d", cacheKey, genre, pageGroup)
+	totalKey := fmt.Sprintf("com.tmdb.topshows.%s.%s.total", cacheKey, genre)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		wg := sync.WaitGroup{}
 		for p := 0; p < PagesAtOnce; p++ {
@@ -216,22 +218,27 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					}
 				})
 				if results != nil {
+					if totalResults == -1 {
+						totalResults = results.TotalResults
+						cacheStore.Set(totalKey, totalResults, recentExpiration)
+					}
 					for s, show := range results.Results {
-						if s >= ResultsPerPage - 1 {
-							break
-						}
 						shows[p * ResultsPerPage + s] = GetShow(show.Id, params["language"])
 					}
 				}
 			}(p)
 		}
 		wg.Wait()
-		cacheStore.Set(key, shows, 15 * time.Minute)
+		cacheStore.Set(key, shows, recentExpiration)
+	} else {
+		if err := cacheStore.Get(totalKey, &totalResults); err != nil {
+			totalResults = -1
+		}
 	}
-	return shows
+	return shows, totalResults
 }
 
-func PopularShows(genre string, language string, page int) Shows {
+func PopularShows(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 	if genre == "" {
 		p = napping.Params{
@@ -250,7 +257,7 @@ func PopularShows(genre string, language string, page int) Shows {
 	return listShows("discover/tv", "popular", p, page)
 }
 
-func RecentShows(genre string, language string, page int) Shows {
+func RecentShows(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 	if genre == "" {
 		p = napping.Params{
@@ -269,7 +276,7 @@ func RecentShows(genre string, language string, page int) Shows {
 	return listShows("discover/tv", "recent.shows", p, page)
 }
 
-func RecentEpisodes(genre string, language string, page int) Shows {
+func RecentEpisodes(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 
 	if genre == "" {
@@ -289,11 +296,11 @@ func RecentEpisodes(genre string, language string, page int) Shows {
 	return listShows("discover/tv", "recent.episodes", p, page)
 }
 
-func TopRatedShows(genre string, language string, page int) Shows {
+func TopRatedShows(genre string, language string, page int) (Shows, int) {
 	return listShows("tv/top_rated", "toprated", napping.Params{"language": language}, page)
 }
 
-func MostVotedShows(genre string, language string, page int) Shows {
+func MostVotedShows(genre string, language string, page int) (Shows, int) {
 	return listShows("discover/tv", "mostvoted", napping.Params{
 		"language":           language,
 		"sort_by":            "vote_count.desc",
