@@ -178,13 +178,13 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 		linksLabel := "LOCALIZE[30202]"
 		linksURL := UrlForXBMC("/movie/%d/links", movie.Id)
 
-		defaultURL := playURL
-		contextLabel := linksLabel
-		contextURL := linksURL
-		if config.Get().ChooseStreamAuto == false {
-			defaultURL = linksURL
-			contextLabel = playLabel
-			contextURL = playURL
+		defaultURL := linksURL
+		contextLabel := playLabel
+		contextURL := playURL
+		if config.Get().ChooseStreamAuto == true {
+			defaultURL = playURL
+			contextLabel = linksLabel
+			contextURL = linksURL
 		}
 
 		item.Path = defaultURL

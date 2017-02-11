@@ -361,13 +361,13 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 		linksLabel := "LOCALIZE[30202]"
 		linksURL := UrlForXBMC("/movie/%d/links", movie.IDs.TMDB)
 
-		defaultURL := playURL
-		contextLabel := linksLabel
-		contextURL := linksURL
-		if config.Get().ChooseStreamAuto == false {
-			defaultURL = linksURL
-			contextLabel = playLabel
-			contextURL = playURL
+		defaultURL := linksURL
+		contextLabel := playLabel
+		contextURL := playURL
+		if config.Get().ChooseStreamAuto == true {
+			defaultURL = playURL
+			contextLabel = linksLabel
+			contextURL = linksURL
 		}
 
 		item.Path = defaultURL
@@ -766,13 +766,13 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 		linksLabel := "LOCALIZE[30202]"
 		linksURL := UrlForXBMC("/movie/%d/links", movie.IDs.TMDB)
 
-		defaultURL := playURL
-		contextLabel := linksLabel
-		contextURL := linksURL
-		if config.Get().ChooseStreamAuto == false {
-			defaultURL = linksURL
-			contextLabel = playLabel
-			contextURL = playURL
+		defaultURL := linksURL
+		contextLabel := playLabel
+		contextURL := playURL
+		if config.Get().ChooseStreamAuto == true {
+			defaultURL = playURL
+			contextLabel = linksLabel
+			contextURL = linksURL
 		}
 
 		item.Path = defaultURL

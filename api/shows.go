@@ -317,13 +317,13 @@ func ShowEpisodes(ctx *gin.Context) {
 			item.Info.Episode,
 		)
 
-		defaultURL := playURL
-		contextLabel := linksLabel
-		contextURL := linksURL
-		if config.Get().ChooseStreamAuto == false {
-			defaultURL = linksURL
-			contextLabel = playLabel
-			contextURL = playURL
+		defaultURL := linksURL
+		contextLabel := playLabel
+		contextURL := playURL
+		if config.Get().ChooseStreamAuto == true {
+			defaultURL = playURL
+			contextLabel = linksLabel
+			contextURL = linksURL
 		}
 
 		item.Path = defaultURL
