@@ -263,6 +263,7 @@ var (
 		"ae4bd1b6fce2a5648671bfc171d15ba4",
 	}
 	apiKey = apiKeys[rand.Intn(len(apiKeys))]
+	WarmingUp = true
 )
 
 var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)

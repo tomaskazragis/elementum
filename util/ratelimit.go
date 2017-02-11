@@ -14,12 +14,8 @@ type RateLimiter struct {
 	rateTicker   *time.Ticker
 	rateLimiter  chan bool
 	parallelChan chan bool
-	coolDown     *time.Ticker
-	waiting      int
-
-	BurstRate     int
-	BurstTimeSpan time.Duration
-	ParallelCount int
+	burstRate    int
+	coolDown     int
 }
 
 func NewRateLimiter(burstRate int, burstTimeSpan time.Duration, parallelCount int) *RateLimiter {
@@ -27,24 +23,19 @@ func NewRateLimiter(burstRate int, burstTimeSpan time.Duration, parallelCount in
 		rateTicker:   time.NewTicker(burstTimeSpan),
 		rateLimiter:  make(chan bool, burstRate),
 		parallelChan: make(chan bool, parallelCount),
-		coolDown:     time.NewTicker(time.Duration(10)),
-		waiting:      0,
-
-		BurstRate:     burstRate,
-		BurstTimeSpan: burstTimeSpan,
-		ParallelCount: parallelCount,
+		burstRate:    burstRate,
 	}
-	limiter.coolDown.Stop()
 	go func() {
 		for _ = range limiter.rateTicker.C {
-			limiter.Reset()
-		}
-	}()
-	go func() {
-		for _ = range limiter.coolDown.C {
-			limiter.waiting = 0
-			limiter.coolDown.Stop()
-			limiter.rateTicker = time.NewTicker(burstTimeSpan)
+			// log.Debugf("Rate limiter ticking (%d / %d)...", burstRate, parallelCount)
+			if limiter.coolDown == 0 {
+				limiter.Reset()
+				// log.Debugf("Resetting (%d / %d)...", burstRate, parallelCount)
+			} else {
+				time.Sleep(time.Duration(limiter.coolDown) * time.Second)
+				limiter.coolDown = 0
+				// log.Debugf("Cooldown tick after %ds (%d / %d)...", limiter.coolDown, burstRate, parallelCount)
+			}
 		}
 	}()
 	return limiter
@@ -62,15 +53,16 @@ func (rl *RateLimiter) Leave() {
 func (rl *RateLimiter) Call(f func()) {
 	rl.Enter()
 	defer rl.Leave()
-	if rl.waiting > 0 {
-		time.Sleep(time.Duration(rl.waiting))
+	if rl.coolDown > 0 {
+		// Already cooling down, wait up
+		time.Sleep(time.Duration(rl.coolDown) * time.Second)
 	}
 	f()
 }
 
 func (rl *RateLimiter) Reset() {
 outer:
-	for i := 0; i < rl.BurstRate; i++ {
+	for i := 0; i < rl.burstRate; i++ {
 		select {
 		case <-rl.rateLimiter:
 		default:
@@ -79,29 +71,25 @@ outer:
 	}
 }
 
-func (rl *RateLimiter) Wait(coolDown time.Duration) {
-	rl.rateTicker.Stop()
-	rl.coolDown = time.NewTicker(coolDown)
-}
-
 func (rl *RateLimiter) CoolDown(headers http.Header) {
 	if len(headers) > 0 {
 		if retryAfter, exists := headers["Retry-After"]; exists {
 			if retryAfter != nil {
 				coolDown, err := strconv.Atoi(retryAfter[0])
-				if err == nil {
-					log.Debugf("Cooling down for %d second(s)...", coolDown + 1)
-					rl.waiting = coolDown
-					rl.Wait(time.Duration(coolDown + 1))
+				if err == nil && coolDown > 0 {
+					coolDown = rl.coolDown + coolDown + 1
+					log.Debugf("Cooling down for %d second(s)...", coolDown)
+					rl.coolDown = coolDown
 					return
 				}
 			}
 		}
 	}
-	rl.Wait(time.Duration(3))
+	defaultCoolDown := rl.coolDown + 3
+	log.Debugf("No Retry-After header found, cooling down for %d seconds...", defaultCoolDown)
+	rl.coolDown = defaultCoolDown
 }
 
 func (rl *RateLimiter) Close() {
 	rl.rateTicker.Stop()
-	rl.coolDown.Stop()
 }

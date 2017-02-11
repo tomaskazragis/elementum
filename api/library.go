@@ -1001,6 +1001,14 @@ func LibraryUpdate() {
 	// Start warming caches by pre-fetching popular/trending lists
 	go func() {
 		libraryLog.Notice("Warming up caches...")
+		tmdb.WarmingUp = true
+		go func() {
+			time.Sleep(30 * time.Second)
+			if tmdb.WarmingUp == true {
+				xbmc.Notify("Quasar", "LOCALIZE[30147]", config.AddonIcon())
+			}
+		}()
+		started := time.Now()
 		language := config.Get().Language
 		tmdb.PopularMovies("", language, 1)
 		tmdb.PopularShows("", language, 1)
@@ -1010,7 +1018,12 @@ func LibraryUpdate() {
 		if _, _, err := trakt.TopShows("trending", "1"); err != nil {
 			libraryLog.Warning(err)
 		}
-		libraryLog.Notice("Caches warmed up")
+		tmdb.WarmingUp = false
+		took := time.Since(started)
+		if took.Seconds() > 30 {
+			xbmc.Notify("Quasar", "LOCALIZE[30148]", config.AddonIcon())
+		}
+		libraryLog.Noticef("Caches warmed up in %s", took)
 	}()
 
 	// Removed episodes debouncer

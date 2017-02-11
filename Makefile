@@ -168,7 +168,7 @@ dist: quasar vendor_$(TARGET_OS) strip checksum
 else ifeq ($(TARGET_OS), darwin)
 dist: quasar vendor_$(TARGET_OS) strip checksum
 else
-dist: quasar vendor_$(TARGET_OS) strip upx checksum
+dist: quasar vendor_$(TARGET_OS) strip checksum
 endif
 
 libs: force
