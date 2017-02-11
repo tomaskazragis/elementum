@@ -549,7 +549,7 @@ func (btp *BTPlayer) Close() {
 	}
 
 	askedToDelete := false
-	if askedToKeepDownloading == false && btp.askToDelete == true {
+	if btp.askToDelete == true && (btp.askToKeepDownloading == false || askedToKeepDownloading == false) {
 		if xbmc.DialogConfirm("Quasar", "LOCALIZE[30269]") {
 			askedToDelete = true
 		}
