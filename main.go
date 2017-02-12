@@ -13,6 +13,7 @@ import (
 	"github.com/scakemyer/quasar/api"
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
+	"github.com/scakemyer/quasar/trakt"
 	"github.com/scakemyer/quasar/util"
 	"github.com/scakemyer/quasar/xbmc"
 )
@@ -137,6 +138,7 @@ func main() {
 	}()
 
 	go api.LibraryUpdate()
+	go trakt.TokenRefreshHandler()
 
 	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)
 }

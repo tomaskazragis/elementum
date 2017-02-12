@@ -54,6 +54,7 @@ type Configuration struct {
 	TraktUsername       string
 	TraktToken          string
 	TraktRefreshToken   string
+	TraktTokenExpiry    int
 	TraktSyncFrequency  int
 	UpdateFrequency     int
 	UpdateDelay         int
@@ -213,6 +214,7 @@ func Reload() *Configuration {
 		TraktUsername:       settings["trakt_username"].(string),
 		TraktToken:          settings["trakt_token"].(string),
 		TraktRefreshToken:   settings["trakt_refresh_token"].(string),
+		TraktTokenExpiry:    settings["trakt_token_expiry"].(int),
 		TraktSyncFrequency:  settings["trakt_sync"].(int),
 		UpdateFrequency:     settings["library_update_frequency"].(int),
 		UpdateDelay:         settings["library_update_delay"].(int),

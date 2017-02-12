@@ -234,6 +234,14 @@ type Token struct {
 	Scope        string `json:"scope"`
 }
 
+type TokenRefresh struct {
+	RefreshToken string `json:"refresh_token"`
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	RedirectURI  string `json:"redirect_uri"`
+	GrantType    string `json:"grant_type"`
+}
+
 type List struct {
 	Name           string `json:"name"`
 	Description    string `json:"description"`
@@ -530,6 +538,80 @@ func PollToken(code *Code) (token *Token, err error) {
 	}
 }
 
+func RefreshToken() (resp *napping.Response, err error) {
+	endPoint := "oauth/token"
+	header := http.Header{
+		"Content-type": []string{"application/json"},
+		"User-Agent": []string{clearance.UserAgent},
+		"Cookie": []string{clearance.Cookies},
+	}
+	params := napping.Params{
+		"refresh_token": config.Get().TraktRefreshToken,
+		"client_id": ClientId,
+		"client_secret": ClientSecret,
+		"redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+		"grant_type": "refresh_token",
+	}.AsUrlValues()
+
+	req := napping.Request{
+		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Method: "POST",
+		Params: &params,
+		Header: &header,
+	}
+
+
+	resp, err = napping.Send(&req)
+	if err != nil {
+		return
+	} else if resp.Status() == 403 && retriesLeft > 0 {
+		err = newClearance()
+		if err == nil {
+			resp, err = RefreshToken()
+		}
+	}
+	return
+}
+
+func TokenRefreshHandler() {
+	if config.Get().TraktToken == "" {
+		return
+	}
+
+	var token *Token
+	ticker := time.NewTicker(12 * time.Hour)
+	for {
+		select {
+		case <-ticker.C:
+			if time.Now().Unix() > int64(config.Get().TraktTokenExpiry) - int64(259200) {
+				resp, err := RefreshToken()
+				if err != nil {
+					xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+					log.Error(err)
+					return
+				} else {
+					if resp.Status() == 200 {
+						if err := resp.Unmarshal(&token); err != nil {
+							xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+							log.Error(err)
+						} else {
+							expiry := time.Now().Unix() + int64(token.ExpiresIn)
+							xbmc.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
+							xbmc.SetSetting("trakt_token", token.AccessToken)
+							xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
+							log.Noticef("Token refreshed for Trakt authorization, next refresh in %s", time.Duration(token.ExpiresIn - 259200) * time.Second)
+						}
+					} else {
+						err = errors.New(fmt.Sprintf("Bad status while refreshing Trakt token: %d", resp.Status()))
+						xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+						log.Error(err)
+					}
+				}
+			}
+		}
+	}
+}
+
 func Authorize(fromSettings bool) error {
 	code, err := GetCode()
 
@@ -554,9 +636,13 @@ func Authorize(fromSettings bool) error {
 	if fromSettings {
 		success += " (Save your settings!)"
 	}
-	xbmc.Notify("Quasar", success, config.AddonIcon())
+
+	expiry := time.Now().Unix() + int64(token.ExpiresIn)
+	xbmc.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
 	xbmc.SetSetting("trakt_token", token.AccessToken)
 	xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
+
+	xbmc.Notify("Quasar", success, config.AddonIcon())
 	return nil
 }
 
