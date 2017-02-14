@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 	"errors"
+	"strconv"
 	"strings"
 	"io/ioutil"
 	"encoding/hex"
@@ -31,6 +32,12 @@ const (
 	minCandidateSize   = 100 * 1024 * 1024
 )
 
+var (
+	Seeked        bool
+	WatchedTime   float64
+	VideoDuration float64
+)
+
 type BTPlayer struct {
 	bts                      *BTService
 	log                      *logging.Logger
@@ -43,7 +50,6 @@ type BTPlayer struct {
 	fileIndex                int
 	resumeIndex              int
 	tmdbId                   int
-	runtime                  int
 	scrobble                 bool
 	deleteAfter              bool
 	askToDelete              bool
@@ -72,7 +78,6 @@ type BTPlayerParams struct {
 	ResumeIndex  int
 	ContentType  string
 	TMDBId       int
-	Runtime      int
 }
 
 type candidateFile struct {
@@ -101,7 +106,6 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		scrobble:             config.Get().Scrobble == true && params.TMDBId > 0 && config.Get().TraktToken != "",
 		contentType:          params.ContentType,
 		tmdbId:               params.TMDBId,
-		runtime:              params.Runtime * 60,
 		fastResumeFile:       "",
 		torrentFile:          "",
 		hasChosenFile:        false,
@@ -702,6 +706,15 @@ func (btp *BTPlayer) setRateLimiting(enable bool) {
 	}
 }
 
+func updateWatchTimes() {
+	ret := xbmc.GetWatchTimes()
+	err := ret["error"]
+	if err == "" {
+		WatchedTime, _ = strconv.ParseFloat(ret["watchedTime"], 64)
+		VideoDuration, _ = strconv.ParseFloat(ret["videoDuration"], 64)
+	}
+}
+
 func (btp *BTPlayer) playerLoop() {
 	defer btp.Close()
 
@@ -738,24 +751,34 @@ playbackWaitLoop:
 	btp.log.Info("Playback loop")
 	overlayStatusActive := false
 	playing := true
-	btp.log.Infof("Got runtime: %d", btp.runtime)
+
+	updateWatchTimes()
+
+	btp.log.Infof("Got playback: %fs / %fs", WatchedTime, VideoDuration)
 	if btp.scrobble {
-		trakt.Scrobble("start", btp.contentType, btp.tmdbId, btp.runtime)
+		trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
 	}
 
 playbackLoop:
 	for {
 		if xbmc.PlayerIsPlaying() == false {
 			break playbackLoop
-		} else if btp.scrobble {
-			trakt.Scrobble("update", btp.contentType, btp.tmdbId, btp.runtime)
 		}
 		select {
 		case <-oneSecond.C:
-			if xbmc.PlayerIsPaused() {
-				if btp.scrobble && playing == true {
+			if Seeked {
+				Seeked = false
+				updateWatchTimes()
+				if btp.scrobble {
+					trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+				}
+			} else if xbmc.PlayerIsPaused() {
+				if playing == true {
 					playing = false
-					trakt.Scrobble("pause", btp.contentType, btp.tmdbId, btp.runtime)
+					updateWatchTimes()
+					if btp.scrobble {
+						trakt.Scrobble("pause", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+					}
 				}
 				if btp.overlayStatusEnabled == true {
 					status := btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
@@ -768,9 +791,12 @@ playbackLoop:
 					}
 				}
 			} else {
-				if btp.scrobble && playing == false {
+				updateWatchTimes()
+				if playing == false {
 					playing = true
-					trakt.Scrobble("start", btp.contentType, btp.tmdbId, btp.runtime)
+					if btp.scrobble {
+						trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+					}
 				}
 				if overlayStatusActive == true {
 					btp.overlayStatus.Hide()
@@ -780,10 +806,13 @@ playbackLoop:
 		}
 	}
 
+	if btp.scrobble {
+		trakt.Scrobble("stop", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+	}
+	Seeked = false
+	WatchedTime = 0
+	VideoDuration = 0
+
 	btp.overlayStatus.Close()
 	btp.setRateLimiting(false)
-
-	if btp.scrobble {
-		trakt.Scrobble("stop", btp.contentType, btp.tmdbId, btp.runtime)
-	}
 }

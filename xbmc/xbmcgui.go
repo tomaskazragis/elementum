@@ -164,6 +164,11 @@ func PlayerIsPlaying() bool {
 	return retVal != 0
 }
 
+func PlayerSeek(position float64) (ret string) {
+	executeJSONRPCEx("Player_Seek", &ret, Args{position})
+	return
+}
+
 func PlayerIsPaused() bool {
 	retVal := 0
 	executeJSONRPCEx("Player_IsPaused", &retVal, nil)

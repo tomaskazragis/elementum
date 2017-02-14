@@ -1194,8 +1194,104 @@ func Notification(ctx *gin.Context) {
 	method := ctx.Query("method")
 	data := ctx.Query("data")
 
+	// jsData, _ := base64.StdEncoding.DecodeString(data)
+	// libraryLog.Debugf("Notification: sender=%s method=%s data=%s", sender, method, jsData)
+
 	if sender == "xbmc" {
 		switch method {
+		case "Player.OnSeek":
+			if bittorrent.VideoDuration > 0 {
+				bittorrent.Seeked = true
+			}
+		case "Player.OnPlay":
+			time.Sleep(1 * time.Second) // Let player get its WatchedTime and VideoDuration
+			if bittorrent.VideoDuration == 0 {
+				return
+			}
+			var started struct {
+				Item  struct {
+					ID   int    `json:"id"`
+					Type string `json:"type"`
+				} `json:"item"`
+			}
+			jsonData, _ := base64.StdEncoding.DecodeString(data)
+			if err := json.Unmarshal(jsonData, &started); err != nil {
+				libraryLog.Error(err)
+				return
+			}
+			var position float64
+		  if started.Item.Type == "movie" {
+		    var movie *xbmc.VideoLibraryMovieItem
+		    for _, libraryMovie := range libraryMovies.Movies {
+		      if libraryMovie.ID == started.Item.ID {
+		        movie = libraryMovie
+		        break
+		      }
+		    }
+		    if movie == nil || movie.ID == 0 {
+		      libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
+		      return
+		    }
+				position = movie.Resume.Position
+		  } else {
+		    if libraryEpisodes == nil {
+		      return
+		    }
+		    var episode *xbmc.VideoLibraryEpisodeItem
+		    for _, episodes := range libraryEpisodes {
+		      for _, existingEpisode := range episodes.Episodes {
+		        if existingEpisode.ID == started.Item.ID {
+		          episode = existingEpisode
+		          break
+		        }
+		      }
+		      if episode != nil {
+		        break
+		      }
+		    }
+		    if episode == nil || episode.ID == 0 {
+		      libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
+		      return
+		    }
+				position = episode.Resume.Position
+		  }
+			xbmc.PlayerSeek(position)
+
+		case "Player.OnStop":
+			if bittorrent.VideoDuration <= 1 {
+				return
+			}
+			var stopped struct {
+				Ended bool `json:"end"`
+				Item  struct {
+					ID   int    `json:"id"`
+					Type string `json:"type"`
+				} `json:"item"`
+			}
+			jsonData, _ := base64.StdEncoding.DecodeString(data)
+			if err := json.Unmarshal(jsonData, &stopped); err != nil {
+				libraryLog.Error(err)
+				return
+			}
+
+			progress := bittorrent.WatchedTime / bittorrent.VideoDuration * 100
+
+			libraryLog.Infof("Stopped at %f%%", progress)
+
+			if stopped.Ended || progress > 90 {
+				if stopped.Item.Type == "movie" {
+					xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+				} else {
+					xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
+				}
+			} else if bittorrent.WatchedTime > 180 {
+				if stopped.Item.Type == "movie" {
+					xbmc.SetMovieWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+				} else {
+					xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+				}
+			}
+
 		case "VideoLibrary.OnRemove":
 			jsonData, err := base64.StdEncoding.DecodeString(data)
 			if err != nil {
@@ -1297,14 +1393,16 @@ func Notification(ctx *gin.Context) {
 						}
 						if err := removeMovie(strconv.Itoa(tmdbMovie.Id)); err != nil {
 							libraryLog.Warning("Nothing left to remove from Quasar")
-							break
 						}
+						break
 					}
 				}
 			}
+
 		case "VideoLibrary.OnScanFinished":
 			scanning = false
 			fallthrough
+
 		case "VideoLibrary.OnCleanFinished":
 			updateLibraryMovies()
 			updateLibraryShows()

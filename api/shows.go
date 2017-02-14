@@ -391,18 +391,12 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		longName := fmt.Sprintf("%s Season %02d", show.Name, seasonNumber)
 
-		runtime := 45
-		if len(show.EpisodeRunTime) > 0 {
-			runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
-		}
-
 		existingTorrent := ExistingTorrent(btService, longName)
 		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(season.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -415,8 +409,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", strconv.Itoa(season.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -540,18 +533,12 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 
-		runtime := 45
-		if len(show.EpisodeRunTime) > 0 {
-			runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
-		}
-
 		existingTorrent := ExistingTorrent(btService, longName)
 		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(episode.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -564,8 +551,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", strconv.Itoa(episode.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -633,8 +619,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[choice].URI,
 				                     "tmdb", strconv.Itoa(episode.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -665,19 +650,13 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		runtime := 45
-		if len(show.EpisodeRunTime) > 0 {
-			runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1]
-		}
-
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 		existingTorrent := ExistingTorrent(btService, longName)
 		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(episode.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -690,8 +669,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", strconv.Itoa(episode.Id),
-				                     "type", "episode",
-				                     "runtime", strconv.Itoa(runtime))
+				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
 			} else {
@@ -716,8 +694,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		rUrl := UrlQuery(
 			UrlForXBMC("/play"), "uri", torrents[0].URI,
 			                     "tmdb", strconv.Itoa(episode.Id),
-			                     "type", "episode",
-			                     "runtime", strconv.Itoa(runtime))
+			                     "type", "episode")
 		if external != "" {
 			xbmc.PlayURL(rUrl)
 		} else {

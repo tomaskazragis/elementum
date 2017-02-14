@@ -2,7 +2,6 @@ package trakt
 
 import (
 	"fmt"
-	"math"
 	"time"
 	"bytes"
 	"errors"
@@ -30,8 +29,6 @@ var log = logging.MustGetLogger("trakt")
 var (
 	clearance, _            = cloudhole.GetClearance()
 	retriesLeft             = 3
-	scrobbleTime            = float64(0)
-	scrobbleEnd             = float64(0)
 	PagesAtOnce             = 5
 	burstRate               = 50
 	burstTime               = 10 * time.Second
@@ -692,54 +689,22 @@ func RemoveFromCollection(itemType string, tmdbId string) (resp *napping.Respons
 	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbId)))
 }
 
-func Scrobble(action string, contentType string, tmdbId int, runtime int) {
+func Scrobble(action string, contentType string, tmdbId int, watched float64, runtime float64) {
 	if err := Authorized(); err != nil {
 		return
 	}
-	if action != "update" {
-		log.Notice(action, contentType, tmdbId)
-	}
 
-	retVal := xbmc.GetWatchTimes()
-
-	errStr := retVal["error"]
-	watchedTime, _ := strconv.ParseFloat(retVal["watchedTime"], 64)
-	videoDuration, _ := strconv.ParseFloat(retVal["videoDuration"], 64)
-	if errStr != "" {
-		log.Warning(errStr)
-	} else {
-		scrobbleTime = watchedTime
-		scrobbleEnd = videoDuration
-	}
-	if action == "update" {
+	if runtime < 1 {
 		return
 	}
+	progress := watched / runtime * 100
 
-	if scrobbleEnd == 0 {
-		if runtime != 0 {
-			scrobbleEnd = float64(runtime)
-			log.Warningf("Using specified runtime of %d", runtime)
-		} else {
-			if contentType == "movie" {
-				scrobbleEnd = 7200
-			} else {
-				scrobbleEnd = 2700
-			}
-			log.Warningf("Using fallback runtime of %d", videoDuration)
-		}
-	}
-
-	progress := scrobbleTime / math.Floor(scrobbleEnd) * 100
-
-	log.Infof("Progress: %f%%, watched: %fs, duration: %fs", progress, scrobbleTime, scrobbleEnd)
-
-	if action == "stop" {
-		scrobbleTime = 0
-		scrobbleEnd = 0
-	}
+	log.Noticef("%s %s: %f%%, watched: %fs, duration: %fs", action, contentType, progress, watched, runtime)
 
 	endPoint := fmt.Sprintf("scrobble/%s", action)
-	resp, err := Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": {"ids": {"tmdb": %d}}, "progress": %f}`, contentType, tmdbId, progress)))
+	payload := fmt.Sprintf(`{"%s": {"ids": {"tmdb": %d}}, "progress": %f, "app_version": "%s"}`,
+	                       contentType, tmdbId, progress, util.Version[1:len(util.Version) - 1])
+	resp, err := Post(endPoint, bytes.NewBufferString(payload))
 	if err != nil {
 		log.Error(err.Error())
 		xbmc.Notify("Quasar", "Scrobble failed, check your logs.", config.AddonIcon())

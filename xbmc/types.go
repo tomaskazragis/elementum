@@ -119,11 +119,16 @@ type StreamInfoEntry struct {
 }
 
 type VideoLibraryMovies struct {
-	Movies []*struct {
-		ID         int    `json:"movieid"`
-		Title      string `json:"label"`
-		IMDBNumber string `json:"imdbnumber"`
-	} `json:"movies"`
+	Movies []*VideoLibraryMovieItem `json:"movies"`
+}
+
+type VideoLibraryMovieItem struct {
+	ID         int    `json:"movieid"`
+	Title      string `json:"label"`
+	IMDBNumber string `json:"imdbnumber"`
+	PlayCount  int    `json:"playcount"`
+	File       string `json:"file"`
+	Resume     *Resume
 }
 
 type VideoLibraryShows struct {
@@ -149,11 +154,19 @@ type VideoLibraryEpisodeItem struct {
 	Season     int       `json:"season"`
 	Episode    int       `json:"episode"`
 	TVShowID   int       `json:"tvshowid"`
+	PlayCount  int       `json:"playcount"`
+	File       string    `json:"file"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
+	Resume     *Resume
 }
 
 type UniqueIDs struct {
 	ID string `json:"unknown"`
+}
+
+type Resume struct {
+	Position float64 `json:"position"`
+	Total    float64 `json:"total"`
 }
 
 func NewView(contentType string, items ListItems) *View {

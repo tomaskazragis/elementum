@@ -18,7 +18,6 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		resume := ctx.Query("resume")
 		contentType := ctx.Query("type")
 		tmdb := ctx.Query("tmdb")
-		runtime := ctx.Query("runtime")
 
 		if uri == "" && resume == "" {
 			return
@@ -48,21 +47,12 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 		}
 
-		runTime := -1
-		if tmdb != "" {
-			runtimeInt, err := strconv.Atoi(runtime)
-			if err == nil && runtimeInt >= 0 {
-				runTime = runtimeInt
-			}
-		}
-
 		params := bittorrent.BTPlayerParams{
 			URI: uri,
 			FileIndex: fileIndex,
 			ResumeIndex: resumeIndex,
 			ContentType: contentType,
 			TMDBId: tmdbId,
-			Runtime: runTime,
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)

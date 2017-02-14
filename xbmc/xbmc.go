@@ -1,5 +1,7 @@
 package xbmc
 
+import "time"
+
 func UpdateAddonRepos() (retVal string) {
 	executeJSONRPCEx("UpdateAddonRepos", &retVal, nil)
 	return
@@ -26,7 +28,12 @@ func VideoLibraryClean() (retVal string) {
 }
 
 func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
-	params := map[string]interface{}{"properties": []interface{}{"imdbnumber"}}
+	params := map[string]interface{}{"properties": []interface{}{
+		"imdbnumber",
+		"playcount",
+		"file",
+		"resume",
+	}}
 	ret := executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if ret != nil {
 		log.Error(ret)
@@ -44,7 +51,15 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 }
 
 func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
-	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{"tvshowid", "uniqueid", "season", "episode"}}
+	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{
+		"tvshowid",
+		"uniqueid",
+		"season",
+		"episode",
+		"playcount",
+		"file",
+		"resume",
+	}}
 	err := executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
 	if err != nil {
 		log.Error(err)
@@ -52,13 +67,47 @@ func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
 	return
 }
 
-func VideoLibraryGetEpisodeDetails(episodeId int) (episode *VideoLibraryEpisode, err error) {
-	params := map[string]interface{}{"episodeid": episodeId, "properties": []interface{}{"tvshowid", "uniqueid", "season", "episode"}}
-	err = executeJSONRPCO("VideoLibrary.GetEpisodeDetails", &episode, params)
-	if err != nil {
-		return nil, err
+func SetMovieWatched(movieId int, playcount int, position int, total int) (ret string) {
+	params := map[string]interface{}{
+		"movieid": movieId,
+		"playcount": playcount,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total": total,
+		},
+		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
 	}
-	return episode, nil
+	executeJSONRPCO("VideoLibrary.SetMovieDetails", &ret, params)
+	return
+}
+
+func SetEpisodeWatched(episodeId int, playcount int, position int, total int) (ret string) {
+	params := map[string]interface{}{
+		"episodeid": episodeId,
+		"playcount": playcount,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total": total,
+		},
+		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetEpisodeDetails", &ret, params)
+	return
+}
+
+func SetFileWatched(file string, position int, total int) (ret string) {
+	params := map[string]interface{}{
+		"file": file,
+		"media": "video",
+		"playcount": 0,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total": total,
+		},
+		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetFileDetails", &ret, params)
+	return
 }
 
 func TranslatePath(path string) (retVal string) {
