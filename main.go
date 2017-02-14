@@ -56,6 +56,7 @@ func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration
 		TunedStorage:        conf.TunedStorage,
 		DownloadPath:        conf.DownloadPath,
 		TorrentsPath:        conf.TorrentsPath,
+		DisableBgProgress:   conf.DisableBgProgress,
 	}
 
 	if conf.SocksEnabled == true {

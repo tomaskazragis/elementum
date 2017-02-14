@@ -26,6 +26,7 @@ type Configuration struct {
 	BackgroundHandling  bool
 	KeepFilesAfterStop  bool
 	KeepFilesAsk        bool
+	DisableBgProgress   bool
 	ResultsPerPage      int
 	EnableOverlayStatus bool
 	ChooseStreamAuto    bool
@@ -190,6 +191,7 @@ func Reload() *Configuration {
 		BackgroundHandling:  settings["background_handling"].(bool),
 		KeepFilesAfterStop:  settings["keep_files"].(bool),
 		KeepFilesAsk:        settings["keep_files_ask"].(bool),
+		DisableBgProgress:   settings["disable_bg_progress"].(bool),
 		ResultsPerPage:      settings["results_per_page"].(int),
 		EnableOverlayStatus: settings["enable_overlay_status"].(bool),
 		ChooseStreamAuto:    settings["choose_stream_auto"].(bool),

@@ -103,6 +103,7 @@ type BTConfiguration struct {
 	TunedStorage        bool
 	DownloadPath        string
 	TorrentsPath        string
+	DisableBgProgress   bool
 	Proxy               *ProxySettings
 }
 
@@ -628,7 +629,7 @@ func (s *BTService) downloadProgress() {
 	for {
 		select {
 		case <-rotateTicker.C:
-			if s.Session.GetHandle().IsPaused() && s.dialogProgressBG != nil {
+			if !s.config.DisableBgProgress && s.Session.GetHandle().IsPaused() && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
 				s.dialogProgressBG = nil
 				continue
@@ -708,11 +709,13 @@ func (s *BTService) downloadProgress() {
 					showTorrent = activeTorrents[showNext].torrentName
 					showNext += 1
 				}
-				if s.dialogProgressBG == nil {
-					s.dialogProgressBG = xbmc.NewDialogProgressBG("Quasar", "")
+				if !s.config.DisableBgProgress {
+					if s.dialogProgressBG == nil {
+						s.dialogProgressBG = xbmc.NewDialogProgressBG("Quasar", "")
+					}
+					s.dialogProgressBG.Update(showProgress, "Quasar", showTorrent)
 				}
-				s.dialogProgressBG.Update(showProgress, "Quasar", showTorrent)
-			} else if s.dialogProgressBG != nil {
+			} else if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
 				s.dialogProgressBG = nil
 			}
