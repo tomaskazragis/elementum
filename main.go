@@ -8,8 +8,10 @@ import (
 	"runtime"
 	"strconv"
 	"net/http"
+	"path/filepath"
 
 	"github.com/op/go-logging"
+	"github.com/nightlyone/lockfile"
 	"github.com/scakemyer/quasar/api"
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
@@ -30,8 +32,31 @@ const (
 `
 )
 
-func ensureSingleInstance() {
+func ensureSingleInstance() (lock lockfile.Lockfile, err error) {
 	http.Head(fmt.Sprintf("http://localhost:%d/shutdown", config.ListenPort))
+
+	lock, err = lockfile.New(filepath.Join(config.Get().Info.Path, ".lockfile"))
+	if err != nil {
+		log.Critical("Unable to initialize lockfile:", err)
+		return
+	}
+	err = lock.TryLock()
+	if err != nil {
+		log.Warningf("Unable to acquire lock %q: %v, killing...", lock, err)
+
+		var p *os.Process
+		p, err = lock.GetOwner()
+		if err != nil {
+			log.Critical("Unable to get other process owner:", err)
+			return
+		}
+		if err = p.Kill(); err != nil {
+			log.Critical("Unable to kill other process:", err)
+			return
+		}
+		err = nil
+	}
+	return
 }
 
 func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration {
@@ -90,7 +115,12 @@ func main() {
 
 	log.Infof("Addon: %s v%s", conf.Info.Id, conf.Info.Version)
 
-	ensureSingleInstance()
+	lock, err := ensureSingleInstance()
+	defer lock.Unlock()
+	if err != nil {
+		os.Exit(1)
+	}
+
 	wasFirstRun := Migrate()
 
 	btService := bittorrent.NewBTService(*makeBTConfiguration(conf))
