@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"fmt"
 	"time"
 	"strings"
 	"runtime"
@@ -11,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/op/go-logging"
-	"github.com/nightlyone/lockfile"
 	"github.com/scakemyer/quasar/api"
+	"github.com/scakemyer/quasar/lockfile"
 	"github.com/scakemyer/quasar/bittorrent"
 	"github.com/scakemyer/quasar/config"
 	"github.com/scakemyer/quasar/trakt"
@@ -32,29 +31,32 @@ const (
 `
 )
 
-func ensureSingleInstance() (lock lockfile.Lockfile, err error) {
-	http.Head(fmt.Sprintf("http://localhost:%d/shutdown", config.ListenPort))
-
-	lock, err = lockfile.New(filepath.Join(config.Get().Info.Path, ".lockfile"))
+func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, err error) {
+	file := filepath.Join(conf.Info.Path, ".lockfile")
+	lock, err = lockfile.New(file)
 	if err != nil {
 		log.Critical("Unable to initialize lockfile:", err)
 		return
 	}
-	err = lock.TryLock()
+	var pid int
+	var p *os.Process
+	pid, err = lock.Lock()
 	if err != nil {
-		log.Warningf("Unable to acquire lock %q: %v, killing...", lock, err)
-
-		var p *os.Process
-		p, err = lock.GetOwner()
+		log.Warningf("Unable to acquire lock %q: %v, killing...", lock.File, err)
+		p, err = os.FindProcess(pid)
 		if err != nil {
-			log.Critical("Unable to get other process owner:", err)
+			log.Warning("Unable to find other process:", err)
 			return
 		}
 		if err = p.Kill(); err != nil {
 			log.Critical("Unable to kill other process:", err)
 			return
 		}
-		err = nil
+		if err = os.Remove(lock.File); err != nil {
+			log.Critical("Unable to remove lockfile")
+			return
+		}
+		_, err = lock.Lock()
 	}
 	return
 }
@@ -115,9 +117,10 @@ func main() {
 
 	log.Infof("Addon: %s v%s", conf.Info.Id, conf.Info.Version)
 
-	lock, err := ensureSingleInstance()
+	lock, err := ensureSingleInstance(conf)
 	defer lock.Unlock()
 	if err != nil {
+		log.Warningf("Unable to acquire lock %q: %v, exiting...", lock.File, err)
 		os.Exit(1)
 	}
 
