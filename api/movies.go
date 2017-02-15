@@ -189,8 +189,9 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 
 		item.Path = defaultURL
 
+		tmdbId := strconv.Itoa(movie.Id)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.Id))}
-		if _, err := isDuplicateMovie(strconv.Itoa(movie.Id)); err != nil {
+		if _, err := isDuplicateMovie(tmdbId); err != nil || isAddedToLibrary(tmdbId, Movie) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.Id))}
 		}
 

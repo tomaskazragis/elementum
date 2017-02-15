@@ -79,11 +79,14 @@ type removedEpisode struct {
 }
 
 func clearPageCache(ctx *gin.Context) {
-	ctx.Abort()
+	if ctx != nil {
+		ctx.Abort()
+	}
 	files, _ := filepath.Glob(filepath.Join(config.Get().Info.Profile, "cache", "page.*"))
 	for _, file := range files {
 		os.Remove(file)
 	}
+	xbmc.Refresh()
 }
 
 //
@@ -292,6 +295,23 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 	return nil
 }
 
+func isAddedToLibrary(id string, addedType int) (isAdded bool) {
+	DB.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket([]byte(bucket)).Cursor()
+		prefix := []byte(fmt.Sprintf("%d_", addedType))
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			itemID := strings.Split(string(k), "_")[1]
+			if itemID == id {
+				isAdded = true
+				return nil
+			}
+		}
+		return nil
+	})
+	return
+}
+
+
 //
 // Database updates
 //
@@ -357,16 +377,12 @@ func wasRemoved(id string, removedType int) (wasRemoved bool) {
 	DB.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte(bucket)).Cursor()
 		prefix := []byte(fmt.Sprintf("%d_", removedType))
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var item *DBItem
-			if err := json.Unmarshal(v, &item); err != nil {
-				return err
-			}
-			if item.ID == id {
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			itemID := strings.Split(string(k), "_")[1]
+			if itemID == id {
 				wasRemoved = true
 				return nil
 			}
-			return nil
 		}
 		return nil
 	})
@@ -538,7 +554,7 @@ func writeMovieStrm(tmdbId string) (*tmdb.Movie, error) {
 	return movie, nil
 }
 
-func removeMovie(tmdbId string) error {
+func removeMovie(ctx *gin.Context, tmdbId string) error {
 	if err := checkMoviesPath(); err != nil {
 		return err
 	}
@@ -564,6 +580,8 @@ func removeMovie(tmdbId string) error {
 	libraryLog.Warningf("%s removed from library", movieName)
 	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", movieName)) {
 		xbmc.VideoLibraryClean()
+	} else {
+		clearPageCache(ctx)
 	}
 
 	return nil
@@ -727,7 +745,7 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 	return show, nil
 }
 
-func removeShow(tmdbId string) error {
+func removeShow(ctx *gin.Context, tmdbId string) error {
 	if err := checkShowsPath(); err != nil {
 		return err
 	}
@@ -760,6 +778,8 @@ func removeShow(tmdbId string) error {
 	libraryLog.Noticef("%s removed from library", show.Name)
 	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", show.Name)) {
 		xbmc.VideoLibraryClean()
+	} else {
+		clearPageCache(ctx)
 	}
 
 	return nil
@@ -843,6 +863,8 @@ func AddMovie(ctx *gin.Context) {
 	libraryLog.Noticef("%s added to library", movie.Title)
 	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30277];;%s", movie.Title)) {
 		xbmc.VideoLibraryScan()
+	} else {
+		clearPageCache(ctx)
 	}
 }
 
@@ -860,7 +882,7 @@ func AddMoviesList(ctx *gin.Context) {
 
 func RemoveMovie(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
-	if err := removeMovie(tmdbId); err != nil {
+	if err := removeMovie(ctx, tmdbId); err != nil {
 		ctx.String(200, err.Error())
 	}
 }
@@ -909,6 +931,8 @@ func AddShow(ctx *gin.Context) {
 	libraryLog.Noticef(logMsg, show.Name, tmdbId)
 	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("%s;;%s", label, show.Name)) {
 		xbmc.VideoLibraryScan()
+	} else {
+		clearPageCache(ctx)
 	}
 }
 
@@ -926,7 +950,7 @@ func AddShowsList(ctx *gin.Context) {
 
 func RemoveShow(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
-	if err := removeShow(tmdbId); err != nil {
+	if err := removeShow(ctx, tmdbId); err != nil {
 		ctx.String(200, err.Error())
 	}
 }
@@ -1057,7 +1081,7 @@ func LibraryUpdate() {
 							}
 						}
 						if len(showEpisodes) == libraryTotal {
-							if err := removeShow(showEpisodes[0].ShowID); err != nil {
+							if err := removeShow(nil, showEpisodes[0].ShowID); err != nil {
 								libraryLog.Error("Unable to remove show after removing all episodes...")
 							}
 						} else {
@@ -1391,7 +1415,7 @@ func Notification(ctx *gin.Context) {
 						if tmdbMovie == nil || tmdbMovie.Id == 0 {
 							break
 						}
-						if err := removeMovie(strconv.Itoa(tmdbMovie.Id)); err != nil {
+						if err := removeMovie(ctx, strconv.Itoa(tmdbMovie.Id)); err != nil {
 							libraryLog.Warning("Nothing left to remove from Quasar")
 						}
 						break

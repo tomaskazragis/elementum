@@ -15,6 +15,10 @@ func ClearCache(ctx *gin.Context) {
 	xbmc.Notify("Quasar", "LOCALIZE[30200]", config.AddonIcon())
 }
 
+func ClearPageCache(ctx *gin.Context) {
+	clearPageCache(ctx)
+}
+
 func ResetClearances(ctx *gin.Context) {
 	cloudhole.ResetClearances()
 	xbmc.Notify("Quasar", "LOCALIZE[30264]", config.AddonIcon())

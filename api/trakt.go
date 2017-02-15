@@ -196,7 +196,6 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -212,7 +211,6 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -228,7 +226,6 @@ func AddShowToWatchlist(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -244,7 +241,6 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -260,7 +256,6 @@ func AddMovieToCollection(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -276,7 +271,6 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -292,7 +286,6 @@ func AddShowToCollection(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -308,7 +301,6 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
 		clearPageCache(ctx)
-		xbmc.Refresh()
 	}
 }
 
@@ -372,8 +364,9 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 
 		item.Path = defaultURL
 
+		tmdbId := strconv.Itoa(movie.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
-		if _, err := isDuplicateMovie(strconv.Itoa(movie.IDs.TMDB)); err != nil {
+		if _, err := isDuplicateMovie(tmdbId); err != nil || isAddedToLibrary(tmdbId, Movie) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.IDs.TMDB))}
 		}
 
@@ -523,8 +516,9 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		item := show.ToListItem()
 		item.Path = UrlForXBMC("/show/%d/seasons", show.IDs.TMDB)
 
+		tmdbId := strconv.Itoa(show.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d", show.IDs.TMDB))}
-		if _, err := isDuplicateShow(strconv.Itoa(show.IDs.TMDB)); err != nil {
+		if _, err := isDuplicateShow(tmdbId); err != nil || isAddedToLibrary(tmdbId, Show) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d?merge=true", show.IDs.TMDB))}
@@ -777,8 +771,9 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 
 		item.Path = defaultURL
 
+		tmdbId := strconv.Itoa(movie.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
-		if _, err := isDuplicateMovie(strconv.Itoa(movie.IDs.TMDB)); err != nil {
+		if _, err := isDuplicateMovie(tmdbId); err != nil || isAddedToLibrary(tmdbId, Movie) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.IDs.TMDB))}
 		}
 
@@ -868,8 +863,9 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 		}
 		item.Path = itemPath
 
+		tmdbId := strconv.Itoa(show.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d", show.IDs.TMDB))}
-		if _, err := isDuplicateShow(strconv.Itoa(show.IDs.TMDB)); err != nil {
+		if _, err := isDuplicateShow(tmdbId); err != nil || isAddedToLibrary(tmdbId, Show) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d?merge=true", show.IDs.TMDB))}

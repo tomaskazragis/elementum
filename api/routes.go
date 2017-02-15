@@ -239,6 +239,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	cmd := r.Group("/cmd")
 	{
 		cmd.GET("/clear_cache", ClearCache)
+		cmd.GET("/clear_page_cache", ClearPageCache)
 		cmd.GET("/reset_clearances", ResetClearances)
 	}
 

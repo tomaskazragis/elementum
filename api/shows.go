@@ -147,8 +147,9 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 		item := show.ToListItem()
 		item.Path = UrlForXBMC("/show/%d/seasons", show.Id)
 
+		tmdbId := strconv.Itoa(show.Id)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d", show.Id))}
-		if _, err := isDuplicateShow(strconv.Itoa(show.Id)); err != nil {
+		if _, err := isDuplicateShow(tmdbId); err != nil || isAddedToLibrary(tmdbId, Show) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/remove/%d", show.Id))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/show/add/%d?merge=true", show.Id))}
