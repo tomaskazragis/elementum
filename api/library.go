@@ -1227,9 +1227,22 @@ func Notification(ctx *gin.Context) {
 			if bittorrent.VideoDuration > 0 {
 				bittorrent.Seeked = true
 			}
+
+		case "Player.OnPause":
+			if bittorrent.VideoDuration == 0 {
+				return
+			}
+			if !bittorrent.Paused {
+				bittorrent.Paused = true
+			}
+
 		case "Player.OnPlay":
 			time.Sleep(1 * time.Second) // Let player get its WatchedTime and VideoDuration
 			if bittorrent.VideoDuration == 0 {
+				return
+			}
+			if bittorrent.Paused { // Prevent seeking when simply unpausing
+				bittorrent.Paused = false
 				return
 			}
 			var started struct {
@@ -1244,41 +1257,44 @@ func Notification(ctx *gin.Context) {
 				return
 			}
 			var position float64
-		  if started.Item.Type == "movie" {
-		    var movie *xbmc.VideoLibraryMovieItem
-		    for _, libraryMovie := range libraryMovies.Movies {
-		      if libraryMovie.ID == started.Item.ID {
-		        movie = libraryMovie
-		        break
-		      }
-		    }
-		    if movie == nil || movie.ID == 0 {
-		      libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
-		      return
-		    }
+			if started.Item.Type == "movie" {
+				var movie *xbmc.VideoLibraryMovieItem
+				if libraryMovies == nil {
+					return
+				}
+				for _, libraryMovie := range libraryMovies.Movies {
+					if libraryMovie.ID == started.Item.ID {
+						movie = libraryMovie
+						break
+					}
+				}
+				if movie == nil || movie.ID == 0 {
+					libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
+					return
+				}
 				position = movie.Resume.Position
-		  } else {
-		    if libraryEpisodes == nil {
-		      return
-		    }
-		    var episode *xbmc.VideoLibraryEpisodeItem
-		    for _, episodes := range libraryEpisodes {
-		      for _, existingEpisode := range episodes.Episodes {
-		        if existingEpisode.ID == started.Item.ID {
-		          episode = existingEpisode
-		          break
-		        }
-		      }
-		      if episode != nil {
-		        break
-		      }
-		    }
-		    if episode == nil || episode.ID == 0 {
-		      libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
-		      return
-		    }
+			} else {
+				if libraryEpisodes == nil {
+					return
+				}
+				var episode *xbmc.VideoLibraryEpisodeItem
+				for _, episodes := range libraryEpisodes {
+					for _, existingEpisode := range episodes.Episodes {
+						if existingEpisode.ID == started.Item.ID {
+							episode = existingEpisode
+							break
+						}
+					}
+					if episode != nil {
+						break
+					}
+				}
+				if episode == nil || episode.ID == 0 {
+					libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
+					return
+				}
 				position = episode.Resume.Position
-		  }
+			}
 			xbmc.PlayerSeek(position)
 
 		case "Player.OnStop":
@@ -1314,6 +1330,30 @@ func Notification(ctx *gin.Context) {
 				} else {
 					xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
 				}
+			}
+
+		case "VideoLibrary.OnUpdate":
+			time.Sleep(200 * time.Millisecond) // Because Kodi...
+			if !bittorrent.WasPlaying {
+				return
+			}
+			var item struct {
+				ID   int    `json:"id"`
+				Type string `json:"type"`
+			}
+			jsonData, _ := base64.StdEncoding.DecodeString(data)
+			if err := json.Unmarshal(jsonData, &item); err != nil {
+				libraryLog.Error(err)
+				return
+			}
+			if item.ID != 0 {
+				bittorrent.WasPlaying = false
+				if item.Type == "movie" {
+					updateLibraryMovies()
+				} else {
+					updateLibraryShows()
+				}
+				xbmc.Refresh()
 			}
 
 		case "VideoLibrary.OnRemove":

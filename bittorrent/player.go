@@ -33,7 +33,9 @@ const (
 )
 
 var (
+	Paused        bool
 	Seeked        bool
+	WasPlaying    bool
 	WatchedTime   float64
 	VideoDuration float64
 )
@@ -809,7 +811,9 @@ playbackLoop:
 	if btp.scrobble {
 		trakt.Scrobble("stop", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
 	}
+	Paused = false
 	Seeked = false
+	WasPlaying = true
 	WatchedTime = 0
 	VideoDuration = 0
 
