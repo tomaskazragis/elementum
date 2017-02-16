@@ -232,7 +232,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
 
-	r.GET("/notification", Notification)
+	r.GET("/notification", Notification(btService))
 
 	r.GET("/versions", Versions(btService))
 

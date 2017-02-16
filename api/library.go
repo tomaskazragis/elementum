@@ -1213,7 +1213,9 @@ func CloseLibrary() {
 //
 // Kodi notifications
 //
-func Notification(ctx *gin.Context) {
+func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+
 	sender := ctx.Query("sender")
 	method := ctx.Query("method")
 	data := ctx.Query("data")
@@ -1245,6 +1247,10 @@ func Notification(ctx *gin.Context) {
 				bittorrent.Paused = false
 				return
 			}
+			libraryResume := config.Get().LibraryResume
+			if libraryResume == 0 {
+				return
+			}
 			var started struct {
 				Item  struct {
 					ID   int    `json:"id"`
@@ -1272,6 +1278,9 @@ func Notification(ctx *gin.Context) {
 					libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
 					return
 				}
+				if libraryResume == 2 && ExistingTorrent(btService, movie.Title) == "" {
+					return
+				}
 				position = movie.Resume.Position
 			} else {
 				if libraryEpisodes == nil {
@@ -1291,6 +1300,10 @@ func Notification(ctx *gin.Context) {
 				}
 				if episode == nil || episode.ID == 0 {
 					libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
+					return
+				}
+				longName := fmt.Sprintf("%s S%02dE%02d", episode.Title, episode.Season, episode.Episode)
+				if libraryResume == 2 && ExistingTorrent(btService, longName) == "" {
 					return
 				}
 				position = episode.Resume.Position
@@ -1330,6 +1343,9 @@ func Notification(ctx *gin.Context) {
 				} else {
 					xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
 				}
+			} else {
+				time.Sleep(200 * time.Millisecond)
+				xbmc.Refresh()
 			}
 
 		case "VideoLibrary.OnUpdate":
@@ -1473,7 +1489,7 @@ func Notification(ctx *gin.Context) {
 			clearPageCache(ctx)
 		}
 	}
-}
+}}
 
 // DEPRECATED
 func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
