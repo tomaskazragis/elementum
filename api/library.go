@@ -539,10 +539,7 @@ func writeMovieStrm(tmdbId string) (*tmdb.Movie, error) {
 
 	movieStrmPath := filepath.Join(moviePath, fmt.Sprintf("%s.strm", movieStrm))
 
-	playLink := UrlForXBMC("/movie/%s/play", tmdbId)
-	if config.Get().ChooseStreamAuto == false {
-		playLink = strings.Replace(playLink, "/play", "/links", 1)
-	}
+	playLink := UrlForXBMC("/library/movie/play/%s", tmdbId)
 	if _, err := os.Stat(movieStrmPath); err == nil {
 		return movie, errors.New(fmt.Sprintf("LOCALIZE[30287];;%s", movie.Title))
 	}
@@ -665,10 +662,6 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 	}
 	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
-	playSuffix := "play"
-	if config.Get().ChooseStreamAuto == false {
-		playSuffix = "links"
-	}
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
 		if err := os.Mkdir(showPath, 0755); err != nil {
@@ -725,7 +718,7 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 			}
 
 			episodeStrmPath := filepath.Join(showPath, fmt.Sprintf("%s S%02dE%02d.strm", showStrm, season.Season, episode.EpisodeNumber))
-			playLink := UrlForXBMC("/show/%d/season/%d/episode/%d/%s", Id, season.Season, episode.EpisodeNumber, playSuffix)
+			playLink := UrlForXBMC("/library/show/play/%d/%d/%d", Id, season.Season, episode.EpisodeNumber)
 			if _, err := os.Stat(episodeStrmPath); err == nil {
 				libraryLog.Warningf("%s already exists, skipping", episodeStrmPath)
 				continue
@@ -1491,7 +1484,6 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }}
 
-// DEPRECATED
 func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 	if config.Get().ChooseStreamAuto == true {
 		return MoviePlay(btService)
