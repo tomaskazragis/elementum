@@ -18,20 +18,31 @@ import (
 
 // Fill fanart from TMDB
 func setShowFanart(show *Show) *Show {
+	if show.Images == nil {
+		show.Images = &Images{}
+	}
+	if show.Images.Poster == nil {
+		show.Images.Poster = &Sizes{}
+	}
+	if show.Images.Thumbnail == nil {
+		show.Images.Thumbnail = &Sizes{}
+	}
+	if show.Images.FanArt == nil {
+		show.Images.FanArt = &Sizes{}
+	}
+	if show.Images.Banner == nil {
+		show.Images.Banner = &Sizes{}
+	}
+
 	if show.IDs == nil || show.IDs.TMDB == 0 {
 		return show
 	}
+
 	tmdbImages := tmdb.GetShowImages(show.IDs.TMDB)
 	if tmdbImages == nil {
 		return show
 	}
-	if show.Images == nil {
-		show.Images = &Images{}
-		show.Images.Poster = &Sizes{}
-		show.Images.Thumbnail = &Sizes{}
-		show.Images.FanArt = &Sizes{}
-		show.Images.Banner = &Sizes{}
-	}
+
 	if len(tmdbImages.Posters) > 0 {
 		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
 		for _, image := range tmdbImages.Posters {
