@@ -298,7 +298,12 @@ func CollectionMovies() (movies []*Movies, err error) {
 }
 
 func Userlists() (lists []*List) {
-	endPoint := fmt.Sprintf("users/%s/lists", config.Get().TraktUsername)
+	traktUsername := config.Get().TraktUsername
+	if traktUsername == "" {
+		xbmc.Notify("Quasar", "LOCALIZE[30149]", config.AddonIcon())
+		return lists
+	}
+	endPoint := fmt.Sprintf("users/%s/lists", traktUsername)
 
 	params := napping.Params{}.AsUrlValues()
 
@@ -311,7 +316,15 @@ func Userlists() (lists []*List) {
 		resp, err = GetWithAuth(endPoint, params)
 	}
 
-	if err != nil || resp.Status() != 200 {
+	if err != nil {
+		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		log.Error(err)
+		return lists
+	}
+	if resp.Status() != 200 {
+		errMsg := fmt.Sprintf("Bad status getting custom lists for %s: %d", traktUsername, resp.Status())
+		xbmc.Notify("Quasar", errMsg, config.AddonIcon())
+		log.Warningf(errMsg)
 		return lists
 	}
 
