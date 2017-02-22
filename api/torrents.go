@@ -456,11 +456,14 @@ func PauseTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 
 func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		deleteFiles := ctx.Query("files")
+		torrentId := ctx.Params.ByName("torrentId")
+		torrentIndex, _ := strconv.Atoi(torrentId)
+
+		torrentsPath := config.Get().TorrentsPath
+
 		btService.Session.GetHandle().GetTorrents()
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
-		torrentId := ctx.Params.ByName("torrentId")
-		deleteFiles := ctx.Query("files")
-		torrentIndex, _ := strconv.Atoi(torrentId)
 		torrentHandle := torrentsVector.Get(torrentIndex)
 		if torrentHandle.IsValid() == false {
 			ctx.Error(errors.New("Invalid torrent handle"))
@@ -471,14 +474,14 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		infoHash := hex.EncodeToString([]byte(shaHash))
 
 		// Delete torrent file
-		torrentFile := filepath.Join(config.Get().TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+		torrentFile := filepath.Join(torrentsPath, fmt.Sprintf("%s.torrent", infoHash))
 		if _, err := os.Stat(torrentFile); err == nil {
 			torrentsLog.Infof("Deleting torrent file at %s", torrentFile)
 			defer os.Remove(torrentFile)
 		}
 
 		// Delete fast resume data
-		fastResumeFile := filepath.Join(config.Get().TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
+		fastResumeFile := filepath.Join(torrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 		if _, err := os.Stat(fastResumeFile); err == nil {
 			torrentsLog.Infof("Deleting fast resume data at %s", fastResumeFile)
 			defer os.Remove(fastResumeFile)
@@ -494,6 +497,8 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		if config.Get().KeepFilesAfterStop == false || askedToDelete == true || deleteFiles == "true" {
 			torrentsLog.Info("Removing the torrent and deleting files...")
 			btService.Session.GetHandle().RemoveTorrent(torrentHandle, int(libtorrent.SessionHandleDeleteFiles))
+			partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
+			defer os.Remove(partsFile)
 		} else {
 			torrentsLog.Info("Removing the torrent without deleting files...")
 			btService.Session.GetHandle().RemoveTorrent(torrentHandle, 0)

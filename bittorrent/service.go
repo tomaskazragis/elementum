@@ -578,6 +578,8 @@ func (s *BTService) saveResumeDataConsumer() {
 func (s *BTService) loadTorrentFiles() {
 	pattern := filepath.Join(s.config.TorrentsPath, "*.torrent")
 	files, _ := filepath.Glob(pattern)
+	activeHashes := make(map[string]bool, len(files))
+
 	for _, torrentFile := range files {
 		torrentParams := libtorrent.NewAddTorrentParams()
 		defer libtorrent.DeleteAddTorrentParams(torrentParams)
@@ -588,6 +590,10 @@ func (s *BTService) loadTorrentFiles() {
 		defer libtorrent.DeleteTorrentInfo(info)
 		torrentParams.SetTorrentInfo(info)
 		torrentParams.SetSavePath(s.config.DownloadPath)
+
+		shaHash := info.InfoHash().ToString()
+		infoHash := hex.EncodeToString([]byte(shaHash))
+		activeHashes[infoHash] = true
 
 		fastResumeFile := strings.Replace(torrentFile, ".torrent", ".fastresume", 1)
 
@@ -611,12 +617,31 @@ func (s *BTService) loadTorrentFiles() {
 		if torrentHandle == nil {
 			s.log.Errorf("Error adding torrent file for %s", torrentFile)
 			if _, err := os.Stat(torrentFile); err == nil {
-				os.Remove(torrentFile)
+				if err := os.Remove(torrentFile); err != nil {
+					s.log.Error(err)
+				}
 			}
 			if _, err := os.Stat(fastResumeFile); err == nil {
-				os.Remove(fastResumeFile)
+				if err := os.Remove(fastResumeFile); err != nil {
+					s.log.Error(err)
+				}
 			}
 			continue
+		}
+	}
+
+	s.log.Info("Cleaning up stale .parts files...")
+	partsFiles, _ := filepath.Glob(filepath.Join(s.config.DownloadPath, "*.parts"))
+	for _, partsFile := range partsFiles {
+		infoHash := strings.Replace(strings.Replace(partsFile, s.config.DownloadPath, "", 1), ".parts", "", 1)[2:]
+		if _, exists := activeHashes[infoHash]; exists {
+			continue
+		} else {
+			if err := os.Remove(partsFile); err != nil {
+				s.log.Error(err)
+			} else {
+				s.log.Info("Removed", partsFile)
+			}
 		}
 	}
 }

@@ -48,6 +48,7 @@ type BTPlayer struct {
 	uri                      string
 	fastResumeFile           string
 	torrentFile              string
+	partsFile                string
 	contentType              string
 	fileIndex                int
 	resumeIndex              int
@@ -110,6 +111,7 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		tmdbId:               params.TMDBId,
 		fastResumeFile:       "",
 		torrentFile:          "",
+		partsFile:            "",
 		hasChosenFile:        false,
 		isDownloading:        false,
 		notEnoughSpace:       false,
@@ -366,6 +368,7 @@ func (btp *BTPlayer) onMetadataReceived() {
 	shaHash := btp.torrentInfo.InfoHash().ToString()
 	infoHash := hex.EncodeToString([]byte(shaHash))
 	btp.fastResumeFile = filepath.Join(btp.bts.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
+	btp.partsFile = filepath.Join(btp.bts.config.DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
 
 	var err error
 	btp.chosenFile, err = btp.chooseFile()
@@ -576,6 +579,7 @@ func (btp *BTPlayer) Close() {
 		if btp.deleteAfter || askedToDelete == true || btp.notEnoughSpace {
 			btp.log.Info("Removing the torrent and deleting files...")
 			btp.bts.Session.GetHandle().RemoveTorrent(btp.torrentHandle, int(libtorrent.SessionHandleDeleteFiles))
+			defer os.Remove(btp.partsFile)
 		} else {
 			btp.log.Info("Removing the torrent without deleting files...")
 			btp.bts.Session.GetHandle().RemoveTorrent(btp.torrentHandle, 0)
