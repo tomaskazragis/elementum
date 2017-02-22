@@ -7,6 +7,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"context"
 	"net/http"
 	"io/ioutil"
 	"crypto/md5"
@@ -36,7 +37,7 @@ var (
 
 func getLastRelease(user string, repository string) (string, string) {
 	client := github.NewClient(nil)
-	releases, _, _ := client.Repositories.ListReleases(user, repository, nil)
+	releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
 	if len(releases) > 0 {
 		lastRelease := releases[0]
 		return *lastRelease.TagName, *lastRelease.TargetCommitish
@@ -46,7 +47,7 @@ func getLastRelease(user string, repository string) (string, string) {
 
 func getReleaseByTag(user string, repository string, tagName string) *github.RepositoryRelease {
 	client := github.NewClient(nil)
-	releases, _, _ := client.Repositories.ListReleases(user, repository, nil)
+	releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
 	for _, release := range releases {
 		if *release.TagName == tagName {
 			return release
@@ -201,7 +202,7 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 		// if there a release with an asset that matches a addon zip, use it
 		if release != nil {
 			client := github.NewClient(nil)
-			assets, _, _ := client.Repositories.ListReleaseAssets(user, repository, *release.ID, nil)
+			assets, _, _ := client.Repositories.ListReleaseAssets(context.TODO(), user, repository, *release.ID, nil)
 			platformStruct := xbmc.GetPlatform()
 			platform := platformStruct.OS + "_" + platformStruct.Arch
 			var assetAllPlatforms string
@@ -255,7 +256,7 @@ func fetchChangelog(user string, repository string) string {
 	changelog := ""
 	if repository == "plugin.video.quasar" {
 		client := github.NewClient(nil)
-		releases, _, _ := client.Repositories.ListReleases(user, repository, nil)
+		releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
 		changelog = "Quasar changelog\n======\n\n"
 		for _, release := range releases {
 			changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), *release.Body)
