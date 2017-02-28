@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
 	"github.com/scakemyer/quasar/api"
 	"github.com/scakemyer/quasar/lockfile"
@@ -84,6 +85,9 @@ func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration
 		DownloadPath:        conf.DownloadPath,
 		TorrentsPath:        conf.TorrentsPath,
 		DisableBgProgress:   conf.DisableBgProgress,
+		CompletedMove:       conf.CompletedMove,
+		CompletedMoviesPath: conf.CompletedMoviesPath,
+		CompletedShowsPath:  conf.CompletedShowsPath,
 	}
 
 	if conf.SocksEnabled == true {
@@ -126,7 +130,17 @@ func main() {
 
 	wasFirstRun := Migrate()
 
-	btService := bittorrent.NewBTService(*makeBTConfiguration(conf))
+	db, err := bolt.Open(filepath.Join(conf.Info.Profile, "library.db"), 0600, &bolt.Options{
+		ReadOnly: false,
+		Timeout: 15 * time.Second,
+	})
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer db.Close()
+
+	btService := bittorrent.NewBTService(*makeBTConfiguration(conf), db)
 
 	var shutdown = func() {
 		log.Info("Shutting down...")
@@ -171,7 +185,7 @@ func main() {
 		xbmc.ResetRPC()
 	}()
 
-	go api.LibraryUpdate()
+	go api.LibraryUpdate(db)
 	go trakt.TokenRefreshHandler()
 
 	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)

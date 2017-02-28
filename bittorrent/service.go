@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"time"
 	"bytes"
+	"errors"
 	"strings"
 	"strconv"
 	"io/ioutil"
 	"math/rand"
 	"encoding/hex"
+	"encoding/json"
 	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
 	"github.com/dustin/go-humanize"
 	"github.com/scakemyer/libtorrent-go"
@@ -26,7 +29,19 @@ import (
 )
 
 const (
+	Bucket = "BitTorrent"
 	libtorrentAlertWaitTime = 1 // 1 second
+)
+
+const (
+	Delete = iota
+	Update
+	RemoveFromLibrary
+)
+
+const (
+	Remove = iota
+	Active
 )
 
 const (
@@ -104,10 +119,14 @@ type BTConfiguration struct {
 	DownloadPath        string
 	TorrentsPath        string
 	DisableBgProgress   bool
+	CompletedMove       bool
+	CompletedMoviesPath string
+	CompletedShowsPath  string
 	Proxy               *ProxySettings
 }
 
 type BTService struct {
+	db                *bolt.DB
 	Session           libtorrent.Session
 	config            *BTConfiguration
 	log               *logging.Logger
@@ -120,9 +139,14 @@ type BTService struct {
 	closing           chan interface{}
 }
 
-type activeTorrent struct {
-	torrentName       string
-	progress          int
+type DBItem struct {
+	ID      int    `json:"id"`
+	State   int    `json:"state"`
+	Type    string `json:"type"`
+	File    int    `json:"file"`
+	ShowID  int    `json:"showid"`
+	Season  int    `json:"season"`
+	Episode int    `json:"episode"`
 }
 
 type ResumeFile struct {
@@ -130,13 +154,19 @@ type ResumeFile struct {
 	Trackers  [][]string `bencode:"trackers"`
 }
 
-func NewBTService(config BTConfiguration) *BTService {
+type activeTorrent struct {
+	torrentName       string
+	progress          int
+}
+
+func NewBTService(conf BTConfiguration, db *bolt.DB) *BTService {
 	s := &BTService{
+		db:                db,
 		log:               logging.MustGetLogger("btservice"),
 		libtorrentLog:     logging.MustGetLogger("libtorrent"),
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 		SpaceChecked:      make(map[string]bool, 0),
-		config:            &config,
+		config:            &conf,
 		closing:           make(chan interface{}),
 	}
 
@@ -145,6 +175,16 @@ func NewBTService(config BTConfiguration) *BTService {
 			s.log.Error("Unable to create Torrents folder")
 		}
 	}
+
+	s.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
+		if err != nil {
+			s.log.Error(err)
+			xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+			return err
+		}
+		return nil
+	})
 
 	s.configure()
 	s.startServices()
@@ -649,6 +689,7 @@ func (s *BTService) loadTorrentFiles() {
 func (s *BTService) downloadProgress() {
 	rotateTicker := time.NewTicker(5 * time.Second)
 	defer rotateTicker.Stop()
+	warnedMissing := make(map[string]bool)
 
 	showNext := 0
 	for {
@@ -672,62 +713,189 @@ func (s *BTService) downloadProgress() {
 				}
 
 				torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
-				if torrentStatus.GetHasMetadata() == false  || torrentStatus.GetPaused() || s.Session.GetHandle().IsPaused() {
+				status := StatusStrings[int(torrentStatus.GetState())]
+				isPaused := torrentStatus.GetPaused()
+				if torrentStatus.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
 					continue
 				}
 
 				torrentName := torrentStatus.GetName()
 				progress := int(float64(torrentStatus.GetProgress()) * 100)
-
-				if progress < 100 {
+				if progress < 100 && !isPaused {
 					activeTorrents = append(activeTorrents, &activeTorrent{
 						torrentName: torrentName,
 						progress: progress,
 					})
 					totalProgress += progress
-				} else {
-					finished_time := torrentStatus.GetFinishedTime()
-					if s.config.SeedTimeLimit > 0 {
-						if finished_time >= s.config.SeedTimeLimit {
-							s.log.Noticef("Seeding time limit reached, pausing %s", torrentName)
+					continue
+				}
+
+				seedingTime := torrentStatus.GetSeedingTime()
+				finishedTime := torrentStatus.GetFinishedTime()
+				if progress == 100 && seedingTime == 0 {
+					seedingTime = finishedTime
+				}
+
+				if s.config.SeedTimeLimit > 0 {
+					if seedingTime >= s.config.SeedTimeLimit {
+						if !isPaused {
+							s.log.Warningf("Seeding time limit reached, pausing %s", torrentName)
 							torrentHandle.AutoManaged(false)
 							torrentHandle.Pause(1)
-							continue
+							isPaused = true
 						}
-					}
-					if s.config.SeedTimeRatioLimit > 0 {
-						timeRatio := 0
-						download_time := torrentStatus.GetActiveTime() - finished_time
-						if download_time > 1 {
-							timeRatio = finished_time * 100 / download_time
-						}
-						if timeRatio >= s.config.SeedTimeRatioLimit {
-							s.log.Noticef("Seeding time ratio reached, pausing %s", torrentName)
-							torrentHandle.AutoManaged(false)
-							torrentHandle.Pause(1)
-							continue
-						}
-					}
-					if s.config.ShareRatioLimit > 0 {
-						ratio := int64(0)
-						allTimeDownload := torrentStatus.GetAllTimeDownload()
-						if allTimeDownload > 0 {
-							ratio = torrentStatus.GetAllTimeUpload() * 100 / allTimeDownload
-						}
-						if ratio >= int64(s.config.ShareRatioLimit) {
-							s.log.Noticef("Share ratio reached, pausing %s", torrentName)
-							torrentHandle.AutoManaged(false)
-							torrentHandle.Pause(1)
-						}
+						status = "Finished"
 					}
 				}
+				if s.config.SeedTimeRatioLimit > 0 && !isPaused {
+					timeRatio := 0
+					downloadTime := torrentStatus.GetActiveTime() - seedingTime
+					if downloadTime > 1 {
+						timeRatio = seedingTime * 100 / downloadTime
+					}
+					if timeRatio >= s.config.SeedTimeRatioLimit {
+						s.log.Warningf("Seeding time ratio reached, pausing %s", torrentName)
+						torrentHandle.AutoManaged(false)
+						torrentHandle.Pause(1)
+						status = "Finished"
+					}
+				}
+				if s.config.ShareRatioLimit > 0 && !isPaused {
+					ratio := int64(0)
+					allTimeDownload := torrentStatus.GetAllTimeDownload()
+					if allTimeDownload > 0 {
+						ratio = torrentStatus.GetAllTimeUpload() * 100 / allTimeDownload
+					}
+					if ratio >= int64(s.config.ShareRatioLimit) {
+						s.log.Warningf("Share ratio reached, pausing %s", torrentName)
+						torrentHandle.AutoManaged(false)
+						torrentHandle.Pause(1)
+						status = "Finished"
+					}
+				}
+
+				//
+				// Handle moving completed downloads
+				//
+				if !s.config.CompletedMove || Playing {
+					continue
+				}
+				if status != "Finished" && status != "Seeding" {
+					continue
+				}
+				if seedingTime < s.config.SeedTimeLimit {
+					continue
+				}
+				if xbmc.PlayerIsPlaying() {
+					continue
+				}
+
+				shaHash := torrentStatus.GetInfoHash().ToString()
+				infoHash := hex.EncodeToString([]byte(shaHash))
+				if _, exists := warnedMissing[infoHash]; exists {
+					continue
+				}
+
+				s.db.View(func(tx *bolt.Tx) error {
+					b := tx.Bucket([]byte(Bucket))
+					v := b.Get([]byte(infoHash))
+					var item *DBItem
+					errMsg := fmt.Sprintf("Missing item type to move files to completed folder for %s", torrentName)
+					if err := json.Unmarshal(v, &item); err != nil {
+						s.log.Warning(errMsg)
+						warnedMissing[infoHash] = true
+						return err
+					}
+					if item.Type == "" {
+						s.log.Error(errMsg)
+						return errors.New(errMsg)
+					} else {
+						s.log.Notice(torrentName, "completed and seeding time limit reached, moving files...")
+
+						// TODO generic "valid" path checker, ie. no 'nfs:/' and 'smb:/' paths
+						if filepath.Dir(s.config.CompletedMoviesPath) == "." || filepath.Dir(s.config.CompletedShowsPath) == "." {
+							errMsg := "Empty or invalid path, check your settings."
+							s.log.Error(errMsg)
+							warnedMissing[infoHash] = true
+							return errors.New(errMsg)
+						}
+
+						s.log.Info("Removing the torrent without deleting files...")
+						s.Session.GetHandle().RemoveTorrent(torrentHandle, 0)
+
+						// Delete leftover .parts file if any
+						partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
+						os.Remove(partsFile)
+
+						// Delete torrent file
+						torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+						if _, err := os.Stat(torrentFile); err == nil {
+							s.log.Info("Deleting torrent file at", torrentFile)
+							if err := os.Remove(torrentFile); err != nil {
+								s.log.Error(err)
+								return err
+							}
+						}
+
+						// Delete fast resume data
+						fastResumeFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
+						if _, err := os.Stat(fastResumeFile); err == nil {
+							s.log.Info("Deleting fast resume data at", fastResumeFile)
+							if err := os.Remove(fastResumeFile); err != nil {
+								s.log.Error(err)
+								return err
+							}
+						}
+
+						torrentInfo := torrentHandle.TorrentFile()
+						filePath := torrentInfo.Files().FilePath(item.File)
+						fileName := filepath.Base(filePath)
+
+						var dstPath string
+						if item.Type == "movie" {
+							dstPath = filepath.Dir(s.config.CompletedMoviesPath)
+						} else {
+							dstPath = filepath.Dir(s.config.CompletedShowsPath)
+							if item.ShowID > 0 {
+								show := tmdb.GetShow(item.ShowID, "en")
+								if show != nil {
+									showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+									seasonPath := filepath.Join(showPath, fmt.Sprintf("Season %d", item.Season))
+									if item.Season == 0 {
+										seasonPath = filepath.Join(showPath, "Specials")
+									}
+									dstPath = filepath.Join(dstPath, seasonPath)
+									os.MkdirAll(dstPath, 0755)
+								}
+							}
+						}
+
+						go func() {
+							s.log.Infof("Moving %s to %s", fileName, dstPath)
+							srcPath := filepath.Join(s.config.DownloadPath, filePath)
+							if dst, err := util.Move(srcPath, dstPath); err != nil {
+								s.log.Error(err)
+							} else {
+								// Remove leftover folder
+								if dirPath := filepath.Dir(filePath); dirPath != "." {
+									os.RemoveAll(filepath.Dir(srcPath))
+								}
+								s.log.Noticef("%s moved to %s", fileName, dst)
+
+								s.log.Infof("Marking %s for removal from library and database...", torrentName)
+								s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
+							}
+						}()
+					}
+					return nil
+				})
 			}
 
-			activeDownloads := len(activeTorrents)
-			if activeDownloads > 0 {
-				showProgress := totalProgress / activeDownloads
+			totalActive := len(activeTorrents)
+			if totalActive > 0 {
+				showProgress := totalProgress / totalActive
 				showTorrent := "Total"
-				if showNext >= activeDownloads {
+				if showNext >= totalActive {
 					showNext = 0
 				} else {
 					showProgress = activeTorrents[showNext].progress
@@ -746,6 +914,59 @@ func (s *BTService) downloadProgress() {
 			}
 		}
 	}
+}
+
+//
+// Database updates
+//
+func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) (err error) {
+	switch Operation {
+	case Delete:
+		err = s.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(Bucket))
+			if err := b.Delete([]byte(InfoHash)); err != nil {
+				return err
+			}
+			return nil
+		})
+	case Update:
+		err = s.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(Bucket))
+			item := DBItem{
+				State: Active,
+				ID: ID,
+				Type: Type,
+				File: infos[0],
+				ShowID: infos[1],
+				Season: infos[2],
+				Episode: infos[3],
+			}
+			if buf, err := json.Marshal(item); err != nil {
+				return err
+			} else if err := b.Put([]byte(InfoHash), buf); err != nil {
+				return err
+			}
+			return nil
+		})
+	case RemoveFromLibrary:
+		err = s.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(Bucket))
+			v := b.Get([]byte(InfoHash))
+			var item *DBItem
+			if err := json.Unmarshal(v, &item); err != nil {
+				s.log.Error(err)
+				return err
+			}
+			item.State = Remove
+			if buf, err := json.Marshal(item); err != nil {
+				return err
+			} else if err := b.Put([]byte(InfoHash), buf); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	return err
 }
 
 func (s *BTService) alertsConsumer() {

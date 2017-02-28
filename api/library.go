@@ -46,6 +46,7 @@ const (
 	Update
 	Batch
 	BatchDelete
+	DeleteTorrent
 )
 
 var (
@@ -215,29 +216,29 @@ func isDuplicateShow(tmdbId string) (*tmdb.Show, error) {
 	return show, nil
 }
 
-func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) error {
+func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) (episodeId string, err error) {
 	episode := tmdb.GetEpisode(tmdbShowId, seasonNumber, episodeNumber, "en")
 	noExternalIDs := fmt.Sprintf("No external IDs found for S%02dE%02d (%d)", seasonNumber, episodeNumber, tmdbShowId)
 	if episode == nil || episode.ExternalIDs == nil {
 		libraryLog.Warning(noExternalIDs)
-		return nil
+		return
 	}
 
-	episodeId := strconv.Itoa(episode.Id)
+	episodeId = strconv.Itoa(episode.Id)
 	switch config.Get().TvScraper {
 	case TMDBScraper:
 		break
 	case TVDBScraper:
 		if episode.ExternalIDs == nil || episode.ExternalIDs.TVDBID == nil {
 			libraryLog.Warningf(noExternalIDs)
-			return nil
+			return
 		}
 		episodeId = strconv.Itoa(util.StrInterfaceToInt(episode.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktEpisode := trakt.GetEpisodeByTMDB(episodeId)
 		if traktEpisode == nil || traktEpisode.IDs == nil || traktEpisode.IDs.Trakt == 0 {
 			libraryLog.Warning(noExternalIDs + " from Trakt episode")
-			return nil
+			return
 		}
 		episodeId = strconv.Itoa(traktEpisode.IDs.Trakt)
 	}
@@ -250,21 +251,21 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 		show := tmdb.GetShowById(strconv.Itoa(tmdbShowId), "en")
 		if show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
 			libraryLog.Warning(noExternalIDs + " for TVDB show")
-			return nil
+			return
 		}
 		showId = strconv.Itoa(util.StrInterfaceToInt(show.ExternalIDs.TVDBID))
 	case TraktScraper:
 		traktShow := trakt.GetShowByTMDB(strconv.Itoa(tmdbShowId))
 		if traktShow == nil || traktShow.IDs == nil || traktShow.IDs.Trakt == 0 {
 			libraryLog.Warning(noExternalIDs + " from Trakt show")
-			return nil
+			return
 		}
 		showId = strconv.Itoa(traktShow.IDs.Trakt)
 	}
 
 	var tvshowId int
 	if libraryShows == nil {
-		return nil
+		return
 	}
 	for _, existingShow := range libraryShows.Shows {
 		if existingShow.ScraperID == showId {
@@ -273,26 +274,27 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) err
 		}
 	}
 	if tvshowId == 0 {
-		return nil
+		return
 	}
 
 	if libraryEpisodes == nil {
-		return nil
+		return
 	}
 	if episodes, exists := libraryEpisodes[tvshowId]; exists {
 		if episodes == nil {
-			return nil
+			return
 		}
 		for _, existingEpisode := range episodes.Episodes {
 			if existingEpisode.UniqueIDs.ID == episodeId ||
 				 (existingEpisode.Season == seasonNumber && existingEpisode.Episode == episodeNumber) {
-				return errors.New(fmt.Sprintf("%s S%02dE%02d already in library", existingEpisode.Title, seasonNumber, episodeNumber))
+				err = errors.New(fmt.Sprintf("%s S%02dE%02d already in library", existingEpisode.Title, seasonNumber, episodeNumber))
+				return
 			}
 		}
 	} else {
 		libraryLog.Warningf("Missing tvshowid (%d) in library episodes for S%02dE%02d (%s)", tvshowId, seasonNumber, episodeNumber, showId)
 	}
-	return nil
+	return
 }
 
 func isAddedToLibrary(id string, addedType int) (isAdded bool) {
@@ -366,6 +368,14 @@ func updateDB(Operation int, Type int, IDs []string, TVShowID int) (err error) {
 				if err := b.Delete([]byte(fmt.Sprintf("%d_%s", Type, id))); err != nil {
 					return err
 				}
+			}
+			return nil
+		})
+	case DeleteTorrent:
+		err = DB.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(bittorrent.Bucket))
+			if err := b.Delete([]byte(IDs[0])); err != nil {
+				return err
 			}
 			return nil
 		})
@@ -573,12 +583,14 @@ func removeMovie(ctx *gin.Context, tmdbId string) error {
 	if err := updateDB(Update, RemovedMovie, []string{tmdbId}, 0); err != nil {
 		return err
 	}
-
 	libraryLog.Warningf("%s removed from library", movieName)
-	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", movieName)) {
-		xbmc.VideoLibraryClean()
-	} else {
-		clearPageCache(ctx)
+
+	if ctx != nil {
+		if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", movieName)) {
+			xbmc.VideoLibraryClean()
+		} else {
+			clearPageCache(ctx)
+		}
 	}
 
 	return nil
@@ -713,7 +725,7 @@ func writeShowStrm(showId string, adding bool) (*tmdb.Show, error) {
 				}
 			}
 
-			if err := isDuplicateEpisode(Id, season.Season, episode.EpisodeNumber); err != nil {
+			if _, err := isDuplicateEpisode(Id, season.Season, episode.EpisodeNumber); err != nil {
 				continue
 			}
 
@@ -767,12 +779,14 @@ func removeShow(ctx *gin.Context, tmdbId string) error {
 	if err := updateDB(Update, RemovedShow, []string{tmdbId}, 0); err != nil {
 		return err
 	}
+	libraryLog.Warningf("%s removed from library", show.Name)
 
-	libraryLog.Noticef("%s removed from library", show.Name)
-	if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", show.Name)) {
-		xbmc.VideoLibraryClean()
-	} else {
-		clearPageCache(ctx)
+	if ctx != nil {
+		if xbmc.DialogConfirm("Quasar", fmt.Sprintf("LOCALIZE[30278];;%s", show.Name)) {
+			xbmc.VideoLibraryClean()
+		} else {
+			clearPageCache(ctx)
+		}
 	}
 
 	return nil
@@ -951,7 +965,7 @@ func RemoveShow(ctx *gin.Context) {
 //
 // Library update loop
 //
-func LibraryUpdate() {
+func LibraryUpdate(db *bolt.DB) {
 	if err := checkMoviesPath(); err != nil {
 		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
 		return
@@ -961,27 +975,16 @@ func LibraryUpdate() {
 		return
 	}
 
-	db, err := bolt.Open(filepath.Join(config.Get().Info.Profile, "library.db"), 0600, &bolt.Options{
-		ReadOnly: false,
-		Timeout: 15 * time.Second,
-	})
-	if err != nil {
-		libraryLog.Error(err)
-		return
-	}
-	defer db.Close()
-
-	DB = db
-
 	db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
 		if err != nil {
 			libraryLog.Error(err)
 			xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
-		  return err
-	  }
+			return err
+		}
 		return nil
 	})
+	DB = db
 
 	// Migrate old QuasarDB.json
 	if _, err := os.Stat(filepath.Join(libraryPath, "QuasarDB.json")); err == nil {
@@ -1073,6 +1076,9 @@ func LibraryUpdate() {
 								break
 							}
 						}
+						if libraryTotal == 0 {
+							break
+						}
 						if len(showEpisodes) == libraryTotal {
 							if err := removeShow(nil, showEpisodes[0].ShowID); err != nil {
 								libraryLog.Error("Unable to remove show after removing all episodes...")
@@ -1160,6 +1166,9 @@ func LibraryUpdate() {
 	traktSyncTicker := time.NewTicker(time.Duration(traktFrequency) * time.Hour)
 	defer traktSyncTicker.Stop()
 
+	markedForRemovalTicker := time.NewTicker(30 * time.Second)
+	defer markedForRemovalTicker.Stop()
+
 	for {
 		select {
 		case <- updateTicker.C:
@@ -1182,6 +1191,40 @@ func LibraryUpdate() {
 					xbmc.VideoLibraryScan()
 				}
 			}
+		case <- markedForRemovalTicker.C:
+			DB.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(bittorrent.Bucket))
+				b.ForEach(func(k, v []byte) error {
+					var item *bittorrent.DBItem
+					if err := json.Unmarshal(v, &item); err != nil {
+						libraryLog.Error(err)
+						return err
+					}
+					if item.State > bittorrent.Remove {
+						return nil
+					}
+
+					// Remove from Quasar's library to prevent duplicates
+					if item.Type == "movie" {
+						if _, err := isDuplicateMovie(strconv.Itoa(item.ID)); err != nil {
+							removeMovie(nil, strconv.Itoa(item.ID))
+							if err := removeMovie(nil, strconv.Itoa(item.ID)); err != nil {
+								libraryLog.Warning("Nothing left to remove from Quasar")
+							}
+						}
+					} else {
+						if scraperId, err := isDuplicateEpisode(item.ShowID, item.Season, item.Episode); err != nil {
+							if err := removeEpisode(strconv.Itoa(item.ID), strconv.Itoa(item.ShowID), scraperId, item.Season, item.Episode); err != nil {
+								libraryLog.Warning(err)
+							}
+						}
+					}
+					updateDB(DeleteTorrent, 0, []string{string(k)}, 0)
+					libraryLog.Infof("Removed %s from database", k)
+					return nil
+				})
+				return nil
+			})
 		case <- closing:
 			close(removedEpisodes)
 			return
@@ -1464,7 +1507,7 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 						if tmdbMovie == nil || tmdbMovie.Id == 0 {
 							break
 						}
-						if err := removeMovie(ctx, strconv.Itoa(tmdbMovie.Id)); err != nil {
+						if err := removeMovie(nil, strconv.Itoa(tmdbMovie.Id)); err != nil {
 							libraryLog.Warning("Nothing left to remove from Quasar")
 						}
 						break

@@ -83,6 +83,10 @@ type Configuration struct {
 	SocksPort     int
 	SocksLogin    string
 	SocksPassword string
+
+	CompletedMove       bool
+	CompletedMoviesPath string
+	CompletedShowsPath  string
 }
 
 type Addon struct {
@@ -245,6 +249,10 @@ func Reload() *Configuration {
 		SocksPort:     settings["socks_port"].(int),
 		SocksLogin:    settings["socks_login"].(string),
 		SocksPassword: settings["socks_password"].(string),
+
+		CompletedMove:       settings["completed_move"].(bool),
+		CompletedMoviesPath: settings["completed_movies_path"].(string),
+		CompletedShowsPath:  settings["completed_shows_path"].(string),
 	}
 
 	lock.Lock()

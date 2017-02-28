@@ -35,6 +35,7 @@ const (
 var (
 	Paused        bool
 	Seeked        bool
+	Playing       bool
 	WasPlaying    bool
 	WatchedTime   float64
 	VideoDuration float64
@@ -53,6 +54,9 @@ type BTPlayer struct {
 	fileIndex                int
 	resumeIndex              int
 	tmdbId                   int
+	showId                   int
+	season                   int
+	episode                  int
 	scrobble                 bool
 	deleteAfter              bool
 	askToDelete              bool
@@ -81,6 +85,9 @@ type BTPlayerParams struct {
 	ResumeIndex  int
 	ContentType  string
 	TMDBId       int
+	ShowID       int
+	Season       int
+	Episode      int
 }
 
 type candidateFile struct {
@@ -94,6 +101,7 @@ func (a byFilename) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byFilename) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
 func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
+	Playing = true
 	btp := &BTPlayer{
 		log:                  logging.MustGetLogger("btplayer"),
 		bts:                  bts,
@@ -109,6 +117,9 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		scrobble:             config.Get().Scrobble == true && params.TMDBId > 0 && config.Get().TraktToken != "",
 		contentType:          params.ContentType,
 		tmdbId:               params.TMDBId,
+		showId:               params.ShowID,
+		season:               params.Season,
+		episode:              params.Episode,
 		fastResumeFile:       "",
 		torrentFile:          "",
 		partsFile:            "",
@@ -198,7 +209,7 @@ func (btp *BTPlayer) addTorrent() error {
 	fastResumeFile := filepath.Join(btp.bts.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 	btp.fastResumeFile = fastResumeFile
 	if _, err := os.Stat(fastResumeFile); err == nil {
-		btp.log.Info("Found fast resume data...")
+		btp.log.Info("Found fast resume data")
 		fastResumeData, err := ioutil.ReadFile(fastResumeFile)
 		if err != nil {
 			return err
@@ -327,7 +338,7 @@ func (btp *BTPlayer) CheckAvailableSpace() bool {
 		sizeLeft := totalSize - totalDone
 		availableSpace := btp.diskStatus.Free
 
-		btp.log.Infof("Checking for sufficient space on %s...", btp.bts.config.DownloadPath)
+		btp.log.Infof("Checking for sufficient space on %s", btp.bts.config.DownloadPath)
 		btp.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
 		btp.log.Infof("All time download: %s", humanize.Bytes(uint64(status.GetAllTimeDownload())))
 		btp.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
@@ -357,7 +368,7 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.torrentInfo = btp.torrentHandle.TorrentFile()
 
 	// Save .torrent
-	btp.log.Infof("Saving %s ...", btp.torrentFile)
+	btp.log.Infof("Saving %s", btp.torrentFile)
 	torrentFile := libtorrent.NewCreateTorrent(btp.torrentInfo)
 	defer libtorrent.DeleteCreateTorrent(torrentFile)
 	torrentContent := torrentFile.Generate()
@@ -382,6 +393,9 @@ func (btp *BTPlayer) onMetadataReceived() {
 	fileName := filepath.Base(files.FilePath(btp.chosenFile))
 	btp.fileName = fileName
 	btp.log.Infof("Chosen file: %s", fileName)
+
+	btp.log.Infof("Saving torrent to database")
+	btp.bts.UpdateDB(Update, infoHash, btp.tmdbId, btp.contentType, btp.chosenFile, btp.showId, btp.season, btp.episode)
 
 	// Set all file priorities to 0 except chosen file
 	btp.log.Info("Setting file priorities")
@@ -575,6 +589,11 @@ func (btp *BTPlayer) Close() {
 			btp.log.Infof("Deleting fast resume data at %s", btp.fastResumeFile)
 			defer os.Remove(btp.fastResumeFile)
 		}
+
+		shaHash := btp.torrentInfo.InfoHash().ToString()
+		infoHash := hex.EncodeToString([]byte(shaHash))
+		btp.bts.UpdateDB(Delete, infoHash, 0, "")
+		btp.log.Infof("Removed %s from database", infoHash)
 
 		if btp.deleteAfter || askedToDelete == true || btp.notEnoughSpace {
 			btp.log.Info("Removing the torrent and deleting files...")
@@ -817,6 +836,7 @@ playbackLoop:
 	}
 	Paused = false
 	Seeked = false
+	Playing = false
 	WasPlaying = true
 	WatchedTime = 0
 	VideoDuration = 0

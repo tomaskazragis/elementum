@@ -143,25 +143,34 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			timeRatio := float64(0)
-			finished_time := float64(torrentStatus.GetFinishedTime())
-			download_time := float64(torrentStatus.GetActiveTime()) - finished_time
-			if download_time > 1 {
-				timeRatio = finished_time / download_time
+			finishedTime := float64(torrentStatus.GetFinishedTime())
+			downloadTime := float64(torrentStatus.GetActiveTime()) - finishedTime
+			if downloadTime > 1 {
+				timeRatio = finishedTime / downloadTime
 			}
 
 			seedingTime := time.Duration(torrentStatus.GetSeedingTime()) * time.Second
+			if progress == 100 && seedingTime == 0 {
+				seedingTime = time.Duration(finishedTime) * time.Second
+			}
 
 			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause/%d", i))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause"))}
 
-			if torrentStatus.GetPaused() && status != "Finished" {
-				status = "Paused"
-				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume/%d", i))}
-			}
 			if btService.Session.GetHandle().IsPaused() {
 				status = "Paused"
 				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume"))}
+			} else if torrentStatus.GetPaused() && status != "Finished" {
+				if progress == 100 {
+					status = "Finished"
+				} else {
+					status = "Paused"
+				}
+				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume/%d", i))}
+			} else if !torrentStatus.GetPaused() && (status == "Finished" || progress == 100) {
+				status = "Seeding"
 			}
+
 			color := "white"
 			switch (status) {
 			case "Paused":
@@ -226,11 +235,16 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			progress := float64(torrentStatus.GetProgress()) * 100
 
 			status := bittorrent.StatusStrings[int(torrentStatus.GetState())]
-			if torrentStatus.GetPaused() && status != "Finished" {
-				status = "Paused"
-			}
 			if btService.Session.GetHandle().IsPaused() {
 				status = "Paused"
+			} else if torrentStatus.GetPaused() && status != "Finished" {
+				if progress == 100 {
+					status = "Finished"
+				} else {
+					status = "Paused"
+				}
+			} else if !torrentStatus.GetPaused() && (status == "Finished" || progress == 100) {
+				status = "Seeding"
 			}
 
 			ratio := float64(0)
@@ -240,12 +254,15 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			timeRatio := float64(0)
-			finished_time := float64(torrentStatus.GetFinishedTime())
-			download_time := float64(torrentStatus.GetActiveTime()) - finished_time
-			if download_time > 1 {
-				timeRatio = finished_time / download_time
+			finishedTime := float64(torrentStatus.GetFinishedTime())
+			downloadTime := float64(torrentStatus.GetActiveTime()) - finishedTime
+			if downloadTime > 1 {
+				timeRatio = finishedTime / downloadTime
 			}
 			seedingTime := time.Duration(torrentStatus.GetSeedingTime()) * time.Second
+			if progress == 100 && seedingTime == 0 {
+				seedingTime = time.Duration(finishedTime) * time.Second
+			}
 
 			torrentInfo := torrentHandle.TorrentFile()
 			size := ""
@@ -486,6 +503,9 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			torrentsLog.Infof("Deleting fast resume data at %s", fastResumeFile)
 			defer os.Remove(fastResumeFile)
 		}
+
+		btService.UpdateDB(bittorrent.Delete, infoHash, 0, "")
+		torrentsLog.Infof("Removed %s from database", infoHash)
 
 		askedToDelete := false
 		if config.Get().KeepFilesAsk == true && deleteFiles == "" {
