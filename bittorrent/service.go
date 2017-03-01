@@ -811,7 +811,7 @@ func (s *BTService) downloadProgress() {
 						s.log.Error(errMsg)
 						return errors.New(errMsg)
 					} else {
-						s.log.Notice(torrentName, "completed and seeding time limit reached, moving files...")
+						s.log.Warning(torrentName, "finished seeding, moving files...")
 
 						// Check paths are valid and writable, and only once
 						if _, exists := pathChecked[item.Type]; !exists {
@@ -894,7 +894,7 @@ func (s *BTService) downloadProgress() {
 								if dirPath := filepath.Dir(filePath); dirPath != "." {
 									os.RemoveAll(filepath.Dir(srcPath))
 								}
-								s.log.Noticef("%s moved to %s", fileName, dst)
+								s.log.Warning(fileName, "moved to", dst)
 
 								s.log.Infof("Marking %s for removal from library and database...", torrentName)
 								s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
