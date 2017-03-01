@@ -97,12 +97,15 @@ func checkLibraryPath() error {
 	if libraryPath == "" {
 		libraryPath = config.Get().LibraryPath
 	}
+	if libraryPath == "" || libraryPath == "." {
+		return errors.New("LOCALIZE[30220]")
+	}
 	if fileInfo, err := os.Stat(libraryPath); err != nil {
-		if fileInfo.IsDir() == false {
-			return errors.New("Libray path is not a directory")
+		if fileInfo == nil {
+			return errors.New("Invalid library path")
 		}
-		if libraryPath == "" || libraryPath == "." {
-			return errors.New("LOCALIZE[30220]")
+		if !fileInfo.IsDir() {
+			return errors.New("Libray path is not a directory")
 		}
 		return err
 	}

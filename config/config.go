@@ -2,8 +2,10 @@ package config
 
 import (
 	"os"
+	"fmt"
 	"sync"
 	"time"
+	"errors"
 	"strings"
 	"strconv"
 	"path/filepath"
@@ -136,6 +138,10 @@ func Reload() *Configuration {
 		xbmc.Dialog("Quasar", "LOCALIZE[30113]")
 		xbmc.AddonSettings("plugin.video.quasar")
 		go waitSettingsSet()
+	} else if err := IsWritablePath(downloadPath); err != nil {
+		log.Error(err)
+		xbmc.Dialog("Quasar", err.Error())
+		xbmc.AddonSettings("plugin.video.quasar")
 	} else {
 		settingsSet = true
 	}
@@ -143,6 +149,10 @@ func Reload() *Configuration {
 	libraryPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("library_path")))
 	if libraryPath == "." {
 		libraryPath = downloadPath
+	} else if err := IsWritablePath(libraryPath); err != nil {
+		log.Error(err)
+		xbmc.Dialog("Quasar", err.Error())
+		xbmc.AddonSettings("plugin.video.quasar")
 	}
 	log.Infof("Using library path: %s", libraryPath)
 
@@ -268,6 +278,29 @@ func AddonIcon() string {
 
 func AddonResource(args ...string) string {
 	return filepath.Join(Get().Info.Path, "resources", filepath.Join(args...))
+}
+
+func IsWritablePath(path string) error {
+	if path == "." {
+		return errors.New("Path not set")
+	}
+	if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
+		return errors.New(fmt.Sprintf("Network paths are not supported, change %s to a locally mounted path by the OS", path))
+	}
+	if p, err := os.Stat(path); err != nil || !p.IsDir() {
+		if err != nil {
+			return err
+		}
+    return errors.New(fmt.Sprintf("%s is not a valid directory", path))
+	}
+	writableFile := filepath.Join(path, ".writable")
+	if writable, err := os.Create(writableFile); err != nil {
+		return err
+	} else {
+		writable.Close()
+		os.Remove(writableFile)
+	}
+	return nil
 }
 
 func waitSettingsSet() {

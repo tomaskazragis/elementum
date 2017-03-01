@@ -689,6 +689,8 @@ func (s *BTService) loadTorrentFiles() {
 func (s *BTService) downloadProgress() {
 	rotateTicker := time.NewTicker(5 * time.Second)
 	defer rotateTicker.Stop()
+
+	pathChecked := make(map[string]bool)
 	warnedMissing := make(map[string]bool)
 
 	showNext := 0
@@ -812,12 +814,25 @@ func (s *BTService) downloadProgress() {
 					} else {
 						s.log.Notice(torrentName, "completed and seeding time limit reached, moving files...")
 
-						// TODO generic "valid" path checker, ie. no 'nfs:/' and 'smb:/' paths
-						if filepath.Dir(s.config.CompletedMoviesPath) == "." || filepath.Dir(s.config.CompletedShowsPath) == "." {
-							errMsg := "Empty or invalid path, check your settings."
-							s.log.Error(errMsg)
-							warnedMissing[infoHash] = true
-							return errors.New(errMsg)
+						// Check paths are valid and writable, and only once
+						if _, exists := pathChecked[item.Type]; !exists {
+							if item.Type == "movie" {
+								if err := config.IsWritablePath(s.config.CompletedMoviesPath); err != nil {
+									warnedMissing[infoHash] = true
+									pathChecked[item.Type] = true
+									s.log.Error(err)
+									return err
+								}
+								pathChecked[item.Type] = true
+							} else {
+								if err := config.IsWritablePath(s.config.CompletedShowsPath); err != nil {
+									warnedMissing[infoHash] = true
+									pathChecked[item.Type] = true
+									s.log.Error(err)
+									return err
+								}
+								pathChecked[item.Type] = true
+							}
 						}
 
 						s.log.Info("Removing the torrent without deleting files...")
