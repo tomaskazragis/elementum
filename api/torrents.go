@@ -33,6 +33,8 @@ type TorrentsWeb struct {
 	Ratio        float64 `json:"ratio"`
 	TimeRatio    float64 `json:"time_ratio"`
 	SeedingTime  string  `json:"seeding_time"`
+	SeedTime     float64 `json:"seed_time"`
+	SeedTimeLimit    int `json:"seed_time_limit"`
 	DownloadRate float64 `json:"download_rate"`
 	UploadRate   float64 `json:"upload_rate"`
 	Seeders      int     `json:"seeders"`
@@ -222,6 +224,7 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
 		torrentsVectorSize := int(torrentsVector.Size())
 		torrents := make([]*TorrentsWeb, 0, torrentsVectorSize)
+		seedTimeLimit := config.Get().SeedTimeLimit
 
 		for i := 0; i < torrentsVectorSize; i++ {
 			torrentHandle := torrentsVector.Get(i)
@@ -284,6 +287,8 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 				Ratio: ratio,
 				TimeRatio: timeRatio,
 				SeedingTime: seedingTime.String(),
+				SeedTime: seedingTime.Seconds(),
+				SeedTimeLimit: seedTimeLimit,
 				DownloadRate: downloadRate,
 				UploadRate: uploadRate,
 				Seeders: seeders,

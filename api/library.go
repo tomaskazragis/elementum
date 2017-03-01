@@ -105,7 +105,7 @@ func checkLibraryPath() error {
 			return errors.New("Invalid library path")
 		}
 		if !fileInfo.IsDir() {
-			return errors.New("Libray path is not a directory")
+			return errors.New("Library path is not a directory")
 		}
 		return err
 	}

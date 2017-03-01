@@ -746,46 +746,45 @@ func (s *BTService) downloadProgress() {
 							torrentHandle.Pause(1)
 							isPaused = true
 						}
-						status = "Finished"
+						status = "Seeded"
 					}
 				}
-				if s.config.SeedTimeRatioLimit > 0 && !isPaused {
+				if s.config.SeedTimeRatioLimit > 0 {
 					timeRatio := 0
 					downloadTime := torrentStatus.GetActiveTime() - seedingTime
 					if downloadTime > 1 {
 						timeRatio = seedingTime * 100 / downloadTime
 					}
 					if timeRatio >= s.config.SeedTimeRatioLimit {
-						s.log.Warningf("Seeding time ratio reached, pausing %s", torrentName)
-						torrentHandle.AutoManaged(false)
-						torrentHandle.Pause(1)
-						status = "Finished"
+						if !isPaused {
+							s.log.Warningf("Seeding time ratio reached, pausing %s", torrentName)
+							torrentHandle.AutoManaged(false)
+							torrentHandle.Pause(1)
+							isPaused = true
+						}
+						status = "Seeded"
 					}
 				}
-				if s.config.ShareRatioLimit > 0 && !isPaused {
+				if s.config.ShareRatioLimit > 0 {
 					ratio := int64(0)
 					allTimeDownload := torrentStatus.GetAllTimeDownload()
 					if allTimeDownload > 0 {
 						ratio = torrentStatus.GetAllTimeUpload() * 100 / allTimeDownload
 					}
 					if ratio >= int64(s.config.ShareRatioLimit) {
-						s.log.Warningf("Share ratio reached, pausing %s", torrentName)
-						torrentHandle.AutoManaged(false)
-						torrentHandle.Pause(1)
-						status = "Finished"
+						if !isPaused {
+							s.log.Warningf("Share ratio reached, pausing %s", torrentName)
+							torrentHandle.AutoManaged(false)
+							torrentHandle.Pause(1)
+						}
+						status = "Seeded"
 					}
 				}
 
 				//
 				// Handle moving completed downloads
 				//
-				if !s.config.CompletedMove || Playing {
-					continue
-				}
-				if status != "Finished" && status != "Seeding" {
-					continue
-				}
-				if seedingTime < s.config.SeedTimeLimit {
+				if !s.config.CompletedMove || status != "Seeded" || Playing {
 					continue
 				}
 				if xbmc.PlayerIsPlaying() {
