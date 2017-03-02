@@ -156,6 +156,8 @@ type ResumeFile struct {
 
 type activeTorrent struct {
 	torrentName       string
+	downloadRate      float64
+	uploadRate        float64
 	progress          int
 }
 
@@ -703,9 +705,11 @@ func (s *BTService) downloadProgress() {
 				continue
 			}
 
+			var totalDownloadRate float64
+			var totalUploadRate float64
+			var totalProgress int
 			torrentsVector := s.Session.GetHandle().GetTorrents()
 			torrentsVectorSize := int(torrentsVector.Size())
-			totalProgress := 0
 			activeTorrents := make([]*activeTorrent, 0)
 
 			for i := 0; i < torrentsVectorSize; i++ {
@@ -720,12 +724,18 @@ func (s *BTService) downloadProgress() {
 				if torrentStatus.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
 					continue
 				}
+				downloadRate := float64(torrentStatus.GetDownloadRate()) / 1024
+				uploadRate := float64(torrentStatus.GetUploadRate()) / 1024
+				totalDownloadRate += downloadRate
+				totalUploadRate += uploadRate
 
 				torrentName := torrentStatus.GetName()
 				progress := int(float64(torrentStatus.GetProgress()) * 100)
 				if progress < 100 && !isPaused {
 					activeTorrents = append(activeTorrents, &activeTorrent{
 						torrentName: torrentName,
+						downloadRate: downloadRate,
+						uploadRate: uploadRate,
 						progress: progress,
 					})
 					totalProgress += progress
@@ -908,12 +918,13 @@ func (s *BTService) downloadProgress() {
 			totalActive := len(activeTorrents)
 			if totalActive > 0 {
 				showProgress := totalProgress / totalActive
-				showTorrent := "Total"
+				showTorrent := fmt.Sprintf("Total - D/L: %.2f kB/s - U/L: %.2f kB/s", totalDownloadRate, totalUploadRate)
 				if showNext >= totalActive {
 					showNext = 0
 				} else {
 					showProgress = activeTorrents[showNext].progress
 					showTorrent = activeTorrents[showNext].torrentName
+					showTorrent += fmt.Sprintf(" - %.2f kB/s - %.2f kB/s", activeTorrents[showNext].downloadRate, activeTorrents[showNext].uploadRate)
 					showNext += 1
 				}
 				if !s.config.DisableBgProgress {
