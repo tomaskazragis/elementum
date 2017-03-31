@@ -994,6 +994,18 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 	return err
 }
 
+func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
+	s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(Bucket))
+		v := b.Get([]byte(infoHash))
+		if err := json.Unmarshal(v, &dbItem); err != nil {
+			return err
+		}
+		return nil
+	})
+	return
+}
+
 func (s *BTService) alertsConsumer() {
 	defer s.alertsBroadcaster.Close()
 

@@ -324,11 +324,16 @@ func movieLinks(tmdbId string) []*bittorrent.Torrent {
 	return providers.SearchMovie(searchers, movie)
 }
 
-func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Query("external")
+
 		tmdbId := ctx.Params.ByName("tmdbId")
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
 
 		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
 
@@ -337,6 +342,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", tmdbId,
+				                     "library", library,
 				                     "type", "movie")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -350,6 +356,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", tmdbId,
+				                     "library", library,
 				                     "type", "movie")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -414,6 +421,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[choice].URI,
 				                     "tmdb", tmdbId,
+				                     "library", library,
 				                     "type", "movie")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -424,11 +432,16 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
-func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
+func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Query("external")
+
 		tmdbId := ctx.Params.ByName("tmdbId")
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
 
 		movie := tmdb.GetMovieById(tmdbId, "")
 
@@ -437,6 +450,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", tmdbId,
+				                     "library", library,
 				                     "type", "movie")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -450,6 +464,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", tmdbId,
+				                     "library", library,
 				                     "type", "movie")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -469,9 +484,11 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		AddToTorrentsMap(tmdbId, torrents[0])
 
-		rUrl := UrlQuery(UrlForXBMC("/play"), "uri", torrents[0].URI,
-		                                      "tmdb", tmdbId,
-		                                      "type", "movie")
+		rUrl := UrlQuery(
+			UrlForXBMC("/play"), "uri", torrents[0].URI,
+			                     "tmdb", tmdbId,
+			                     "library", library,
+			                     "type", "movie")
 		if external != "" {
 			xbmc.PlayURL(rUrl)
 		} else {

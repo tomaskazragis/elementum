@@ -38,6 +38,7 @@ var (
 	Seeked        bool
 	Playing       bool
 	WasPlaying    bool
+	FromLibrary   bool
 	WatchedTime   float64
 	VideoDuration float64
 )
@@ -84,6 +85,7 @@ type BTPlayerParams struct {
 	URI          string
 	FileIndex    int
 	ResumeIndex  int
+	FromLibrary  bool
 	ContentType  string
 	TMDBId       int
 	ShowID       int
@@ -103,6 +105,9 @@ func (a byFilename) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
 func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 	Playing = true
+	if params.FromLibrary {
+		FromLibrary = true
+	}
 	btp := &BTPlayer{
 		log:                  logging.MustGetLogger("btplayer"),
 		bts:                  bts,
@@ -857,6 +862,7 @@ playbackLoop:
 	Seeked = false
 	Playing = false
 	WasPlaying = true
+	FromLibrary = false
 	WatchedTime = 0
 	VideoDuration = 0
 

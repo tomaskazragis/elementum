@@ -371,12 +371,17 @@ func showSeasonLinks(showId int, seasonNumber int) ([]*bittorrent.Torrent, error
 	return providers.SearchSeason(searchers, show, season), nil
 }
 
-func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Query("external")
+
 		showId, _ := strconv.Atoi(ctx.Params.ByName("showId"))
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
 
 		show := tmdb.GetShow(showId, "")
 		if show == nil {
@@ -397,6 +402,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(season.Id),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -410,6 +416,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", torrents[0].URI,
 				                     "tmdb", strconv.Itoa(season.Id),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -511,14 +518,19 @@ func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bitto
 	return providers.SearchEpisode(searchers, show, episode), nil
 }
 
-func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Query("external")
+
 		tmdbId := ctx.Params.ByName("showId")
 		showId, _ := strconv.Atoi(tmdbId)
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
 
 		show := tmdb.GetShow(showId, "")
 		if show == nil {
@@ -542,6 +554,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 				                     "show", tmdbId,
 				                     "season", ctx.Params.ByName("season"),
 				                     "episode", ctx.Params.ByName("episode"),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -558,6 +571,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 				                     "show", tmdbId,
 				                     "season", ctx.Params.ByName("season"),
 				                     "episode", ctx.Params.ByName("episode"),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -629,6 +643,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 				                     "show", tmdbId,
 				                     "season", ctx.Params.ByName("season"),
 				                     "episode", ctx.Params.ByName("episode"),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -639,14 +654,19 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
-func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowEpisodePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		external := ctx.Query("external")
+
 		tmdbId := ctx.Params.ByName("showId")
 		showId, _ := strconv.Atoi(tmdbId)
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
 
 		show := tmdb.GetShow(showId, "")
 		if show == nil {
@@ -669,6 +689,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 				                     "show", tmdbId,
 				                     "season", ctx.Params.ByName("season"),
 				                     "episode", ctx.Params.ByName("episode"),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -685,6 +706,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 				                     "show", tmdbId,
 				                     "season", ctx.Params.ByName("season"),
 				                     "episode", ctx.Params.ByName("episode"),
+				                     "library", library,
 				                     "type", "episode")
 			if external != "" {
 				xbmc.PlayURL(rUrl)
@@ -713,6 +735,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			                     "show", tmdbId,
 			                     "season", ctx.Params.ByName("season"),
 			                     "episode", ctx.Params.ByName("episode"),
+			                     "library", library,
 			                     "type", "episode")
 		if external != "" {
 			xbmc.PlayURL(rUrl)

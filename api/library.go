@@ -1337,6 +1337,9 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 				bittorrent.Paused = false
 				return
 			}
+			if !bittorrent.FromLibrary {
+				return
+			}
 			libraryResume := config.Get().LibraryResume
 			if libraryResume == 0 {
 				return
@@ -1583,15 +1586,15 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 
 func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 	if config.Get().ChooseStreamAuto == true {
-		return MoviePlay(btService)
+		return MoviePlay(btService, true)
 	} else {
-		return MovieLinks(btService)
+		return MovieLinks(btService, true)
 	}
 }
 func PlayShow(btService *bittorrent.BTService) gin.HandlerFunc {
 	if config.Get().ChooseStreamAuto == true {
-		return ShowEpisodePlay(btService)
+		return ShowEpisodePlay(btService, true)
 	} else {
-		return ShowEpisodeLinks(btService)
+		return ShowEpisodeLinks(btService, true)
 	}
 }

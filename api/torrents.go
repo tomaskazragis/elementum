@@ -195,7 +195,35 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 			torrentsLog.Infof("- %.2f%% - %s - %.2f:1 / %.2f:1 (%s) - %s", progress, status, ratio, timeRatio, seedingTime.String(), torrentName)
 
-			playUrl := UrlQuery(UrlForXBMC("/play"), "resume", fmt.Sprintf("%d", i))
+			var (
+				tmdb string
+				show string
+				season string
+				episode string
+				contentType string
+			)
+			shaHash := torrentStatus.GetInfoHash().ToString()
+			infoHash := hex.EncodeToString([]byte(shaHash))
+			dbItem := btService.GetDBItem(infoHash)
+			if dbItem.Type != "" {
+				contentType = dbItem.Type
+				if contentType == "movie" {
+					tmdb = strconv.Itoa(dbItem.ID)
+				} else {
+					show = strconv.Itoa(dbItem.ShowID)
+					season = strconv.Itoa(dbItem.Season)
+					episode = strconv.Itoa(dbItem.Episode)
+				}
+			}
+
+			playUrl := UrlQuery(UrlForXBMC("/play"),
+				"resume", strconv.Itoa(i),
+				"type", contentType,
+				"tmdb", tmdb,
+				"show", show,
+				"season", season,
+				"episode", episode)
+
 			item := xbmc.ListItem{
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %.2f:1 / %.2f:1 (%s) - %s", progress, color, status, ratio, timeRatio, seedingTime.String(), torrentName),
 				Path: playUrl,
