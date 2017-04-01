@@ -963,8 +963,11 @@ func (s *BTService) downloadProgress() {
 					showNext = 0
 				} else {
 					showProgress = activeTorrents[showNext].progress
-					showTorrent = activeTorrents[showNext].torrentName
-					showTorrent += fmt.Sprintf(" - %.2f kB/s - %.2f kB/s", activeTorrents[showNext].downloadRate, activeTorrents[showNext].uploadRate)
+					torrentName := activeTorrents[showNext].torrentName
+					if len(torrentName) > 30 {
+						torrentName = torrentName[:30] + "..."
+					}
+					showTorrent = fmt.Sprintf("%s - %.2f kB/s - %.2f kB/s", torrentName, activeTorrents[showNext].downloadRate, activeTorrents[showNext].uploadRate)
 					showNext += 1
 				}
 				if !s.config.DisableBgProgress {
