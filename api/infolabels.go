@@ -123,6 +123,10 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 		tmdbId := ctx.Params.ByName("tmdbId")
 
 		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
+		if movie == nil {
+			ctx.Error(errors.New("Unable to find movie"))
+			return
+		}
 
 		item := movie.ToListItem()
 		libraryItem := FindMovieInLibrary(movie)

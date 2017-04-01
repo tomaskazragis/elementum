@@ -7,10 +7,12 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"bufio"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
+	"os/exec"
 	"io/ioutil"
 	"encoding/hex"
 	"path/filepath"
@@ -73,6 +75,8 @@ type BTPlayer struct {
 	bufferPiecesProgress     map[int]float64
 	bufferPiecesProgressLock sync.RWMutex
 	torrentName              string
+	extracted                string
+	isRarArchive             bool
 	hasChosenFile            bool
 	isDownloading            bool
 	notEnoughSpace           bool
@@ -281,7 +285,12 @@ func (btp *BTPlayer) resumeTorrent() error {
 }
 
 func (btp *BTPlayer) PlayURL() string {
-	return strings.Join(strings.Split(btp.torrentInfo.Files().FilePath(btp.chosenFile), string(os.PathSeparator)), "/")
+	if btp.isRarArchive {
+		extractedPath := filepath.Join(filepath.Dir(btp.torrentInfo.Files().FilePath(btp.chosenFile)), "extracted", btp.extracted)
+		return strings.Join(strings.Split(extractedPath, string(os.PathSeparator)), "/")
+	} else {
+		return strings.Join(strings.Split(btp.torrentInfo.Files().FilePath(btp.chosenFile), string(os.PathSeparator)), "/")
+	}
 }
 
 func (btp *BTPlayer) Buffer() error {
@@ -338,17 +347,24 @@ func (btp *BTPlayer) CheckAvailableSpace() bool {
 
 		totalSize := btp.torrentInfo.TotalSize()
 		totalDone := status.GetTotalDone()
-		if btp.fileSize > 0 {
+		if btp.fileSize > 0 && !btp.isRarArchive {
 			totalSize = btp.fileSize
 		}
 		sizeLeft := totalSize - totalDone
 		availableSpace := btp.diskStatus.Free
+		if btp.isRarArchive {
+			sizeLeft = sizeLeft * 2
+		}
 
 		btp.log.Infof("Checking for sufficient space on %s", btp.bts.config.DownloadPath)
 		btp.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
 		btp.log.Infof("All time download: %s", humanize.Bytes(uint64(status.GetAllTimeDownload())))
 		btp.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
-		btp.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
+		if btp.isRarArchive {
+			btp.log.Infof("Size left to download (x2 to extract): %s", humanize.Bytes(uint64(sizeLeft)))
+		} else {
+			btp.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
+		}
 		btp.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
 
 		if availableSpace < sizeLeft {
@@ -406,6 +422,13 @@ func (btp *BTPlayer) onMetadataReceived() {
 
 	btp.log.Infof("Saving torrent to database")
 	btp.bts.UpdateDB(Update, infoHash, btp.tmdbId, btp.contentType, btp.chosenFile, btp.showId, btp.season, btp.episode)
+
+	if btp.isRarArchive {
+		// Just disable sequential download for RAR archives
+		btp.log.Info("Disabling sequential download")
+		btp.torrentHandle.SetSequentialDownload(false)
+		return
+	}
 
 	// Set all file priorities to 0 except chosen file
 	btp.log.Info("Setting file priorities")
@@ -472,7 +495,7 @@ func (btp *BTPlayer) statusStrings(progress float64, status libtorrent.TorrentSt
 	line1 := fmt.Sprintf("%s (%.2f%%)", StatusStrings[int(status.GetState())], progress * 100)
 	if btp.torrentInfo != nil && btp.torrentInfo.Swigcptr() != 0 {
 		var totalSize int64
-		if btp.fileSize > 0 {
+		if btp.fileSize > 0 && !btp.isRarArchive {
 			totalSize = btp.fileSize
 		} else {
 			totalSize = btp.torrentInfo.TotalSize()
@@ -489,7 +512,7 @@ func (btp *BTPlayer) statusStrings(progress float64, status libtorrent.TorrentSt
 		status.GetNumIncomplete(),
 	)
 	line3 := ""
-	if btp.fileName != "" {
+	if btp.fileName != "" && !btp.isRarArchive {
 		line3 = btp.fileName
 	} else {
 		line3 = btp.torrentName
@@ -526,6 +549,17 @@ func (btp *BTPlayer) chooseFile() (int, error) {
 		}
 		if size > minCandidateSize {
 			candidateFiles = append(candidateFiles, i)
+		}
+
+		fileName := filepath.Base(files.FilePath(i))
+		re := regexp.MustCompile("(?i).*\\.rar")
+		if re.MatchString(fileName) && size > 10 * 1024 * 1024 {
+			btp.isRarArchive = true
+			if !xbmc.DialogConfirm("Quasar", "LOCALIZE[30303]") {
+				btp.notEnoughSpace = true
+				return i, errors.New("RAR archive detected and download was cancelled")
+			}
+			return i, nil
 		}
 	}
 
@@ -700,18 +734,76 @@ func (btp *BTPlayer) bufferDialog() {
 		select {
 		case <-halfSecond.C:
 			if btp.dialogProgress.IsCanceled() || btp.notEnoughSpace {
-				btp.log.Info("User cancelled the buffering")
-				btp.bufferEvents.Broadcast(errors.New("user canceled the buffering"))
+				errMsg := "User cancelled the buffering"
+				btp.log.Info(errMsg)
+				btp.bufferEvents.Broadcast(errors.New(errMsg))
 				return
 			}
 		case <-oneSecond.C:
 			status := btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
 
 			// Handle "Checking" state for resumed downloads
-			if int(status.GetState()) == 1 {
+			if int(status.GetState()) == 1 || btp.isRarArchive {
 				progress := float64(status.GetProgress())
 				line1, line2, line3 := btp.statusStrings(progress, status)
 				btp.dialogProgress.Update(int(progress * 100.0), line1, line2, line3)
+
+				if btp.isRarArchive && progress >= 1 {
+					archivePath := filepath.Join(btp.bts.config.DownloadPath, btp.torrentInfo.Files().FilePath(btp.chosenFile))
+					destPath := filepath.Join(btp.bts.config.DownloadPath, filepath.Dir(btp.torrentInfo.Files().FilePath(btp.chosenFile)), "extracted")
+
+					if _, err := os.Stat(destPath); err == nil {
+						btp.findExtracted(destPath)
+						btp.setRateLimiting(true)
+						btp.bufferEvents.Signal()
+						return
+					} else {
+						os.MkdirAll(destPath, 0755)
+					}
+
+					cmdName := "unrar"
+					cmdArgs := []string{"e", archivePath, destPath}
+					cmd := exec.Command(cmdName, cmdArgs...)
+					if platform := xbmc.GetPlatform(); platform.OS == "windows" {
+						cmdName = "unrar.exe"
+					}
+
+					cmdReader, err := cmd.StdoutPipe()
+					if err != nil {
+						btp.log.Error(err)
+						btp.bufferEvents.Broadcast(err)
+						xbmc.Notify("Quasar", "LOCALIZE[30304]", config.AddonIcon())
+						return
+					}
+
+					scanner := bufio.NewScanner(cmdReader)
+					go func() {
+						for scanner.Scan() {
+							btp.log.Infof("unrar | %s", scanner.Text())
+						}
+					}()
+
+					err = cmd.Start()
+					if err != nil {
+						btp.log.Error(err)
+						btp.bufferEvents.Broadcast(err)
+						xbmc.Notify("Quasar", "LOCALIZE[30305]", config.AddonIcon())
+						return
+					}
+
+					err = cmd.Wait()
+					if err != nil {
+						btp.log.Error(err)
+						btp.bufferEvents.Broadcast(err)
+						xbmc.Notify("Quasar", "LOCALIZE[30306]", config.AddonIcon())
+						return
+					}
+
+					btp.findExtracted(destPath)
+					btp.setRateLimiting(true)
+					btp.bufferEvents.Signal()
+					return
+				}
 			} else {
 				bufferProgress := float64(0)
 				btp.bufferPiecesProgressLock.Lock()
@@ -731,6 +823,30 @@ func (btp *BTPlayer) bufferDialog() {
 					btp.bufferEvents.Signal()
 					return
 				}
+			}
+		}
+	}
+}
+
+func (btp *BTPlayer) findExtracted(destPath string) {
+	files, err := ioutil.ReadDir(destPath)
+	if err != nil {
+		btp.log.Error(err)
+		btp.bufferEvents.Broadcast(err)
+		xbmc.Notify("Quasar", "LOCALIZE[30307]", config.AddonIcon())
+		return
+	}
+	if len(files) == 1 {
+		btp.log.Info("Extracted", files[0].Name())
+		btp.extracted = files[0].Name()
+	} else {
+		for _, file := range files {
+			fileName := file.Name()
+			re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
+			if re.MatchString(fileName) {
+				btp.log.Info("Extracted", fileName)
+				btp.extracted = fileName
+				break
 			}
 		}
 	}

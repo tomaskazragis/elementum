@@ -7,6 +7,7 @@ import (
 	"time"
 	"bytes"
 	"errors"
+	"regexp"
 	"strings"
 	"strconv"
 	"io/ioutil"
@@ -135,6 +136,7 @@ type BTService struct {
 	dialogProgressBG  *xbmc.DialogProgressBG
 	packSettings      libtorrent.SettingsPack
 	SpaceChecked      map[string]bool
+	MarkedToMove      int
 	UserAgent         string
 	closing           chan interface{}
 }
@@ -168,6 +170,7 @@ func NewBTService(conf BTConfiguration, db *bolt.DB) *BTService {
 		libtorrentLog:     logging.MustGetLogger("libtorrent"),
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 		SpaceChecked:      make(map[string]bool, 0),
+		MarkedToMove:      -1,
 		config:            &conf,
 		closing:           make(chan interface{}),
 	}
@@ -790,6 +793,10 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
+				if s.MarkedToMove >= 0 && i == s.MarkedToMove {
+					s.MarkedToMove = -1
+					status = "Seeded"
+				}
 
 				//
 				// Handle moving completed downloads
@@ -875,6 +882,33 @@ func (s *BTService) downloadProgress() {
 						filePath := torrentInfo.Files().FilePath(item.File)
 						fileName := filepath.Base(filePath)
 
+						extracted := ""
+						re := regexp.MustCompile("(?i).*\\.rar")
+						if re.MatchString(fileName) {
+							extractedPath := filepath.Join(s.config.DownloadPath, filepath.Dir(filePath), "extracted")
+							files, err := ioutil.ReadDir(extractedPath)
+							if err != nil {
+								return err
+							}
+							if len(files) == 1 {
+								extracted = files[0].Name()
+							} else {
+								for _, file := range files {
+									fileName := file.Name()
+									re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
+									if re.MatchString(fileName) {
+										extracted = fileName
+										break
+									}
+								}
+							}
+							if extracted != "" {
+								filePath = filepath.Join(filepath.Dir(filePath), "extracted", extracted)
+							} else {
+								return errors.New("No extracted file to move")
+							}
+						}
+
 						var dstPath string
 						if item.Type == "movie" {
 							dstPath = filepath.Dir(s.config.CompletedMoviesPath)
@@ -900,9 +934,15 @@ func (s *BTService) downloadProgress() {
 							if dst, err := util.Move(srcPath, dstPath); err != nil {
 								s.log.Error(err)
 							} else {
-								// Remove leftover folder
+								// Remove leftover folders
 								if dirPath := filepath.Dir(filePath); dirPath != "." {
 									os.RemoveAll(filepath.Dir(srcPath))
+									if extracted != "" {
+										parentPath := filepath.Clean(filepath.Join(filepath.Dir(srcPath), ".."))
+										if parentPath != "." && parentPath != s.config.DownloadPath {
+											os.RemoveAll(parentPath)
+										}
+									}
 								}
 								s.log.Warning(fileName, "moved to", dst)
 

@@ -205,7 +205,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			shaHash := torrentStatus.GetInfoHash().ToString()
 			infoHash := hex.EncodeToString([]byte(shaHash))
 			dbItem := btService.GetDBItem(infoHash)
-			if dbItem.Type != "" {
+			if dbItem != nil && dbItem.Type != "" {
 				contentType = dbItem.Type
 				if contentType == "movie" {
 					tmdb = strconv.Itoa(dbItem.ID)
@@ -236,6 +236,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 				torrentAction,
 				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%d", i))},
 				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%d?files=1", i))},
+				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/move/%d", i))},
 				sessionAction,
 			}
 			item.IsPlayable = true
@@ -476,6 +477,26 @@ func ResumeTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		torrentsLog.Infof("Resuming %s", torrentName)
 
 		torrentHandle.AutoManaged(true)
+
+		xbmc.Refresh()
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		ctx.String(200, "")
+	}
+}
+
+func MoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		btService.Session.GetHandle().GetTorrents()
+		torrentsVector := btService.Session.GetHandle().GetTorrents()
+		torrentId := ctx.Params.ByName("torrentId")
+		torrentIndex, _ := strconv.Atoi(torrentId)
+		torrentHandle := torrentsVector.Get(torrentIndex)
+		if torrentHandle.IsValid() == false {
+			ctx.Error(errors.New("Invalid torrent handle"))
+		}
+
+		torrentsLog.Infof("Marking %s to be moved...", torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName)).GetName())
+		btService.MarkedToMove = torrentIndex
 
 		xbmc.Refresh()
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
