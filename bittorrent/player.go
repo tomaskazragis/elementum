@@ -250,13 +250,13 @@ func (btp *BTPlayer) addTorrent() error {
 	return nil
 }
 
-func (btp *BTPlayer) resumeTorrent(torrentIndex int) error {
+func (btp *BTPlayer) resumeTorrent() error {
 	torrentsVector := btp.bts.Session.GetHandle().GetTorrents()
-	btp.torrentHandle = torrentsVector.Get(torrentIndex)
+	btp.torrentHandle = torrentsVector.Get(btp.resumeIndex)
 	go btp.consumeAlerts()
 
 	if btp.torrentHandle == nil {
-		return fmt.Errorf("Unable to resume torrent with index %d", torrentIndex)
+		return fmt.Errorf("Unable to resume torrent with index %d", btp.resumeIndex)
 	}
 
 	btp.log.Info("Enabling sequential download")
@@ -286,7 +286,7 @@ func (btp *BTPlayer) PlayURL() string {
 
 func (btp *BTPlayer) Buffer() error {
 	if btp.resumeIndex >= 0 {
-		if err := btp.resumeTorrent(btp.resumeIndex); err != nil {
+		if err := btp.resumeTorrent(); err != nil {
 			return err
 		}
 	} else {
@@ -365,21 +365,25 @@ func (btp *BTPlayer) CheckAvailableSpace() bool {
 func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Info("Metadata received.")
 
-	btp.torrentHandle.AutoManaged(false)
-	btp.torrentHandle.Pause()
-	defer btp.torrentHandle.AutoManaged(true)
+	if btp.resumeIndex < 0 {
+		btp.torrentHandle.AutoManaged(false)
+		btp.torrentHandle.Pause()
+		defer btp.torrentHandle.AutoManaged(true)
+	}
 
 	btp.torrentName = btp.torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName)).GetName()
 
 	btp.torrentInfo = btp.torrentHandle.TorrentFile()
 
-	// Save .torrent
-	btp.log.Infof("Saving %s", btp.torrentFile)
-	torrentFile := libtorrent.NewCreateTorrent(btp.torrentInfo)
-	defer libtorrent.DeleteCreateTorrent(torrentFile)
-	torrentContent := torrentFile.Generate()
-	bEncodedTorrent := []byte(libtorrent.Bencode(torrentContent))
-	ioutil.WriteFile(btp.torrentFile, bEncodedTorrent, 0644)
+	if btp.resumeIndex < 0 {
+		// Save .torrent
+		btp.log.Infof("Saving %s", btp.torrentFile)
+		torrentFile := libtorrent.NewCreateTorrent(btp.torrentInfo)
+		defer libtorrent.DeleteCreateTorrent(torrentFile)
+		torrentContent := torrentFile.Generate()
+		bEncodedTorrent := []byte(libtorrent.Bencode(torrentContent))
+		ioutil.WriteFile(btp.torrentFile, bEncodedTorrent, 0644)
+	}
 
 	// Reset fastResumeFile
 	shaHash := btp.torrentInfo.InfoHash().ToString()
@@ -465,7 +469,6 @@ func (btp *BTPlayer) onMetadataReceived() {
 }
 
 func (btp *BTPlayer) statusStrings(progress float64, status libtorrent.TorrentStatus) (string, string, string) {
-
 	line1 := fmt.Sprintf("%s (%.2f%%)", StatusStrings[int(status.GetState())], progress * 100)
 	if btp.torrentInfo != nil && btp.torrentInfo.Swigcptr() != 0 {
 		var totalSize int64
