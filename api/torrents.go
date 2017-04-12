@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"strconv"
+	"unicode"
 	"io/ioutil"
 	"encoding/hex"
 	"path/filepath"
@@ -80,8 +81,7 @@ func InTorrentsMap(tmdbId string) (torrents []*bittorrent.Torrent) {
 
 func nameMatch(torrentName string, itemName string) bool {
 	patterns := strings.FieldsFunc(strings.ToLower(itemName), func(r rune) bool {
-		switch r {
-		case ' ', '.', '_', '-':
+		if unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsMark(r) {
 			return true
 		}
 		return false
