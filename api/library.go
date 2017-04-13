@@ -1457,7 +1457,16 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 					libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
 					return
 				}
-				longName := fmt.Sprintf("%s S%02dE%02d", episode.Title, episode.Season, episode.Episode)
+				if libraryShows == nil {
+					return
+				}
+				showTitle := ""
+				for _, show := range libraryShows.Shows {
+					if show.ScraperID == strconv.Itoa(episode.TVShowID) {
+						showTitle = show.Title
+					}
+				}
+				longName := fmt.Sprintf("%s S%02dE%02d", showTitle, episode.Season, episode.Episode)
 				if libraryResume == 2 && ExistingTorrent(btService, longName) == "" {
 					return
 				}
