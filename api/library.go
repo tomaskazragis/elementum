@@ -1465,6 +1465,44 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 			xbmc.PlayerSeek(position)
 
+		case "Player.OnStop":
+			if bittorrent.VideoDuration <= 1 {
+				return
+			}
+			var stopped struct {
+				Ended bool `json:"end"`
+				Item  struct {
+					ID   int    `json:"id"`
+					Type string `json:"type"`
+				} `json:"item"`
+			}
+			jsonData, _ := base64.StdEncoding.DecodeString(data)
+			if err := json.Unmarshal(jsonData, &stopped); err != nil {
+				libraryLog.Error(err)
+				return
+			}
+
+			progress := bittorrent.WatchedTime / bittorrent.VideoDuration * 100
+
+			libraryLog.Infof("Stopped at %f%%", progress)
+
+			if stopped.Ended || progress > 90 {
+				if stopped.Item.Type == "movie" {
+					xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+				} else {
+					xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
+				}
+			} else if bittorrent.WatchedTime > 180 {
+				if stopped.Item.Type == "movie" {
+					xbmc.SetMovieWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+				} else {
+					xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+				}
+			} else {
+				time.Sleep(200 * time.Millisecond)
+				xbmc.Refresh()
+			}
+
 		case "VideoLibrary.OnUpdate":
 			time.Sleep(200 * time.Millisecond) // Because Kodi...
 			if !bittorrent.WasPlaying {
