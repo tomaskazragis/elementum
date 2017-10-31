@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
-	"github.com/scakemyer/quasar/util"
+	"github.com/elgatito/elementum/util"
 )
 
 const (

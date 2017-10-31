@@ -10,9 +10,9 @@ import (
 	"math/rand"
 
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 // Unused...
@@ -39,7 +39,7 @@ func GetImages(movieId int) *Images {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Quasar", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieId), config.AddonIcon())
+				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieId), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", movieId)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
@@ -77,14 +77,14 @@ func GetMovieById(movieId string, language string) *Movie {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Quasar", fmt.Sprintf("Failed getting movie %s, check your logs.", movieId), config.AddonIcon())
+				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting movie %s, check your logs.", movieId), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting movie %s, cooling down...", movieId)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting movie %s: %d", movieId, resp.Status())
 				log.Error(message)
-				xbmc.Notify("Quasar", message, config.AddonIcon())
+				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 			if movie != nil {
 				cacheStore.Set(key, movie, cacheExpiration)
@@ -137,14 +137,14 @@ func GetMovieGenres(language string) []*Genre {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Quasar", "Failed getting movie genres, check your logs.", config.AddonIcon())
+				xbmc.Notify("Elementum", "Failed getting movie genres, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warning("Rate limit exceeded getting genres, cooling down...")
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting movie genres: %d", resp.Status())
 				log.Error(message)
-				xbmc.Notify("Quasar", message, config.AddonIcon())
+				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 		})
 		if genres.Genres != nil && len(genres.Genres) > 0 {
@@ -171,14 +171,14 @@ func SearchMovies(query string, language string, page int) (Movies, int) {
 		)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed searching movies, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed searching movies, check your logs.", config.AddonIcon())
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded searching movies with %s", query)
 			rateLimiter.CoolDown(resp.HttpResponse().Header)
 		} else if resp.Status() != 200 {
 			message := fmt.Sprintf("Bad status searching movies: %d", resp.Status())
 			log.Error(message)
-			xbmc.Notify("Quasar", message, config.AddonIcon())
+			xbmc.Notify("Elementum", message, config.AddonIcon())
 		}
 	})
 	tmdbIds := make([]int, 0, len(results.Results))
@@ -211,14 +211,14 @@ func GetIMDBList(listId string, language string, page int) (movies Movies, total
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Quasar", "Failed getting IMDb list, check your logs.", config.AddonIcon())
+				xbmc.Notify("Elementum", "Failed getting IMDb list, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warning("Rate limit exceeded getting IMDb list, cooling down...")
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting IMDb list: %d", resp.Status())
 				log.Error(message + fmt.Sprintf(" (%s)", listId))
-				xbmc.Notify("Quasar", message, config.AddonIcon())
+				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 		})
 		tmdbIds := make([]int, 0)
@@ -281,14 +281,14 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 					)
 					if err != nil {
 						log.Error(err)
-						xbmc.Notify("Quasar", "Failed while listing movies, check your logs.", config.AddonIcon())
+						xbmc.Notify("Elementum", "Failed while listing movies, check your logs.", config.AddonIcon())
 					} else if resp.Status() == 429 {
 						log.Warningf("Rate limit exceeded listing movies from %s, cooling down...", endpoint)
 						rateLimiter.CoolDown(resp.HttpResponse().Header)
 					} else if resp.Status() != 200 {
 						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
 						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
-						xbmc.Notify("Quasar", message, config.AddonIcon())
+						xbmc.Notify("Elementum", message, config.AddonIcon())
 					}
 				})
 				if results != nil {

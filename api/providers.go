@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 type Addon struct {
@@ -31,7 +31,7 @@ func (a ByStatus) Less(i, j int) bool { return a[i].Status < a[j].Status }
 func getProviders() []Addon {
 	list := make([]Addon, 0)
 	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
-		if strings.HasPrefix(addon.ID, "script.quasar.") {
+		if strings.HasPrefix(addon.ID, "script.elementum.") {
 			list = append(list, Addon{
 				ID: addon.ID,
 				Name: addon.Name,
@@ -99,7 +99,7 @@ func ProviderCheck(ctx *gin.Context) {
 	addonId := ctx.Params.ByName("provider")
 	failures := xbmc.AddonCheck(addonId)
 	translated := xbmc.GetLocalizedString(30243)
-	xbmc.Notify("Quasar", fmt.Sprintf("%s: %d", translated, failures), config.AddonIcon())
+	xbmc.Notify("Elementum", fmt.Sprintf("%s: %d", translated, failures), config.AddonIcon())
 	ctx.String(200, "")
 }
 
@@ -113,7 +113,7 @@ func ProviderEnable(ctx *gin.Context) {
 	addonId := ctx.Params.ByName("provider")
 	xbmc.SetAddonEnabled(addonId, true)
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.quasar/provider/" {
+	if path == "plugin://plugin.video.elementum/provider/" {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
@@ -123,7 +123,7 @@ func ProviderDisable(ctx *gin.Context) {
 	addonId := ctx.Params.ByName("provider")
 	xbmc.SetAddonEnabled(addonId, false)
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.quasar/provider/" {
+	if path == "plugin://plugin.video.elementum/provider/" {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
@@ -136,7 +136,7 @@ func ProvidersEnableAll(ctx *gin.Context) {
 		xbmc.SetAddonEnabled(addon.ID, true)
 	}
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.quasar/provider/" {
+	if path == "plugin://plugin.video.elementum/provider/" {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
@@ -149,7 +149,7 @@ func ProvidersDisableAll(ctx *gin.Context) {
 		xbmc.SetAddonEnabled(addon.ID, false)
 	}
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.quasar/provider/" {
+	if path == "plugin://plugin.video.elementum/provider/" {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")

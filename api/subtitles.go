@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/osdb"
-	"github.com/scakemyer/quasar/util"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/osdb"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 var subLog = logging.MustGetLogger("subtitles")
@@ -92,7 +92,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 	)
 	playingFile := xbmc.PlayerGetPlayingFile()
 
-	// Check if we are reading a file from Quasar
+	// Check if we are reading a file from Elementum
 	if strings.HasPrefix(playingFile, util.GetHTTPHost()) {
 		playingFile = strings.Replace(playingFile, util.GetHTTPHost() + "/files", config.Get().DownloadPath, 1)
 		playingFile, _ = url.QueryUnescape(playingFile)

@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/scakemyer/quasar/bittorrent"
-	"github.com/scakemyer/quasar/providers"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/trakt"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/providers"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 // Maps TMDB movie genre ids to slugs for images
@@ -289,27 +289,28 @@ func MoviesMostVoted(ctx *gin.Context) {
 func SearchMovies(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	query := ctx.Query("q")
-	if query == "" {
-		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
-			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)
-			query = searchHistory[choice]
-		} else {
+	keyboard := ctx.Query("keyboard")
+
+	if len(query) == 0 {
+		historyType := "movies"
+		if len(keyboard) > 0 || searchHistoryEmpty(historyType) {
 			query = xbmc.Keyboard("", "LOCALIZE[30206]")
-			if query == "" {
+			if len(query) == 0 {
 				return
 			}
-			searchHistory = append(searchHistory, query)
+			searchHistoryAppend(ctx, historyType, query)
+		} else if !searchHistoryEmpty(historyType) {
+			searchHistoryList(ctx, historyType)
 		}
-	}
-	if query == "" {
 		return
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.SearchMovies(query, config.Get().Language, page)
 	renderMovies(ctx, movies, page, total, query)
 }
 
-func movieLinks(tmdbId string) []*bittorrent.Torrent {
+func movieLinks(tmdbId string) []*bittorrent.TorrentFile {
 	log.Println("Searching links for:", tmdbId)
 
 	movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
@@ -318,10 +319,29 @@ func movieLinks(tmdbId string) []*bittorrent.Torrent {
 
 	searchers := providers.GetMovieSearchers()
 	if len(searchers) == 0 {
-		xbmc.Notify("Quasar", "LOCALIZE[30204]", config.AddonIcon())
+		xbmc.Notify("Elementum", "LOCALIZE[30204]", config.AddonIcon())
 	}
 
 	return providers.SearchMovie(searchers, movie)
+}
+
+func MoviePlaySelector(link string, btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
+	play := link == "play"
+
+	if config.Get().ForceLinkType {
+		if config.Get().ChooseStreamAuto {
+			play = true
+		} else {
+			play = false
+		}
+	}
+
+
+	if play {
+		return MoviePlay(btService, fromLibrary)
+	} else {
+		return MovieLinks(btService, fromLibrary)
+	}
 }
 
 func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
@@ -338,7 +358,7 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
-		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", tmdbId,
@@ -369,7 +389,7 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 		torrents := movieLinks(tmdbId)
 
 		if len(torrents) == 0 {
-			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
 		}
 
@@ -446,7 +466,7 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 		movie := tmdb.GetMovieById(tmdbId, "")
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
-		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", tmdbId,
@@ -476,7 +496,7 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 
 		torrents := movieLinks(tmdbId)
 		if len(torrents) == 0 {
-			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
 		}
 

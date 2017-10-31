@@ -1,37 +1,32 @@
 package bittorrent
 
 import (
-	"os"
-	"io"
-	"fmt"
-	"time"
-	"bytes"
 	"errors"
-	"regexp"
-	"strings"
-	"strconv"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"encoding/hex"
-	"encoding/json"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/boltdb/bolt"
-	"github.com/op/go-logging"
+	"github.com/anacrolix/missinggo/pubsub"
+	gotorrent "github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/iplist"
+	"github.com/anacrolix/torrent/storage"
 	"github.com/dustin/go-humanize"
-	"github.com/scakemyer/libtorrent-go"
-	"github.com/scakemyer/quasar/broadcast"
-	"github.com/scakemyer/quasar/diskusage"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/util"
-	"github.com/scakemyer/quasar/xbmc"
-	"github.com/zeebo/bencode"
-)
+	"github.com/op/go-logging"
+	"golang.org/x/time/rate"
 
-const (
-	Bucket                  = "BitTorrent"
-	libtorrentAlertWaitTime = 1 // 1 second
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/diskusage"
+	qstorage "github.com/elgatito/elementum/storage"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -45,13 +40,13 @@ const (
 	Active
 )
 
-const (
-	ipToSDefault     = iota
-	ipToSLowDelay    = 1 << iota
-	ipToSReliability = 1 << iota
-	ipToSThroughput  = 1 << iota
-	ipToSLowCost     = 1 << iota
-)
+// const (
+// 	ipToSDefault     = iota
+// 	ipToSLowDelay    = 1 << iota
+// 	ipToSReliability = 1 << iota
+// 	ipToSThroughput  = 1 << iota
+// 	ipToSLowCost     = 1 << iota
+// )
 
 var dhtBootstrapNodes = []string{
 	"router.bittorrent.com",
@@ -69,76 +64,86 @@ var DefaultTrackers = []string{
 	"udp://explodie.org:6969",
 }
 
-var StatusStrings = []string{
-	"Queued",
-	"Checking",
-	"Finding",
-	"Buffering",
-	"Finished",
-	"Seeding",
-	"Allocating",
-	"Stalled",
-}
-
-const (
-	ProxyTypeNone = iota
-	ProxyTypeSocks4
-	ProxyTypeSocks5
-	ProxyTypeSocks5Password
-	ProxyTypeSocksHTTP
-	ProxyTypeSocksHTTPPassword
-	ProxyTypeI2PSAM
+var (
+	db     *database.Database
+	Bucket = database.BitTorrentBucket
 )
 
-type ProxySettings struct {
-	Type     int
-	Port     int
-	Hostname string
-	Username string
-	Password string
-}
+const (
+	StorageFile = iota
+	StorageMemory
+	StorageFat32
+)
+
+// const (
+// 	ProxyTypeNone = iota
+// 	ProxyTypeSocks4
+// 	ProxyTypeSocks5
+// 	ProxyTypeSocks5Password
+// 	ProxyTypeSocksHTTP
+// 	ProxyTypeSocksHTTPPassword
+// 	ProxyTypeI2PSAM
+// )
+
+// type ProxySettings struct {
+// 	Type     int
+// 	Port     int
+// 	Hostname string
+// 	Username string
+// 	Password string
+// }
 
 type BTConfiguration struct {
 	SpoofUserAgent      int
-	BufferSize          int
+	DownloadStorage     int
+	MemorySize          int64
+	BufferSize          int64
 	MaxUploadRate       int
 	MaxDownloadRate     int
 	LimitAfterBuffering bool
 	ConnectionsLimit    int
-	SessionSave         int
-	ShareRatioLimit     int
-	SeedTimeRatioLimit  int
 	SeedTimeLimit       int
 	DisableDHT          bool
-	DisableUPNP         bool
 	EncryptionPolicy    int
 	LowerListenPort     int
 	UpperListenPort     int
 	ListenInterfaces    string
 	OutgoingInterfaces  string
-	TunedStorage        bool
 	DownloadPath        string
 	TorrentsPath        string
 	DisableBgProgress   bool
 	CompletedMove       bool
 	CompletedMoviesPath string
 	CompletedShowsPath  string
-	Proxy               *ProxySettings
+
+	// SessionSave         int
+	// ShareRatioLimit     int
+	// SeedTimeRatioLimit  int
+	// DisableUPNP         bool
+	// TunedStorage        bool
+	// Proxy               *ProxySettings
 }
 
 type BTService struct {
-	db                *bolt.DB
-	Session           libtorrent.Session
-	config            *BTConfiguration
-	log               *logging.Logger
-	libtorrentLog     *logging.Logger
-	alertsBroadcaster *broadcast.Broadcaster
-	dialogProgressBG  *xbmc.DialogProgressBG
-	packSettings      libtorrent.SettingsPack
-	SpaceChecked      map[string]bool
-	MarkedToMove      int
-	UserAgent         string
-	closing           chan interface{}
+	Client          *gotorrent.Client
+	ClientConfig    *gotorrent.Config
+	PieceCompletion storage.PieceCompletion
+	DefaultStorage  storage.ClientImpl
+	StorageEvents   *pubsub.PubSub
+	DownloadLimiter *rate.Limiter
+	UploadLimiter   *rate.Limiter
+	Torrents        []*Torrent
+	UserAgent       string
+
+	config           *BTConfiguration
+	log              *logging.Logger
+	dialogProgressBG *xbmc.DialogProgressBG
+	SpaceChecked     map[string]bool
+	MarkedToMove     int
+
+	closing      chan struct{}
+	bufferEvents chan int
+	pieceEvents  chan qstorage.PieceChange
 }
 
 type DBItem struct {
@@ -152,14 +157,15 @@ type DBItem struct {
 }
 
 type PlayingItem struct {
-	DBItem      *DBItem
+	DBID   int
+	DBTYPE string
+
+	TMDBID  int
+	Season  int
+	Episode int
+
 	WatchedTime float64
 	Duration    float64
-}
-
-type ResumeFile struct {
-	InfoHash string     `bencode:"info-hash"`
-	Trackers [][]string `bencode:"trackers"`
 }
 
 type activeTorrent struct {
@@ -169,16 +175,22 @@ type activeTorrent struct {
 	progress     int
 }
 
-func NewBTService(conf BTConfiguration, db *bolt.DB) *BTService {
+func InitDB() {
+	db, _ = database.NewDB()
+}
+
+func NewBTService(conf BTConfiguration) *BTService {
 	s := &BTService{
-		db:                db,
-		log:               logging.MustGetLogger("btservice"),
-		libtorrentLog:     logging.MustGetLogger("libtorrent"),
-		alertsBroadcaster: broadcast.NewBroadcaster(),
-		SpaceChecked:      make(map[string]bool, 0),
-		MarkedToMove:      -1,
-		config:            &conf,
-		closing:           make(chan interface{}),
+		log:    logging.MustGetLogger("btservice"),
+		config: &conf,
+
+		SpaceChecked:  make(map[string]bool, 0),
+		MarkedToMove:  -1,
+		StorageEvents: pubsub.NewPubSub(),
+
+		Torrents:        []*Torrent{},
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
 	}
 
 	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
@@ -187,23 +199,13 @@ func NewBTService(conf BTConfiguration, db *bolt.DB) *BTService {
 		}
 	}
 
-	s.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
-		if err != nil {
-			s.log.Error(err)
-			xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
-			return err
-		}
-		return nil
-	})
+	if completion, err := storage.NewBoltPieceCompletion(config.Get().ProfilePath); err == nil {
+		s.PieceCompletion = completion
+	} else {
+		s.PieceCompletion = storage.NewMapPieceCompletion()
+	}
 
 	s.configure()
-	s.startServices()
-
-	go s.saveResumeDataConsumer()
-	go s.saveResumeDataLoop()
-	go s.alertsConsumer()
-	go s.logAlerts()
 
 	tmdb.CheckApiKey()
 
@@ -215,24 +217,44 @@ func NewBTService(conf BTConfiguration, db *bolt.DB) *BTService {
 
 func (s *BTService) Close() {
 	s.log.Info("Stopping BT Services...")
+	s.closing <- struct{}{}
 	s.stopServices()
-	close(s.closing)
-	libtorrent.DeleteSession(s.Session)
+	s.Client.Close()
 }
 
 func (s *BTService) Reconfigure(config BTConfiguration) {
 	s.stopServices()
 	s.config = &config
 	s.configure()
-	s.startServices()
 	s.loadTorrentFiles()
 }
 
 func (s *BTService) configure() {
-	settings := libtorrent.NewSettingsPack()
-	s.Session = libtorrent.NewSession(settings, int(libtorrent.SessionHandleAddDefaultPlugins))
+	s.log.Info("Configuring client...")
 
-	s.log.Info("Applying session settings...")
+	var listenPorts []string
+	for p := s.config.LowerListenPort; p <= s.config.UpperListenPort; p++ {
+		listenPorts = append(listenPorts, strconv.Itoa(p))
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	listenInterfaces := []string{"0.0.0.0"}
+	if strings.TrimSpace(s.config.ListenInterfaces) != "" {
+		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
+	}
+
+	listenInterfacesStrings := make([]string, 0)
+	for _, listenInterface := range listenInterfaces {
+		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
+		if len(listenPorts) > 1 {
+			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
+		}
+	}
+
+	blocklist, err := iplist.MMapPacked("packed-blocklist")
+	if err != nil {
+		s.log.Debug(err)
+	}
 
 	userAgent := util.UserAgent()
 	if s.config.SpoofUserAgent > 0 {
@@ -273,8 +295,6 @@ func (s *BTService) configure() {
 		}
 		if userAgent != "" {
 			s.log.Infof("UserAgent: %s", userAgent)
-		} else {
-			s.log.Infof("UserAgent: libtorrent/%s", libtorrent.Version())
 		}
 	} else {
 		s.log.Infof("UserAgent: %s", util.UserAgent())
@@ -282,188 +302,61 @@ func (s *BTService) configure() {
 
 	if userAgent != "" {
 		s.UserAgent = userAgent
-		settings.SetStr(libtorrent.SettingByName("user_agent"), userAgent)
-	}
-	settings.SetInt(libtorrent.SettingByName("request_timeout"), 2)
-	settings.SetInt(libtorrent.SettingByName("peer_connect_timeout"), 2)
-	settings.SetBool(libtorrent.SettingByName("strict_end_game_mode"), true)
-	settings.SetBool(libtorrent.SettingByName("announce_to_all_trackers"), true)
-	settings.SetBool(libtorrent.SettingByName("announce_to_all_tiers"), true)
-	settings.SetInt(libtorrent.SettingByName("connection_speed"), 500)
-	settings.SetInt(libtorrent.SettingByName("download_rate_limit"), 0)
-	settings.SetInt(libtorrent.SettingByName("upload_rate_limit"), 0)
-	settings.SetInt(libtorrent.SettingByName("choking_algorithm"), 0)
-	settings.SetInt(libtorrent.SettingByName("share_ratio_limit"), 0)
-	settings.SetInt(libtorrent.SettingByName("seed_time_ratio_limit"), 0)
-	settings.SetInt(libtorrent.SettingByName("seed_time_limit"), 0)
-	settings.SetInt(libtorrent.SettingByName("peer_tos"), ipToSLowCost)
-	settings.SetInt(libtorrent.SettingByName("torrent_connect_boost"), 0)
-	settings.SetBool(libtorrent.SettingByName("rate_limit_ip_overhead"), true)
-	settings.SetBool(libtorrent.SettingByName("no_atime_storage"), true)
-	settings.SetBool(libtorrent.SettingByName("announce_double_nat"), true)
-	settings.SetBool(libtorrent.SettingByName("prioritize_partial_pieces"), false)
-	settings.SetBool(libtorrent.SettingByName("free_torrent_hashes"), true)
-	settings.SetBool(libtorrent.SettingByName("use_parole_mode"), true)
-	settings.SetInt(libtorrent.SettingByName("seed_choking_algorithm"), int(libtorrent.SettingsPackFastestUpload))
-	settings.SetBool(libtorrent.SettingByName("upnp_ignore_nonrouters"), true)
-	settings.SetBool(libtorrent.SettingByName("lazy_bitfields"), true)
-	settings.SetInt(libtorrent.SettingByName("stop_tracker_timeout"), 1)
-	settings.SetInt(libtorrent.SettingByName("auto_scrape_interval"), 1200)
-	settings.SetInt(libtorrent.SettingByName("auto_scrape_min_interval"), 900)
-	settings.SetBool(libtorrent.SettingByName("ignore_limits_on_local_network"), true)
-	settings.SetBool(libtorrent.SettingByName("rate_limit_utp"), true)
-	settings.SetInt(libtorrent.SettingByName("mixed_mode_algorithm"), int(libtorrent.SettingsPackPreferTcp))
-
-	// For Android external storage / OS-mounted NAS setups
-	if s.config.TunedStorage {
-		settings.SetBool(libtorrent.SettingByName("use_read_cache"), true)
-		settings.SetBool(libtorrent.SettingByName("coalesce_reads"), true)
-		settings.SetBool(libtorrent.SettingByName("coalesce_writes"), true)
-		settings.SetInt(libtorrent.SettingByName("max_queued_disk_bytes"), 10 * 1024 * 1024)
-		settings.SetInt(libtorrent.SettingByName("cache_size"), -1)
 	}
 
-	if s.config.ConnectionsLimit > 0 {
-		settings.SetInt(libtorrent.SettingByName("connections_limit"), s.config.ConnectionsLimit)
+	if s.config.ConnectionsLimit == 0 {
+		setPlatformSpecificSettings(s.config)
+	}
+
+	s.closing      = make(chan struct{}, 5)
+	s.bufferEvents = make(chan int, 5)
+	s.pieceEvents  = make(chan qstorage.PieceChange, 5)
+
+	if s.config.DownloadStorage == StorageMemory {
+		memSize := int64(config.Get().MemorySize)
+		if memSize < s.config.BufferSize {
+			memSize = s.config.BufferSize
+			s.log.Noticef("Raising memory size (%d) to fit all the buffer", memSize)
+		}
+
+		s.DefaultStorage = qstorage.NewMemoryStorage(memSize, s.StorageEvents, s.bufferEvents, s.pieceEvents)
+	// } else if s.config.DownloadStorage == StorageFat32 {
+	// 	// FAT32 File Storage Driver
+	// 	s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath)
 	} else {
-		setPlatformSpecificSettings(settings)
+		s.DefaultStorage = storage.NewFileWithCompletion(config.Get().DownloadPath, s.PieceCompletion)
 	}
 
-	if s.config.LimitAfterBuffering == false {
-		if s.config.MaxDownloadRate > 0 {
-			s.log.Infof("Rate limiting download to %dkB/s", s.config.MaxDownloadRate / 1024)
-			settings.SetInt(libtorrent.SettingByName("download_rate_limit"), s.config.MaxDownloadRate)
-		}
-		if s.config.MaxUploadRate > 0 {
-			s.log.Infof("Rate limiting upload to %dkB/s", s.config.MaxUploadRate / 1024)
-			// If we have an upload rate, use the nicer bittyrant choker
-			settings.SetInt(libtorrent.SettingByName("upload_rate_limit"), s.config.MaxUploadRate)
-			settings.SetInt(libtorrent.SettingByName("choking_algorithm"), int(libtorrent.SettingsPackBittyrantChoker))
-		}
+	s.ClientConfig = &gotorrent.Config{
+		DataDir: config.Get().DownloadPath,
+
+		ListenAddr: listenInterfacesStrings[0],
+
+		NoDHT: s.config.DisableDHT,
+
+		Seed:     s.config.SeedTimeLimit > 0,
+		NoUpload: s.config.SeedTimeLimit == 0,
+
+		EncryptionPolicy: gotorrent.EncryptionPolicy{
+			DisableEncryption: s.config.EncryptionPolicy == 0,
+			ForceEncryption:   s.config.EncryptionPolicy == 2,
+		},
+
+		IPBlocklist: blocklist,
+
+		DownloadRateLimiter: s.DownloadLimiter,
+		UploadRateLimiter:   s.UploadLimiter,
+
+		DefaultStorage: s.DefaultStorage,
 	}
 
-	if s.config.ShareRatioLimit > 0 {
-		settings.SetInt(libtorrent.SettingByName("share_ratio_limit"), s.config.ShareRatioLimit)
-	}
-	if s.config.SeedTimeRatioLimit > 0 {
-		settings.SetInt(libtorrent.SettingByName("seed_time_ratio_limit"), s.config.SeedTimeRatioLimit)
-	}
-	if s.config.SeedTimeLimit > 0 {
-		settings.SetInt(libtorrent.SettingByName("seed_time_limit"), s.config.SeedTimeLimit)
+	if !s.config.LimitAfterBuffering {
+		s.RestoreLimits()
 	}
 
-	s.log.Info("Applying encryption settings...")
-	if s.config.EncryptionPolicy > 0 {
-		policy := int(libtorrent.SettingsPackPeDisabled)
-		level := int(libtorrent.SettingsPackPeBoth)
-		preferRc4 := false
+	s.Client, err = gotorrent.NewClient(s.ClientConfig)
 
-		if s.config.EncryptionPolicy == 2 {
-			policy = int(libtorrent.SettingsPackPeForced)
-			level = int(libtorrent.SettingsPackPeRc4)
-			preferRc4 = true
-		}
-
-		settings.SetInt(libtorrent.SettingByName("out_enc_policy"), policy)
-		settings.SetInt(libtorrent.SettingByName("in_enc_policy"), policy)
-		settings.SetInt(libtorrent.SettingByName("allowed_enc_level"), level)
-		settings.SetBool(libtorrent.SettingByName("prefer_rc4"), preferRc4)
-	}
-
-	if s.config.Proxy != nil {
-		s.log.Info("Applying proxy settings...")
-		proxy_type := s.config.Proxy.Type + 1
-		settings.SetInt(libtorrent.SettingByName("proxy_type"), proxy_type)
-		settings.SetInt(libtorrent.SettingByName("proxy_port"), s.config.Proxy.Port)
-		settings.SetStr(libtorrent.SettingByName("proxy_hostname"), s.config.Proxy.Hostname)
-		settings.SetStr(libtorrent.SettingByName("proxy_username"), s.config.Proxy.Username)
-		settings.SetStr(libtorrent.SettingByName("proxy_password"), s.config.Proxy.Password)
-		settings.SetBool(libtorrent.SettingByName("proxy_tracker_connections"), true)
-		settings.SetBool(libtorrent.SettingByName("proxy_peer_connections"), true)
-		settings.SetBool(libtorrent.SettingByName("proxy_hostnames"), true)
-		settings.SetBool(libtorrent.SettingByName("force_proxy"), true)
-		if proxy_type == ProxyTypeI2PSAM {
-			settings.SetInt(libtorrent.SettingByName("i2p_port"), s.config.Proxy.Port)
-			settings.SetStr(libtorrent.SettingByName("i2p_hostname"), s.config.Proxy.Hostname)
-			settings.SetBool(libtorrent.SettingByName("allows_i2p_mixed"), false)
-			settings.SetBool(libtorrent.SettingByName("allows_i2p_mixed"), true)
-		}
-	}
-
-	// Set alert_mask here so it also applies on reconfigure...
-	settings.SetInt(libtorrent.SettingByName("alert_mask"), int(
-		libtorrent.AlertStatusNotification |
-		libtorrent.AlertStorageNotification |
-		libtorrent.AlertErrorNotification))
-
-	s.packSettings = settings
-	s.Session.GetHandle().ApplySettings(s.packSettings)
-}
-
-func (s *BTService) WriteState(f io.Writer) error {
-	entry := libtorrent.NewEntry()
-	defer libtorrent.DeleteEntry(entry)
-	s.Session.GetHandle().SaveState(entry, 0xFFFF)
-	_, err := f.Write([]byte(libtorrent.Bencode(entry)))
-	return err
-}
-
-func (s *BTService) LoadState(f io.Reader) error {
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	entry := libtorrent.NewEntry()
-	defer libtorrent.DeleteEntry(entry)
-	libtorrent.Bdecode(string(data), entry)
-	s.Session.GetHandle().LoadState(entry)
-	return nil
-}
-
-func (s *BTService) startServices() {
-	var listenPorts []string
-	for p := s.config.LowerListenPort; p <= s.config.UpperListenPort; p++ {
-		listenPorts = append(listenPorts, strconv.Itoa(p))
-	}
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	listenInterfaces := []string{"0.0.0.0"}
-	if strings.TrimSpace(s.config.ListenInterfaces) != "" {
-		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
-	}
-
-	listenInterfacesStrings := make([]string, 0)
-	for _, listenInterface := range listenInterfaces {
-		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface + ":" + listenPorts[rand.Intn(len(listenPorts))])
-		if len(listenPorts) > 1 {
-			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface + ":" + listenPorts[rand.Intn(len(listenPorts))])
-		}
-	}
-	s.packSettings.SetStr(libtorrent.SettingByName("listen_interfaces"), strings.Join(listenInterfacesStrings, ","))
-
-	if strings.TrimSpace(s.config.OutgoingInterfaces) != "" {
-		s.packSettings.SetStr(libtorrent.SettingByName("outgoing_interfaces"), strings.Replace(strings.TrimSpace(s.config.OutgoingInterfaces), " ", "", -1))
-	}
-
-	s.log.Info("Starting LSD...")
-	s.packSettings.SetBool(libtorrent.SettingByName("enable_lsd"), true)
-
-	if s.config.DisableDHT == false {
-		s.log.Info("Starting DHT...")
-		bootstrap_nodes := strings.Join(dhtBootstrapNodes, ":6881,") + ":6881"
-		s.packSettings.SetStr(libtorrent.SettingByName("dht_bootstrap_nodes"), bootstrap_nodes)
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_dht"), true)
-	}
-
-	if s.config.DisableUPNP == false {
-		s.log.Info("Starting UPNP...")
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_upnp"), true)
-
-		s.log.Info("Starting NATPMP...")
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_natpmp"), true)
-	}
-
-	s.Session.GetHandle().ApplySettings(s.packSettings)
+	go s.Watch()
 }
 
 func (s *BTService) stopServices() {
@@ -473,227 +366,170 @@ func (s *BTService) stopServices() {
 	s.dialogProgressBG = nil
 	xbmc.ResetRPC()
 
-	s.log.Info("Stopping LSD...")
-	s.packSettings.SetBool(libtorrent.SettingByName("enable_lsd"), false)
-
-	if s.config.DisableDHT == false {
-		s.log.Info("Stopping DHT...")
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_dht"), false)
-	}
-
-	if s.config.DisableUPNP == false {
-		s.log.Info("Stopping UPNP...")
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_upnp"), false)
-
-		s.log.Info("Stopping NATPMP...")
-		s.packSettings.SetBool(libtorrent.SettingByName("enable_natpmp"), false)
-	}
-
-	s.Session.GetHandle().ApplySettings(s.packSettings)
+	s.Client.Close()
 }
 
-func (s *BTService) checkAvailableSpace(torrentHandle libtorrent.TorrentHandle) {
-	var diskStatus *diskusage.DiskStatus
-	if dStatus, err := diskusage.DiskUsage(config.Get().DownloadPath); err != nil {
-		s.log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
-		return
-	} else {
-		diskStatus = dStatus
-	}
+func (s *BTService) Watch() {
+	defer close(s.closing)
+	// defer s.StorageChanges.Close()
 
-	if diskStatus != nil {
-		torrentInfo := torrentHandle.TorrentFile()
-
-		if torrentInfo == nil || torrentInfo.Swigcptr() == 0 {
-			s.log.Warning("Missing torrent info to check available space.")
+	for {
+		select {
+		// case change := <- s.pieceEvents:
+		// 	//change := _i.(qstorage.PieceChange)
+		// 	log.Debugf("Sending piece change event: %#v", change)
+		// 	if change.State == "complete" {
+		// 		s.Torrents[0].Torrent.UpdatePieceCompletion(change.Index)
+		// 	}
+		case <- s.closing:
 			return
 		}
+	}
+}
 
-		status := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryAccurateDownloadCounters) | uint(libtorrent.TorrentHandleQuerySavePath))
-		totalSize := torrentInfo.TotalSize()
-		totalDone := status.GetTotalDone()
-		sizeLeft := totalSize - totalDone
-		availableSpace := diskStatus.Free
-		path := status.GetSavePath()
+func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
+	diskStatus := &diskusage.DiskStatus{}
+	if status, err := diskusage.DiskUsage(config.Get().DownloadPath); err != nil {
+		s.log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
+		return false
+	} else {
+		diskStatus = status
+	}
 
-		s.log.Infof("Checking for sufficient space on %s...", path)
-		s.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
-		s.log.Infof("All time download: %s", humanize.Bytes(uint64(status.GetAllTimeDownload())))
-		s.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
+	if torrent == nil || torrent.Info() == nil {
+		s.log.Warning("Missing torrent info to check available space.")
+		return false
+	}
+
+	totalSize := torrent.BytesCompleted() + torrent.BytesMissing()
+	totalDone := torrent.BytesCompleted()
+	sizeLeft := torrent.BytesMissing()
+	availableSpace := diskStatus.Free
+	path := s.ClientConfig.DataDir
+
+	if torrent.IsRarArchive {
+		sizeLeft = sizeLeft * 2
+	}
+
+	s.log.Infof("Checking for sufficient space on %s...", path)
+	s.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
+	s.log.Infof("All time download: %s", humanize.Bytes(uint64(torrent.BytesCompleted())))
+	s.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
+	if torrent.IsRarArchive {
+		s.log.Infof("Size left to download (x2 to extract): %s", humanize.Bytes(uint64(sizeLeft)))
+	} else {
 		s.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
-		s.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
-
-		if availableSpace < sizeLeft {
-			s.log.Errorf("Unsufficient free space on %s. Has %d, needs %d.", path, diskStatus.Free, sizeLeft)
-			xbmc.Notify("Quasar", "LOCALIZE[30207]", config.AddonIcon())
-
-			s.log.Infof("Pausing torrent %s", torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName)).GetName())
-			torrentHandle.AutoManaged(false)
-			torrentHandle.Pause(1)
-		}
 	}
+	s.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
+
+	if availableSpace < sizeLeft {
+		s.log.Errorf("Unsufficient free space on %s. Has %d, needs %d.", path, diskStatus.Free, sizeLeft)
+		xbmc.Notify("Elementum", "LOCALIZE[30207]", config.AddonIcon())
+
+		torrent.Pause()
+		return false
+	}
+
+	return true
 }
 
-func (s *BTService) onStateChanged(stateAlert libtorrent.StateChangedAlert) {
-	switch stateAlert.GetState() {
-	case libtorrent.TorrentStatusDownloading:
-		torrentHandle := stateAlert.GetHandle()
-		torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
-		shaHash := torrentStatus.GetInfoHash().ToString()
-		infoHash := hex.EncodeToString([]byte(shaHash))
-		if spaceChecked, exists := s.SpaceChecked[infoHash]; exists {
-			if spaceChecked == false {
-				s.checkAvailableSpace(torrentHandle)
-				delete(s.SpaceChecked, infoHash)
+func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
+	s.log.Infof("Adding torrent from %s", uri)
+
+	if s.config.DownloadPath == "." {
+		xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
+		return nil, fmt.Errorf("Download path empty")
+	}
+
+	var err error
+	var torrentHandle *gotorrent.Torrent
+	if strings.HasPrefix(uri, "magnet:") {
+		if torrentHandle, err = s.Client.AddMagnet(uri); err != nil {
+			return nil, err
+		}
+		uri = ""
+	} else {
+		if strings.HasPrefix(uri, "http") {
+			torrent := NewTorrentFile(uri)
+
+			if err = torrent.Resolve(); err != nil {
+				s.log.Warningf("Could not resolve torrent %s: %#v", uri, err)
+				return nil, err
 			}
+			uri = torrent.URI
+		}
+
+		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
+			s.log.Warningf("Could not add torrent %s: %#v", uri, err)
+			return nil, err
 		}
 	}
+
+	torrent := NewTorrent(s, torrentHandle, uri)
+	if s.config.ConnectionsLimit > 0 {
+		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)
+	}
+
+	s.Torrents = append(s.Torrents, torrent)
+
+	go torrent.Watch()
+
+	return torrent, nil
 }
 
-func (s *BTService) saveResumeDataLoop() {
-	saveResumeWait := time.NewTicker(time.Duration(s.config.SessionSave) * time.Second)
-	defer saveResumeWait.Stop()
+func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
+	s.log.Debugf("Removing torrent: %s", torrent.Name())
+	if torrent == nil {
+		return false
+	}
 
-	for {
-		select {
-		case <-saveResumeWait.C:
-			torrentsVector := s.Session.GetHandle().GetTorrents()
-			torrentsVectorSize := int(torrentsVector.Size())
-
-			for i := 0; i < torrentsVectorSize; i++ {
-				torrentHandle := torrentsVector.Get(i)
-				if torrentHandle.IsValid() == false {
-					continue
-				}
-
-				status := torrentHandle.Status()
-				if status.GetHasMetadata() == false || status.GetNeedSaveResume() == false {
-					continue
-				}
-
-				torrentHandle.SaveResumeData(1)
-			}
+	query := torrent.InfoHash()
+	matched := -1
+	for i, t := range s.Torrents {
+		if t.InfoHash() == query {
+			matched = i
+			break
 		}
 	}
-}
 
-func (s *BTService) saveResumeDataConsumer() {
-	alerts, alertsDone := s.Alerts()
-	defer close(alertsDone)
+	if matched > -1 {
+		t := s.Torrents[matched]
 
-	for {
-		select {
-		case alert, ok := <-alerts:
-			if !ok { // was the alerts channel closed?
-				return
-			}
-			switch alert.Type {
-			case libtorrent.MetadataReceivedAlertAlertType:
-				metadataAlert := libtorrent.SwigcptrMetadataReceivedAlert(alert.Pointer)
-				torrentHandle := metadataAlert.GetHandle()
-				torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
-				shaHash := torrentStatus.GetInfoHash().ToString()
-				infoHash := hex.EncodeToString([]byte(shaHash))
-				torrentFileName := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+		go func() {
+			t.Drop(removeFiles)
+			t = nil
+		}()
 
-				// Save .torrent
-				s.log.Infof("Saving %s...", torrentFileName)
-				torrentInfo := torrentHandle.TorrentFile()
-				torrentFile := libtorrent.NewCreateTorrent(torrentInfo)
-				defer libtorrent.DeleteCreateTorrent(torrentFile)
-				torrentContent := torrentFile.Generate()
-				bEncodedTorrent := []byte(libtorrent.Bencode(torrentContent))
-				ioutil.WriteFile(torrentFileName, bEncodedTorrent, 0644)
-
-			case libtorrent.StateChangedAlertAlertType:
-				stateAlert := libtorrent.SwigcptrStateChangedAlert(alert.Pointer)
-				s.onStateChanged(stateAlert)
-
-			case libtorrent.SaveResumeDataAlertAlertType:
-				bEncoded := []byte(libtorrent.Bencode(alert.Entry))
-				b := bytes.NewReader(bEncoded)
-				dec := bencode.NewDecoder(b)
-				var torrentFile *TorrentFileRaw
-				if err := dec.Decode(&torrentFile); err != nil {
-					s.log.Warningf("Resume data corrupted for %s, %d bytes received and failed to decode with: %s, skipping...", alert.Name, len(bEncoded), err.Error())
-				} else {
-					// s.log.Infof("Saving resume data for %s to %s.fastresume", torrentStatus.GetName(), infoHash)
-					path := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", alert.InfoHash))
-					ioutil.WriteFile(path, bEncoded, 0644)
-				}
-			}
-		}
+		s.Torrents = append(s.Torrents[:matched], s.Torrents[matched+1:]...)
+		return true
 	}
+
+	return false
 }
 
 func (s *BTService) loadTorrentFiles() {
 	pattern := filepath.Join(s.config.TorrentsPath, "*.torrent")
 	files, _ := filepath.Glob(pattern)
-	activeHashes := make(map[string]bool, len(files))
 
 	for _, torrentFile := range files {
-		torrentParams := libtorrent.NewAddTorrentParams()
-		defer libtorrent.DeleteAddTorrentParams(torrentParams)
-
 		s.log.Infof("Loading torrent file %s", torrentFile)
 
-		info := libtorrent.NewTorrentInfo(torrentFile)
-		defer libtorrent.DeleteTorrentInfo(info)
-		torrentParams.SetTorrentInfo(info)
-		torrentParams.SetSavePath(s.config.DownloadPath)
-
-		shaHash := info.InfoHash().ToString()
-		infoHash := hex.EncodeToString([]byte(shaHash))
-		activeHashes[infoHash] = true
-
-		fastResumeFile := strings.Replace(torrentFile, ".torrent", ".fastresume", 1)
-
-		if _, err := os.Stat(fastResumeFile); err == nil {
-			fastResumeData, err := ioutil.ReadFile(fastResumeFile)
-			if err != nil {
-				s.log.Errorf("Error reading fastresume file: %s", err.Error())
-				os.Remove(fastResumeFile)
-			} else {
-				fastResumeVector := libtorrent.NewStdVectorChar()
-				defer libtorrent.DeleteStdVectorChar(fastResumeVector)
-				for _, c := range fastResumeData {
-					fastResumeVector.Add(c)
-				}
-				torrentParams.SetResumeData(fastResumeVector)
-			}
-		}
-
-		torrentHandle := s.Session.GetHandle().AddTorrent(torrentParams)
-
-		if torrentHandle == nil {
+		torrentHandle := &gotorrent.Torrent{}
+		var err error
+		if torrentHandle, err = s.Client.AddTorrentFromFile(torrentFile); err != nil || torrentHandle == nil {
 			s.log.Errorf("Error adding torrent file for %s", torrentFile)
 			if _, err := os.Stat(torrentFile); err == nil {
 				if err := os.Remove(torrentFile); err != nil {
 					s.log.Error(err)
 				}
 			}
-			if _, err := os.Stat(fastResumeFile); err == nil {
-				if err := os.Remove(fastResumeFile); err != nil {
-					s.log.Error(err)
-				}
-			}
-			continue
-		}
-	}
 
-	s.log.Info("Cleaning up stale .parts files...")
-	partsFiles, _ := filepath.Glob(filepath.Join(s.config.DownloadPath, "*.parts"))
-	for _, partsFile := range partsFiles {
-		infoHash := strings.Replace(strings.Replace(partsFile, s.config.DownloadPath, "", 1), ".parts", "", 1)[2:]
-		if _, exists := activeHashes[infoHash]; exists {
 			continue
-		} else {
-			if err := os.Remove(partsFile); err != nil {
-				s.log.Error(err)
-			} else {
-				s.log.Info("Removed", partsFile)
-			}
 		}
+
+		torrent := NewTorrent(s, torrentHandle, torrentFile)
+
+		s.Torrents = append(s.Torrents, torrent)
 	}
 }
 
@@ -708,128 +544,69 @@ func (s *BTService) downloadProgress() {
 	for {
 		select {
 		case <-rotateTicker.C:
-			if !s.config.DisableBgProgress && s.Session.GetHandle().IsPaused() && s.dialogProgressBG != nil {
+			if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
 				s.dialogProgressBG = nil
 				continue
 			}
 
-			var totalDownloadRate float64
-			var totalUploadRate float64
+			var totalDownloadRate int64
+			var totalUploadRate int64
 			var totalProgress int
-			torrentsVector := s.Session.GetHandle().GetTorrents()
-			torrentsVectorSize := int(torrentsVector.Size())
+
 			activeTorrents := make([]*activeTorrent, 0)
 
-			for i := 0; i < torrentsVectorSize; i++ {
-				torrentHandle := torrentsVector.Get(i)
-				if torrentHandle.IsValid() == false {
+			for i, torrentHandle := range s.Torrents {
+				if torrentHandle == nil {
 					continue
 				}
 
-				torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQueryName))
-				status := StatusStrings[int(torrentStatus.GetState())]
-				isPaused := torrentStatus.GetPaused()
-				if torrentStatus.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
-					continue
-				}
-				downloadRate := float64(torrentStatus.GetDownloadRate()) / 1024
-				uploadRate := float64(torrentStatus.GetUploadRate()) / 1024
-				totalDownloadRate += downloadRate
-				totalUploadRate += uploadRate
+				torrentName := torrentHandle.Info().Name
+				progress := int(torrentHandle.GetProgress())
+				status := torrentHandle.GetState()
 
-				torrentName := torrentStatus.GetName()
-				progress := int(float64(torrentStatus.GetProgress()) * 100)
-				if progress < 100 && !isPaused {
+				totalDownloadRate += torrentHandle.DownloadRate
+				totalUploadRate += torrentHandle.UploadRate
+
+				if progress < 100 && status != STATUS_PAUSED {
 					activeTorrents = append(activeTorrents, &activeTorrent{
 						torrentName:  torrentName,
-						downloadRate: downloadRate,
-						uploadRate:   uploadRate,
+						downloadRate: float64(torrentHandle.DownloadRate),
+						uploadRate:   float64(torrentHandle.UploadRate),
 						progress:     progress,
 					})
 					totalProgress += progress
 					continue
 				}
 
-				seedingTime := torrentStatus.GetSeedingTime()
-				finishedTime := torrentStatus.GetFinishedTime()
-				if progress == 100 && seedingTime == 0 {
-					seedingTime = finishedTime
-				}
-
-				if s.config.SeedTimeLimit > 0 {
-					if seedingTime >= s.config.SeedTimeLimit {
-						if !isPaused {
-							s.log.Warningf("Seeding time limit reached, pausing %s", torrentName)
-							torrentHandle.AutoManaged(false)
-							torrentHandle.Pause(1)
-							isPaused = true
-						}
-						status = "Seeded"
-					}
-				}
-				if s.config.SeedTimeRatioLimit > 0 {
-					timeRatio := 0
-					downloadTime := torrentStatus.GetActiveTime() - seedingTime
-					if downloadTime > 1 {
-						timeRatio = seedingTime * 100 / downloadTime
-					}
-					if timeRatio >= s.config.SeedTimeRatioLimit {
-						if !isPaused {
-							s.log.Warningf("Seeding time ratio reached, pausing %s", torrentName)
-							torrentHandle.AutoManaged(false)
-							torrentHandle.Pause(1)
-							isPaused = true
-						}
-						status = "Seeded"
-					}
-				}
-				if s.config.ShareRatioLimit > 0 {
-					ratio := int64(0)
-					allTimeDownload := torrentStatus.GetAllTimeDownload()
-					if allTimeDownload > 0 {
-						ratio = torrentStatus.GetAllTimeUpload() * 100 / allTimeDownload
-					}
-					if ratio >= int64(s.config.ShareRatioLimit) {
-						if !isPaused {
-							s.log.Warningf("Share ratio reached, pausing %s", torrentName)
-							torrentHandle.AutoManaged(false)
-							torrentHandle.Pause(1)
-						}
-						status = "Seeded"
-					}
-				}
 				if s.MarkedToMove >= 0 && i == s.MarkedToMove {
 					s.MarkedToMove = -1
-					status = "Seeded"
+					status = STATUS_SEEDING
 				}
 
 				//
 				// Handle moving completed downloads
 				//
-				if !s.config.CompletedMove || status != "Seeded" || Playing {
+				if !s.config.CompletedMove || status != STATUS_SEEDING || Playing {
 					continue
 				}
 				if xbmc.PlayerIsPlaying() {
 					continue
 				}
 
-				shaHash := torrentStatus.GetInfoHash().ToString()
-				infoHash := hex.EncodeToString([]byte(shaHash))
+				infoHash := torrentHandle.InfoHash()
 				if _, exists := warnedMissing[infoHash]; exists {
 					continue
 				}
 
-				s.db.View(func(tx *bolt.Tx) error {
-					b := tx.Bucket([]byte(Bucket))
-					v := b.Get([]byte(infoHash))
-					var item *DBItem
-					errMsg := fmt.Sprintf("Missing item type to move files to completed folder for %s", torrentName)
-					if err := json.Unmarshal(v, &item); err != nil {
-						s.log.Warning(errMsg)
+				item := &DBItem{}
+				func() error {
+					if err := db.GetObject(Bucket, infoHash, item); err != nil {
 						warnedMissing[infoHash] = true
 						return err
 					}
+
+					errMsg := fmt.Sprintf("Missing item type to move files to completed folder for %s", torrentName)
 					if item.Type == "" {
 						s.log.Error(errMsg)
 						return errors.New(errMsg)
@@ -858,34 +635,19 @@ func (s *BTService) downloadProgress() {
 						}
 
 						s.log.Info("Removing the torrent without deleting files...")
-						s.Session.GetHandle().RemoveTorrent(torrentHandle, 0)
-
-						// Delete leftover .parts file if any
-						partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
-						os.Remove(partsFile)
+						s.RemoveTorrent(torrentHandle, false)
 
 						// Delete torrent file
 						torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
 						if _, err := os.Stat(torrentFile); err == nil {
-							s.log.Info("Deleting torrent file at", torrentFile)
+							s.log.Info("Deleting torrent file at ", torrentFile)
 							if err := os.Remove(torrentFile); err != nil {
 								s.log.Error(err)
 								return err
 							}
 						}
 
-						// Delete fast resume data
-						fastResumeFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
-						if _, err := os.Stat(fastResumeFile); err == nil {
-							s.log.Info("Deleting fast resume data at", fastResumeFile)
-							if err := os.Remove(fastResumeFile); err != nil {
-								s.log.Error(err)
-								return err
-							}
-						}
-
-						torrentInfo := torrentHandle.TorrentFile()
-						filePath := torrentInfo.Files().FilePath(item.File)
+						filePath := torrentHandle.Files()[item.File].Path()
 						fileName := filepath.Base(filePath)
 
 						extracted := ""
@@ -958,13 +720,13 @@ func (s *BTService) downloadProgress() {
 						}()
 					}
 					return nil
-				})
+				}()
 			}
 
 			totalActive := len(activeTorrents)
 			if totalActive > 0 {
 				showProgress := totalProgress / totalActive
-				showTorrent := fmt.Sprintf("Total - D/L: %.2f kB/s - U/L: %.2f kB/s", totalDownloadRate, totalUploadRate)
+				showTorrent := fmt.Sprintf("Total - D/L: %s - U/L: %s", humanize.Bytes(uint64(totalDownloadRate))+"/s", humanize.Bytes(uint64(totalUploadRate))+"/s")
 				if showNext >= totalActive {
 					showNext = 0
 				} else {
@@ -973,14 +735,14 @@ func (s *BTService) downloadProgress() {
 					if len(torrentName) > 30 {
 						torrentName = torrentName[:30] + "..."
 					}
-					showTorrent = fmt.Sprintf("%s - %.2f kB/s - %.2f kB/s", torrentName, activeTorrents[showNext].downloadRate, activeTorrents[showNext].uploadRate)
+					showTorrent = fmt.Sprintf("%s - %s - %s", torrentName, humanize.Bytes(uint64(activeTorrents[showNext].downloadRate))+"/s", humanize.Bytes(uint64(activeTorrents[showNext].uploadRate))+"/s")
 					showNext += 1
 				}
 				if !s.config.DisableBgProgress {
 					if s.dialogProgressBG == nil {
-						s.dialogProgressBG = xbmc.NewDialogProgressBG("Quasar", "")
+						s.dialogProgressBG = xbmc.NewDialogProgressBG("Elementum", "")
 					}
-					s.dialogProgressBG.Update(showProgress, "Quasar", showTorrent)
+					s.dialogProgressBG.Update(showProgress, "Elementum", showTorrent)
 				}
 			} else if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
@@ -993,145 +755,100 @@ func (s *BTService) downloadProgress() {
 //
 // Database updates
 //
-func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) (err error) {
+func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) error {
 	switch Operation {
 	case Delete:
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(Bucket))
-			if err := b.Delete([]byte(InfoHash)); err != nil {
-				return err
-			}
-			return nil
-		})
+		return db.Delete(Bucket, InfoHash)
 	case Update:
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(Bucket))
-			item := DBItem{
-				State:   Active,
-				ID:      ID,
-				Type:    Type,
-				File:    infos[0],
-				ShowID:  infos[1],
-				Season:  infos[2],
-				Episode: infos[3],
-			}
-			if buf, err := json.Marshal(item); err != nil {
-				return err
-			} else if err := b.Put([]byte(InfoHash), buf); err != nil {
-				return err
-			}
-			return nil
-		})
+		item := DBItem{
+			State:   Active,
+			ID:      ID,
+			Type:    Type,
+			File:    infos[0],
+			ShowID:  infos[1],
+			Season:  infos[2],
+			Episode: infos[3],
+		}
+		return db.SetObject(Bucket, InfoHash, item)
 	case RemoveFromLibrary:
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(Bucket))
-			v := b.Get([]byte(InfoHash))
-			var item *DBItem
-			if err := json.Unmarshal(v, &item); err != nil {
-				s.log.Error(err)
-				return err
-			}
-			item.State = Remove
-			if buf, err := json.Marshal(item); err != nil {
-				return err
-			} else if err := b.Put([]byte(InfoHash), buf); err != nil {
-				return err
-			}
-			return nil
-		})
+		item := &DBItem{}
+		if err := db.GetObject(Bucket, InfoHash, item); err != nil {
+			s.log.Error(err)
+			return err
+		}
+
+		item.State = Remove
+		return db.SetObject(Bucket, InfoHash, item)
 	}
-	return err
+
+	return nil
 }
 
 func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(Bucket))
-		v := b.Get([]byte(infoHash))
-		if err := json.Unmarshal(v, &dbItem); err != nil {
-			return err
-		}
+	if err := db.GetObject(Bucket, infoHash, dbItem); err != nil {
 		return nil
-	})
-	return
+	}
+	return dbItem
 }
 
-func (s *BTService) alertsConsumer() {
-	defer s.alertsBroadcaster.Close()
-
-	ltOneSecond := libtorrent.Seconds(libtorrentAlertWaitTime)
-	s.log.Info("Consuming alerts...")
-	for {
-		select {
-		case <-s.closing:
-			s.log.Info("Closing all alert channels...")
-			return
-		default:
-			if s.Session.GetHandle().WaitForAlert(ltOneSecond).Swigcptr() == 0 {
-				continue
-			}
-			var alerts libtorrent.StdVectorAlerts
-			alerts = s.Session.GetHandle().PopAlerts()
-			queueSize := alerts.Size()
-			var name string
-			var infoHash string
-			var entry libtorrent.Entry
-			for i := 0; i < int(queueSize); i++ {
-				ltAlert := alerts.Get(i)
-				alertType := ltAlert.Type()
-				alertPtr := ltAlert.Swigcptr()
-				alertMessage := ltAlert.Message()
-				switch alertType {
-				case libtorrent.SaveResumeDataAlertAlertType:
-					saveResumeData := libtorrent.SwigcptrSaveResumeDataAlert(alertPtr)
-					torrentHandle := saveResumeData.GetHandle()
-					torrentStatus := torrentHandle.Status(uint(libtorrent.TorrentHandleQuerySavePath) | uint(libtorrent.TorrentHandleQueryName))
-					name = torrentStatus.GetName()
-					shaHash := torrentStatus.GetInfoHash().ToString()
-					infoHash = hex.EncodeToString([]byte(shaHash))
-					entry = saveResumeData.ResumeData()
-				case libtorrent.ExternalIpAlertAlertType:
-					splitMessage := strings.Split(alertMessage, ":")
-					splitIP := strings.Split(splitMessage[len(splitMessage) - 1], ".")
-					alertMessage = strings.Join(splitMessage[:len(splitMessage) - 1], ":") + splitIP[0] + ".XX.XX.XX"
-				}
-				alert := &Alert{
-					Type:     alertType,
-					Category: ltAlert.Category(),
-					What:     ltAlert.What(),
-					Message:  alertMessage,
-					Pointer:  alertPtr,
-					Name:     name,
-					Entry:    entry,
-					InfoHash: infoHash,
-				}
-				s.alertsBroadcaster.Broadcast(alert)
-			}
-		}
+func (s *BTService) SetDownloadLimit(i int) {
+	if i == 0 {
+		s.DownloadLimiter.SetLimit(rate.Inf)
+	} else {
+		s.DownloadLimiter.SetLimit(rate.Limit(i))
 	}
 }
 
-func (s *BTService) Alerts() (<-chan *Alert, chan<- interface{}) {
-	c, done := s.alertsBroadcaster.Listen()
-	ac := make(chan *Alert)
-	go func() {
-		for v := range c {
-			ac <- v.(*Alert)
-		}
-	}()
-	return ac, done
+func (s *BTService) SetUploadLimit(i int) {
+	if i == 0 {
+		s.UploadLimiter.SetLimit(rate.Inf)
+	} else {
+		s.UploadLimiter.SetLimit(rate.Limit(i))
+	}
 }
 
-func (s *BTService) logAlerts() {
-	alerts, _ := s.Alerts()
-	for alert := range alerts {
-		if alert.Category & int(libtorrent.AlertErrorNotification) != 0 {
-			s.libtorrentLog.Errorf("%s: %s", alert.What, alert.Message)
-		} else if alert.Category & int(libtorrent.AlertDebugNotification) != 0 {
-			s.libtorrentLog.Debugf("%s: %s", alert.What, alert.Message)
-		} else if alert.Category & int(libtorrent.AlertPerformanceWarning) != 0 {
-			s.libtorrentLog.Warningf("%s: %s", alert.What, alert.Message)
-		} else {
-			s.libtorrentLog.Noticef("%s: %s", alert.What, alert.Message)
-		}
+func (s *BTService) RestoreLimits() {
+	if s.config.MaxDownloadRate > 0 {
+		s.SetDownloadLimit(s.config.MaxDownloadRate)
+		s.log.Infof("Rate limiting download to %dkB/s", s.config.MaxDownloadRate/1024)
 	}
+	if s.config.MaxUploadRate > 0 {
+		s.SetUploadLimit(s.config.MaxUploadRate)
+		s.log.Infof("Rate limiting upload to %dkB/s", s.config.MaxUploadRate/1024)
+	}
+}
+
+func (s *BTService) SetBufferingLimits() {
+	if s.config.LimitAfterBuffering {
+		s.SetDownloadLimit(0)
+		s.log.Info("Resetting rate limited download for buffering")
+	}
+}
+
+func (s *BTService) GetSeedTime() int64 {
+	return int64(s.config.SeedTimeLimit)
+}
+
+func (s *BTService) GetBufferSize() int64 {
+	if s.config.BufferSize < endBufferSize {
+		return endBufferSize
+	} else {
+		return s.config.BufferSize
+	}
+}
+
+func (s *BTService) GetMemorySize() int64 {
+	return s.config.MemorySize
+}
+
+func (s *BTService) GetReadaheadSize() int64 {
+	if s.config.DownloadStorage == StorageMemory {
+		return s.GetMemorySize()
+	} else {
+		return s.GetBufferSize()
+	}
+}
+
+func (s *BTService) GetStorageType() int {
+	return s.config.DownloadStorage
 }

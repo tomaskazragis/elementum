@@ -10,10 +10,10 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/util"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -317,7 +317,7 @@ func tmdbCheck(key string) bool {
 
 	if err != nil {
 		log.Error(err.Error())
-		xbmc.Notify("Quasar", "TMDB check failed, check your logs.", config.AddonIcon())
+		xbmc.Notify("Elementum", "TMDB check failed, check your logs.", config.AddonIcon())
 		return false
 	} else if resp.Status() != 200 {
 		return false
@@ -359,11 +359,11 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 				)
 				if err != nil {
 					log.Error(err.Error())
-					xbmc.Notify("Quasar", "Failed listing entities, check your logs.", config.AddonIcon())
+					xbmc.Notify("Elementum", "Failed listing entities, check your logs.", config.AddonIcon())
 				} else if resp.Status() != 200 {
 					message := fmt.Sprintf("Bad status listing entities: %d", resp.Status())
 					log.Error(message)
-					xbmc.Notify("Quasar", message, config.AddonIcon())
+					xbmc.Notify("Elementum", message, config.AddonIcon())
 				}
 			})
 			for i, entity := range tmp.Results {
@@ -396,11 +396,11 @@ func Find(externalId string, externalSource string) *FindResult {
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Quasar", "Failed Find call, check your logs.", config.AddonIcon())
+				xbmc.Notify("Elementum", "Failed Find call, check your logs.", config.AddonIcon())
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Find call bad status: %d", resp.Status())
 				log.Error(message)
-				xbmc.Notify("Quasar", message, config.AddonIcon())
+				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 			cacheStore.Set(key, result, 15 * time.Minute)
 		})

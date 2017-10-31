@@ -41,6 +41,27 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
 	return movies
 }
 
+func PlayerGetActive() (int) {
+	params := map[string]interface{}{}
+	items := ActivePlayers{}
+	executeJSONRPCO("Player.GetActivePlayers", &items, params)
+	for _, v := range items {
+		if v.Type == "video" {
+			return v.Id
+		}
+	}
+
+	return -1
+}
+
+func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
+	params := map[string]interface{}{
+		"playerid": playerid,
+	}
+	executeJSONRPCO("Player.GetItem", &item, params)
+	return
+}
+
 func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 	params := map[string]interface{}{"properties": []interface{}{"imdbnumber", "episode"}}
 	err := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
@@ -112,6 +133,11 @@ func SetFileWatched(file string, position int, total int) (ret string) {
 
 func TranslatePath(path string) (retVal string) {
 	executeJSONRPCEx("TranslatePath", &retVal, Args{path})
+	return
+}
+
+func UpdatePath(path string) (retVal string) {
+	executeJSONRPCEx("Update", &retVal, Args{path})
 	return
 }
 

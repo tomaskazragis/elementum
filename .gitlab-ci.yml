@@ -20,7 +20,7 @@ before_script:
   script:
     - make pull
     - go get -d ./...
-    - go get -d github.com/scakemyer/libtorrent-go
+    - go get -d github.com/elgatito/cross-compiler
     - go tool vet -unsafeptr=false .
     - make libs
     - make $PLATFORM
@@ -32,7 +32,7 @@ before_script:
   script:
     - make pull
     - go get -d ./...
-    - go get -d github.com/scakemyer/libtorrent-go
+    - go get -d github.com/elgatito/cross-compiler
     - go tool vet -unsafeptr=false .
     - make libs
     - make $PLATFORM
@@ -40,9 +40,9 @@ before_script:
     - |
         mkdir -p build
         lftp -c "open 'ftp://$FTP_USER:$FTP_PASS@$FTP_HOST'; \
-        mkdir -p -f quasar-binaries/$CI_BUILD_REF_NAME; \
+        mkdir -p -f elementum-binaries/$CI_BUILD_REF_NAME; \
         lcd build; \
-        cd quasar-binaries/$CI_BUILD_REF_NAME; \
+        cd elementum-binaries/$CI_BUILD_REF_NAME; \
         mirror --reverse --verbose --include-glob *; \
         exit;"
   only:

@@ -10,10 +10,10 @@ import (
 	"math/rand"
 
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 // Fill fanart from TMDB
@@ -94,7 +94,7 @@ func GetMovie(Id string) (movie *Movie) {
 
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", Id), config.AddonIcon())
+			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", Id), config.AddonIcon())
 		}
 
 		if err := resp.Unmarshal(&movie); err != nil {
@@ -300,7 +300,7 @@ func CollectionMovies() (movies []*Movies, err error) {
 func Userlists() (lists []*List) {
 	traktUsername := config.Get().TraktUsername
 	if traktUsername == "" {
-		xbmc.Notify("Quasar", "LOCALIZE[30149]", config.AddonIcon())
+		xbmc.Notify("Elementum", "LOCALIZE[30149]", config.AddonIcon())
 		return lists
 	}
 	endPoint := fmt.Sprintf("users/%s/lists", traktUsername)
@@ -317,13 +317,13 @@ func Userlists() (lists []*List) {
 	}
 
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 		log.Error(err)
 		return lists
 	}
 	if resp.Status() != 200 {
 		errMsg := fmt.Sprintf("Bad status getting custom lists for %s: %d", traktUsername, resp.Status())
-		xbmc.Notify("Quasar", errMsg, config.AddonIcon())
+		xbmc.Notify("Elementum", errMsg, config.AddonIcon())
 		log.Warningf(errMsg)
 		return lists
 	}

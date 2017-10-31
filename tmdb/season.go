@@ -7,9 +7,9 @@ import (
 	"math/rand"
 
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 func GetSeason(showId int, seasonNumber int, language string) *Season {
@@ -31,14 +31,14 @@ func GetSeason(showId int, seasonNumber int, language string) *Season {
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showId)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showId, resp.Status())
 				log.Error(message)
-				xbmc.Notify("Quasar", message, config.AddonIcon())
+				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 		})
 		season.EpisodeCount = len(season.Episodes)

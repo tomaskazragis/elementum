@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/scakemyer/quasar/bittorrent"
-	"github.com/scakemyer/quasar/providers"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/trakt"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/providers"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 
@@ -237,21 +237,22 @@ func TVMostVoted(ctx *gin.Context) {
 func SearchShows(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	query := ctx.Query("q")
-	if query == "" {
-		if len(searchHistory) > 0 && xbmc.DialogConfirm("Quasar", "LOCALIZE[30262]") {
-			choice := xbmc.ListDialog("LOCALIZE[30261]", searchHistory...)
-			query = searchHistory[choice]
-		} else {
-			query = xbmc.Keyboard("", "LOCALIZE[30201]")
-			if query == "" {
+	keyboard := ctx.Query("keyboard")
+
+	if len(query) == 0 {
+		historyType := "shows"
+		if len(keyboard) > 0 || searchHistoryEmpty(historyType) {
+			query = xbmc.Keyboard("", "LOCALIZE[30206]")
+			if len(query) == 0 {
 				return
 			}
-			searchHistory = append(searchHistory, query)
+			searchHistoryAppend(ctx, historyType, query)
+		} else if !searchHistoryEmpty(historyType) {
+			searchHistoryList(ctx, historyType)
 		}
-	}
-	if query == "" {
 		return
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.SearchShows(query, config.Get().Language, page)
 	renderShows(ctx, shows, page, total, query)
@@ -348,7 +349,7 @@ func ShowEpisodes(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("episodes", items))
 }
 
-func showSeasonLinks(showId int, seasonNumber int) ([]*bittorrent.Torrent, error) {
+func showSeasonLinks(showId int, seasonNumber int) ([]*bittorrent.TorrentFile, error) {
 	log.Println("Searching links for TMDB Id:", showId)
 
 	show := tmdb.GetShow(showId, config.Get().Language)
@@ -365,7 +366,7 @@ func showSeasonLinks(showId int, seasonNumber int) ([]*bittorrent.Torrent, error
 
 	searchers := providers.GetSeasonSearchers()
 	if len(searchers) == 0 {
-		xbmc.Notify("Quasar", "LOCALIZE[30204]", config.AddonIcon())
+		xbmc.Notify("Elementum", "LOCALIZE[30204]", config.AddonIcon())
 	}
 
 	return providers.SearchSeason(searchers, show, season), nil
@@ -398,7 +399,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 		longName := fmt.Sprintf("%s Season %02d", show.Name, seasonNumber)
 
 		existingTorrent := ExistingTorrent(btService, longName)
-		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(season.Id),
@@ -433,7 +434,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 		}
 
 		if len(torrents) == 0 {
-			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
 		}
 
@@ -493,7 +494,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 	}
 }
 
-func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bittorrent.Torrent, error) {
+func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bittorrent.TorrentFile, error) {
 	log.Println("Searching links for TMDB Id:", showId)
 
 	show := tmdb.GetShow(showId, config.Get().Language)
@@ -512,10 +513,28 @@ func showEpisodeLinks(showId int, seasonNumber int, episodeNumber int) ([]*bitto
 
 	searchers := providers.GetEpisodeSearchers()
 	if len(searchers) == 0 {
-		xbmc.Notify("Quasar", "LOCALIZE[30204]", config.AddonIcon())
+		xbmc.Notify("Elementum", "LOCALIZE[30204]", config.AddonIcon())
 	}
 
 	return providers.SearchEpisode(searchers, show, episode), nil
+}
+
+func ShowEpisodePlaySelector(link string, btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
+	play := link == "play"
+
+	if config.Get().ForceLinkType {
+		if config.Get().ChooseStreamAuto {
+			play = true
+		} else {
+			play = false
+		}
+	}
+
+	if play {
+		return ShowEpisodePlay(btService, fromLibrary)
+	} else {
+		return ShowEpisodeLinks(btService, fromLibrary)
+	}
 }
 
 func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
@@ -547,7 +566,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Han
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 
 		existingTorrent := ExistingTorrent(btService, longName)
-		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(episode.Id),
@@ -588,7 +607,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Han
 		}
 
 		if len(torrents) == 0 {
-			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
 		}
 
@@ -682,7 +701,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 		existingTorrent := ExistingTorrent(btService, longName)
-		if existingTorrent != "" && xbmc.DialogConfirm("Quasar", "LOCALIZE[30270]") {
+		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rUrl := UrlQuery(
 				UrlForXBMC("/play"), "uri", existingTorrent,
 				                     "tmdb", strconv.Itoa(episode.Id),
@@ -723,7 +742,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 		}
 
 		if len(torrents) == 0 {
-			xbmc.Notify("Quasar", "LOCALIZE[30205]", config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
 		}
 

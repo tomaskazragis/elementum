@@ -10,10 +10,10 @@ import (
 	"math/rand"
 
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 // Fill fanart from TMDB
@@ -93,7 +93,7 @@ func GetShow(Id string) (show *Show) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", Id), config.AddonIcon())
+			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", Id), config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&show); err != nil {
@@ -117,7 +117,7 @@ func GetShowByTMDB(tmdbId string) (show *Show) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed getting Trakt show using TMDB ID, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed getting Trakt show using TMDB ID, check your logs.", config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&show); err != nil {
@@ -139,7 +139,7 @@ func GetShowByTVDB(tvdbId string) (show *Show) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed getting Trakt show using TVDB ID, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed getting Trakt show using TVDB ID, check your logs.", config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&show); err != nil {
@@ -161,7 +161,7 @@ func GetEpisode(id string) (episode *Episode) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed getting Trakt episode, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed getting Trakt episode, check your logs.", config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&episode); err != nil {
@@ -183,7 +183,7 @@ func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed getting Trakt episode using TMDB ID, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed getting Trakt episode using TMDB ID, check your logs.", config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&episode); err != nil {
@@ -205,7 +205,7 @@ func GetEpisodeByTVDB(tvdbId string) (episode *Episode) {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Quasar", "Failed getting Trakt episode using TVDB ID, check your logs.", config.AddonIcon())
+			xbmc.Notify("Elementum", "Failed getting Trakt episode using TVDB ID, check your logs.", config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&episode); err != nil {

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/op/go-logging"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 var log = logging.MustGetLogger("config")
@@ -25,34 +25,37 @@ type Configuration struct {
 	Language            string
 	ProfilePath         string
 	SpoofUserAgent      int
-	BackgroundHandling  bool
-	KeepFilesAfterStop  bool
-	KeepFilesAsk        bool
+	KeepDownloading     int
+	KeepFilesPlaying    int
+	KeepFilesFinished   int
 	DisableBgProgress   bool
 	ResultsPerPage      int
 	EnableOverlayStatus bool
 	ChooseStreamAuto    bool
+	ForceLinkType 		  bool
 	UseOriginalTitle    bool
 	AddSpecials         bool
 	ShowUnairedSeasons  bool
 	ShowUnairedEpisodes bool
+	DownloadStorage     int
+	MemorySize          int
 	BufferSize          int
 	UploadRateLimit     int
 	DownloadRateLimit   int
 	LimitAfterBuffering bool
 	ConnectionsLimit    int
-	SessionSave         int
-	ShareRatioLimit     int
-	SeedTimeRatioLimit  int
+	// SessionSave         int
+	// ShareRatioLimit     int
+	// SeedTimeRatioLimit  int
 	SeedTimeLimit       int
 	DisableDHT          bool
-	DisableUPNP         bool
+	// DisableUPNP         bool
 	EncryptionPolicy    int
 	BTListenPortMin     int
 	BTListenPortMax     int
 	ListenInterfaces    string
 	OutgoingInterfaces  string
-	TunedStorage        bool
+	// TunedStorage        bool
 	Scrobble            bool
 	TraktUsername       string
 	TraktToken          string
@@ -79,12 +82,12 @@ type Configuration struct {
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
 
-	ProxyType     int
-	SocksEnabled  bool
-	SocksHost     string
-	SocksPort     int
-	SocksLogin    string
-	SocksPassword string
+	// ProxyType     int
+	// SocksEnabled  bool
+	// SocksHost     string
+	// SocksPort     int
+	// SocksLogin    string
+	// SocksPassword string
 
 	CompletedMove       bool
 	CompletedMoviesPath string
@@ -118,7 +121,7 @@ func Reload() *Configuration {
 	info := xbmc.GetAddonInfo()
 	info.Path = xbmc.TranslatePath(info.Path)
 	info.Profile = xbmc.TranslatePath(info.Profile)
-	info.TempPath = filepath.Join(xbmc.TranslatePath("special://temp"), "quasar")
+	info.TempPath = filepath.Join(xbmc.TranslatePath("special://temp"), "elementum")
 	platform := xbmc.GetPlatform()
 
 	os.RemoveAll(info.TempPath)
@@ -135,13 +138,13 @@ func Reload() *Configuration {
 
 	downloadPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("download_path")))
 	if downloadPath == "." {
-		xbmc.Dialog("Quasar", "LOCALIZE[30113]")
-		xbmc.AddonSettings("plugin.video.quasar")
+		xbmc.Dialog("Elementum", "LOCALIZE[30113]")
+		xbmc.AddonSettings("plugin.video.elementum")
 		go waitSettingsSet()
 	} else if err := IsWritablePath(downloadPath); err != nil {
-		log.Error(err)
-		xbmc.Dialog("Quasar", err.Error())
-		xbmc.AddonSettings("plugin.video.quasar")
+		log.Errorf("Cannot write to location '%s': %#v", downloadPath, err)
+		xbmc.Dialog("Elementum", err.Error())
+		xbmc.AddonSettings("plugin.video.elementum")
 	} else {
 		settingsSet = true
 	}
@@ -152,8 +155,8 @@ func Reload() *Configuration {
 		libraryPath = downloadPath
 	} else if err := IsWritablePath(libraryPath); err != nil {
 		log.Error(err)
-		xbmc.Dialog("Quasar", err.Error())
-		xbmc.AddonSettings("plugin.video.quasar")
+		xbmc.Dialog("Elementum", err.Error())
+		xbmc.AddonSettings("plugin.video.elementum")
 	}
 	log.Infof("Using library path: %s", libraryPath)
 
@@ -191,6 +194,15 @@ func Reload() *Configuration {
 		}
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warningf("Addon settings not properly set, opening settings window: %#v", r)
+			xbmc.Dialog("Elementum", "LOCALIZE[30314]")
+			xbmc.AddonSettings("plugin.video.elementum")
+			os.Exit(0)
+	 	}
+	}()
+
 	newConfig := Configuration{
 		DownloadPath:        downloadPath,
 		LibraryPath:         libraryPath,
@@ -199,35 +211,38 @@ func Reload() *Configuration {
 		Platform:            platform,
 		Language:            xbmc.GetLanguageISO_639_1(),
 		ProfilePath:         info.Profile,
+		DownloadStorage:     settings["download_storage"].(int),
+		MemorySize:          settings["memory_size"].(int) * 1024 * 1024,
 		BufferSize:          settings["buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:     settings["max_upload_rate"].(int) * 1024,
 		DownloadRateLimit:   settings["max_download_rate"].(int) * 1024,
 		SpoofUserAgent:      settings["spoof_user_agent"].(int),
 		LimitAfterBuffering: settings["limit_after_buffering"].(bool),
-		BackgroundHandling:  settings["background_handling"].(bool),
-		KeepFilesAfterStop:  settings["keep_files"].(bool),
-		KeepFilesAsk:        settings["keep_files_ask"].(bool),
+		KeepDownloading:     settings["keep_downloading"].(int),
+		KeepFilesPlaying:    settings["keep_files_playing"].(int),
+		KeepFilesFinished:   settings["keep_files_finished"].(int),
 		DisableBgProgress:   settings["disable_bg_progress"].(bool),
 		ResultsPerPage:      settings["results_per_page"].(int),
 		EnableOverlayStatus: settings["enable_overlay_status"].(bool),
 		ChooseStreamAuto:    settings["choose_stream_auto"].(bool),
+		ForceLinkType:       settings["force_link_type"].(bool),
 		UseOriginalTitle:    settings["use_original_title"].(bool),
 		AddSpecials:         settings["add_specials"].(bool),
 		ShowUnairedSeasons:  settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes: settings["unaired_episodes"].(bool),
-		ShareRatioLimit:     settings["share_ratio_limit"].(int),
-		SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
-		SeedTimeLimit:       settings["seed_time_limit"].(int) * 3600,
+		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
+		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
+		SeedTimeLimit:       settings["seed_time_limit"].(int),
 		DisableDHT:          settings["disable_dht"].(bool),
-		DisableUPNP:         settings["disable_upnp"].(bool),
+		// DisableUPNP:         settings["disable_upnp"].(bool),
 		EncryptionPolicy:    settings["encryption_policy"].(int),
 		BTListenPortMin:     settings["listen_port_min"].(int),
 		BTListenPortMax:     settings["listen_port_max"].(int),
 		ListenInterfaces:    settings["listen_interfaces"].(string),
 		OutgoingInterfaces:  settings["outgoing_interfaces"].(string),
-		TunedStorage:        settings["tuned_storage"].(bool),
+		// TunedStorage:        settings["tuned_storage"].(bool),
 		ConnectionsLimit:    settings["connections_limit"].(int),
-		SessionSave:         settings["session_save"].(int),
+		// SessionSave:         settings["session_save"].(int),
 		Scrobble:            settings["trakt_scrobble"].(bool),
 		TraktUsername:       settings["trakt_username"].(string),
 		TraktToken:          settings["trakt_token"].(string),
@@ -254,16 +269,26 @@ func Reload() *Configuration {
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
 
-		ProxyType:     settings["proxy_type"].(int),
-		SocksEnabled:  settings["socks_enabled"].(bool),
-		SocksHost:     settings["socks_host"].(string),
-		SocksPort:     settings["socks_port"].(int),
-		SocksLogin:    settings["socks_login"].(string),
-		SocksPassword: settings["socks_password"].(string),
+		// ProxyType:     settings["proxy_type"].(int),
+		// SocksEnabled:  settings["socks_enabled"].(bool),
+		// SocksHost:     settings["socks_host"].(string),
+		// SocksPort:     settings["socks_port"].(int),
+		// SocksLogin:    settings["socks_login"].(string),
+		// SocksPassword: settings["socks_password"].(string),
 
 		CompletedMove:       settings["completed_move"].(bool),
 		CompletedMoviesPath: settings["completed_movies_path"].(string),
 		CompletedShowsPath:  settings["completed_shows_path"].(string),
+	}
+
+	// For memory we are changing configuration
+	if newConfig.DownloadStorage == 1 {
+		newConfig.CompletedMove = false
+		newConfig.KeepDownloading = 2
+		newConfig.KeepFilesFinished = 2
+		newConfig.KeepFilesPlaying = 2
+		newConfig.LimitAfterBuffering = false
+		newConfig.SeedTimeLimit = 0
 	}
 
 	lock.Lock()
@@ -292,7 +317,7 @@ func IsWritablePath(path string) error {
 		if err != nil {
 			return err
 		}
-	    return errors.New(fmt.Sprintf("%s is not a valid directory", path))
+	  return errors.New(fmt.Sprintf("%s is not a valid directory", path))
 	}
 	writableFile := filepath.Join(path, ".writable")
 	if writable, err := os.Create(writableFile); err != nil {
@@ -320,12 +345,12 @@ func waitSettingsSet() {
 }
 
 func CheckBurst() {
-	// Check for enabled providers and Quasar Burst
+	// Check for enabled providers and Elementum Burst
 	hasBurst := false
 	enabledProviders := make([]Addon, 0)
 	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
-		if strings.HasPrefix(addon.ID, "script.quasar.") {
-			if addon.ID == "script.quasar.burst" && addon.Enabled == true {
+		if strings.HasPrefix(addon.ID, "script.elementum.") {
+			if addon.ID == "script.elementum.burst" && addon.Enabled == true {
 				hasBurst = true
 			}
 			enabledProviders = append(enabledProviders, Addon{
@@ -342,10 +367,10 @@ func CheckBurst() {
 		xbmc.UpdateAddonRepos()
 		time.Sleep(10 * time.Second)
 
-		if xbmc.DialogConfirm("Quasar", "LOCALIZE[30271]") {
-			xbmc.PlayURL("plugin://script.quasar.burst/")
+		if xbmc.DialogConfirm("Elementum", "LOCALIZE[30271]") {
+			xbmc.PlayURL("plugin://script.elementum.burst/")
 			for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
-				if addon.ID == "script.quasar.burst" && addon.Enabled == true {
+				if addon.ID == "script.elementum.burst" && addon.Enabled == true {
 					hasBurst = true
 				}
 			}
@@ -353,9 +378,9 @@ func CheckBurst() {
 				for _, addon := range enabledProviders {
 					xbmc.SetAddonEnabled(addon.ID, false)
 				}
-				xbmc.Notify("Quasar", "LOCALIZE[30272]", AddonIcon())
+				xbmc.Notify("Elementum", "LOCALIZE[30272]", AddonIcon())
 			} else {
-				xbmc.Dialog("Quasar", "LOCALIZE[30273]")
+				xbmc.Dialog("Elementum", "LOCALIZE[30273]")
 			}
 		}
 	}

@@ -1,10 +1,10 @@
-Quasar daemon [![Build Status](https://travis-ci.org/scakemyer/quasar.svg?branch=master)](https://travis-ci.org/scakemyer/quasar)
+Elementum daemon [![Build Status](https://travis-ci.org/elgatito/elementum.svg?branch=master)](https://travis-ci.org/elgatito/elementum)
 ======
 
-Fork of the great [Pulsar daemon](https://github.com/steeve/pulsar)
+Fork of the great [Pulsar daemon](https://github.com/steeve/pulsar) and [Quasar daemon](https://github.com/scakemyer/quasar)
 
-1. Build the [cross-compiler](https://github.com/scakemyer/cross-compiler) and [libtorrent-go](https://github.com/scakemyer/libtorrent-go) images,
-    or alternatively, pull the libtorrent-go images from [Docker Hub](https://hub.docker.com/r/quasarhq/libtorrent-go):
+1. Build the [cross-compiler](https://github.com/elgatito/cross-compiler) images,
+    or alternatively, pull the cross-compiler images from [Docker Hub](https://hub.docker.com/r/elgatito/cross-compiler):
 
     ```
     make pull-all
@@ -24,7 +24,7 @@ Fork of the great [Pulsar daemon](https://github.com/steeve/pulsar)
 3. go get
 
     ```
-    go get -d github.com/scakemyer/quasar
+    go get -d github.com/elgatito/elementum
     ```
 
     For Windows support, but required for all builds, you also need:

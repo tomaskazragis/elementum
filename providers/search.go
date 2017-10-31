@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/op/go-logging"
-	"github.com/scakemyer/quasar/bittorrent"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -36,8 +36,8 @@ var (
 	log = logging.MustGetLogger("linkssearch")
 )
 
-func Search(searchers []Searcher, query string) []*bittorrent.Torrent {
-	torrentsChan := make(chan *bittorrent.Torrent)
+func Search(searchers []Searcher, query string) []*bittorrent.TorrentFile {
+	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
 		wg := sync.WaitGroup{}
 		for _, searcher := range searchers {
@@ -56,8 +56,8 @@ func Search(searchers []Searcher, query string) []*bittorrent.Torrent {
 	return processLinks(torrentsChan, SortMovies)
 }
 
-func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.Torrent {
-	torrentsChan := make(chan *bittorrent.Torrent)
+func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.TorrentFile {
+	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
 		wg := sync.WaitGroup{}
 		for _, searcher := range searchers {
@@ -76,8 +76,8 @@ func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.Tor
 	return processLinks(torrentsChan, SortMovies)
 }
 
-func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Season) []*bittorrent.Torrent {
-	torrentsChan := make(chan *bittorrent.Torrent)
+func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Season) []*bittorrent.TorrentFile {
+	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
 		wg := sync.WaitGroup{}
 		for _, searcher := range searchers {
@@ -96,8 +96,8 @@ func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Seas
 	return processLinks(torrentsChan, SortShows)
 }
 
-func SearchEpisode(searchers []EpisodeSearcher, show *tmdb.Show, episode *tmdb.Episode) []*bittorrent.Torrent {
-	torrentsChan := make(chan *bittorrent.Torrent)
+func SearchEpisode(searchers []EpisodeSearcher, show *tmdb.Show, episode *tmdb.Episode) []*bittorrent.TorrentFile {
+	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
 		wg := sync.WaitGroup{}
 		for _, searcher := range searchers {
@@ -116,11 +116,11 @@ func SearchEpisode(searchers []EpisodeSearcher, show *tmdb.Show, episode *tmdb.E
 	return processLinks(torrentsChan, SortShows)
 }
 
-func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittorrent.Torrent {
+func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bittorrent.TorrentFile {
 	trackers := map[string]*bittorrent.Tracker{}
-	torrentsMap := map[string]*bittorrent.Torrent{}
+	torrentsMap := map[string]*bittorrent.TorrentFile{}
 
-	torrents := make([]*bittorrent.Torrent, 0)
+	torrents := make([]*bittorrent.TorrentFile, 0)
 
 	log.Info("Resolving torrent files...")
 	progress := 0
@@ -134,7 +134,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 			progressTotal += 1
 		}
 		torrents = append(torrents, torrent)
-		go func(torrent *bittorrent.Torrent) {
+		go func(torrent *bittorrent.TorrentFile) {
 			defer wg.Done()
 			if err := torrent.Resolve(); err != nil {
 				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
@@ -148,7 +148,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		}(torrent)
 	}
 
-	dialogProgressBG := xbmc.NewDialogProgressBG("Quasar", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
+	dialogProgressBG := xbmc.NewDialogProgressBG("Elementum", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
 	go func() {
 		for {
 			select {
@@ -160,7 +160,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 				}
 				if dialogProgressBG != nil {
 					if msg != "skip" {
-						dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", msg)
+						dialogProgressBG.Update(progress * 100 / progressTotal, "Elementum", msg)
 					}
 				} else {
 					return
@@ -170,7 +170,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	}()
 
 	wg.Wait()
-	dialogProgressBG.Update(100, "Quasar", "LOCALIZE[30117]")
+	dialogProgressBG.Update(100, "Elementum", "LOCALIZE[30117]")
 
 	for _, torrent := range torrents {
 		if torrent.InfoHash == "" {
@@ -222,7 +222,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		}
 	}
 
-	torrents = make([]*bittorrent.Torrent, 0, len(torrentsMap))
+	torrents = make([]*bittorrent.TorrentFile, 0, len(torrentsMap))
 	for _, torrent := range torrentsMap {
 		torrents = append(torrents, torrent)
 	}
@@ -239,7 +239,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 	progressTotal = len(trackers) * 2 + 1
 	progress = 0
 	progressMsg := "LOCALIZE[30118]"
-	dialogProgressBG.Update(progress * 100 / progressTotal, "Quasar", progressMsg)
+	dialogProgressBG.Update(progress * 100 / progressTotal, "Elementum", progressMsg)
 
 	scrapeResults := make(chan []bittorrent.ScrapeResponseEntry, len(trackers))
 	failedConnect := 0
@@ -299,7 +299,7 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		}
 		wg.Wait()
 
-		dialogProgressBG.Update(100, "Quasar", progressMsg)
+		dialogProgressBG.Update(100, "Elementum", progressMsg)
 
 		if failedConnect > 0 {
 			log.Warningf("Failed to connect to %d tracker(s)", failedConnect)
@@ -340,12 +340,12 @@ func processLinks(torrentsChan chan *bittorrent.Torrent, sortType int) []*bittor
 		resolutionPreference = conf.ResolutionPreferenceShows
 	}
 
-	seeds := func(c1, c2 *bittorrent.Torrent) bool { return c1.Seeds > c2.Seeds }
-	resolutionUp := func(c1, c2 *bittorrent.Torrent) bool { return c1.Resolution < c2.Resolution }
-	resolutionDown := func(c1, c2 *bittorrent.Torrent) bool { return c1.Resolution > c2.Resolution }
-	resolution720p1080p := func(c1, c2 *bittorrent.Torrent) bool { return Resolution720p1080p(c1) < Resolution720p1080p(c2) }
-	resolution720p480p := func(c1, c2 *bittorrent.Torrent) bool { return Resolution720p480p(c1) < Resolution720p480p(c2) }
-	balanced := func(c1, c2 *bittorrent.Torrent) bool { return float64(c1.Seeds) > Balanced(c2) }
+	seeds := func(c1, c2 *bittorrent.TorrentFile) bool { return c1.Seeds > c2.Seeds }
+	resolutionUp := func(c1, c2 *bittorrent.TorrentFile) bool { return c1.Resolution < c2.Resolution }
+	resolutionDown := func(c1, c2 *bittorrent.TorrentFile) bool { return c1.Resolution > c2.Resolution }
+	resolution720p1080p := func(c1, c2 *bittorrent.TorrentFile) bool { return Resolution720p1080p(c1) < Resolution720p1080p(c2) }
+	resolution720p480p := func(c1, c2 *bittorrent.TorrentFile) bool { return Resolution720p480p(c1) < Resolution720p480p(c2) }
+	balanced := func(c1, c2 *bittorrent.TorrentFile) bool { return float64(c1.Seeds) > Balanced(c2) }
 
 	if sortMode == SortBySeeders {
 		sort.Sort(sort.Reverse(BySeeds(torrents)))

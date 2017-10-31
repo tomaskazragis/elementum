@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 
 	"github.com/gin-gonic/gin"
-	"github.com/scakemyer/quasar/providers"
-	"github.com/scakemyer/quasar/tmdb"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/providers"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 type providerDebugResponse struct {

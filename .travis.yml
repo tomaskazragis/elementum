@@ -1,34 +1,52 @@
 sudo: required
 language: go
 go:
-  - 1.7
+  - 1.8
+
+cache:
+  bundler: true
+  directories:
+    - $HOME/docker
+before_cache:
+  # Save tagged docker images
+  - >
+    mkdir -p $HOME/docker && docker images -a --filter='dangling=false' --format '{{.Repository}}:{{.Tag}} {{.ID}}'
+    | xargs -n 2 -t sh -c 'test -e $HOME/docker/$1.tar.gz || docker save $0 | gzip -2 > $HOME/docker/$1.tar.gz'
+before_install:
+  # Load cached docker images
+  - if [[ -d $HOME/docker ]]; then ls $HOME/docker/*.tar.gz | xargs -I {file} sh -c "zcat {file} | docker load"; fi
 
 env:
-  - PLATFORM=android-arm
-  - PLATFORM=android-x64
-  - PLATFORM=android-x86
-  - PLATFORM=darwin-x64
-  - PLATFORM=linux-arm
-  - PLATFORM=linux-armv7
-  - PLATFORM=linux-arm64
-  - PLATFORM=linux-x64
-  - PLATFORM=linux-x86
-  - PLATFORM=windows-x64
-  - PLATFORM=windows-x86
+  - PLATFORM=all
+  # - PLATFORM=android-16/arm
+  # - PLATFORM=android-16/amd64
+  # - PLATFORM=android-16/386
+  # - PLATFORM=darwin-10.6/amd64
+  # - PLATFORM=darwin-10.6/386
+  # - PLATFORM=ios-8.1/arm64
+  # - PLATFORM=ios-8.1/armv7
+  # - PLATFORM=linux/arm-6
+  # - PLATFORM=linux/arm-7
+  # - PLATFORM=linux/arm64
+  # - PLATFORM=linux/amd64
+  # - PLATFORM=linux/386
+  # - PLATFORM=windows/amd64
+  # - PLATFORM=windows/386
 
 services:
   - docker
 
-before_install:
-  - make pull
+# before_install:
+  # - travis_wait 60 docker pull karalabe/xgo-latest
+  # - travis_wait 60 docker pull karalabe/xgo-1.8.3
 
 install:
+  - travis_wait 60 docker pull karalabe/xgo-1.8.3
+  - go get github.com/karalabe/xgo
   - go get -d ./...
-  - go get -d github.com/scakemyer/libtorrent-go
 
 script:
   - go tool vet -unsafeptr=false .
-  - make libs
   - make $PLATFORM
   - |
     if [ "${TRAVIS_PULL_REQUEST}" = "false" ] && [ -n "${TRAVIS_TAG}" ]; then

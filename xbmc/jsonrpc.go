@@ -4,7 +4,7 @@ import (
 	"net"
 	"errors"
 
-	"github.com/scakemyer/quasar/jsonrpc"
+	"github.com/elgatito/elementum/jsonrpc"
 )
 
 type Args []interface{}

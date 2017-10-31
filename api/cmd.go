@@ -3,16 +3,16 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
-	"github.com/scakemyer/quasar/cloudhole"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/cloudhole"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 var cmdLog = logging.MustGetLogger("cmd")
 
 func ClearCache(ctx *gin.Context) {
 	clearPageCache(ctx)
-	xbmc.Notify("Quasar", "LOCALIZE[30200]", config.AddonIcon())
+	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
 }
 
 func ClearPageCache(ctx *gin.Context) {
@@ -21,7 +21,7 @@ func ClearPageCache(ctx *gin.Context) {
 
 func ResetClearances(ctx *gin.Context) {
 	cloudhole.ResetClearances()
-	xbmc.Notify("Quasar", "LOCALIZE[30264]", config.AddonIcon())
+	xbmc.Notify("Elementum", "LOCALIZE[30264]", config.AddonIcon())
 }
 
 func SetViewMode(ctx *gin.Context) {

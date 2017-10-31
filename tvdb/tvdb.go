@@ -12,8 +12,8 @@ import (
 	"archive/zip"
 	"encoding/xml"
 
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/config"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
 )
 
 const (

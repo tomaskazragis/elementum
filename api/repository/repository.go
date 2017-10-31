@@ -18,13 +18,13 @@ import (
 	"github.com/op/go-logging"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
 	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
-	burstWebsiteURL      = "https://burst.surge.sh/release/%s"
+	burstWebsiteURL      = "https://bitbucket.org/elgatito/script.elementum.burst/raw/master/%s"
 	backupRepositoryURL  = "https://offshoregit.com/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
@@ -59,14 +59,14 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
-	_, lastReleaseBranch := getLastRelease(user, "plugin.video.quasar")
-	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.quasar", lastReleaseBranch) + "/addon.xml")
+	_, lastReleaseBranch := getLastRelease(user, "plugin.video.elementum")
+	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.elementum", lastReleaseBranch) + "/addon.xml")
 	if err == nil && resp.StatusCode != 200 {
 		err = errors.New(resp.Status)
 	}
 	if err != nil {
 		log.Warning("Unable to retrieve the addon.xml file, checking backup repository...")
-		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, "plugin.video.quasar") + "/addon.xml")
+		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, "plugin.video.elementum") + "/addon.xml")
 		if err == nil && resp.StatusCode != 200 {
 			err = errors.New(resp.Status)
 		}
@@ -82,7 +82,7 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	}
 	if err != nil {
 		log.Warning("Unable to retrieve Burst's addon.xml file, checking backup repository...")
-		respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.quasar.burst") + "/addon.xml")
+		respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.elementum.burst") + "/addon.xml")
 		if errBurst == nil && respBurst.StatusCode != 200 {
 			errBurst = errors.New(respBurst.Status)
 		}
@@ -124,7 +124,7 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 		log.Infof("Last available release of %s: v%s", repository, addons.Addons[0].Version)
 	}
 	if len(addons.Addons) > 1 {
-		log.Infof("Last available release of script.quasar.burst: v%s", addons.Addons[1].Version)
+		log.Infof("Last available release of script.elementum.burst: v%s", addons.Addons[1].Version)
 	}
 	if err != nil {
 		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file."))
@@ -140,7 +140,7 @@ func GetAddonFiles(ctx *gin.Context) {
 	filepath := ctx.Params.ByName("filepath")[1:] // strip the leading "/"
 
 	lastReleaseTag := ""
-	if repository == "plugin.video.quasar" {
+	if repository == "plugin.video.elementum" {
 		lastReleaseTag, _ = getLastRelease(user, repository)
 		if lastReleaseTag == "" {
 			// Get last release from addons.xml on master
@@ -166,14 +166,14 @@ func GetAddonFiles(ctx *gin.Context) {
 		GetAddonsXML(ctx)
 		return
 	case "addons.xml.md5":
-		go writeChangelog(user, "plugin.video.quasar")
-		go writeChangelog(user, "script.quasar.burst")
+		go writeChangelog(user, "plugin.video.elementum")
+		go writeChangelog(user, "script.elementum.burst")
 		GetAddonsXMLChecksum(ctx)
 		return
 	case "fanart.jpg":
 		fallthrough
 	case "icon.png":
-		if repository == "plugin.video.quasar" {
+		if repository == "plugin.video.elementum" {
 			ctx.Redirect(302, fmt.Sprintf(githubUserContentURL + "/" + filepath, user, repository, lastReleaseTag))
 		} else {
 			ctx.Redirect(302, fmt.Sprintf(burstWebsiteURL, filepath))
@@ -197,7 +197,7 @@ func GetAddonFilesHead(ctx *gin.Context) {
 }
 
 func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag string) {
-	if repository == "plugin.video.quasar" {
+	if repository == "plugin.video.elementum" {
 		release := getReleaseByTag(user, repository, lastReleaseTag)
 		// if there a release with an asset that matches a addon zip, use it
 		if release != nil {
@@ -254,10 +254,10 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 func fetchChangelog(user string, repository string) string {
 	log.Infof("Fetching add-on changelog for %s...", repository)
 	changelog := ""
-	if repository == "plugin.video.quasar" {
+	if repository == "plugin.video.elementum" {
 		client := github.NewClient(nil)
 		releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-		changelog = "Quasar changelog\n======\n\n"
+		changelog = "Elementum changelog\n======\n\n"
 		for _, release := range releases {
 			changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), *release.Body)
 		}

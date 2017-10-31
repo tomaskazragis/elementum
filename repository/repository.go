@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/util"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 func copyFile(from string, to string) error {
@@ -28,11 +28,11 @@ func copyFile(from string, to string) error {
 	return nil
 }
 
-func MakeQuasarRepositoryAddon() error {
-	addonId := "repository.quasar"
-	addonName := "Quasar Repository"
+func MakeElementumRepositoryAddon() error {
+	addonId := "repository.elementum"
+	addonName := "Elementum Repository"
 
-	quasarHost := fmt.Sprintf("http://localhost:%d", config.ListenPort)
+	elementumHost := fmt.Sprintf("http://localhost:%d", config.ListenPort)
 	addon := &xbmc.Addon{
 		Id:           addonId,
 		Name:         addonName,
@@ -43,12 +43,12 @@ func MakeQuasarRepositoryAddon() error {
 				Point: "xbmc.addon.repository",
 				Name:  addonName,
 				Info: &xbmc.AddonRepositoryInfo{
-					Text:       quasarHost + "/repository/scakemyer/plugin.video.quasar/addons.xml",
+					Text:       elementumHost + "/repository/elgatito/plugin.video.elementum/addons.xml",
 					Compressed: false,
 				},
-				Checksum: quasarHost + "/repository/scakemyer/plugin.video.quasar/addons.xml.md5",
+				Checksum: elementumHost + "/repository/elgatito/plugin.video.elementum/addons.xml.md5",
 				Datadir: &xbmc.AddonRepositoryDataDir{
-					Text: quasarHost + "/repository/scakemyer/",
+					Text: elementumHost + "/repository/elgatito/",
 					Zip:  true,
 				},
 			},
@@ -56,7 +56,7 @@ func MakeQuasarRepositoryAddon() error {
 				Point: "xbmc.addon.metadata",
 				Summaries: []*xbmc.AddonText{
 					&xbmc.AddonText{
-						Text: "GitHub repository for Quasar updates",
+						Text: "GitHub repository for Elementum updates",
 						Lang: "en",
 					},
 				},

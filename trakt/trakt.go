@@ -11,10 +11,10 @@ import (
 
 	"github.com/op/go-logging"
 	"github.com/jmcvetta/napping"
-	"github.com/scakemyer/quasar/cloudhole"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/util"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/cloudhole"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -583,13 +583,13 @@ func TokenRefreshHandler() {
 			if time.Now().Unix() > int64(config.Get().TraktTokenExpiry) - int64(259200) {
 				resp, err := RefreshToken()
 				if err != nil {
-					xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+					xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 					log.Error(err)
 					return
 				} else {
 					if resp.Status() == 200 {
 						if err := resp.Unmarshal(&token); err != nil {
-							xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+							xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 							log.Error(err)
 						} else {
 							expiry := time.Now().Unix() + int64(token.ExpiresIn)
@@ -600,7 +600,7 @@ func TokenRefreshHandler() {
 						}
 					} else {
 						err = errors.New(fmt.Sprintf("Bad status while refreshing Trakt token: %d", resp.Status()))
-						xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+						xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 						log.Error(err)
 					}
 				}
@@ -613,7 +613,7 @@ func Authorize(fromSettings bool) error {
 	code, err := GetCode()
 
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 		return err
 	}
 	log.Noticef("Got code for %s: %s", code.VerificationURL, code.UserCode)
@@ -625,7 +625,7 @@ func Authorize(fromSettings bool) error {
 	token, err := PollToken(code)
 
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 		return err
 	}
 
@@ -639,7 +639,7 @@ func Authorize(fromSettings bool) error {
 	xbmc.SetSetting("trakt_token", token.AccessToken)
 	xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
 
-	xbmc.Notify("Quasar", success, config.AddonIcon())
+	xbmc.Notify("Elementum", success, config.AddonIcon())
 	return nil
 }
 
@@ -707,7 +707,7 @@ func Scrobble(action string, contentType string, tmdbId int, watched float64, ru
 	resp, err := Post(endPoint, bytes.NewBufferString(payload))
 	if err != nil {
 		log.Error(err.Error())
-		xbmc.Notify("Quasar", "Scrobble failed, check your logs.", config.AddonIcon())
+		xbmc.Notify("Elementum", "Scrobble failed, check your logs.", config.AddonIcon())
 	} else if resp.Status() != 201 {
 		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbId, action, progress, resp.Status())
 	}

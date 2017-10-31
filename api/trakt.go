@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	"github.com/scakemyer/quasar/config"
-	"github.com/scakemyer/quasar/cache"
-	"github.com/scakemyer/quasar/trakt"
-	"github.com/scakemyer/quasar/xbmc"
+	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 func inMoviesWatchlist(tmdbId int) bool {
@@ -111,7 +111,7 @@ func AuthorizeTrakt(ctx *gin.Context) {
 	if err == nil {
 		ctx.String(200, "")
 	} else {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 		ctx.String(200, "")
 	}
 }
@@ -122,7 +122,7 @@ func AuthorizeTrakt(ctx *gin.Context) {
 func WatchlistMovies(ctx *gin.Context) {
 	movies, err := trakt.WatchlistMovies()
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, -1, 0)
 }
@@ -130,7 +130,7 @@ func WatchlistMovies(ctx *gin.Context) {
 func WatchlistShows(ctx *gin.Context) {
 	shows, err := trakt.WatchlistShows()
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, -1, 0)
 }
@@ -138,7 +138,7 @@ func WatchlistShows(ctx *gin.Context) {
 func CollectionMovies(ctx *gin.Context) {
 	movies, err := trakt.CollectionMovies()
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, -1, 0)
 }
@@ -146,7 +146,7 @@ func CollectionMovies(ctx *gin.Context) {
 func CollectionShows(ctx *gin.Context) {
 	shows, err := trakt.CollectionShows()
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, -1, 0)
 }
@@ -157,7 +157,7 @@ func UserlistMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, err := trakt.ListItemsMovies(listId, true)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, -1, page)
 }
@@ -168,7 +168,7 @@ func UserlistShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, err := trakt.ListItemsShows(listId, true)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, -1, page)
 }
@@ -188,11 +188,11 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
 	resp, err := trakt.AddToWatchlist("movies", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 201 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Movie added to watchlist", config.AddonIcon())
+		xbmc.Notify("Elementum", "Movie added to watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
@@ -203,11 +203,11 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
 	resp, err := trakt.RemoveFromWatchlist("movies", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 200 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Movie removed from watchlist", config.AddonIcon())
+		xbmc.Notify("Elementum", "Movie removed from watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
@@ -218,11 +218,11 @@ func AddShowToWatchlist(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("showId")
 	resp, err := trakt.AddToWatchlist("shows", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 201 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed %d", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed %d", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Show added to watchlist", config.AddonIcon())
+		xbmc.Notify("Elementum", "Show added to watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
@@ -233,11 +233,11 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("showId")
 	resp, err := trakt.RemoveFromWatchlist("shows", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 200 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Show removed from watchlist", config.AddonIcon())
+		xbmc.Notify("Elementum", "Show removed from watchlist", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
@@ -248,11 +248,11 @@ func AddMovieToCollection(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
 	resp, err := trakt.AddToCollection("movies", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 201 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Movie added to collection", config.AddonIcon())
+		xbmc.Notify("Elementum", "Movie added to collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
 		clearPageCache(ctx)
@@ -263,11 +263,11 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("tmdbId")
 	resp, err := trakt.RemoveFromCollection("movies", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 200 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Movie removed from collection", config.AddonIcon())
+		xbmc.Notify("Elementum", "Movie removed from collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
 		clearPageCache(ctx)
@@ -278,11 +278,11 @@ func AddShowToCollection(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("showId")
 	resp, err := trakt.AddToCollection("shows", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 201 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Show added to collection", config.AddonIcon())
+		xbmc.Notify("Elementum", "Show added to collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
 		clearPageCache(ctx)
@@ -293,11 +293,11 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 	tmdbId := ctx.Params.ByName("showId")
 	resp, err := trakt.RemoveFromCollection("shows", tmdbId)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	} else if resp.Status() != 200 {
-		xbmc.Notify("Quasar", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
+		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
-		xbmc.Notify("Quasar", "Show removed from collection", config.AddonIcon())
+		xbmc.Notify("Elementum", "Show removed from collection", config.AddonIcon())
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
 		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
 		clearPageCache(ctx)
@@ -308,11 +308,11 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 // 	tmdbId := ctx.Params.ByName("episodeId")
 // 	resp, err := trakt.AddToWatchlist("episodes", tmdbId)
 // 	if err != nil {
-// 		xbmc.Notify("Quasar", fmt.Sprintf("Failed: %s", err), config.AddonIcon())
+// 		xbmc.Notify("Elementum", fmt.Sprintf("Failed: %s", err), config.AddonIcon())
 // 	} else if resp.Status() != 201 {
-// 		xbmc.Notify("Quasar", fmt.Sprintf("Failed: %d", resp.Status()), config.AddonIcon())
+// 		xbmc.Notify("Elementum", fmt.Sprintf("Failed: %d", resp.Status()), config.AddonIcon())
 // 	} else {
-// 		xbmc.Notify("Quasar", "Episode added to watchlist", config.AddonIcon())
+// 		xbmc.Notify("Elementum", "Episode added to watchlist", config.AddonIcon())
 // 	}
 // }
 
@@ -419,7 +419,7 @@ func TraktPopularMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("popular", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -429,7 +429,7 @@ func TraktTrendingMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("trending", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -439,7 +439,7 @@ func TraktMostPlayedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("played", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -449,7 +449,7 @@ func TraktMostWatchedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("watched", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -459,7 +459,7 @@ func TraktMostCollectedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("collected", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -469,7 +469,7 @@ func TraktMostAnticipatedMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.TopMovies("anticipated", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, total, page)
 }
@@ -477,7 +477,7 @@ func TraktMostAnticipatedMovies(ctx *gin.Context) {
 func TraktBoxOffice(ctx *gin.Context) {
 	movies, _, err := trakt.TopMovies("boxoffice", "1")
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktMovies(ctx, movies, -1, 0)
 }
@@ -562,7 +562,7 @@ func TraktPopularShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("popular", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -572,7 +572,7 @@ func TraktTrendingShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("trending", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -582,7 +582,7 @@ func TraktMostPlayedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("played", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -592,7 +592,7 @@ func TraktMostWatchedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("watched", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -602,7 +602,7 @@ func TraktMostCollectedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("collected", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -612,7 +612,7 @@ func TraktMostAnticipatedShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.TopShows("anticipated", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderTraktShows(ctx, shows, total, page)
 }
@@ -625,7 +625,7 @@ func TraktMyShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -635,7 +635,7 @@ func TraktMyNewShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows/new", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -645,7 +645,7 @@ func TraktMyPremieres(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("my/shows/premieres", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -655,7 +655,7 @@ func TraktMyMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("my/movies", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarMovies(ctx, movies, total, page)
 }
@@ -665,7 +665,7 @@ func TraktMyReleases(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("my/dvd", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarMovies(ctx, movies, total, page)
 }
@@ -675,7 +675,7 @@ func TraktAllShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -685,7 +685,7 @@ func TraktAllNewShows(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows/new", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -695,7 +695,7 @@ func TraktAllPremieres(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	shows, total, err := trakt.CalendarShows("all/shows/premieres", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarShows(ctx, shows, total, page)
 }
@@ -705,7 +705,7 @@ func TraktAllMovies(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("all/movies", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarMovies(ctx, movies, total, page)
 }
@@ -715,7 +715,7 @@ func TraktAllReleases(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageParam)
 	movies, total, err := trakt.CalendarMovies("all/dvd", pageParam)
 	if err != nil {
-		xbmc.Notify("Quasar", err.Error(), config.AddonIcon())
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
 	renderCalendarMovies(ctx, movies, total, page)
 }
