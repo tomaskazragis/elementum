@@ -17,7 +17,7 @@ var (
 		net.JoinHostPort("127.0.0.1", "9090"),
 	}
 	XBMCExJSONRPCHosts = []string{
-		net.JoinHostPort("127.0.0.1", "65252"),
+		net.JoinHostPort("127.0.0.1", "65220"),
 	}
 )
 

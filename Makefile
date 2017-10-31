@@ -8,7 +8,7 @@ GIT_VERSION = $(shell $(GIT) describe --tags)
 OUTPUT_NAME = $(NAME)$(EXT)
 BUILD_PATH = build/
 GO_BUILD_TAGS =
-GO_LDFLAGS = -v -x -w -X $(GO_PKG)/util.Version="$(GIT_VERSION)"
+GO_LDFLAGS = -w -X $(GO_PKG)/util.Version="$(GIT_VERSION)"
 PLATFORMS = \
 	android-16/arm \
 	android-16/386 \
@@ -66,9 +66,9 @@ distclean:
 
 build: force
 ifndef XGO_LOCAL
-	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) $(GO_PKG)
+	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GO_PKG)
 else
-	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) $(GOPATH)/src/$(GO_PKG)
+	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GOPATH)/src/$(GO_PKG)
 endif
 	./move-binaries.sh
 
