@@ -9,7 +9,7 @@ import (
 	"strings"
 	"context"
 	"net/http"
-	"io/ioutil"
+	// "io/ioutil"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/xml"
@@ -25,6 +25,7 @@ import (
 const (
 	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
 	burstWebsiteURL      = "https://bitbucket.org/elgatito/script.elementum.burst/raw/master/%s"
+	burstZipURL          = "https://bitbucket.org/elgatito/script.elementum.burst/get/%s"
 	backupRepositoryURL  = "https://offshoregit.com/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
@@ -77,6 +78,7 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	}
 
 	respBurst, errBurst := http.Get(fmt.Sprintf(burstWebsiteURL, "addon.xml"))
+	log.Debugf("Burst url: %#v, %#v", fmt.Sprintf(burstWebsiteURL, "addon.xml"), errBurst)
 	if errBurst == nil && respBurst.StatusCode != 200 {
 		err = errors.New(resp.Status)
 	}
@@ -236,8 +238,8 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 			return
 		}
 	} else {
-		addonFile := fmt.Sprintf("%s-%s.zip", repository, lastReleaseTag[1:])
-		assetURI := fmt.Sprintf(burstWebsiteURL, addonFile)
+		addonFile := fmt.Sprintf("%s.zip", lastReleaseTag)
+		assetURI := fmt.Sprintf(burstZipURL, addonFile)
 		if resp, err := http.Head(assetURI); err == nil && resp.StatusCode == 200 {
 			ctx.Redirect(302, assetURI)
 			return
@@ -256,28 +258,33 @@ func fetchChangelog(user string, repository string) string {
 	changelog := ""
 	if repository == "plugin.video.elementum" {
 		client := github.NewClient(nil)
-		releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-		changelog = "Elementum changelog\n======\n\n"
-		for _, release := range releases {
-			changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), *release.Body)
-		}
-	} else {
-		resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
-		if err != nil || resp.StatusCode != 200 {
-			log.Warning("Unable to fetch changelog, trying backup repository...")
-			resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/changelog.txt")
-			if err != nil || resp.StatusCode != 200 {
-				changelog = "Unable to fetch changelog, try again later."
-				return changelog
+		releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+		log.Debugf("ListReleases response for %s: %#v, Len: %#v, Error: %#v", repository, releases, len(releases), err)
+		if err == nil && releases != nil && len(releases) > 0 {
+			changelog = "Elementum changelog\n======\n\n"
+			for _, release := range releases {
+				// log.Debugf("REL: %#v", release)
+				changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), release.GetBody())
 			}
 		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			changelog = err.Error()
-		} else {
-			changelog = string(data)
-		}
 	}
+	// else {
+	// 	resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
+	// 	if err != nil || resp.StatusCode != 200 {
+	// 		log.Warning("Unable to fetch changelog, trying backup repository...")
+	// 		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/changelog.txt")
+	// 		if err != nil || resp.StatusCode != 200 {
+	// 			changelog = "Unable to fetch changelog, try again later."
+	// 			return changelog
+	// 		}
+	// 	}
+	// 	data, err := ioutil.ReadAll(resp.Body)
+	// 	if err != nil {
+	// 		changelog = err.Error()
+	// 	} else {
+	// 		changelog = string(data)
+	// 	}
+	// }
 	return changelog
 }
 

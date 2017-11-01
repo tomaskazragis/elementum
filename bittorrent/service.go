@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/dht"
 	"github.com/anacrolix/missinggo/pubsub"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/iplist"
@@ -47,13 +48,6 @@ const (
 // 	ipToSThroughput  = 1 << iota
 // 	ipToSLowCost     = 1 << iota
 // )
-
-var dhtBootstrapNodes = []string{
-	"router.bittorrent.com",
-	"router.utorrent.com",
-	"dht.transmissionbt.com",
-	"dht.aelitis.com", // Vuze
-}
 
 var DefaultTrackers = []string{
 	"udp://tracker.opentrackr.org:1337/announce",
@@ -333,6 +327,9 @@ func (s *BTService) configure() {
 		ListenAddr: listenInterfacesStrings[0],
 
 		NoDHT: s.config.DisableDHT,
+		DHTConfig: dht.ServerConfig{
+			StartingNodes: dht.GlobalBootstrapAddrs,
+		},
 
 		Seed:     s.config.SeedTimeLimit > 0,
 		NoUpload: s.config.SeedTimeLimit == 0,
@@ -354,6 +351,7 @@ func (s *BTService) configure() {
 		s.RestoreLimits()
 	}
 
+	s.log.Debugf("BitClient config: %#v", s.ClientConfig)
 	s.Client, err = gotorrent.NewClient(s.ClientConfig)
 
 	go s.Watch()

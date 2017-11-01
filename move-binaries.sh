@@ -2,6 +2,10 @@
 
 cd build/
 
+if [ "$USER" = "travis" ]; then
+	sudo chown -R travis:travis ../
+fi
+
 for file in *; do
 	if [ ! -d "$file" ]; then
 		FILENAME=`echo $file | sed -e "s/.exe//"`
