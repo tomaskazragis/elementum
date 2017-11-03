@@ -259,15 +259,14 @@ func fetchChangelog(user string, repository string) string {
 	if repository == "plugin.video.elementum" {
 		client := github.NewClient(nil)
 		releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-		log.Debugf("ListReleases response for %s: %#v, Len: %#v, Error: %#v", repository, releases, len(releases), err)
 		if err == nil && releases != nil && len(releases) > 0 {
 			changelog = "Elementum changelog\n======\n\n"
 			for _, release := range releases {
-				// log.Debugf("REL: %#v", release)
 				changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), release.GetBody())
 			}
 		}
 	}
+	// TODO: rewrite changelog receive; add display for new changes
 	// else {
 	// 	resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
 	// 	if err != nil || resp.StatusCode != 200 {

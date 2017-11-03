@@ -25,6 +25,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	qstorage "github.com/elgatito/elementum/storage"
+  fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -183,8 +184,14 @@ func NewBTService(conf BTConfiguration) *BTService {
 		StorageEvents: pubsub.NewPubSub(),
 
 		Torrents:        []*Torrent{},
-		DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
-		UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 1024),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 1024),
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 1),
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 0),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
 	}
 
 	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
@@ -314,9 +321,9 @@ func (s *BTService) configure() {
 		}
 
 		s.DefaultStorage = qstorage.NewMemoryStorage(memSize, s.StorageEvents, s.bufferEvents, s.pieceEvents)
-	// } else if s.config.DownloadStorage == StorageFat32 {
-	// 	// FAT32 File Storage Driver
-	// 	s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath)
+	} else if s.config.DownloadStorage == StorageFat32 {
+		// FAT32 File Storage Driver
+		s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath)
 	} else {
 		s.DefaultStorage = storage.NewFileWithCompletion(config.Get().DownloadPath, s.PieceCompletion)
 	}
@@ -326,7 +333,8 @@ func (s *BTService) configure() {
 
 		ListenAddr: listenInterfacesStrings[0],
 
-		NoDHT: s.config.DisableDHT,
+		// NoDHT: s.config.DisableDHT,
+		NoDHT: true,
 		DHTConfig: dht.ServerConfig{
 			StartingNodes: dht.GlobalBootstrapAddrs,
 		},
@@ -457,6 +465,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 			uri = torrent.URI
 		}
 
+		s.log.Debugf("Adding torrent: %#v", uri)
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
 			s.log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err
@@ -809,10 +818,15 @@ func (s *BTService) RestoreLimits() {
 	if s.config.MaxDownloadRate > 0 {
 		s.SetDownloadLimit(s.config.MaxDownloadRate)
 		s.log.Infof("Rate limiting download to %dkB/s", s.config.MaxDownloadRate/1024)
+	} else {
+		s.SetDownloadLimit(0)
 	}
+
 	if s.config.MaxUploadRate > 0 {
 		s.SetUploadLimit(s.config.MaxUploadRate)
 		s.log.Infof("Rate limiting upload to %dkB/s", s.config.MaxUploadRate/1024)
+	} else {
+		s.SetUploadLimit(0)
 	}
 }
 

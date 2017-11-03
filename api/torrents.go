@@ -65,7 +65,9 @@ func AddToTorrentsMap(tmdbId string, torrent *bittorrent.TorrentFile) {
 func InTorrentsMap(tmdbId string) (torrents []*bittorrent.TorrentFile) {
 	for index, torrentMap := range TorrentsMap {
 		if tmdbId == torrentMap.tmdbId {
-			if xbmc.DialogConfirm("Elementum", "LOCALIZE[30260]") {
+			torrentFile := filepath.Join(config.Get().TorrentsPath, fmt.Sprintf("%s.torrent", torrentMap.torrent.InfoHash))
+
+			if _, err := os.Stat(torrentFile); err == nil && xbmc.DialogConfirm("Elementum", "LOCALIZE[30260]") {
 				torrents = append(torrents, torrentMap.torrent)
 			} else {
 				TorrentsMap = append(TorrentsMap[:index], TorrentsMap[index + 1:]...)

@@ -186,14 +186,32 @@ func (t *Torrent) Watch() {
 		case <- bufferTicker.C:
 			t.muBuffer.Lock()
 
+			// TODO: delete when done debugging
+			completed := 0
+			checking := 0
+			partial := 0
+			total := 0
+
 			log.Noticef(strings.Repeat("=", 20))
 			for i :=  range t.BufferPiecesProgress {
+				total++
 				if t.PieceState(i).Complete {
-					continue
+					completed++
+				}
+				if t.PieceState(i).Checking {
+					checking++
+				}
+				if t.PieceState(i).Partial {
+					partial++
 				}
 
-				log.Debugf("Piece: %d, %#v", i, t.PieceState(i))
+				// if t.PieceState(i).Complete {
+				// 	continue
+				// }
+				//
+				// log.Debugf("Piece: %d, %#v", i, t.PieceState(i))
 			}
+			log.Noticef("Total: %#v, Completed: %#v, Partial: %#v, Checking: %#v", total, completed, partial, checking)
 			log.Noticef(strings.Repeat("=", 20))
 
 			if t.IsBuffering {
@@ -262,14 +280,15 @@ func (t *Torrent) Watch() {
 				rateCounter = 0
 			}
 
-			// log.Debugf("ProgressTicker: %s; %#v/%#v; %#v = %#v ", t.Name(), t.DownloadRate, t.UploadRate, t.GetStateString(), t.GetProgress())
+			log.Debugf("ProgressTicker: %s; %#v/%#v; %#v = %#v ", t.Name(), t.DownloadRate, t.UploadRate, t.GetStateString(), t.GetProgress())
 			if t.needSeeding && t.Service.GetSeedTime() > 0 && t.GetProgress() >= 100 {
 				t.muSeeding.Lock()
-				log.Debugf("Starting seeding timer for: %s", t.Info().Name)
+				seedingTime := time.Duration(t.Service.GetSeedTime()) * time.Hour
+				log.Debugf("Starting seeding timer (%s) for: %s", seedingTime, t.Info().Name)
 
 				t.IsSeeding = true
 				t.needSeeding = false
-				t.seedTicker = time.NewTicker(time.Duration(t.Service.GetSeedTime()) * time.Second)
+				t.seedTicker = time.NewTicker(seedingTime)
 
 				t.muSeeding.Unlock()
 			}
@@ -524,7 +543,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 			path := filepath.Join(t.Service.ClientConfig.DataDir, f)
 			if _, err := os.Stat(path); err == nil {
 				log.Infof("Deleting torrent file at %s", path)
-				defer os.Remove(path)
+				os.Remove(path)
 			}
 		}
 	}
