@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	endBufferSize      int64 = 10 * 1024 * 1024 // 10m
+	// endBufferSize      int64 = 10 * 1024 * 1024 // 10m
+	endBufferSize      int64 = 2 * 1024 * 1024 // 10m
 	playbackMaxWait    = 20 * time.Second
 	minCandidateSize   = 100 * 1024 * 1024
 )

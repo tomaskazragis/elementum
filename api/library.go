@@ -1486,7 +1486,7 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 
 			libraryLog.Infof("Stopped at %f%%", progress)
 
-			if stopped.Ended || progress > 90 {
+			if stopped.Ended && progress > 90 {
 				if stopped.Item.Type == "movie" {
 					xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
 				} else {

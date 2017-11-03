@@ -316,12 +316,15 @@ func (s *BTService) configure() {
 
 	if s.config.DownloadStorage == StorageMemory {
 		memSize := int64(config.Get().MemorySize)
-		if memSize < s.config.BufferSize {
-			memSize = s.config.BufferSize
-			s.log.Noticef("Raising memory size (%d) to fit all the buffer", memSize)
+		needSize := s.config.BufferSize + endBufferSize + 5 * 1024 * 1024
+
+		if memSize < needSize {
+			s.log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
+			memSize = needSize
 		}
 
-		s.DefaultStorage = qstorage.NewMemoryStorage(memSize, s.StorageEvents, s.bufferEvents, s.pieceEvents)
+		s.DefaultStorage = qstorage.NewCacheStorage(memSize)
+		//s.DefaultStorage = qstorage.NewMemoryStorage(memSize, s.StorageEvents, s.bufferEvents, s.pieceEvents)
 	} else if s.config.DownloadStorage == StorageFat32 {
 		// FAT32 File Storage Driver
 		s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath)
@@ -334,9 +337,10 @@ func (s *BTService) configure() {
 
 		ListenAddr: listenInterfacesStrings[0],
 
-		// TODO: force disabled DHT, since libutp throwing errors
-		NoDHT: true,
-		// NoDHT: s.config.DisableDHT,
+		// TODO: force disabled UTP, since libutp throwing errors
+		DisableUTP: true,
+
+		NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
 			StartingNodes: dht.GlobalBootstrapAddrs,
 		},
