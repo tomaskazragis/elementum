@@ -186,6 +186,7 @@ func NewBTService(conf BTConfiguration) *BTService {
 		Torrents:        []*Torrent{},
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 1024),
 		UploadLimiter:   rate.NewLimiter(rate.Inf, 1024),
+		// TODO: cleanup when limiting is finished
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
@@ -333,14 +334,18 @@ func (s *BTService) configure() {
 
 		ListenAddr: listenInterfacesStrings[0],
 
-		// NoDHT: s.config.DisableDHT,
+		// TODO: force disabled DHT, since libutp throwing errors
 		NoDHT: true,
+		// NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
 			StartingNodes: dht.GlobalBootstrapAddrs,
 		},
 
-		Seed:     s.config.SeedTimeLimit > 0,
-		NoUpload: s.config.SeedTimeLimit == 0,
+		// TODO: force disabled upload
+		Seed:     false,
+		NoUpload: true,
+		// Seed:     s.config.SeedTimeLimit > 0,
+		// NoUpload: s.config.SeedTimeLimit == 0,
 
 		EncryptionPolicy: gotorrent.EncryptionPolicy{
 			DisableEncryption: s.config.EncryptionPolicy == 0,
