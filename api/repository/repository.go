@@ -262,7 +262,7 @@ func fetchChangelog(user string, repository string) string {
 		if err == nil && releases != nil && len(releases) > 0 {
 			changelog = "Elementum changelog\n======\n\n"
 			for _, release := range releases {
-				changelog += fmt.Sprintf(releaseChangelog, *release.TagName, release.PublishedAt.Format("Jan 2 2006"), release.GetBody())
+				changelog += fmt.Sprintf(releaseChangelog, release.GetTagName(), release.GetPublishedAt().Format("Jan 2 2006"), release.GetBody())
 			}
 		}
 	}

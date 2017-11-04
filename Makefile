@@ -66,9 +66,9 @@ distclean:
 
 build: force
 ifndef XGO_LOCAL
-	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GO_PKG)
+	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GO_PKG)
 else
-	xgo -go 1.8.3 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GOPATH)/src/$(GO_PKG)
+	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GOPATH)/src/$(GO_PKG)
 endif
 	./move-binaries.sh
 
