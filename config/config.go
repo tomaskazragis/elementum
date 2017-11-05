@@ -197,8 +197,10 @@ func Reload() *Configuration {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Warningf("Addon settings not properly set, opening settings window: %#v", r)
-			xbmc.Dialog("Elementum", "LOCALIZE[30314]")
-			xbmc.AddonSettings("plugin.video.elementum")
+			if settingsSet {
+				xbmc.Dialog("Elementum", "LOCALIZE[30314]")
+				xbmc.AddonSettings("plugin.video.elementum")
+			}
 			os.Exit(0)
 	 	}
 	}()

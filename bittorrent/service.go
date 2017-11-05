@@ -184,6 +184,8 @@ func NewBTService(conf BTConfiguration) *BTService {
 		StorageEvents: pubsub.NewPubSub(),
 
 		Torrents:        []*Torrent{},
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 16),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 15),
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 13),
 		UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 13),
 		// TODO: cleanup when limiting is finished
