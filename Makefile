@@ -9,6 +9,7 @@ OUTPUT_NAME = $(NAME)$(EXT)
 BUILD_PATH = build/
 GO_BUILD_TAGS =
 GO_LDFLAGS = -w -X $(GO_PKG)/util.Version="$(GIT_VERSION)"
+GO_EXTRALDFLAGS =
 PLATFORMS = \
 	android-16/arm \
 	android-16/386 \
@@ -65,10 +66,13 @@ distclean:
 	rm -rf build
 
 build: force
+ifeq ($(TARGET_OS),windows)
+	GO_EXTRALDFLAGS = -static -static-libgcc -static-libstdc++
+endif
 ifndef XGO_LOCAL
-	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GO_PKG)
+	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) $(GO_EXTRALDFLAGS)' $(GO_PKG)
 else
-	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS)' $(GOPATH)/src/$(GO_PKG)
+	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) $(GO_EXTRALDFLAGS)' $(GOPATH)/src/$(GO_PKG)
 endif
 	./move-binaries.sh
 
