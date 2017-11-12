@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -24,7 +25,8 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
-	qstorage "github.com/elgatito/elementum/storage"
+	estorage "github.com/elgatito/elementum/storage"
+	"github.com/elgatito/elementum/storage/memory"
   fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
@@ -123,7 +125,7 @@ type BTService struct {
 	Client          *gotorrent.Client
 	ClientConfig    *gotorrent.Config
 	PieceCompletion storage.PieceCompletion
-	DefaultStorage  storage.ClientImpl
+	DefaultStorage  estorage.ElementumStorage
 	StorageEvents   *pubsub.PubSub
 	DownloadLimiter *rate.Limiter
 	UploadLimiter   *rate.Limiter
@@ -136,9 +138,9 @@ type BTService struct {
 	SpaceChecked     map[string]bool
 	MarkedToMove     int
 
-	closing      chan struct{}
+	// closing      chan struct{}
 	bufferEvents chan int
-	pieceEvents  chan qstorage.PieceChange
+	// pieceEvents  chan qstorage.PieceChange
 }
 
 type DBItem struct {
@@ -184,11 +186,12 @@ func NewBTService(conf BTConfiguration) *BTService {
 		StorageEvents: pubsub.NewPubSub(),
 
 		Torrents:        []*Torrent{},
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 16),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 15),
-		DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 13),
-		UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 13),
+
 		// TODO: cleanup when limiting is finished
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 19),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 19),
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 18),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 17),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
@@ -221,7 +224,6 @@ func NewBTService(conf BTConfiguration) *BTService {
 
 func (s *BTService) Close() {
 	s.log.Info("Stopping BT Services...")
-	s.closing <- struct{}{}
 	s.stopServices()
 	s.Client.Close()
 }
@@ -238,6 +240,12 @@ func (s *BTService) configure() {
 
 	var listenPorts []string
 	for p := s.config.LowerListenPort; p <= s.config.UpperListenPort; p++ {
+		ln, err := net.Listen("tcp", ":" + strconv.Itoa(p))
+		if err != nil {
+			continue
+		}
+
+		ln.Close()
 		listenPorts = append(listenPorts, strconv.Itoa(p))
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -312,11 +320,12 @@ func (s *BTService) configure() {
 		setPlatformSpecificSettings(s.config)
 	}
 
-	s.closing      = make(chan struct{}, 5)
 	s.bufferEvents = make(chan int, 5)
-	s.pieceEvents  = make(chan qstorage.PieceChange, 5)
 
 	if s.config.DownloadStorage == StorageMemory {
+		// Forcing disable upload for memory storage
+		s.config.SeedTimeLimit = 0
+
 		memSize := int64(config.Get().MemorySize)
 		needSize := s.config.BufferSize + endBufferSize + 5 * 1024 * 1024
 
@@ -325,19 +334,19 @@ func (s *BTService) configure() {
 			memSize = needSize
 		}
 
-		s.DefaultStorage = qstorage.NewCacheStorage(memSize)
-		//s.DefaultStorage = qstorage.NewMemoryStorage(memSize, s.StorageEvents, s.bufferEvents, s.pieceEvents)
+		s.DefaultStorage = memory.NewMemoryStorage(memSize)
 	} else if s.config.DownloadStorage == StorageFat32 {
 		// FAT32 File Storage Driver
-		s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath)
+		s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath).(estorage.ElementumStorage)
 	} else {
-		s.DefaultStorage = storage.NewFileWithCompletion(config.Get().DownloadPath, s.PieceCompletion)
+		s.DefaultStorage = storage.NewFileWithCompletion(config.Get().DownloadPath, s.PieceCompletion).(estorage.ElementumStorage)
 	}
 
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
 		ListenAddr: listenInterfacesStrings[0],
+		Debug: true,
 
 		// TODO: force disabled UTP, since libutp throwing errors
 		DisableUTP: true,
@@ -371,9 +380,11 @@ func (s *BTService) configure() {
 	}
 
 	s.log.Debugf("BitClient config: %#v", s.ClientConfig)
-	s.Client, err = gotorrent.NewClient(s.ClientConfig)
-
-	go s.Watch()
+	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
+		s.log.Warningf("Error creating bit client: %#v", err)
+	} else {
+		s.log.Debugf("Created bit client: %#v", s.Client)
+	}
 }
 
 func (s *BTService) stopServices() {
@@ -386,23 +397,23 @@ func (s *BTService) stopServices() {
 	s.Client.Close()
 }
 
-func (s *BTService) Watch() {
-	defer close(s.closing)
-	// defer s.StorageChanges.Close()
-
-	for {
-		select {
-		// case change := <- s.pieceEvents:
-		// 	//change := _i.(qstorage.PieceChange)
-		// 	log.Debugf("Sending piece change event: %#v", change)
-		// 	if change.State == "complete" {
-		// 		s.Torrents[0].Torrent.UpdatePieceCompletion(change.Index)
-		// 	}
-		case <- s.closing:
-			return
-		}
-	}
-}
+// func (s *BTService) Watch() {
+// 	defer close(s.closing)
+// 	// defer s.StorageChanges.Close()
+//
+// 	for {
+// 		select {
+// 		// case change := <- s.pieceEvents:
+// 		// 	//change := _i.(qstorage.PieceChange)
+// 		// 	log.Debugf("Sending piece change event: %#v", change)
+// 		// 	if change.State == "complete" {
+// 		// 		s.Torrents[0].Torrent.UpdatePieceCompletion(change.Index)
+// 		// 	}
+// 		case <- s.closing:
+// 			return
+// 		}
+// 	}
+// }
 
 func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 	diskStatus := &diskusage.DiskStatus{}
@@ -477,6 +488,8 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		}
 
 		s.log.Debugf("Adding torrent: %#v", uri)
+		s.log.Debugf("Service: %#v", s)
+		s.log.Debugf("Client: %#v", s.Client)
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
 			s.log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err
@@ -874,4 +887,23 @@ func (s *BTService) GetReadaheadSize() int64 {
 
 func (s *BTService) GetStorageType() int {
 	return s.config.DownloadStorage
+}
+
+func (s *BTService) PlayerStop() {
+	log.Debugf("PlayerStop")
+
+	// For memory storage we cleanup the memory
+	if s.GetStorageType() == StorageMemory {
+		s.DefaultStorage.Stop()
+	}
+}
+
+func (s *BTService) PlayerSeek() {
+	log.Debugf("PlayerSeek")
+
+	// For memory storage we cleanup the memory
+	if s.GetStorageType() == StorageMemory {
+		s.DefaultStorage.Seek()
+		// s.DefaultStorage.Clear()
+	}
 }

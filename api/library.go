@@ -1368,6 +1368,7 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 			if bittorrent.VideoDuration > 0 {
 				bittorrent.Seeked = true
 			}
+			btService.PlayerSeek()
 
 		case "Player.OnPause":
 			if bittorrent.VideoDuration == 0 {

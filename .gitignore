@@ -21,3 +21,6 @@ _testmain.go
 
 *.exe
 *.test
+
+# Custom shell scripts
+test_build.sh

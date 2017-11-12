@@ -450,6 +450,8 @@ func (btp *BTPlayer) Close() {
 			btp.bts.RemoveTorrent(btp.Torrent, false)
 		}
 	}
+
+	go btp.bts.PlayerStop()
 }
 
 func (btp *BTPlayer) bufferDialog() {

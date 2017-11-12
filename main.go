@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"net/http"
 	"path/filepath"
-  //_ "net/http/pprof"
+  _ "net/http/pprof"
 
 	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/api"

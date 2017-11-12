@@ -356,6 +356,9 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 		}
 
 		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
+		if movie == nil {
+			return
+		}
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
@@ -464,6 +467,9 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 		}
 
 		movie := tmdb.GetMovieById(tmdbId, "")
+		if movie == nil {
+			return
+		}
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
