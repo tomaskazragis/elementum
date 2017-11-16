@@ -26,11 +26,11 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	estorage "github.com/elgatito/elementum/storage"
-	"github.com/elgatito/elementum/storage/memory"
-  fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
+	memory "github.com/elgatito/elementum/storage/cache"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 )
 
 const (
@@ -185,13 +185,13 @@ func NewBTService(conf BTConfiguration) *BTService {
 		MarkedToMove:  -1,
 		StorageEvents: pubsub.NewPubSub(),
 
-		Torrents:        []*Torrent{},
+		Torrents: []*Torrent{},
 
 		// TODO: cleanup when limiting is finished
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 19),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 19),
-		DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 18),
-		UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 17),
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
@@ -240,7 +240,7 @@ func (s *BTService) configure() {
 
 	var listenPorts []string
 	for p := s.config.LowerListenPort; p <= s.config.UpperListenPort; p++ {
-		ln, err := net.Listen("tcp", ":" + strconv.Itoa(p))
+		ln, err := net.Listen("tcp", ":"+strconv.Itoa(p))
 		if err != nil {
 			continue
 		}
@@ -327,7 +327,7 @@ func (s *BTService) configure() {
 		s.config.SeedTimeLimit = 0
 
 		memSize := int64(config.Get().MemorySize)
-		needSize := s.config.BufferSize + endBufferSize + 5 * 1024 * 1024
+		needSize := s.config.BufferSize + endBufferSize + 5*1024*1024
 
 		if memSize < needSize {
 			s.log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
@@ -346,10 +346,10 @@ func (s *BTService) configure() {
 		DataDir: config.Get().DownloadPath,
 
 		ListenAddr: listenInterfacesStrings[0],
-		Debug: true,
+		Debug:      true,
 
-		// TODO: force disabled UTP, since libutp throwing errors
-		DisableUTP: true,
+		// // TODO: force disabled UTP, since libutp throwing errors
+		// DisableUTP: true,
 
 		NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
