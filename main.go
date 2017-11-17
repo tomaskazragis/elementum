@@ -4,21 +4,21 @@ import (
 	"os"
 	"time"
 	// "strings"
-	"runtime"
-	"strconv"
 	"net/http"
 	"path/filepath"
-  _ "net/http/pprof"
+	"runtime"
+	"strconv"
+	// _ "net/http/pprof"
 
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/api"
-	"github.com/elgatito/elementum/lockfile"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/lockfile"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("main")
@@ -66,14 +66,14 @@ func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration
 		// SessionSave:         conf.SessionSave,
 		// ShareRatioLimit:     conf.ShareRatioLimit,
 		// SeedTimeRatioLimit:  conf.SeedTimeRatioLimit,
-		SeedTimeLimit:       conf.SeedTimeLimit,
-		DisableDHT:          conf.DisableDHT,
+		SeedTimeLimit: conf.SeedTimeLimit,
+		DisableDHT:    conf.DisableDHT,
 		// DisableUPNP:         conf.DisableUPNP,
-		EncryptionPolicy:    conf.EncryptionPolicy,
-		LowerListenPort:     conf.BTListenPortMin,
-		UpperListenPort:     conf.BTListenPortMax,
-		ListenInterfaces:    conf.ListenInterfaces,
-		OutgoingInterfaces:  conf.OutgoingInterfaces,
+		EncryptionPolicy:   conf.EncryptionPolicy,
+		LowerListenPort:    conf.BTListenPortMin,
+		UpperListenPort:    conf.BTListenPortMax,
+		ListenInterfaces:   conf.ListenInterfaces,
+		OutgoingInterfaces: conf.OutgoingInterfaces,
 		// TunedStorage:        conf.TunedStorage,
 		DownloadPath:        conf.DownloadPath,
 		TorrentsPath:        conf.TorrentsPath,
@@ -105,7 +105,7 @@ func main() {
 	))
 	logging.SetBackend(logging.NewLogBackend(os.Stdout, "", 0))
 
-	log.Infof("Version: %s Go: %s", util.Version[1:len(util.Version) - 1], runtime.Version())
+	log.Infof("Version: %s Go: %s", util.Version[1:len(util.Version)-1], runtime.Version())
 
 	conf := config.Reload()
 
@@ -176,5 +176,5 @@ func main() {
 	go api.LibraryListener()
 	go trakt.TokenRefreshHandler()
 
-	http.ListenAndServe(":" + strconv.Itoa(config.ListenPort), nil)
+	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
 }

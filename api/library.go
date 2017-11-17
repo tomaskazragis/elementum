@@ -1,26 +1,26 @@
 package api
 
 import (
-	"os"
-	"fmt"
-	"time"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"io/ioutil"
-	"path/filepath"
-	"encoding/json"
-	"encoding/base64"
+	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
-	"github.com/elgatito/elementum/util"
-	"github.com/elgatito/elementum/xbmc"
-	"github.com/elgatito/elementum/tmdb"
-	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
-	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -199,7 +199,6 @@ func UpdateEpisodeWatched(itemID int, watchedTime float64, videoDuration float64
 	}
 }
 
-
 //
 // Duplicate handling
 //
@@ -307,7 +306,7 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) (ep
 		}
 		for _, existingEpisode := range episodes.Episodes {
 			if existingEpisode.UniqueIDs.ID == episodeId ||
-				 (existingEpisode.Season == seasonNumber && existingEpisode.Episode == episodeNumber) {
+				(existingEpisode.Season == seasonNumber && existingEpisode.Episode == episodeNumber) {
 				err = errors.New(fmt.Sprintf("%s S%02dE%02d already in library", existingEpisode.Title, seasonNumber, episodeNumber))
 				return
 			}
@@ -329,7 +328,6 @@ func isAddedToLibrary(id string, addedType int) (isAdded bool) {
 
 	return
 }
-
 
 //
 // Database updates
@@ -794,12 +792,12 @@ func removeEpisode(tmdbId string, showId string, scraperId string, seasonNumber 
 	}
 
 	removedEpisodes <- &removedEpisode{
-		ID: tmdbId,
-		ShowID: showId,
+		ID:        tmdbId,
+		ShowID:    showId,
 		ScraperID: scraperId,
-		ShowName: show.Name,
-		Season: seasonNumber,
-		Episode: episodeNumber,
+		ShowName:  show.Name,
+		Season:    seasonNumber,
+		Episode:   episodeNumber,
 	}
 
 	if !alreadyRemoved {
@@ -1083,7 +1081,7 @@ func LibraryUpdate() {
 
 				episodes = make([]*removedEpisode, 0)
 
-			case episode, ok := <- removedEpisodes:
+			case episode, ok := <-removedEpisodes:
 				if !ok {
 					break
 				}
@@ -1101,7 +1099,7 @@ func LibraryUpdate() {
 		go func() {
 			time.Sleep(time.Duration(updateDelay) * time.Second)
 			select {
-			case <- closing:
+			case <-closing:
 				return
 			default:
 				if err := doUpdateLibrary(); err != nil {
@@ -1136,7 +1134,7 @@ func LibraryUpdate() {
 
 	for {
 		select {
-		case <- updateTicker.C:
+		case <-updateTicker.C:
 			if config.Get().UpdateFrequency > 0 {
 				if err := doUpdateLibrary(); err != nil {
 					libraryLog.Warning(err)
@@ -1146,7 +1144,7 @@ func LibraryUpdate() {
 					xbmc.VideoLibraryScan()
 				}
 			}
-		case <- traktSyncTicker.C:
+		case <-traktSyncTicker.C:
 			if config.Get().TraktSyncFrequency > 0 {
 				if err := doSyncTrakt(); err != nil {
 					libraryLog.Warning(err)
@@ -1156,7 +1154,7 @@ func LibraryUpdate() {
 					xbmc.VideoLibraryScan()
 				}
 			}
-		case <- markedForRemovalTicker.C:
+		case <-markedForRemovalTicker.C:
 			db.ForEach(bittorrent.Bucket, func(key []byte, value []byte) error {
 				item := &bittorrent.DBItem{}
 				if err := json.Unmarshal(value, &item); err != nil {
@@ -1186,7 +1184,7 @@ func LibraryUpdate() {
 				libraryLog.Infof("Removed %s from database", key)
 				return nil
 			})
-		case <- closing:
+		case <-closing:
 			close(removedEpisodes)
 			return
 		}
@@ -1206,7 +1204,6 @@ func CloseLibrary() {
 	libraryLog.Info("Closing library...")
 	close(closing)
 }
-
 
 //
 // Library searchers
@@ -1278,8 +1275,8 @@ func FindEpisodeInLibrary(show *tmdb.Show, episode *tmdb.Episode) *xbmc.VideoLib
 
 			for _, existingEpisode := range episodes.Episodes {
 				if strconv.Itoa(existingEpisode.TVShowID) == showId &&
-				 	 	existingEpisode.Season == episode.SeasonNumber &&
-					 	existingEpisode.Episode == episode.EpisodeNumber {
+					existingEpisode.Season == episode.SeasonNumber &&
+					existingEpisode.Episode == episode.EpisodeNumber {
 					return existingEpisode
 				}
 			}
@@ -1355,301 +1352,302 @@ func GetEpisodeUniqueID(show *tmdb.Show, episode *tmdb.Episode) (episodeId strin
 func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-	sender := ctx.Query("sender")
-	method := ctx.Query("method")
-	data := ctx.Query("data")
+		sender := ctx.Query("sender")
+		method := ctx.Query("method")
+		data := ctx.Query("data")
 
-	// jsData, _ := base64.StdEncoding.DecodeString(data)
-	// libraryLog.Debugf("Notification: sender=%s method=%s data=%s", sender, method, jsData)
+		// jsData, _ := base64.StdEncoding.DecodeString(data)
+		// libraryLog.Debugf("Notification: sender=%s method=%s data=%s", sender, method, jsData)
 
-	if sender == "xbmc" {
-		switch method {
-		case "Player.OnSeek":
-			if bittorrent.VideoDuration > 0 {
-				bittorrent.Seeked = true
-			}
-			btService.PlayerSeek()
+		if sender == "xbmc" {
+			switch method {
+			case "Player.OnSeek":
+				if bittorrent.VideoDuration > 0 {
+					bittorrent.Seeked = true
+				}
+				btService.PlayerSeek()
 
-		case "Player.OnPause":
-			if bittorrent.VideoDuration == 0 {
-				return
-			}
-			if !bittorrent.Paused {
-				bittorrent.Paused = true
-			}
-
-		case "Player.OnPlay":
-			time.Sleep(1 * time.Second) // Let player get its WatchedTime and VideoDuration
-			if bittorrent.VideoDuration == 0 {
-				return
-			}
-			if bittorrent.Paused { // Prevent seeking when simply unpausing
-				bittorrent.Paused = false
-				return
-			}
-			if !bittorrent.FromLibrary {
-				return
-			}
-			libraryResume := config.Get().LibraryResume
-			if libraryResume == 0 {
-				return
-			}
-			var started struct {
-				Item  struct {
-					ID   int    `json:"id"`
-					Type string `json:"type"`
-				} `json:"item"`
-			}
-			jsonData, _ := base64.StdEncoding.DecodeString(data)
-			if err := json.Unmarshal(jsonData, &started); err != nil {
-				libraryLog.Error(err)
-				return
-			}
-			var position float64
-			if started.Item.Type == "movie" {
-				var movie *xbmc.VideoLibraryMovieItem
-				if libraryMovies == nil {
+			case "Player.OnPause":
+				if bittorrent.VideoDuration == 0 {
 					return
 				}
-				for _, libraryMovie := range libraryMovies.Movies {
-					if libraryMovie.ID == started.Item.ID {
-						movie = libraryMovie
-						break
+				if !bittorrent.Paused {
+					bittorrent.Paused = true
+				}
+
+			case "Player.OnPlay":
+				time.Sleep(1 * time.Second) // Let player get its WatchedTime and VideoDuration
+				if bittorrent.VideoDuration == 0 {
+					return
+				}
+				if bittorrent.Paused { // Prevent seeking when simply unpausing
+					bittorrent.Paused = false
+					return
+				}
+				if !bittorrent.FromLibrary {
+					return
+				}
+				libraryResume := config.Get().LibraryResume
+				if libraryResume == 0 {
+					return
+				}
+				var started struct {
+					Item struct {
+						ID   int    `json:"id"`
+						Type string `json:"type"`
+					} `json:"item"`
+				}
+				jsonData, _ := base64.StdEncoding.DecodeString(data)
+				if err := json.Unmarshal(jsonData, &started); err != nil {
+					libraryLog.Error(err)
+					return
+				}
+				var position float64
+				if started.Item.Type == "movie" {
+					var movie *xbmc.VideoLibraryMovieItem
+					if libraryMovies == nil {
+						return
 					}
-				}
-				if movie == nil || movie.ID == 0 {
-					libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
-					return
-				}
-				if libraryResume == 2 && ExistingTorrent(btService, movie.Title) == "" {
-					return
-				}
-				position = movie.Resume.Position
-			} else {
-				if libraryEpisodes == nil {
-					return
-				}
-				var episode *xbmc.VideoLibraryEpisodeItem
-				for _, episodes := range libraryEpisodes {
-					if episodes == nil || episodes.Episodes == nil {
-						continue
-					}
-
-					for _, existingEpisode := range episodes.Episodes {
-						if existingEpisode.ID == started.Item.ID {
-							episode = existingEpisode
+					for _, libraryMovie := range libraryMovies.Movies {
+						if libraryMovie.ID == started.Item.ID {
+							movie = libraryMovie
 							break
 						}
 					}
-					if episode != nil {
-						break
+					if movie == nil || movie.ID == 0 {
+						libraryLog.Warningf("No movie found with ID: %d", started.Item.ID)
+						return
 					}
-				}
-				if episode == nil || episode.ID == 0 {
-					libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
-					return
-				}
-				if libraryShows == nil {
-					return
-				}
-				showTitle := ""
-				for _, show := range libraryShows.Shows {
-					if show.ScraperID == strconv.Itoa(episode.TVShowID) {
-						showTitle = show.Title
+					if libraryResume == 2 && ExistingTorrent(btService, movie.Title) == "" {
+						return
 					}
-				}
-				longName := fmt.Sprintf("%s S%02dE%02d", showTitle, episode.Season, episode.Episode)
-				if libraryResume == 2 && ExistingTorrent(btService, longName) == "" {
-					return
-				}
-				position = episode.Resume.Position
-			}
-			xbmc.PlayerSeek(position)
-
-		case "Player.OnStop":
-			if bittorrent.VideoDuration <= 1 {
-				return
-			}
-			var stopped struct {
-				Ended bool `json:"end"`
-				Item  struct {
-					ID   int    `json:"id"`
-					Type string `json:"type"`
-				} `json:"item"`
-			}
-			jsonData, _ := base64.StdEncoding.DecodeString(data)
-			if err := json.Unmarshal(jsonData, &stopped); err != nil {
-				libraryLog.Error(err)
-				return
-			}
-
-			progress := bittorrent.WatchedTime / bittorrent.VideoDuration * 100
-
-			libraryLog.Infof("Stopped at %f%%", progress)
-
-			if stopped.Ended && progress > 90 {
-				if stopped.Item.Type == "movie" {
-					xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+					position = movie.Resume.Position
 				} else {
-					xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
-				}
-			} else if bittorrent.WatchedTime > 180 {
-				if stopped.Item.Type == "movie" {
-					xbmc.SetMovieWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
-				} else {
-					xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
-				}
-			} else {
-				time.Sleep(200 * time.Millisecond)
-				xbmc.Refresh()
-			}
-
-		case "VideoLibrary.OnUpdate":
-			time.Sleep(200 * time.Millisecond) // Because Kodi...
-			if !bittorrent.WasPlaying {
-				return
-			}
-			var item struct {
-				ID   int    `json:"id"`
-				Type string `json:"type"`
-			}
-			jsonData, _ := base64.StdEncoding.DecodeString(data)
-			if err := json.Unmarshal(jsonData, &item); err != nil {
-				libraryLog.Error(err)
-				return
-			}
-			if item.ID != 0 {
-				bittorrent.WasPlaying = false
-				if item.Type == "movie" {
-					updateLibraryMovies()
-				} else {
-					updateLibraryShows()
-				}
-				xbmc.Refresh()
-			}
-
-		case "VideoLibrary.OnRemove":
-			jsonData, err := base64.StdEncoding.DecodeString(data)
-			if err != nil {
-				libraryLog.Error(err)
-				return
-			}
-
-			var item struct {
-				ID   int    `json:"id"`
-				Type string `json:"type"`
-			}
-			if err := json.Unmarshal(jsonData, &item); err != nil {
-				libraryLog.Error(err)
-				return
-			}
-
-			switch item.Type {
-			case "episode":
-				var episode *xbmc.VideoLibraryEpisodeItem
-				if libraryEpisodes == nil {
-					break
-				}
-				for _, episodes := range libraryEpisodes {
-					if episodes == nil || episodes.Episodes == nil {
-						continue
+					if libraryEpisodes == nil {
+						return
 					}
+					var episode *xbmc.VideoLibraryEpisodeItem
+					for _, episodes := range libraryEpisodes {
+						if episodes == nil || episodes.Episodes == nil {
+							continue
+						}
 
-					for _, existingEpisode := range episodes.Episodes {
-						if existingEpisode.ID == item.ID {
-							episode = existingEpisode
+						for _, existingEpisode := range episodes.Episodes {
+							if existingEpisode.ID == started.Item.ID {
+								episode = existingEpisode
+								break
+							}
+						}
+						if episode != nil {
 							break
 						}
 					}
+					if episode == nil || episode.ID == 0 {
+						libraryLog.Warningf("No episode found with ID: %d", started.Item.ID)
+						return
+					}
+					if libraryShows == nil {
+						return
+					}
+					showTitle := ""
+					for _, show := range libraryShows.Shows {
+						if show.ScraperID == strconv.Itoa(episode.TVShowID) {
+							showTitle = show.Title
+						}
+					}
+					longName := fmt.Sprintf("%s S%02dE%02d", showTitle, episode.Season, episode.Episode)
+					if libraryResume == 2 && ExistingTorrent(btService, longName) == "" {
+						return
+					}
+					position = episode.Resume.Position
 				}
-				if episode == nil || episode.ID == 0 {
-					libraryLog.Warningf("No episode found with ID: %d", item.ID)
+				xbmc.PlayerSeek(position)
+
+			case "Player.OnStop":
+				if bittorrent.VideoDuration <= 1 {
+					return
+				}
+				var stopped struct {
+					Ended bool `json:"end"`
+					Item  struct {
+						ID   int    `json:"id"`
+						Type string `json:"type"`
+					} `json:"item"`
+				}
+				jsonData, _ := base64.StdEncoding.DecodeString(data)
+				if err := json.Unmarshal(jsonData, &stopped); err != nil {
+					libraryLog.Error(err)
 					return
 				}
 
-				var scraperId string
-				if libraryShows == nil {
-					break
+				progress := bittorrent.WatchedTime / bittorrent.VideoDuration * 100
+
+				libraryLog.Infof("Stopped at %f%%", progress)
+
+				if stopped.Ended && progress > 90 {
+					if stopped.Item.Type == "movie" {
+						xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+					} else {
+						xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
+					}
+				} else if bittorrent.WatchedTime > 180 {
+					if stopped.Item.Type == "movie" {
+						xbmc.SetMovieWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+					} else {
+						xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(bittorrent.WatchedTime), int(bittorrent.VideoDuration))
+					}
+				} else {
+					time.Sleep(200 * time.Millisecond)
+					xbmc.Refresh()
 				}
-				for _, tvshow := range libraryShows.Shows {
-					if tvshow.ID == episode.TVShowID {
-						scraperId = tvshow.ScraperID
+
+			case "VideoLibrary.OnUpdate":
+				time.Sleep(200 * time.Millisecond) // Because Kodi...
+				if !bittorrent.WasPlaying {
+					return
+				}
+				var item struct {
+					ID   int    `json:"id"`
+					Type string `json:"type"`
+				}
+				jsonData, _ := base64.StdEncoding.DecodeString(data)
+				if err := json.Unmarshal(jsonData, &item); err != nil {
+					libraryLog.Error(err)
+					return
+				}
+				if item.ID != 0 {
+					bittorrent.WasPlaying = false
+					if item.Type == "movie" {
+						updateLibraryMovies()
+					} else {
+						updateLibraryShows()
+					}
+					xbmc.Refresh()
+				}
+
+			case "VideoLibrary.OnRemove":
+				jsonData, err := base64.StdEncoding.DecodeString(data)
+				if err != nil {
+					libraryLog.Error(err)
+					return
+				}
+
+				var item struct {
+					ID   int    `json:"id"`
+					Type string `json:"type"`
+				}
+				if err := json.Unmarshal(jsonData, &item); err != nil {
+					libraryLog.Error(err)
+					return
+				}
+
+				switch item.Type {
+				case "episode":
+					var episode *xbmc.VideoLibraryEpisodeItem
+					if libraryEpisodes == nil {
 						break
 					}
-				}
+					for _, episodes := range libraryEpisodes {
+						if episodes == nil || episodes.Episodes == nil {
+							continue
+						}
 
-				if scraperId != "" && episode.UniqueIDs.ID != "" {
-					var tmdbId string
-					var showId string
-
-					switch config.Get().TvScraper {
-					case TMDBScraper:
-						tmdbId = episode.UniqueIDs.ID
-						showId = scraperId
-					case TVDBScraper:
-						traktShow := trakt.GetShowByTVDB(scraperId)
-						if traktShow == nil {
-							libraryLog.Warning("No matching TVDB show to remove (%s)", scraperId)
-							return
+						for _, existingEpisode := range episodes.Episodes {
+							if existingEpisode.ID == item.ID {
+								episode = existingEpisode
+								break
+							}
 						}
-						showId = strconv.Itoa(traktShow.IDs.TVDB)
-						TVDBEpisode := trakt.GetEpisodeByTVDB(episode.UniqueIDs.ID)
-						if TVDBEpisode == nil {
-							libraryLog.Warning("No matching TVDB episode to remove (%s)", scraperId)
-							return
-						}
-						tmdbId = strconv.Itoa(TVDBEpisode.IDs.TMDB)
-					case TraktScraper:
-						traktShow := trakt.GetShow(scraperId)
-						if traktShow == nil {
-							libraryLog.Warning("No matching show to remove (%s)", scraperId)
-							return
-						}
-						showId = strconv.Itoa(traktShow.IDs.Trakt)
-						traktEpisode := trakt.GetEpisode(episode.UniqueIDs.ID)
-						if traktEpisode == nil {
-							libraryLog.Warning("No matching episode to remove (%s)", scraperId)
-							return
-						}
-						libraryLog.Warning("No matching episode to remove (%s)", episode.UniqueIDs.ID)
+					}
+					if episode == nil || episode.ID == 0 {
+						libraryLog.Warningf("No episode found with ID: %d", item.ID)
 						return
 					}
 
-					if err := removeEpisode(tmdbId, showId, scraperId, episode.Season, episode.Episode); err != nil {
-						libraryLog.Warning(err)
-					}
-				} else {
-					libraryLog.Warning("Missing episodeid or tvshowid, nothing to remove")
-				}
-			case "movie":
-				if libraryMovies == nil {
-					break
-				}
-				for _, movie := range libraryMovies.Movies {
-					if movie.ID == item.ID {
-						tmdbMovie := tmdb.GetMovieById(movie.IMDBNumber, "en")
-						if tmdbMovie == nil || tmdbMovie.Id == 0 {
-							break
-						}
-						if err := removeMovie(nil, strconv.Itoa(tmdbMovie.Id)); err != nil {
-							libraryLog.Warning("Nothing left to remove from Elementum")
-						}
+					var scraperId string
+					if libraryShows == nil {
 						break
 					}
+					for _, tvshow := range libraryShows.Shows {
+						if tvshow.ID == episode.TVShowID {
+							scraperId = tvshow.ScraperID
+							break
+						}
+					}
+
+					if scraperId != "" && episode.UniqueIDs.ID != "" {
+						var tmdbId string
+						var showId string
+
+						switch config.Get().TvScraper {
+						case TMDBScraper:
+							tmdbId = episode.UniqueIDs.ID
+							showId = scraperId
+						case TVDBScraper:
+							traktShow := trakt.GetShowByTVDB(scraperId)
+							if traktShow == nil {
+								libraryLog.Warning("No matching TVDB show to remove (%s)", scraperId)
+								return
+							}
+							showId = strconv.Itoa(traktShow.IDs.TVDB)
+							TVDBEpisode := trakt.GetEpisodeByTVDB(episode.UniqueIDs.ID)
+							if TVDBEpisode == nil {
+								libraryLog.Warning("No matching TVDB episode to remove (%s)", scraperId)
+								return
+							}
+							tmdbId = strconv.Itoa(TVDBEpisode.IDs.TMDB)
+						case TraktScraper:
+							traktShow := trakt.GetShow(scraperId)
+							if traktShow == nil {
+								libraryLog.Warning("No matching show to remove (%s)", scraperId)
+								return
+							}
+							showId = strconv.Itoa(traktShow.IDs.Trakt)
+							traktEpisode := trakt.GetEpisode(episode.UniqueIDs.ID)
+							if traktEpisode == nil {
+								libraryLog.Warning("No matching episode to remove (%s)", scraperId)
+								return
+							}
+							libraryLog.Warning("No matching episode to remove (%s)", episode.UniqueIDs.ID)
+							return
+						}
+
+						if err := removeEpisode(tmdbId, showId, scraperId, episode.Season, episode.Episode); err != nil {
+							libraryLog.Warning(err)
+						}
+					} else {
+						libraryLog.Warning("Missing episodeid or tvshowid, nothing to remove")
+					}
+				case "movie":
+					if libraryMovies == nil {
+						break
+					}
+					for _, movie := range libraryMovies.Movies {
+						if movie.ID == item.ID {
+							tmdbMovie := tmdb.GetMovieById(movie.IMDBNumber, "en")
+							if tmdbMovie == nil || tmdbMovie.Id == 0 {
+								break
+							}
+							if err := removeMovie(nil, strconv.Itoa(tmdbMovie.Id)); err != nil {
+								libraryLog.Warning("Nothing left to remove from Elementum")
+							}
+							break
+						}
+					}
 				}
+
+			case "VideoLibrary.OnScanFinished":
+				scanning = false
+				fallthrough
+
+			case "VideoLibrary.OnCleanFinished":
+				updateLibraryMovies()
+				updateLibraryShows()
+				clearPageCache(ctx)
 			}
-
-		case "VideoLibrary.OnScanFinished":
-			scanning = false
-			fallthrough
-
-		case "VideoLibrary.OnCleanFinished":
-			updateLibraryMovies()
-			updateLibraryShows()
-			clearPageCache(ctx)
 		}
 	}
-}}
+}
 
 func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 	if config.Get().ChooseStreamAuto == true {

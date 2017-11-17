@@ -1,27 +1,33 @@
 package database
 
 import (
-	"os"
-	"io"
-	"fmt"
-	"sync"
-	"time"
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"path/filepath"
-	"encoding/json"
+	"sync"
+	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/op/go-logging"
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-	"github.com/elgatito/elementum/config"
+	"github.com/op/go-logging"
 )
 
 type callBack func([]byte, []byte)
 type callBackWithError func([]byte, []byte) error
+
+type DatabaseWriter struct {
+	bucket   []byte
+	key      []byte
+	database *Database
+}
 
 type Database struct {
 	db *bolt.DB
@@ -35,29 +41,31 @@ var (
 )
 
 var (
-	LibraryBucket     = []byte("Library")
-	BitTorrentBucket  = []byte("BitTorrent")
-	HistoryBucket     = []byte("History")
-	SearchCacheBucket = []byte("SearchCache")
+	LibraryBucket        = []byte("Library")
+	BitTorrentBucket     = []byte("BitTorrent")
+	HistoryBucket        = []byte("History")
+	TorrentHistoryBucket = []byte("TorrentHistory")
+	SearchCacheBucket    = []byte("SearchCache")
 )
 
-var Buckets = [][]byte {
+var Buckets = [][]byte{
 	LibraryBucket,
 	BitTorrentBucket,
 	HistoryBucket,
+	TorrentHistoryBucket,
 	SearchCacheBucket,
 }
 
 var (
 	databaseLog = logging.MustGetLogger("database")
-	quit 			  chan struct{}
+	quit        chan struct{}
 	database    *Database
 	once        sync.Once
 )
 
 func InitDB(conf *config.Configuration) (*Database, error) {
 	databasePath = filepath.Join(conf.Info.Profile, databaseFileName)
-	backupPath 	 = filepath.Join(conf.Info.Profile, backupFileName)
+	backupPath = filepath.Join(conf.Info.Profile, backupFileName)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -68,14 +76,14 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 
 	db, err := bolt.Open(databasePath, 0600, &bolt.Options{
 		ReadOnly: false,
-		Timeout: 15 * time.Second,
+		Timeout:  15 * time.Second,
 	})
 	if err != nil {
 		databaseLog.Warningf("Could not open database at %s: %s", databasePath, err.Error())
 		return nil, err
 	}
 
-	database = &Database{ db: db }
+	database = &Database{db: db}
 	quit = make(chan struct{}, 1)
 
 	for _, bucket := range Buckets {
@@ -102,7 +110,7 @@ func (database *Database) Close() {
 	database.db.Close()
 }
 
-func (database *Database) CheckBucket(bucket []byte) (error) {
+func (database *Database) CheckBucket(bucket []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucket)
 		return err
@@ -126,7 +134,7 @@ func (database *Database) MaintenanceRefreshHandler() {
 			go database.CreateBackup()
 		case <-ticker_cache.C:
 			go database.CacheCleanup()
-		case <- quit:
+		case <-quit:
 			ticker_backup.Stop()
 			ticker_cache.Stop()
 			return
@@ -314,10 +322,9 @@ func (database *Database) GetObject(bucket []byte, key string, item interface{})
 	return
 }
 
-
 func (database *Database) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
-		value = append([]byte(strconv.Itoa(util.NowPlusSecondsInt(seconds)) + "|"), value...)
+		value = append([]byte(strconv.Itoa(util.NowPlusSecondsInt(seconds))+"|"), value...)
 		return tx.Bucket(bucket).Put([]byte(key), value)
 	})
 }
@@ -408,5 +415,19 @@ func (database *Database) BatchDelete(bucket []byte, keys []string) error {
 			}
 		}
 		return nil
+	})
+}
+
+func (database *Database) AsWriter(bucket []byte, key string) *DatabaseWriter {
+	return &DatabaseWriter{
+		database: database,
+		bucket:   bucket,
+		key:      []byte(key),
+	}
+}
+
+func (w *DatabaseWriter) Write(b []byte) (n int, err error) {
+	return len(b), w.database.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(w.bucket).Put(w.key, b)
 	})
 }

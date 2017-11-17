@@ -1,20 +1,20 @@
 package bittorrent
 
 import (
-	"os"
-	"io"
-	"fmt"
-	"time"
 	"bytes"
-	"regexp"
-	"strings"
-	"net/url"
-	"net/http"
 	"crypto/sha1"
+	"encoding/base32"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/base32"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/op/go-logging"
 	"github.com/zeebo/bencode"
@@ -47,7 +47,6 @@ type TorrentFile struct {
 	SceneRating int    `json:"scene_rating"`
 
 	hasResolved bool
-
 }
 
 // Used to avoid infinite recursion in UnmarshalJSON
@@ -71,22 +70,22 @@ const (
 
 var (
 	resolutionTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+240p\W*`):                      Resolution240p,
-		regexp.MustCompile(`\W+480p\W*`):                      Resolution480p,
-		regexp.MustCompile(`\W+720p\W*`):                      Resolution720p,
-		regexp.MustCompile(`\W+1080p\W*`):                     Resolution1080p,
-		regexp.MustCompile(`\W+1440p\W*`):                     Resolution1440p,
-		regexp.MustCompile(`\W+2160p\W*`):                     Resolution4k,
+		regexp.MustCompile(`\W+240p\W*`):  Resolution240p,
+		regexp.MustCompile(`\W+480p\W*`):  Resolution480p,
+		regexp.MustCompile(`\W+720p\W*`):  Resolution720p,
+		regexp.MustCompile(`\W+1080p\W*`): Resolution1080p,
+		regexp.MustCompile(`\W+1440p\W*`): Resolution1440p,
+		regexp.MustCompile(`\W+2160p\W*`): Resolution4k,
 
-		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):     Resolution240p,
-		regexp.MustCompile(`\W+(xvid|dvd|hdtv)\W*`):           Resolution480p,
-		regexp.MustCompile(`\W+(hdrip|bluray|b[rd]rip)\W*`):   Resolution720p,
-		regexp.MustCompile(`\W+(fullhd|fhd)\W*`):              Resolution1080p,
-		regexp.MustCompile(`\W+2K\W*`):                        Resolution1440p,
-		regexp.MustCompile(`\W+4K\W*`):                        Resolution4k,
+		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):   Resolution240p,
+		regexp.MustCompile(`\W+(xvid|dvd|hdtv)\W*`):         Resolution480p,
+		regexp.MustCompile(`\W+(hdrip|bluray|b[rd]rip)\W*`): Resolution720p,
+		regexp.MustCompile(`\W+(fullhd|fhd)\W*`):            Resolution1080p,
+		regexp.MustCompile(`\W+2K\W*`):                      Resolution1440p,
+		regexp.MustCompile(`\W+4K\W*`):                      Resolution4k,
 	}
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "1440p", "4K"}
-	Colors = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
+	Colors      = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
 )
 
 const (
@@ -181,6 +180,16 @@ func (t *TorrentFile) UnmarshalJSON(b []byte) error {
 	*t = TorrentFile(tmp)
 	t.initialize()
 	return nil
+}
+
+func (t *TorrentFile) MarshalJSON() ([]byte, error) {
+	tmp := torrent(*t)
+	log.Debugf("Marshalling: %#v", tmp)
+	b, err := json.Marshal(tmp)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 func (t *TorrentFile) IsMagnet() bool {
@@ -315,6 +324,62 @@ func (t *TorrentFile) Magnet() {
 	}
 }
 
+func (t *TorrentFile) LoadFromBytes(in []byte) error {
+
+	var torrentFile *TorrentFileRaw
+	if err := bencode.DecodeBytes(in, &torrentFile); err != nil {
+		return err
+	}
+
+	if t.InfoHash == "" {
+		hasher := sha1.New()
+		bencode.NewEncoder(hasher).Encode(torrentFile.Info)
+		t.InfoHash = hex.EncodeToString(hasher.Sum(nil))
+	}
+
+	if t.Name == "" {
+		t.Name = torrentFile.Info["name"].(string)
+	}
+
+	if torrentFile.Info["private"] != nil {
+		if torrentFile.Info["private"].(int64) == 1 {
+			torrentFileLog.Noticef("%s marked as private", t.Name)
+			t.IsPrivate = true
+		}
+	}
+
+	if len(t.Trackers) == 0 {
+		t.Trackers = append(t.Trackers, torrentFile.Announce)
+		for _, trackers := range torrentFile.AnnounceList {
+			t.Trackers = append(t.Trackers, trackers...)
+		}
+	}
+
+	// Save torrent file in temp folder
+	torrentFileName := filepath.Join(config.Get().Info.TempPath, fmt.Sprintf("%s.torrent", t.InfoHash))
+	out, err := os.Create(torrentFileName)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+	buf := bytes.NewReader(in)
+	if _, err := io.Copy(out, buf); err != nil {
+		return err
+	}
+	t.URI = torrentFileName
+
+	t.hasResolved = true
+
+	t.initialize()
+
+	return nil
+}
+
 func (t *TorrentFile) Resolve() error {
 	if t.IsMagnet() {
 		t.hasResolved = true
@@ -340,7 +405,7 @@ func (t *TorrentFile) Resolve() error {
 		if clearance.Cookies != "" {
 			req.Header.Set("User-Agent", clearance.UserAgent)
 			if cookies := req.Header.Get("Cookie"); cookies != "" {
-				req.Header.Set("Cookie", cookies + "; " + clearance.Cookies)
+				req.Header.Set("Cookie", cookies+"; "+clearance.Cookies)
 			} else {
 				req.Header.Add("Cookie", clearance.Cookies)
 			}

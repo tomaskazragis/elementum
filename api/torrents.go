@@ -1,21 +1,23 @@
 package api
 
 import (
-	"os"
-	"fmt"
 	"errors"
-	"strings"
-	"strconv"
-	"unicode"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"unicode"
 
-	"github.com/op/go-logging"
-	"github.com/gin-gonic/gin"
-	"github.com/dustin/go-humanize"
 	"github.com/cloudflare/ahocorasick"
+	"github.com/dustin/go-humanize"
+	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -23,57 +25,47 @@ import (
 var torrentsLog = logging.MustGetLogger("torrents")
 
 type TorrentsWeb struct {
-	Name         string  `json:"name"`
-	Size         string  `json:"size"`
-	Status       string  `json:"status"`
-	Progress     float64 `json:"progress"`
-	Ratio        float64 `json:"ratio"`
-	TimeRatio    float64 `json:"time_ratio"`
-	SeedingTime  string  `json:"seeding_time"`
-	SeedTime     float64 `json:"seed_time"`
-	SeedTimeLimit    int `json:"seed_time_limit"`
-	DownloadRate float64 `json:"download_rate"`
-	UploadRate   float64 `json:"upload_rate"`
-	Seeders      int     `json:"seeders"`
-	SeedersTotal int     `json:"seeders_total"`
-	Peers        int     `json:"peers"`
-	PeersTotal   int     `json:"peers_total"`
+	Name          string  `json:"name"`
+	Size          string  `json:"size"`
+	Status        string  `json:"status"`
+	Progress      float64 `json:"progress"`
+	Ratio         float64 `json:"ratio"`
+	TimeRatio     float64 `json:"time_ratio"`
+	SeedingTime   string  `json:"seeding_time"`
+	SeedTime      float64 `json:"seed_time"`
+	SeedTimeLimit int     `json:"seed_time_limit"`
+	DownloadRate  float64 `json:"download_rate"`
+	UploadRate    float64 `json:"upload_rate"`
+	Seeders       int     `json:"seeders"`
+	SeedersTotal  int     `json:"seeders_total"`
+	Peers         int     `json:"peers"`
+	PeersTotal    int     `json:"peers_total"`
 }
 
-type TorrentMap struct {
-	tmdbId  string
-	torrent *bittorrent.TorrentFile
-}
-var TorrentsMap []*TorrentMap
+var HistoryBucket = database.TorrentHistoryBucket
 
 func AddToTorrentsMap(tmdbId string, torrent *bittorrent.TorrentFile) {
-	inTorrentsMap := false
-	for _, torrentMap := range TorrentsMap {
-		if tmdbId == torrentMap.tmdbId {
-			inTorrentsMap = true
-		}
+	b, err := ioutil.ReadFile(torrent.URI)
+	if err != nil {
+		return
 	}
-	if inTorrentsMap == false {
-		torrentMap := &TorrentMap{
-			tmdbId: tmdbId,
-			torrent: torrent,
-		}
-		TorrentsMap = append(TorrentsMap, torrentMap)
-	}
+
+	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbId)
+	db.SetBytes(HistoryBucket, tmdbId, b)
 }
 
 func InTorrentsMap(tmdbId string) (torrents []*bittorrent.TorrentFile) {
-	for index, torrentMap := range TorrentsMap {
-		if tmdbId == torrentMap.tmdbId {
-			torrentFile := filepath.Join(config.Get().TorrentsPath, fmt.Sprintf("%s.torrent", torrentMap.torrent.InfoHash))
+	if b, err := db.GetBytes(HistoryBucket, tmdbId); err == nil && len(b) > 0 {
+		torrent := &bittorrent.TorrentFile{}
+		torrent.LoadFromBytes(b)
 
-			if _, err := os.Stat(torrentFile); err == nil && xbmc.DialogConfirm("Elementum", "LOCALIZE[30260]") {
-				torrents = append(torrents, torrentMap.torrent)
-			} else {
-				TorrentsMap = append(TorrentsMap[:index], TorrentsMap[index + 1:]...)
-			}
+		if len(torrent.URI) > 0 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name)) {
+			torrents = append(torrents, torrent)
+		} else {
+			db.Delete(HistoryBucket, tmdbId)
 		}
 	}
+
 	return torrents
 }
 
@@ -116,8 +108,8 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			torrentName := torrent.Name()
-			progress    := torrent.GetProgress()
-			status      := torrent.GetStateString()
+			progress := torrent.GetProgress()
+			status := torrent.GetStateString()
 
 			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause/%d", i))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause"))}
@@ -136,7 +128,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			color := "white"
-			switch (status) {
+			switch status {
 			case "Paused":
 				fallthrough
 			case "Finished":
@@ -160,35 +152,35 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			torrentsLog.Infof("- %.2f%% - %s - %s", progress, status, torrentName)
 
 			var (
-				tmdb string
-				show string
-				season string
-				episode string
+				tmdb        string
+				show        string
+				season      string
+				episode     string
 				contentType string
 			)
 
 			if torrent.DBItem != nil && torrent.DBItem.Type != "" {
 				contentType = torrent.DBItem.Type
 				if contentType == "movie" {
-					tmdb    = strconv.Itoa(torrent.DBItem.ID)
+					tmdb = strconv.Itoa(torrent.DBItem.ID)
 				} else {
-					show    = strconv.Itoa(torrent.DBItem.ShowID)
-					season  = strconv.Itoa(torrent.DBItem.Season)
+					show = strconv.Itoa(torrent.DBItem.ShowID)
+					season = strconv.Itoa(torrent.DBItem.Season)
 					episode = strconv.Itoa(torrent.DBItem.Episode)
 				}
 			}
 
 			playUrl := UrlQuery(UrlForXBMC("/play"),
-				"resume",  strconv.Itoa(i),
-				"type",    contentType,
-				"tmdb",    tmdb,
-				"show",    show,
-				"season",  season,
+				"resume", strconv.Itoa(i),
+				"type", contentType,
+				"tmdb", tmdb,
+				"show", show,
+				"season", season,
 				"episode", episode)
 
 			item := xbmc.ListItem{
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %s", progress, color, status, torrentName),
-				Path: playUrl,
+				Path:  playUrl,
 				Info: &xbmc.ListItemInfo{
 					Title: torrentName,
 				},
@@ -220,8 +212,8 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			torrentName := torrent.Name()
-			progress    := torrent.GetProgress()
-			status      := torrent.GetStateString()
+			progress := torrent.GetProgress()
+			status := torrent.GetStateString()
 
 			if status != "Finished" {
 				if progress >= 100 {
@@ -233,23 +225,23 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 				status = "Seeding"
 			}
 
-			size         := humanize.Bytes(uint64( torrent.Length() ))
+			size := humanize.Bytes(uint64(torrent.Length()))
 			downloadRate := float64(torrent.DownloadRate) / 1024
-			uploadRate   := float64(torrent.UploadRate) / 1024
+			uploadRate := float64(torrent.UploadRate) / 1024
 
-			stats        := torrent.Stats()
-			peers        := stats.ActivePeers
-			peersTotal   := stats.TotalPeers
+			stats := torrent.Stats()
+			peers := stats.ActivePeers
+			peersTotal := stats.TotalPeers
 
 			t := TorrentsWeb{
-				Name: torrentName,
-				Size: size,
-				Status: status,
-				Progress: progress,
+				Name:         torrentName,
+				Size:         size,
+				Status:       status,
+				Progress:     progress,
 				DownloadRate: downloadRate,
-				UploadRate: uploadRate,
-				Peers: peers,
-				PeersTotal: peersTotal,
+				UploadRate:   uploadRate,
+				Peers:        peers,
+				PeersTotal:   peersTotal,
 			}
 			torrents = append(torrents, &t)
 		}
@@ -411,12 +403,12 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		type Versions struct {
-			Version    string `json:"version"`
-			UserAgent  string `json:"user-agent"`
+			Version   string `json:"version"`
+			UserAgent string `json:"user-agent"`
 		}
 		versions := Versions{
-			Version:    util.Version[1:len(util.Version) - 1],
-			UserAgent:  btService.UserAgent,
+			Version:   util.Version[1 : len(util.Version)-1],
+			UserAgent: btService.UserAgent,
 		}
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		ctx.JSON(200, versions)

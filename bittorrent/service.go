@@ -30,7 +30,6 @@ import (
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-	fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 )
 
 const (
@@ -336,10 +335,9 @@ func (s *BTService) configure() {
 
 		s.DefaultStorage = memory.NewMemoryStorage(memSize)
 	} else if s.config.DownloadStorage == StorageFat32 {
-		// FAT32 File Storage Driver
-		s.DefaultStorage = fat32storage.NewFat32Storage(config.Get().DownloadPath).(estorage.ElementumStorage)
+		s.DefaultStorage = estorage.NewFat32Storage(config.Get().DownloadPath)
 	} else {
-		s.DefaultStorage = storage.NewFileWithCompletion(config.Get().DownloadPath, s.PieceCompletion).(estorage.ElementumStorage)
+		s.DefaultStorage = estorage.NewFileStorage(config.Get().DownloadPath, s.PieceCompletion)
 	}
 
 	s.ClientConfig = &gotorrent.Config{
