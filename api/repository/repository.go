@@ -1,25 +1,25 @@
 package repository
 
 import (
-	"os"
-	"fmt"
 	"bufio"
+	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"os"
 	"regexp"
 	"strings"
-	"context"
-	"net/http"
 	// "io/ioutil"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/xml"
 	"path/filepath"
 
-	"github.com/op/go-logging"
-	"github.com/gin-gonic/gin"
-	"github.com/google/go-github/github"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
+	"github.com/google/go-github/github"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -176,7 +176,7 @@ func GetAddonFiles(ctx *gin.Context) {
 		fallthrough
 	case "icon.png":
 		if repository == "plugin.video.elementum" {
-			ctx.Redirect(302, fmt.Sprintf(githubUserContentURL + "/" + filepath, user, repository, lastReleaseTag))
+			ctx.Redirect(302, fmt.Sprintf(githubUserContentURL+"/"+filepath, user, repository, lastReleaseTag))
 		} else {
 			ctx.Redirect(302, fmt.Sprintf(burstWebsiteURL, filepath))
 		}
@@ -209,7 +209,7 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 			platform := platformStruct.OS + "_" + platformStruct.Arch
 			var assetAllPlatforms string
 			for _, asset := range assets {
-				if strings.HasSuffix(*asset.Name, platform + ".zip") {
+				if strings.HasSuffix(*asset.Name, platform+".zip") {
 					assetPlatform := *asset.BrowserDownloadURL
 					log.Infof("Using release asset for %s: %s", platform, assetPlatform)
 					ctx.Redirect(302, assetPlatform)
@@ -256,16 +256,16 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 func fetchChangelog(user string, repository string) string {
 	log.Infof("Fetching add-on changelog for %s...", repository)
 	changelog := ""
-	if repository == "plugin.video.elementum" {
-		client := github.NewClient(nil)
-		releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-		if err == nil && releases != nil && len(releases) > 0 {
-			changelog = "Elementum changelog\n======\n\n"
-			for _, release := range releases {
-				changelog += fmt.Sprintf(releaseChangelog, release.GetTagName(), release.GetPublishedAt().Format("Jan 2 2006"), release.GetBody())
-			}
-		}
-	}
+	// if repository == "plugin.video.elementum" {
+	// 	client := github.NewClient(nil)
+	// 	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+	// 	if err == nil && releases != nil && len(releases) > 0 {
+	// 		changelog = "Elementum changelog\n======\n\n"
+	// 		for _, release := range releases {
+	// 			changelog += fmt.Sprintf(releaseChangelog, release.GetTagName(), release.GetPublishedAt().Format("Jan 2 2006"), release.GetBody())
+	// 		}
+	// 	}
+	// }
 	// TODO: rewrite changelog receive; add display for new changes
 	// else {
 	// 	resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
@@ -292,17 +292,17 @@ func writeChangelog(user string, repository string) error {
 	lines := strings.Split(changelog, "\n")
 	path := filepath.Clean(filepath.Join(config.Get().Info.Path, "..", repository, "changelog.txt"))
 
-  file, err := os.Create(path)
-  if err != nil {
-    return err
-  }
-  defer file.Close()
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-  w := bufio.NewWriter(file)
-  for _, line := range lines {
-    fmt.Fprintln(w, line)
-  }
-  return w.Flush()
+	w := bufio.NewWriter(file)
+	for _, line := range lines {
+		fmt.Fprintln(w, line)
+	}
+	return w.Flush()
 }
 
 func addonChangelog(ctx *gin.Context, user string, repository string) {
