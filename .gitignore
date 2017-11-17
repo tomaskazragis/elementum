@@ -23,4 +23,3 @@ _testmain.go
 *.test
 
 # Custom shell scripts
-test_build.sh
