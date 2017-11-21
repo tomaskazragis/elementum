@@ -1,8 +1,8 @@
 package bittorrent
 
 import (
-	"time"
 	"math/rand"
+	"time"
 
 	gotorrent "github.com/anacrolix/torrent"
 )
@@ -16,12 +16,20 @@ type Reader struct {
 	// closing chan struct{}
 }
 
+func (t *Torrent) GetActiveReader(f *gotorrent.File) *Reader {
+	if t.activeReader != nil {
+		return t.activeReader
+	} else {
+		return t.NewReader(f)
+	}
+}
+
 func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	reader := &Reader{
-		Reader: t.Torrent.NewReader(),
-		File:   f,
+		Reader:  t.Torrent.NewReader(),
+		File:    f,
 		Torrent: t,
 
 		id: rand.Int31(),
@@ -31,6 +39,8 @@ func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
 	log.Debugf("NewReader: %#v", reader)
 
 	// go reader.Watch()
+	t.activeReader = reader
+
 	return reader
 }
 

@@ -32,13 +32,19 @@ func (e *FileEntry) Seek(offset int64, whence int) (int64, error) {
 }
 
 func NewFileReader(t *Torrent, f *gotorrent.File, sequential bool) (*FileEntry, error) {
-	reader := t.NewReader(f)
+	var reader *Reader
+	if t.IsPlaying {
+		reader = t.GetActiveReader(f)
+	} else {
+		reader = t.NewReader(f)
 
-	if sequential {
-		reader.SetResponsive()
+		if sequential {
+			reader.SetResponsive()
+		}
+
+		tfsLog.Infof("Setting readahead for reader %d as %d", reader.id, t.Service.GetReadaheadSize())
+		reader.SetReadahead(t.Service.GetReadaheadSize())
 	}
-
-	reader.SetReadahead(t.Service.GetReadaheadSize())
 
 	if _, err := reader.Seek(f.Offset(), os.SEEK_SET); err != nil {
 		return nil, err

@@ -62,6 +62,7 @@ var StatusStrings = []string{
 type Torrent struct {
 	*gotorrent.Torrent
 
+	activeReader *Reader
 	bufferReader *Reader
 	postReader   *Reader
 
@@ -72,6 +73,7 @@ type Torrent struct {
 	DownloadRate int64
 	UploadRate   int64
 
+	BufferLength         int64
 	BufferProgress       float64
 	BufferPiecesProgress map[int]float64
 
@@ -411,6 +413,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	t.muBuffer.Lock()
 	t.IsBuffering = true
 	t.BufferProgress = 0
+	t.BufferLength = endBufferLength + postBufferLength
 
 	for i := startPiece; i <= endBufferPiece; i++ {
 		t.BufferPiecesProgress[int(i)] = 0

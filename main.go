@@ -176,5 +176,13 @@ func main() {
 	go api.LibraryListener()
 	go trakt.TokenRefreshHandler()
 
-	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
+	s := &http.Server{
+		Addr:         ":" + strconv.Itoa(config.ListenPort),
+		Handler:      nil,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+
+		MaxHeaderBytes: 1 << 20,
+	}
+	s.ListenAndServe()
 }

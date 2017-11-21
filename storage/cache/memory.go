@@ -349,8 +349,8 @@ func (c *Cache) OpenBuffer(path string, iswrite bool) (ret *File, err error) {
 		path:     path,
 
 		onRead: func(n int) {
-			c.mu.Lock()
-			defer c.mu.Unlock()
+			// c.mu.Lock()
+			// defer c.mu.Unlock()
 
 			c.updateItem(key, func(i *itemState, ok bool) bool {
 				i.Accessed = time.Now()

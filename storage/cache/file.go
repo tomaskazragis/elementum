@@ -132,6 +132,9 @@ func (me *File) ReadAt(b []byte, off int64) (n int, err error) {
 		lastIndex = startIndex
 	}
 
+	me.c.mu.Lock()
+	defer me.c.mu.Unlock()
+
 	for i := startIndex; i <= lastIndex; i++ {
 		if !me.c.pieces[me.key].Chunks.ContainsInt(i) {
 			log.Debugf("ReadAt not contains: %#v -- %#v -- %#v -- %#v -- %#v", me.path, off, i, startIndex, lastIndex)

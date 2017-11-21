@@ -323,6 +323,7 @@ func (s *BTService) configure() {
 
 	// s.bufferEvents = make(chan int, 5)
 
+	s.log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
 	if s.config.DownloadStorage == StorageMemory {
 		// Forcing disable upload for memory storage
 		s.config.SeedTimeLimit = 0
@@ -388,7 +389,9 @@ func (s *BTService) stopServices() {
 	s.dialogProgressBG = nil
 	xbmc.ResetRPC()
 
-	s.Client.Close()
+	if s.Client != nil {
+		s.Client.Close()
+	}
 }
 
 // func (s *BTService) Watch() {
@@ -878,6 +881,7 @@ func (s *BTService) GetMemorySize() int64 {
 func (s *BTService) GetReadaheadSize() int64 {
 	if s.config.DownloadStorage == StorageMemory {
 		return s.GetMemorySize()
+		// return int64(float64(s.GetMemorySize()) * 0.8)
 	} else {
 		return s.GetBufferSize()
 	}
