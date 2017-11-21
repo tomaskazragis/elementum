@@ -24,9 +24,6 @@ import (
 
 const (
 	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
-	burstWebsiteURL      = "https://bitbucket.org/elgatito/script.elementum.burst/raw/master/%s"
-	burstZipURL          = "https://bitbucket.org/elgatito/script.elementum.burst/get/%s"
-	backupRepositoryURL  = "https://offshoregit.com/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
 
@@ -65,32 +62,11 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	if err == nil && resp.StatusCode != 200 {
 		err = errors.New(resp.Status)
 	}
-	if err != nil {
-		log.Warning("Unable to retrieve the addon.xml file, checking backup repository...")
-		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, "plugin.video.elementum") + "/addon.xml")
-		if err == nil && resp.StatusCode != 200 {
-			err = errors.New(resp.Status)
-		}
-		if err != nil {
-			log.Error("Unable to retrieve the backup's addon.xml file.")
-			return nil, err
-		}
-	}
 
-	respBurst, errBurst := http.Get(fmt.Sprintf(burstWebsiteURL, "addon.xml"))
-	log.Debugf("Burst url: %#v, %#v", fmt.Sprintf(burstWebsiteURL, "addon.xml"), errBurst)
+	_, lastReleaseBranch = getLastRelease(user, "script.elementum.burst")
+	respBurst, errBurst := http.Get(fmt.Sprintf(githubUserContentURL, user, "script.elementum.burst", lastReleaseBranch) + "/addon.xml")
 	if errBurst == nil && respBurst.StatusCode != 200 {
-		err = errors.New(resp.Status)
-	}
-	if err != nil {
-		log.Warning("Unable to retrieve Burst's addon.xml file, checking backup repository...")
-		respBurst, errBurst := http.Get(fmt.Sprintf(backupRepositoryURL, user, "script.elementum.burst") + "/addon.xml")
-		if errBurst == nil && respBurst.StatusCode != 200 {
-			errBurst = errors.New(respBurst.Status)
-		}
-		if errBurst != nil {
-			log.Error("Unable to retrieve Burst's addon.xml file.")
-		}
+		errBurst = errors.New(respBurst.Status)
 	}
 
 	addon := xbmc.Addon{}
@@ -175,11 +151,7 @@ func GetAddonFiles(ctx *gin.Context) {
 	case "fanart.jpg":
 		fallthrough
 	case "icon.png":
-		if repository == "plugin.video.elementum" {
-			ctx.Redirect(302, fmt.Sprintf(githubUserContentURL+"/"+filepath, user, repository, lastReleaseTag))
-		} else {
-			ctx.Redirect(302, fmt.Sprintf(burstWebsiteURL, filepath))
-		}
+		ctx.Redirect(302, fmt.Sprintf(githubUserContentURL+"/"+filepath, user, repository, lastReleaseTag))
 		return
 	}
 
@@ -199,57 +171,34 @@ func GetAddonFilesHead(ctx *gin.Context) {
 }
 
 func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag string) {
-	if repository == "plugin.video.elementum" {
-		release := getReleaseByTag(user, repository, lastReleaseTag)
-		// if there a release with an asset that matches a addon zip, use it
-		if release != nil {
-			client := github.NewClient(nil)
-			assets, _, _ := client.Repositories.ListReleaseAssets(context.TODO(), user, repository, *release.ID, nil)
-			platformStruct := xbmc.GetPlatform()
-			platform := platformStruct.OS + "_" + platformStruct.Arch
-			var assetAllPlatforms string
-			for _, asset := range assets {
-				if strings.HasSuffix(*asset.Name, platform+".zip") {
-					assetPlatform := *asset.BrowserDownloadURL
-					log.Infof("Using release asset for %s: %s", platform, assetPlatform)
-					ctx.Redirect(302, assetPlatform)
-					return
-				}
-				if addonZipRE.MatchString(*asset.Name) {
-					assetAllPlatforms = *asset.BrowserDownloadURL
-					log.Infof("Found all platforms release asset: %s", assetAllPlatforms)
-					continue
-				}
-			}
-			if assetAllPlatforms != "" {
-				log.Infof("Using release asset for all platforms: %s", assetAllPlatforms)
-				ctx.Redirect(302, assetAllPlatforms)
-				return
-			}
-		} else {
-			log.Warning("Release not found on main repository, using backup...")
-			platformStruct := xbmc.GetPlatform()
-			platform := platformStruct.OS + "_" + platformStruct.Arch
-			backupRepoPath := fmt.Sprintf(backupRepositoryURL, user, repository)
-			addonFile := fmt.Sprintf("%s-%s.%s.zip", repository, lastReleaseTag[1:], platform)
-			assetPlatform := fmt.Sprintf("%s/%s/%s", backupRepoPath, lastReleaseTag, addonFile)
-			log.Infof("Backup release asset: %s", assetPlatform)
+	release := getReleaseByTag(user, repository, lastReleaseTag)
+	// if there a release with an asset that matches a addon zip, use it
+	if release == nil {
+		return
+	}
+
+	client := github.NewClient(nil)
+	assets, _, _ := client.Repositories.ListReleaseAssets(context.TODO(), user, repository, *release.ID, nil)
+	platformStruct := xbmc.GetPlatform()
+	platform := platformStruct.OS + "_" + platformStruct.Arch
+	var assetAllPlatforms string
+	for _, asset := range assets {
+		if strings.HasSuffix(*asset.Name, platform+".zip") {
+			assetPlatform := *asset.BrowserDownloadURL
+			log.Infof("Using release asset for %s: %s", platform, assetPlatform)
 			ctx.Redirect(302, assetPlatform)
 			return
 		}
-	} else {
-		addonFile := fmt.Sprintf("%s.zip", lastReleaseTag)
-		assetURI := fmt.Sprintf(burstZipURL, addonFile)
-		if resp, err := http.Head(assetURI); err == nil && resp.StatusCode == 200 {
-			ctx.Redirect(302, assetURI)
-			return
-		} else {
-			log.Warningf("Release of %s not found on main repository, using backup...", repository)
-			repoURI := fmt.Sprintf(backupRepositoryURL, user, repository)
-			assetURI = fmt.Sprintf("%s/%s", repoURI, addonFile)
-			log.Infof("Release asset: %s", assetURI)
-			ctx.Redirect(302, assetURI)
+		if addonZipRE.MatchString(*asset.Name) {
+			assetAllPlatforms = *asset.BrowserDownloadURL
+			log.Infof("Found all platforms release asset: %s", assetAllPlatforms)
+			continue
 		}
+	}
+	if assetAllPlatforms != "" {
+		log.Infof("Using release asset for all platforms: %s", assetAllPlatforms)
+		ctx.Redirect(302, assetAllPlatforms)
+		return
 	}
 }
 
