@@ -1,17 +1,17 @@
 package config
 
 import (
-	"os"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"errors"
-	"strings"
-	"strconv"
-	"path/filepath"
 
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("config")
@@ -32,7 +32,7 @@ type Configuration struct {
 	ResultsPerPage      int
 	EnableOverlayStatus bool
 	ChooseStreamAuto    bool
-	ForceLinkType 		  bool
+	ForceLinkType       bool
 	UseOriginalTitle    bool
 	AddSpecials         bool
 	ShowUnairedSeasons  bool
@@ -47,37 +47,37 @@ type Configuration struct {
 	// SessionSave         int
 	// ShareRatioLimit     int
 	// SeedTimeRatioLimit  int
-	SeedTimeLimit       int
-	DisableDHT          bool
+	SeedTimeLimit int
+	DisableDHT    bool
 	// DisableUPNP         bool
-	EncryptionPolicy    int
-	BTListenPortMin     int
-	BTListenPortMax     int
-	ListenInterfaces    string
-	OutgoingInterfaces  string
+	EncryptionPolicy   int
+	BTListenPortMin    int
+	BTListenPortMax    int
+	ListenInterfaces   string
+	OutgoingInterfaces string
 	// TunedStorage        bool
-	Scrobble            bool
-	TraktUsername       string
-	TraktToken          string
-	TraktRefreshToken   string
-	TraktTokenExpiry    int
-	TraktSyncFrequency  int
-	UpdateFrequency     int
-	UpdateDelay         int
-	UpdateAutoScan      bool
-	TvScraper           int
-	LibraryResume       int
-	UseCloudHole        bool
-	CloudHoleKey        string
-	TMDBApiKey          string
-	OSDBUser            string
-	OSDBPass            string
+	Scrobble           bool
+	TraktUsername      string
+	TraktToken         string
+	TraktRefreshToken  string
+	TraktTokenExpiry   int
+	TraktSyncFrequency int
+	UpdateFrequency    int
+	UpdateDelay        int
+	UpdateAutoScan     bool
+	TvScraper          int
+	LibraryResume      int
+	UseCloudHole       bool
+	CloudHoleKey       string
+	TMDBApiKey         string
+	OSDBUser           string
+	OSDBPass           string
 
-	SortingModeMovies            int
-	SortingModeShows             int
-	ResolutionPreferenceMovies   int
-	ResolutionPreferenceShows    int
-	PercentageAdditionalSeeders  int
+	SortingModeMovies           int
+	SortingModeShows            int
+	ResolutionPreferenceMovies  int
+	ResolutionPreferenceShows   int
+	PercentageAdditionalSeeders int
 
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
@@ -101,9 +101,12 @@ type Addon struct {
 	Enabled bool
 }
 
-var config = &Configuration{}
-var lock = sync.RWMutex{}
-var settingsSet = false
+var (
+	config          = &Configuration{}
+	lock            = sync.RWMutex{}
+	settingsAreSet  = false
+	settingsWarning = ""
+)
 
 const (
 	ListenPort = 65220
@@ -140,13 +143,15 @@ func Reload() *Configuration {
 	if downloadPath == "." {
 		xbmc.Dialog("Elementum", "LOCALIZE[30113]")
 		xbmc.AddonSettings("plugin.video.elementum")
-		go waitSettingsSet()
+		settingsWarning = "LOCALIZE[30113]"
+		panic(settingsWarning)
+		// go waitSettingsSet()
 	} else if err := IsWritablePath(downloadPath); err != nil {
 		log.Errorf("Cannot write to location '%s': %#v", downloadPath, err)
 		xbmc.Dialog("Elementum", err.Error())
 		xbmc.AddonSettings("plugin.video.elementum")
-	} else {
-		settingsSet = true
+		settingsWarning = err.Error()
+		panic(settingsWarning)
 	}
 	log.Infof("Using download path: %s", downloadPath)
 
@@ -157,6 +162,8 @@ func Reload() *Configuration {
 		log.Error(err)
 		xbmc.Dialog("Elementum", err.Error())
 		xbmc.AddonSettings("plugin.video.elementum")
+		settingsWarning = err.Error()
+		panic(settingsWarning)
 	}
 	log.Infof("Using library path: %s", libraryPath)
 
@@ -197,12 +204,19 @@ func Reload() *Configuration {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Warningf("Addon settings not properly set, opening settings window: %#v", r)
-			if settingsSet {
-				xbmc.Dialog("Elementum", "LOCALIZE[30314]")
-				xbmc.AddonSettings("plugin.video.elementum")
+
+			message := "LOCALIZE[30314]"
+			if settingsWarning != "" {
+				message = settingsWarning
 			}
+
+			xbmc.Dialog("Elementum", message)
+			xbmc.AddonSettings("plugin.video.elementum")
+
+			waitForSettingsClosed()
+
 			os.Exit(0)
-	 	}
+		}
 	}()
 
 	newConfig := Configuration{
@@ -234,39 +248,39 @@ func Reload() *Configuration {
 		ShowUnairedEpisodes: settings["unaired_episodes"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
-		SeedTimeLimit:       settings["seed_time_limit"].(int),
-		DisableDHT:          settings["disable_dht"].(bool),
+		SeedTimeLimit: settings["seed_time_limit"].(int),
+		DisableDHT:    settings["disable_dht"].(bool),
 		// DisableUPNP:         settings["disable_upnp"].(bool),
-		EncryptionPolicy:    settings["encryption_policy"].(int),
-		BTListenPortMin:     settings["listen_port_min"].(int),
-		BTListenPortMax:     settings["listen_port_max"].(int),
-		ListenInterfaces:    settings["listen_interfaces"].(string),
-		OutgoingInterfaces:  settings["outgoing_interfaces"].(string),
+		EncryptionPolicy:   settings["encryption_policy"].(int),
+		BTListenPortMin:    settings["listen_port_min"].(int),
+		BTListenPortMax:    settings["listen_port_max"].(int),
+		ListenInterfaces:   settings["listen_interfaces"].(string),
+		OutgoingInterfaces: settings["outgoing_interfaces"].(string),
 		// TunedStorage:        settings["tuned_storage"].(bool),
-		ConnectionsLimit:    settings["connections_limit"].(int),
+		ConnectionsLimit: settings["connections_limit"].(int),
 		// SessionSave:         settings["session_save"].(int),
-		Scrobble:            settings["trakt_scrobble"].(bool),
-		TraktUsername:       settings["trakt_username"].(string),
-		TraktToken:          settings["trakt_token"].(string),
-		TraktRefreshToken:   settings["trakt_refresh_token"].(string),
-		TraktTokenExpiry:    settings["trakt_token_expiry"].(int),
-		TraktSyncFrequency:  settings["trakt_sync"].(int),
-		UpdateFrequency:     settings["library_update_frequency"].(int),
-		UpdateDelay:         settings["library_update_delay"].(int),
-		UpdateAutoScan:      settings["library_auto_scan"].(bool),
-		TvScraper:           settings["library_tv_scraper"].(int),
-		LibraryResume:       settings["library_resume"].(int),
-		UseCloudHole:        settings["use_cloudhole"].(bool),
-		CloudHoleKey:        settings["cloudhole_key"].(string),
-		TMDBApiKey:          settings["tmdb_api_key"].(string),
-		OSDBUser:            settings["osdb_user"].(string),
-		OSDBPass:            settings["osdb_pass"].(string),
+		Scrobble:           settings["trakt_scrobble"].(bool),
+		TraktUsername:      settings["trakt_username"].(string),
+		TraktToken:         settings["trakt_token"].(string),
+		TraktRefreshToken:  settings["trakt_refresh_token"].(string),
+		TraktTokenExpiry:   settings["trakt_token_expiry"].(int),
+		TraktSyncFrequency: settings["trakt_sync"].(int),
+		UpdateFrequency:    settings["library_update_frequency"].(int),
+		UpdateDelay:        settings["library_update_delay"].(int),
+		UpdateAutoScan:     settings["library_auto_scan"].(bool),
+		TvScraper:          settings["library_tv_scraper"].(int),
+		LibraryResume:      settings["library_resume"].(int),
+		UseCloudHole:       settings["use_cloudhole"].(bool),
+		CloudHoleKey:       settings["cloudhole_key"].(string),
+		TMDBApiKey:         settings["tmdb_api_key"].(string),
+		OSDBUser:           settings["osdb_user"].(string),
+		OSDBPass:           settings["osdb_pass"].(string),
 
-		SortingModeMovies:            settings["sorting_mode_movies"].(int),
-		SortingModeShows:             settings["sorting_mode_shows"].(int),
-		ResolutionPreferenceMovies:   settings["resolution_preference_movies"].(int),
-		ResolutionPreferenceShows:    settings["resolution_preference_shows"].(int),
-		PercentageAdditionalSeeders:  settings["percentage_additional_seeders"].(int),
+		SortingModeMovies:           settings["sorting_mode_movies"].(int),
+		SortingModeShows:            settings["sorting_mode_shows"].(int),
+		ResolutionPreferenceMovies:  settings["resolution_preference_movies"].(int),
+		ResolutionPreferenceShows:   settings["resolution_preference_shows"].(int),
+		PercentageAdditionalSeeders: settings["percentage_additional_seeders"].(int),
 
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
@@ -297,6 +311,8 @@ func Reload() *Configuration {
 	config = &newConfig
 	lock.Unlock()
 
+	go CheckBurst()
+
 	return config
 }
 
@@ -319,7 +335,7 @@ func IsWritablePath(path string) error {
 		if err != nil {
 			return err
 		}
-	  return errors.New(fmt.Sprintf("%s is not a valid directory", path))
+		return errors.New(fmt.Sprintf("%s is not a valid directory", path))
 	}
 	writableFile := filepath.Join(path, ".writable")
 	if writable, err := os.Create(writableFile); err != nil {
@@ -331,15 +347,14 @@ func IsWritablePath(path string) error {
 	return nil
 }
 
-func waitSettingsSet() {
+func waitForSettingsClosed() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if settingsSet {
-				go CheckBurst()
+			if !xbmc.AddonSettingsOpened() {
 				return
 			}
 		}
@@ -356,8 +371,8 @@ func CheckBurst() {
 				hasBurst = true
 			}
 			enabledProviders = append(enabledProviders, Addon{
-				ID: addon.ID,
-				Name: addon.Name,
+				ID:      addon.ID,
+				Name:    addon.Name,
 				Version: addon.Version,
 				Enabled: addon.Enabled,
 			})
