@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/anacrolix/dht"
-	"github.com/anacrolix/missinggo/pubsub"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/storage"
@@ -125,7 +124,7 @@ type BTService struct {
 	ClientConfig    *gotorrent.Config
 	PieceCompletion storage.PieceCompletion
 	DefaultStorage  estorage.ElementumStorage
-	StorageEvents   *pubsub.PubSub
+	// StorageEvents   *pubsub.PubSub
 	DownloadLimiter *rate.Limiter
 	UploadLimiter   *rate.Limiter
 	Torrents        []*Torrent
@@ -138,7 +137,7 @@ type BTService struct {
 	MarkedToMove     int
 
 	// closing      chan struct{}
-	bufferEvents chan int
+	// bufferEvents chan int
 	// pieceEvents  chan qstorage.PieceChange
 }
 
@@ -180,17 +179,20 @@ func NewBTService(conf BTConfiguration) *BTService {
 		log:    logging.MustGetLogger("btservice"),
 		config: &conf,
 
-		SpaceChecked:  make(map[string]bool, 0),
-		MarkedToMove:  -1,
-		StorageEvents: pubsub.NewPubSub(),
+		SpaceChecked: make(map[string]bool, 0),
+		MarkedToMove: -1,
+		// StorageEvents: pubsub.NewPubSub(),
 
 		Torrents: []*Torrent{},
 
 		// TODO: cleanup when limiting is finished
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 19),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 19),
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
 		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 0),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
+
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 19),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 19),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
@@ -319,7 +321,7 @@ func (s *BTService) configure() {
 		setPlatformSpecificSettings(s.config)
 	}
 
-	s.bufferEvents = make(chan int, 5)
+	// s.bufferEvents = make(chan int, 5)
 
 	if s.config.DownloadStorage == StorageMemory {
 		// Forcing disable upload for memory storage
@@ -346,17 +348,11 @@ func (s *BTService) configure() {
 		ListenAddr: listenInterfacesStrings[0],
 		Debug:      true,
 
-		// // TODO: force disabled UTP, since libutp throwing errors
-		// DisableUTP: true,
-
 		NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
 			StartingNodes: dht.GlobalBootstrapAddrs,
 		},
 
-		// // TODO: force disabled upload
-		// Seed:     false,
-		// NoUpload: true,
 		Seed:     s.config.SeedTimeLimit > 0,
 		NoUpload: s.config.SeedTimeLimit == 0,
 
@@ -822,16 +818,20 @@ func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
 
 func (s *BTService) SetDownloadLimit(i int) {
 	if i == 0 {
+		// s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
 		s.DownloadLimiter.SetLimit(rate.Inf)
 	} else {
+		// s.DownloadLimiter = rate.NewLimiter(rate.Limit(i), 2<<18)
 		s.DownloadLimiter.SetLimit(rate.Limit(i))
 	}
 }
 
 func (s *BTService) SetUploadLimit(i int) {
 	if i == 0 {
+		// s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
 		s.UploadLimiter.SetLimit(rate.Inf)
 	} else {
+		// s.UploadLimiter = rate.NewLimiter(rate.Limit(i), 2<<17)
 		s.UploadLimiter.SetLimit(rate.Limit(i))
 	}
 }

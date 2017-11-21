@@ -154,9 +154,9 @@ func (t *Torrent) Watch() {
 	t.dbidTries = 0
 
 	t.pieceLength = float64(t.Torrent.Info().PieceLength)
-	t.pieceChange = t.Torrent.SubscribePieceStateChanges()
+	// t.pieceChange = t.Torrent.SubscribePieceStateChanges()
 
-	defer t.pieceChange.Close()
+	// defer t.pieceChange.Close()
 	defer t.progressTicker.Stop()
 	defer t.bufferTicker.Stop()
 	defer t.seedTicker.Stop()
@@ -165,8 +165,8 @@ func (t *Torrent) Watch() {
 
 	for {
 		select {
-		case _i, ok := <-t.pieceChange.Values:
-			go t.pieceChangeEvent(_i, ok)
+		// case _i, ok := <-t.pieceChange.Values:
+		// 	go t.pieceChangeEvent(_i, ok)
 
 		case <-t.bufferTicker.C:
 			go t.bufferTickerEvent()
@@ -175,7 +175,7 @@ func (t *Torrent) Watch() {
 			go t.bufferFinishedEvent()
 
 		case <-t.progressTicker.C:
-			go t.progressEvent()
+			go t.progressTickerEvent()
 
 		case <-t.seedTicker.C:
 			go t.seedTickerEvent()
@@ -193,42 +193,45 @@ func (t *Torrent) bufferTickerEvent() {
 	t.muBuffer.Lock()
 
 	// TODO: delete when done debugging
-	completed := 0
-	checking := 0
-	partial := 0
-	total := 0
+	// completed := 0
+	// checking := 0
+	// partial := 0
+	// total := 0
 
 	// log.Noticef(strings.Repeat("=", 20))
-	for i := range t.BufferPiecesProgress {
-		total++
-		if t.PieceState(i).Complete {
-			completed++
-		}
-		if t.PieceState(i).Checking {
-			checking++
-		}
-		if t.PieceState(i).Partial {
-			partial++
-		}
+	// for i := range t.BufferPiecesProgress {
+	// 	total++
+	// 	ps := t.PieceState(i)
+	// 	if ps.Complete {
+	// 		completed++
+	// 	}
+	// 	if ps.Checking {
+	// 		checking++
+	// 	}
+	// 	if ps.Partial {
+	// 		partial++
+	// 		t.BufferPiecesProgress[i] = float64(t.PieceBytesMissing(i))
+	// 	}
 
-		// if t.PieceState(i).Complete {
-		// 	continue
-		// }
-		//
-		// log.Debugf("Piece: %d, %#v", i, t.PieceState(i))
-	}
+	// if t.PieceState(i).Complete {
+	// 	continue
+	// }
+	//
+	// log.Debugf("Piece: %d, %#v", i, t.PieceState(i))
+	// }
 	//log.Noticef("Total: %#v, Completed: %#v, Partial: %#v, Checking: %#v", total, completed, partial, checking)
 	// log.Noticef(strings.Repeat("=", 20))
 
 	if t.IsBuffering {
+		progressCount := 0.0
 		for i := range t.BufferPiecesProgress {
-			t.BufferPiecesProgress[i] = float64(t.PieceBytesMissing(i))
+			progressCount += float64(t.PieceBytesMissing(i))
 		}
 
-		progressCount := 0.0
-		for _, v := range t.BufferPiecesProgress {
-			progressCount += v
-		}
+		// progressCount := 0.0
+		// for _, v := range t.BufferPiecesProgress {
+		// 	progressCount += v
+		// }
 
 		total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
 		t.BufferProgress = (total - progressCount) / total * 100
@@ -241,40 +244,40 @@ func (t *Torrent) bufferTickerEvent() {
 	t.muBuffer.Unlock()
 }
 
-func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
-	if !ok {
-		return
-	}
-	i := _i.(gotorrent.PieceStateChange).Index
+// func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
+// 	if !ok {
+// 		return
+// 	}
+// 	i := _i.(gotorrent.PieceStateChange).Index
+//
+// 	t.muBuffer.RLock()
+//
+// 	if _, ok := t.BufferPiecesProgress[i]; !ok {
+// 		t.muBuffer.RUnlock()
+// 		return
+// 	}
+// 	t.muBuffer.RUnlock()
+//
+// 	t.muBuffer.Lock()
+// 	t.BufferPiecesProgress[i] = float64(t.PieceBytesMissing(i))
+//
+// 	progressCount := 0.0
+// 	for _, v := range t.BufferPiecesProgress {
+// 		progressCount += v
+// 	}
+//
+// 	total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
+// 	t.BufferProgress = (total - progressCount) / total * 100
+// 	t.muBuffer.Unlock()
+//
+// 	t.muBuffer.RLock()
+// 	if t.BufferProgress >= 100 {
+// 		t.bufferFinished <- struct{}{}
+// 	}
+// 	t.muBuffer.RUnlock()
+// }
 
-	t.muBuffer.RLock()
-
-	if _, ok := t.BufferPiecesProgress[i]; !ok {
-		t.muBuffer.RUnlock()
-		return
-	}
-	t.muBuffer.RUnlock()
-
-	t.muBuffer.Lock()
-	t.BufferPiecesProgress[i] = float64(t.PieceBytesMissing(i))
-
-	progressCount := 0.0
-	for _, v := range t.BufferPiecesProgress {
-		progressCount += v
-	}
-
-	total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
-	t.BufferProgress = (total - progressCount) / total * 100
-	t.muBuffer.Unlock()
-
-	t.muBuffer.RLock()
-	if t.BufferProgress >= 100 {
-		t.bufferFinished <- struct{}{}
-	}
-	t.muBuffer.RUnlock()
-}
-
-func (t *Torrent) progressEvent() {
+func (t *Torrent) progressTickerEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 	// for i := 0; i < 10; i++ {
 	// 	log.Debugf("Progress Piece: %d, %#v", i, t.PieceState(i))
@@ -340,7 +343,7 @@ func (t *Torrent) bufferFinishedEvent() {
 
 	t.muBuffer.Unlock()
 
-	t.pieceChange.Close()
+	// t.pieceChange.Close()
 	t.bufferTicker.Stop()
 	t.Service.RestoreLimits()
 
@@ -384,7 +387,7 @@ func (t *Torrent) seedTickerEvent() {
 	t.seedTicker.Stop()
 }
 
-// Define buffer pieces for downloading prior to sending file to Kodi.
+// Buffer defines buffer pieces for downloading prior to sending file to Kodi.
 // Kodi sends two requests, one for onecoming file read handler,
 // another for a piece of file from the end (probably to get codec descriptors and so on)
 // We set it as post-buffer and include in required buffer pieces array.
@@ -416,10 +419,10 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 		t.BufferPiecesProgress[int(i)] = 0
 	}
 
-	if t.Service.GetStorageType() == StorageMemory {
-		log.Debug("Sending event for initializing memory storage")
-		t.Service.bufferEvents <- len(t.BufferPiecesProgress)
-	}
+	// if t.Service.GetStorageType() == StorageMemory {
+	// 	log.Debug("Sending event for initializing memory storage")
+	// 	t.Service.bufferEvents <- len(t.BufferPiecesProgress)
+	// }
 
 	t.muBuffer.Unlock()
 
@@ -431,7 +434,6 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	t.bufferReader.SetReadahead(endBufferLength)
 	t.bufferReader.Seek(file.Offset(), os.SEEK_SET)
 
-	// log.Debugf("POSTBUF: %#v -- %#v -- %#v", postBufferPiece, postBufferLength, endPiece)
 	t.postReader = t.NewReader(file)
 	t.postReader.SetReadahead(postBufferLength)
 	t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
@@ -553,7 +555,7 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
 	log.Debugf("Offset: %#v", f.Offset())
-	if t.Service.config.DownloadStorage != 1 {
+	if t.Service.config.DownloadStorage != StorageMemory {
 		f.Download()
 	}
 }

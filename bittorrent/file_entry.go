@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/missinggo"
+	gotorrent "github.com/anacrolix/torrent"
 
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/util"
@@ -23,7 +23,7 @@ type FileEntry struct {
 	*gotorrent.File
 	*Reader
 
-	rs io.ReadSeeker
+	rs                 io.ReadSeeker
 	libraryBroadcaster *broadcast.Broadcaster
 }
 
@@ -65,13 +65,13 @@ func (e *FileEntry) setSubtitles() {
 	extension := filepath.Ext(filePath)
 
 	if extension != ".srt" {
-		srtPath  := filePath[0:len(filePath)-len(extension)] + ".srt"
-		files    := e.Torrent.Files()
+		srtPath := filePath[0:len(filePath)-len(extension)] + ".srt"
+		files := e.Torrent.Files()
 
 		for _, f := range files {
 			if f.Path() == srtPath {
 				xbmc.PlayerSetSubtitles(util.GetHTTPHost() + "/files/" + srtPath)
-				return;
+				return
 			}
 		}
 	}

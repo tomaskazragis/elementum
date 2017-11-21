@@ -1,14 +1,13 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"time"
-	// "strings"
-	"net/http"
+	// _ "net/http/pprof"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	// _ "net/http/pprof"
 
 	"github.com/elgatito/elementum/api"
 	"github.com/elgatito/elementum/bittorrent"
@@ -105,6 +104,7 @@ func main() {
 	))
 	logging.SetBackend(logging.NewLogBackend(os.Stdout, "", 0))
 
+	log.Infof("Starting Elementum daemon")
 	log.Infof("Version: %s Go: %s", util.Version[1:len(util.Version)-1], runtime.Version())
 
 	conf := config.Reload()
