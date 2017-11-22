@@ -33,19 +33,29 @@ var (
 	log              = logging.MustGetLogger("repository")
 )
 
+func getGithubClient() *github.Client {
+	return github.NewClient(nil)
+}
+
 func getLastRelease(user string, repository string) (string, string) {
-	client := github.NewClient(nil)
-	releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-	if len(releases) > 0 {
-		lastRelease := releases[0]
-		return *lastRelease.TagName, *lastRelease.TargetCommitish
+	client := getGithubClient()
+	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+
+	if err != nil || len(releases) == 0 {
+		return "", "master"
 	}
-	return "", "master"
+
+	lastRelease := releases[0]
+	return *lastRelease.TagName, *lastRelease.TargetCommitish
 }
 
 func getReleaseByTag(user string, repository string, tagName string) *github.RepositoryRelease {
-	client := github.NewClient(nil)
-	releases, _, _ := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+	client := getGithubClient()
+	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+	if err != nil {
+		return nil
+	}
+
 	for _, release := range releases {
 		if *release.TagName == tagName {
 			return release
@@ -69,9 +79,11 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 		errBurst = errors.New(respBurst.Status)
 	}
 
-	addon := xbmc.Addon{}
-	xml.NewDecoder(resp.Body).Decode(&addon)
-	addons = append(addons, addon)
+	if err == nil {
+		addon := xbmc.Addon{}
+		xml.NewDecoder(resp.Body).Decode(&addon)
+		addons = append(addons, addon)
+	}
 
 	if errBurst == nil {
 		burst := xbmc.Addon{}
@@ -177,8 +189,13 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 		return
 	}
 
-	client := github.NewClient(nil)
-	assets, _, _ := client.Repositories.ListReleaseAssets(context.TODO(), user, repository, *release.ID, nil)
+	client := getGithubClient()
+	assets, _, err := client.Repositories.ListReleaseAssets(context.TODO(), user, repository, *release.ID, nil)
+	if err != nil {
+		ctx.Err()
+		return
+	}
+
 	platformStruct := xbmc.GetPlatform()
 	platform := platformStruct.OS + "_" + platformStruct.Arch
 	var assetAllPlatforms string
@@ -202,38 +219,21 @@ func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag s
 	}
 }
 
-func fetchChangelog(user string, repository string) string {
+func fetchChangelog(user string, repository string) (changelog string) {
 	log.Infof("Fetching add-on changelog for %s...", repository)
-	changelog := ""
-	// if repository == "plugin.video.elementum" {
-	// 	client := github.NewClient(nil)
-	// 	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-	// 	if err == nil && releases != nil && len(releases) > 0 {
-	// 		changelog = "Elementum changelog\n======\n\n"
-	// 		for _, release := range releases {
-	// 			changelog += fmt.Sprintf(releaseChangelog, release.GetTagName(), release.GetPublishedAt().Format("Jan 2 2006"), release.GetBody())
-	// 		}
-	// 	}
-	// }
-	// TODO: rewrite changelog receive; add display for new changes
-	// else {
-	// 	resp, err := http.Get(fmt.Sprintf(burstWebsiteURL, "changelog.txt"))
-	// 	if err != nil || resp.StatusCode != 200 {
-	// 		log.Warning("Unable to fetch changelog, trying backup repository...")
-	// 		resp, err = http.Get(fmt.Sprintf(backupRepositoryURL, user, repository) + "/changelog.txt")
-	// 		if err != nil || resp.StatusCode != 200 {
-	// 			changelog = "Unable to fetch changelog, try again later."
-	// 			return changelog
-	// 		}
-	// 	}
-	// 	data, err := ioutil.ReadAll(resp.Body)
-	// 	if err != nil {
-	// 		changelog = err.Error()
-	// 	} else {
-	// 		changelog = string(data)
-	// 	}
-	// }
-	return changelog
+	client := getGithubClient()
+	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
+
+	if err != nil || len(releases) == 0 {
+		return
+	}
+
+	changelog = repository + " changelog\n======\n\n"
+	for _, release := range releases {
+		changelog += fmt.Sprintf(releaseChangelog, release.GetTagName(), release.GetPublishedAt().Format("Jan 2 2006"), release.GetBody())
+	}
+
+	return
 }
 
 func writeChangelog(user string, repository string) error {
