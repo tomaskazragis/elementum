@@ -328,9 +328,10 @@ func IsWritablePath(path string) error {
 	if path == "." {
 		return errors.New("Path not set")
 	}
-	if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
-		return errors.New(fmt.Sprintf("Network paths are not supported, change %s to a locally mounted path by the OS", path))
-	}
+	// TODO: Review this after test evidences come
+	// if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
+	// 	return errors.New(fmt.Sprintf("Network paths are not supported, change %s to a locally mounted path by the OS", path))
+	// }
 	if p, err := os.Stat(path); err != nil || !p.IsDir() {
 		if err != nil {
 			return err
