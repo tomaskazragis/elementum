@@ -32,6 +32,7 @@ func (me *uniformResource) Put(r io.Reader) (err error) {
 
 	src := r.(*File)
 	src.c.pieces[src.key].Path = me.Location
+	src.c.pieces[src.key].Completed = true
 
 	// dst, err := me.Cache.OpenBuffer(me.Location, true)
 	// if err != nil {
@@ -63,7 +64,7 @@ func (me *uniformResource) Put(r io.Reader) (err error) {
 }
 
 func (me *uniformResource) ReadAt(b []byte, off int64) (n int, err error) {
-	// log.Debugf("ReadAt: %#v --- %#v --- %#v", me.Location, len(b), off)
+	log.Debugf("ReadAt: %#v --- %#v --- %#v", me.Location, len(b), off)
 	f, err := me.Cache.OpenBuffer(me.Location, false)
 	if err != nil {
 		return
@@ -90,6 +91,6 @@ func (me *uniformResource) Stat() (fi os.FileInfo, err error) {
 }
 
 func (me *uniformResource) Delete() error {
-	log.Debugf("Delete: %#v", me.Location)
+	log.Debugf("DELETE: %#v", me.Location)
 	return me.Cache.Remove(me.Location)
 }

@@ -29,29 +29,40 @@ type Cache struct {
 	s  storage.ClientImpl
 	mu sync.Mutex
 
-	capacity int64
-	filled   int64
-	policy   Policy
+	pieceLength int64
+	capacity    int64
+	filled      int64
+	policy      Policy
 
 	progressTicker *time.Ticker
 	closing        chan struct{}
 
 	items  map[key]itemState
 	pieces map[key]*Piece
+	// piecesIdx map[key]int
+	piecesIdx []key
 
 	buffers   [][]byte
-	positions []bool
+	positions []BufferPosition
 }
 
 // Piece stores meta information about buffer contents
 type Piece struct {
-	Path     string
-	Position int
-	Active   bool
-	Size     int64
-	Accessed time.Time
-	Chunks   *roaring.Bitmap
-	mu       sync.Mutex
+	Path      string
+	Index     int64
+	Position  int
+	Active    bool
+	Completed bool
+	Size      int64
+	Accessed  time.Time
+	Chunks    *roaring.Bitmap
+	mu        sync.Mutex
+}
+
+type BufferPosition struct {
+	Used  bool
+	Index int
+	Key   key
 }
 
 // type MemoryCache struct {
@@ -135,23 +146,29 @@ func (c *Cache) Init(info *metainfo.Info) {
 	c.filled = 0
 	c.policy = new(lru)
 	c.items = make(map[key]itemState)
+	c.pieceLength = info.PieceLength
 
-	size := int64(math.Ceil(float64(c.capacity)/float64(info.PieceLength))) + 1
+	size := int64(math.Ceil(float64(c.capacity)/float64(c.pieceLength))) + 1
 	if size > int64(info.NumPieces()) {
 		size = int64(info.NumPieces())
 	}
 
 	c.pieces = map[key]*Piece{}
+	// c.piecesIdx = map[key]int{}
+	c.piecesIdx = make([]key, info.NumPieces())
 	c.buffers = make([][]byte, size)
-	c.positions = make([]bool, size)
+	c.positions = make([]BufferPosition, size)
 
-	// for i := 0; i < info.NumPieces(); i++ {
-	// 	log.Debugf("Piece: %#v === %#v === %#v", info.Piece(i).Hash(), info.Piece(i).Hash().AsString(), info.Piece(i).Hash().String())
-	// 	c.pieces[ key(info.Piece(i).Hash().AsString()) ] = &Piece{ Position: -1 }
-	// }
+	for i := 0; i < info.NumPieces(); i++ {
+		// log.Debugf("Piece: %#v === %#v === %#v", info.Piece(i).Hash(), info.Piece(i).Hash().AsString(), info.Piece(i).Hash().String())
+		// c.pieces[ key(info.Piece(i).Hash().AsString()) ] = &Piece{ Position: -1 }
+		// c.piecesIdx[key(info.Piece(i).Hash().HexString())] = i
+		c.piecesIdx[i] = key(info.Piece(i).Hash().HexString())
+	}
 
 	for i := range c.buffers {
 		c.buffers[i] = make([]byte, info.PieceLength)
+		c.positions[i] = BufferPosition{}
 		// c.info[i].Chunks = roaring.NewBitmap()
 	}
 
@@ -179,6 +196,32 @@ func (c *Cache) Close() error {
 // Seek proxies seek event from Kodi
 func (c *Cache) Seek() {
 	log.Debugf("StorageSeek")
+}
+
+func (c *Cache) RemovePiece(idx int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if idx < len(c.piecesIdx) && c.pieces[c.piecesIdx[idx]].Position != -1 {
+		c.remove(c.piecesIdx[idx])
+	}
+}
+
+func (c *Cache) UpdatePos(idx int) {
+
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
+	//
+	// log.Debugf("UpdatePos: %#v", idx)
+	// for _, v := range c.positions {
+	// 	if v.Used && v.Index < idx {
+	// 		log.Debugf("UpdatePos remove index: %#v -- %#v -- ", idx, v)
+	// 		v.Used = false
+	// 		c.remove(v.Key)
+	// 	}
+	// }
+	// idx := pos / c.pieceLength
+
 }
 
 // Start is watching Cache statistics
@@ -219,6 +262,8 @@ func (c *Cache) Stop() {
 
 	c.buffers = nil
 	c.pieces = map[key]*Piece{}
+	c.piecesIdx = nil
+	// c.piecesIdx = map[key]int{}
 
 	debug.FreeOSMemory()
 }
@@ -322,11 +367,13 @@ func (c *Cache) OpenBuffer(path string, iswrite bool) (ret *File, err error) {
 		// log.Debugf("Positions: %#v", c.positions)
 		for index, v := range c.positions {
 			// log.Debugf("  ... in piece: %#v", c.info[i])
-			if v {
+			if v.Used {
 				continue
 			}
 
-			c.positions[index] = true
+			v.Used = true
+			v.Key = key
+			// v.Index = c.pieces[key].Index
 
 			// c.pieces[k].Chunks = roaring.NewBitmap()
 			c.pieces[key].Position = index
@@ -430,7 +477,8 @@ func (c *Cache) trimToCapacity() {
 }
 
 func (c *Cache) Remove(path string) error {
-	// log.Debugf("Super remove called: %#v", path)
+	log.Debugf("Super remove called: %#v, %#v", path, c.positions)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -449,15 +497,16 @@ func (c *Cache) remove(k key) error {
 	// }
 
 	// debug.PrintStack()
-	// log.Debugf("Removing element: %#v", k)
+	log.Debugf("Removing element: %#v", k)
 	if p, ok := c.pieces[k]; !ok {
 		return nil
 	} else if p.Position != -1 {
-		c.positions[c.pieces[k].Position] = false
+		c.positions[c.pieces[k].Position].Used = false
 	}
 
 	c.pieces[k].Chunks.Clear()
 	c.pieces[k].Position = -1
+	c.pieces[k].Completed = false
 	// c.pieces[k].Size = 0
 
 	// delete(c.align, k)

@@ -25,7 +25,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	estorage "github.com/elgatito/elementum/storage"
-	memory "github.com/elgatito/elementum/storage/cache"
+	memory "github.com/elgatito/elementum/storage/memory_v2"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -321,7 +321,12 @@ func (s *BTService) configure() {
 		setPlatformSpecificSettings(s.config)
 	}
 
-	// s.bufferEvents = make(chan int, 5)
+	if s.config.MaxDownloadRate == 0 {
+		s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
+	}
+	if s.config.MaxUploadRate == 0 {
+		s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
+	}
 
 	s.log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
 	if s.config.DownloadStorage == StorageMemory {
@@ -336,6 +341,7 @@ func (s *BTService) configure() {
 			memSize = needSize
 		}
 
+		s.config.SeedTimeLimit = 0
 		s.DefaultStorage = memory.NewMemoryStorage(memSize)
 	} else if s.config.DownloadStorage == StorageFat32 {
 		s.DefaultStorage = estorage.NewFat32Storage(config.Get().DownloadPath)
@@ -880,8 +886,9 @@ func (s *BTService) GetMemorySize() int64 {
 
 func (s *BTService) GetReadaheadSize() int64 {
 	if s.config.DownloadStorage == StorageMemory {
-		return s.GetMemorySize()
-		// return int64(float64(s.GetMemorySize()) * 0.8)
+		// return s.GetMemorySize()
+		// return int64(float64(s.GetMemorySize()) * 0.5)
+		return int64(float64(s.GetMemorySize()) * 0.8)
 	} else {
 		return s.GetBufferSize()
 	}
@@ -894,18 +901,13 @@ func (s *BTService) GetStorageType() int {
 func (s *BTService) PlayerStop() {
 	log.Debugf("PlayerStop")
 
-	// For memory storage we cleanup the memory
-	if s.GetStorageType() == StorageMemory {
-		s.DefaultStorage.Stop()
-	}
+	s.DefaultStorage.Stop()
 }
 
 func (s *BTService) PlayerSeek() {
 	log.Debugf("PlayerSeek")
 
-	// For memory storage we cleanup the memory
-	if s.GetStorageType() == StorageMemory {
-		s.DefaultStorage.Seek()
-		// s.DefaultStorage.Clear()
+	for _, t := range s.Torrents {
+		go t.SeekEvent()
 	}
 }

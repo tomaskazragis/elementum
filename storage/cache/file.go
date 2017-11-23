@@ -162,7 +162,7 @@ func (me *File) Size() int64 {
 	me.c.pieces[me.key].mu.Lock()
 	defer me.c.pieces[me.key].mu.Unlock()
 
-	if !me.IsPositioned() {
+	if !me.IsPositioned() || !me.c.pieces[me.key].Completed {
 		return 0
 	}
 

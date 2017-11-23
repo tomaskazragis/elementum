@@ -1,22 +1,22 @@
 package bittorrent
 
 import (
-	"os"
-	"fmt"
-	"sort"
-	"time"
 	"bufio"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
-	"os/exec"
-	"io/ioutil"
-	"path/filepath"
+	"time"
 
-	"github.com/op/go-logging"
-	"github.com/dustin/go-humanize"
 	gotorrent "github.com/anacrolix/torrent"
+	"github.com/dustin/go-humanize"
+	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	// endBufferSize      int64 = 10 * 1024 * 1024 // 10m
-	endBufferSize      int64 = 2 * 1024 * 1024 // 10m
-	playbackMaxWait    = 20 * time.Second
-	minCandidateSize   = 100 * 1024 * 1024
+	// endBufferSize      int64 = 10 * 1024 * 1024 // 10mb
+	endBufferSize    int64 = 5 * 1024 * 1024 // 5mb
+	playbackMaxWait        = 30 * time.Second
+	minCandidateSize       = 100 * 1024 * 1024
 )
 
 var (
@@ -42,60 +42,61 @@ var (
 )
 
 type BTPlayer struct {
-	bts                      *BTService
-	log                      *logging.Logger
-	dialogProgress           *xbmc.DialogProgress
-	overlayStatus            *xbmc.OverlayStatus
-	uri                      string
-	torrentFile              string
-	contentType              string
-	fileIndex                int
-	resumeIndex              int
-	tmdbId                   int
-	showId                   int
-	season                   int
-	episode                  int
-	scrobble                 bool
-	deleteAfter              bool
-	keepDownloading          int
-	keepFilesPlaying         int
-	keepFilesFinished        int
-	overlayStatusEnabled     bool
-	Torrent                  *Torrent
-	chosenFile               *gotorrent.File
-	subtitlesFile            *gotorrent.File
-	fileSize                 int64
-	fileName                 string
-	torrentName              string
-	extracted                string
-	hasChosenFile            bool
-	isDownloading            bool
-	notEnoughSpace           bool
-	bufferEvents             *broadcast.Broadcaster
-	closing                  chan interface{}
+	bts                  *BTService
+	log                  *logging.Logger
+	dialogProgress       *xbmc.DialogProgress
+	overlayStatus        *xbmc.OverlayStatus
+	uri                  string
+	torrentFile          string
+	contentType          string
+	fileIndex            int
+	resumeIndex          int
+	tmdbId               int
+	showId               int
+	season               int
+	episode              int
+	scrobble             bool
+	deleteAfter          bool
+	keepDownloading      int
+	keepFilesPlaying     int
+	keepFilesFinished    int
+	overlayStatusEnabled bool
+	Torrent              *Torrent
+	chosenFile           *gotorrent.File
+	subtitlesFile        *gotorrent.File
+	fileSize             int64
+	fileName             string
+	torrentName          string
+	extracted            string
+	hasChosenFile        bool
+	isDownloading        bool
+	notEnoughSpace       bool
+	bufferEvents         *broadcast.Broadcaster
+	closing              chan interface{}
 
-  DBID                     int
-  DBTYPE                   string
+	DBID   int
+	DBTYPE string
 }
 
 type BTPlayerParams struct {
-	URI          string
-	FileIndex    int
-	ResumeIndex  int
-	FromLibrary  bool
-	ContentType  string
-	TMDBId       int
-	ShowID       int
-	Season       int
-	Episode      int
+	URI         string
+	FileIndex   int
+	ResumeIndex int
+	FromLibrary bool
+	ContentType string
+	TMDBId      int
+	ShowID      int
+	Season      int
+	Episode     int
 }
 
 type candidateFile struct {
-	Index     int
-	Filename  string
+	Index    int
+	Filename string
 }
 
 type byFilename []*candidateFile
+
 func (a byFilename) Len() int           { return len(a) }
 func (a byFilename) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byFilename) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
@@ -232,8 +233,8 @@ func (btp *BTPlayer) onMetadataReceived() {
 	infoHash := btp.Torrent.InfoHash()
 
 	btp.hasChosenFile = true
-	btp.fileSize      = btp.chosenFile.Length()
-	btp.fileName      = filepath.Base( btp.chosenFile.Path() )
+	btp.fileSize = btp.chosenFile.Length()
+	btp.fileName = filepath.Base(btp.chosenFile.Path())
 	btp.subtitlesFile = btp.findSubtitlesFile()
 
 	btp.log.Infof("Chosen file: %s", btp.fileName)
@@ -278,8 +279,8 @@ func (btp *BTPlayer) statusStrings(progress float64) (string, string, string) {
 	line1 += " - " + humanize.Bytes(uint64(totalSize))
 
 	line2 := fmt.Sprintf("D:%.0fkB/s U:%.0fkB/s S:%d/%d",
-		float64(btp.Torrent.DownloadRate) / 1024,
-		float64(btp.Torrent.UploadRate) / 1024,
+		float64(btp.Torrent.DownloadRate)/1024,
+		float64(btp.Torrent.UploadRate)/1024,
 		btp.Torrent.Stats().ActivePeers,
 		btp.Torrent.Stats().TotalPeers,
 	)
@@ -294,8 +295,8 @@ func (btp *BTPlayer) statusStrings(progress float64) (string, string, string) {
 
 func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 	biggestFile := 0
-	maxSize 		:= int64(0)
-	files 			:= btp.Torrent.Files()
+	maxSize := int64(0)
+	files := btp.Torrent.Files()
 	var candidateFiles []int
 
 	for i, f := range files {
@@ -310,7 +311,7 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 
 		fileName := filepath.Base(f.Path())
 		re := regexp.MustCompile("(?i).*\\.rar")
-		if re.MatchString(fileName) && size > 10 * 1024 * 1024 {
+		if re.MatchString(fileName) && size > 10*1024*1024 {
 			btp.Torrent.IsRarArchive = true
 			if !xbmc.DialogConfirm("Elementum", "LOCALIZE[30303]") {
 				btp.notEnoughSpace = true
@@ -372,15 +373,15 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 	return &files[biggestFile], nil
 }
 
-func (btp *BTPlayer) findSubtitlesFile() (*gotorrent.File) {
+func (btp *BTPlayer) findSubtitlesFile() *gotorrent.File {
 	extension := filepath.Ext(btp.fileName)
-	chosenName := btp.fileName[0:len(btp.fileName)-len(extension)]
+	chosenName := btp.fileName[0 : len(btp.fileName)-len(extension)]
 	srtFileName := chosenName + ".srt"
 
 	files := btp.Torrent.Files()
 
-	var lastMatched *gotorrent.File;
-	countMatched := 0;
+	var lastMatched *gotorrent.File
+	countMatched := 0
 
 	for _, file := range files {
 		fileName := file.Path()
@@ -535,7 +536,7 @@ func (btp *BTPlayer) bufferDialog() {
 			} else {
 				line1, line2, line3 := btp.statusStrings(btp.Torrent.BufferProgress)
 				btp.dialogProgress.Update(int(btp.Torrent.BufferProgress), line1, line2, line3)
-				if !btp.Torrent.IsBuffering  && btp.Torrent.GetState() != STATUS_CHECKING {
+				if !btp.Torrent.IsBuffering && btp.Torrent.GetState() != STATUS_CHECKING {
 					btp.bufferEvents.Signal()
 					return
 				}
@@ -603,7 +604,7 @@ playbackWaitLoop:
 		}
 		select {
 		case <-playbackTimeout:
-			btp.log.Warningf("Playback was unable to start after %d seconds. Aborting...", playbackMaxWait / time.Second)
+			btp.log.Warningf("Playback was unable to start after %d seconds. Aborting...", playbackMaxWait/time.Second)
 			btp.bufferEvents.Broadcast(errors.New("Playback was unable to start before timeout."))
 			return
 		case <-oneSecond.C:
@@ -621,6 +622,7 @@ playbackWaitLoop:
 		trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
 	}
 
+	go btp.Torrent.SyncPieces()
 	btp.Torrent.IsPlaying = true
 
 playbackLoop:

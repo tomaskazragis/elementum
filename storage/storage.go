@@ -11,7 +11,8 @@ type ElementumStorage interface {
 
 	Start()
 	Stop()
-	Seek()
+	SyncPieces(map[int]bool)
+	RemovePiece(int)
 }
 
 type DummyStorage struct {
@@ -26,6 +27,7 @@ func NewFileStorage(path string, pc storage.PieceCompletion) ElementumStorage {
 	return &DummyStorage{storage.NewFileWithCompletion(path, pc)}
 }
 
-func (me *DummyStorage) Seek()  {}
-func (me *DummyStorage) Start() {}
-func (me *DummyStorage) Stop()  {}
+func (me *DummyStorage) Start()                    {}
+func (me *DummyStorage) Stop()                     {}
+func (me *DummyStorage) SyncPieces(a map[int]bool) {}
+func (me *DummyStorage) RemovePiece(idx int)       {}
