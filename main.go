@@ -2,12 +2,12 @@ package main
 
 import (
 	"net/http"
-	"os"
-	"time"
 	// _ "net/http/pprof"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/elgatito/elementum/api"
 	"github.com/elgatito/elementum/bittorrent"
@@ -176,13 +176,14 @@ func main() {
 	go api.LibraryListener()
 	go trakt.TokenRefreshHandler()
 
-	s := &http.Server{
-		Addr:         ":" + strconv.Itoa(config.ListenPort),
-		Handler:      nil,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-
-		MaxHeaderBytes: 1 << 20,
-	}
-	s.ListenAndServe()
+	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
+	// s := &http.Server{
+	// 	Addr:         ":" + strconv.Itoa(config.ListenPort),
+	// 	Handler:      nil,
+	// 	// ReadTimeout:  60 * time.Second,
+	// 	// WriteTimeout: 60 * time.Second,
+	//
+	// 	MaxHeaderBytes: 1 << 20,
+	// }
+	// s.ListenAndServe()
 }
