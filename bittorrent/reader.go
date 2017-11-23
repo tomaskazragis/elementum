@@ -12,16 +12,8 @@ type Reader struct {
 	*gotorrent.File
 	*Torrent
 
-	id int32
-	// closing chan struct{}
-}
-
-func (t *Torrent) GetActiveReader(f *gotorrent.File) *Reader {
-	if t.activeReader != nil {
-		return t.activeReader
-	} else {
-		return t.NewReader(f)
-	}
+	id     int32
+	curPos int64
 }
 
 func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
@@ -33,41 +25,31 @@ func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
 		Torrent: t,
 
 		id: rand.Int31(),
-		// closing: make(chan struct{}, 1),
 	}
-
+	reader.Reader.SetReadahead(1)
 	log.Debugf("NewReader: %#v", reader)
 
-	// go reader.Watch()
-	t.activeReader = reader
+	t.readers = append(t.readers, reader)
+	// log.Debugf("Active readers: %#v", t.readers)
+	// for i, r := range t.readers {
+	// 	log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
+	// }
 
 	return reader
 }
 
-// func (r *Reader) Watch() {
-// 	ticker := time.NewTicker(10 * time.Second)
-//
-// 	defer ticker.Stop()
-//
-// 	for {
-// 		select {
-// 		case <- ticker.C:
-// 			r.Torrent.CurrentPos(r.Reader.CurrentPos(), r.File)
-// 		case <- r.closing:
-// 			return
-// 		}
-// 	}
-// }
-
 func (r *Reader) Close() error {
 	log.Debugf("Closing reader: %#v", r.id)
-	// r.closing <- struct{}{}
-	// defer close(r.closing)
+
+	r.Torrent.mu.Lock()
+	defer r.Torrent.mu.Unlock()
+
+	for i := 0; i < len(r.Torrent.readers); i++ {
+		if r.Torrent.readers[i].id == r.id {
+			r.Torrent.readers = append(r.Torrent.readers[:i], r.Torrent.readers[i+1:]...)
+			break
+		}
+	}
 
 	return r.Reader.Close()
-}
-
-func (r *Reader) Seek(off int64, whence int) (int64, error) {
-	// r.Torrent.CurrentPos(r.Reader.CurrentPos(), r.File)
-	return r.Reader.Seek(off, whence)
 }
