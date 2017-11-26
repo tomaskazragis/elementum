@@ -16,7 +16,7 @@ type Reader struct {
 	curPos int64
 }
 
-func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
+func (t *Torrent) NewReader(f *gotorrent.File, isget bool) *Reader {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	reader := &Reader{
@@ -29,11 +29,13 @@ func (t *Torrent) NewReader(f *gotorrent.File) *Reader {
 	reader.Reader.SetReadahead(1)
 	log.Debugf("NewReader: %#v", reader)
 
-	t.readers = append(t.readers, reader)
-	// log.Debugf("Active readers: %#v", t.readers)
-	// for i, r := range t.readers {
-	// 	log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
-	// }
+	if isget {
+		t.readers = append(t.readers, reader)
+		log.Debugf("Active readers: %#v", t.readers)
+		for i, r := range t.readers {
+			log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
+		}
+	}
 
 	return reader
 }

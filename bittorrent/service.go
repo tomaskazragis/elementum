@@ -64,12 +64,6 @@ var (
 	Bucket = database.BitTorrentBucket
 )
 
-const (
-	StorageFile = iota
-	StorageMemory
-	StorageFat32
-)
-
 // const (
 // 	ProxyTypeNone = iota
 // 	ProxyTypeSocks4
@@ -329,7 +323,7 @@ func (s *BTService) configure() {
 	}
 
 	s.log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
-	if s.config.DownloadStorage == StorageMemory {
+	if s.config.DownloadStorage == estorage.StorageMemory {
 		// Forcing disable upload for memory storage
 		s.config.SeedTimeLimit = 0
 
@@ -343,7 +337,7 @@ func (s *BTService) configure() {
 
 		s.config.SeedTimeLimit = 0
 		s.DefaultStorage = memory.NewMemoryStorage(memSize)
-	} else if s.config.DownloadStorage == StorageFat32 {
+	} else if s.config.DownloadStorage == estorage.StorageFat32 {
 		s.DefaultStorage = estorage.NewFat32Storage(config.Get().DownloadPath)
 	} else {
 		s.DefaultStorage = estorage.NewFileStorage(config.Get().DownloadPath, s.PieceCompletion)
@@ -354,6 +348,8 @@ func (s *BTService) configure() {
 
 		ListenAddr: listenInterfacesStrings[0],
 		Debug:      true,
+
+		DisableUTP: true,
 
 		NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
@@ -885,7 +881,7 @@ func (s *BTService) GetMemorySize() int64 {
 }
 
 func (s *BTService) GetReadaheadSize() int64 {
-	if s.config.DownloadStorage == StorageMemory {
+	if s.config.DownloadStorage == estorage.StorageMemory {
 		// return s.GetMemorySize()
 		// return int64(float64(s.GetMemorySize()) * 0.5)
 		return int64(float64(s.GetMemorySize()) * 0.8)

@@ -6,6 +6,12 @@ import (
 	fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 )
 
+const (
+	StorageFile = iota
+	StorageMemory
+	StorageFat32
+)
+
 type ElementumStorage interface {
 	storage.ClientImpl
 
@@ -17,14 +23,15 @@ type ElementumStorage interface {
 
 type DummyStorage struct {
 	storage.ClientImpl
+	Type int
 }
 
 func NewFat32Storage(path string) ElementumStorage {
-	return &DummyStorage{fat32storage.NewFat32Storage(path)}
+	return &DummyStorage{fat32storage.NewFat32Storage(path), StorageFat32}
 }
 
 func NewFileStorage(path string, pc storage.PieceCompletion) ElementumStorage {
-	return &DummyStorage{storage.NewFileWithCompletion(path, pc)}
+	return &DummyStorage{storage.NewFileWithCompletion(path, pc), StorageFile}
 }
 
 func (me *DummyStorage) Start()                    {}

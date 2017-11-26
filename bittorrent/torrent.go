@@ -27,8 +27,8 @@ import (
 	// "github.com/elgatito/elementum/config"
 	// "github.com/zeebo/bencode"
 
+	estorage "github.com/elgatito/elementum/storage"
 	"github.com/elgatito/elementum/xbmc"
-	// qstorage "github.com/elgatito/elementum/storage"
 )
 
 var log = logging.MustGetLogger("torrent")
@@ -61,7 +61,6 @@ var StatusStrings = []string{
 
 type Torrent struct {
 	*gotorrent.Torrent
-
 	readers []*Reader
 
 	bufferReader *Reader
@@ -70,6 +69,7 @@ type Torrent struct {
 	ChosenFiles []*gotorrent.File
 	TorrentPath string
 
+	Storage      estorage.ElementumStorage
 	Service      *BTService
 	DownloadRate int64
 	UploadRate   int64
@@ -117,6 +117,7 @@ type Torrent struct {
 
 func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Torrent {
 	t := &Torrent{
+		Storage:     service.DefaultStorage,
 		Service:     service,
 		Torrent:     handle,
 		TorrentPath: path,
@@ -273,7 +274,7 @@ func (t *Torrent) SyncPieces() {
 		}
 	}
 
-	t.Service.DefaultStorage.SyncPieces(active)
+	t.Storage.SyncPieces(active)
 }
 
 func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
@@ -288,7 +289,10 @@ func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
 	// 	log.Debugf("PieceChange: %#v == %#v", pc.Index, pc.Priority)
 	// }
 	if pc.PieceState.Priority == gotorrent.PiecePriorityNone {
-		go t.Service.DefaultStorage.RemovePiece(pc.Index)
+		go func() {
+			t.Storage.RemovePiece(pc.Index)
+			// t.Torrent.UpdatePieceCompletion(pc.Index)
+		}()
 	}
 }
 
@@ -318,8 +322,15 @@ func (t *Torrent) progressTickerEvent() {
 	}
 
 	// str := ""
-	// // for i := 0; i < t.Torrent.NumPieces(); i++ {
+	// // for i := t.Torrent.NumPieces() - 50; i < t.Torrent.NumPieces(); i++ {
 	// for i := 0; i < 50; i++ {
+	// 	st := t.Torrent.PieceState(i)
+	// 	// if st.Priority > 0 {
+	// 	str += fmt.Sprintf("%d:%d  ", i, st.Priority)
+	// 	// }
+	// }
+	// str += "\n"
+	// for i := t.Torrent.NumPieces() - 50; i < t.Torrent.NumPieces(); i++ {
 	// 	st := t.Torrent.PieceState(i)
 	// 	// if st.Priority > 0 {
 	// 	str += fmt.Sprintf("%d:%d  ", i, st.Priority)
@@ -461,12 +472,12 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.Service.SetBufferingLimits()
 
-	t.bufferReader = t.NewReader(file)
+	t.bufferReader = t.NewReader(file, false)
 	t.bufferReader.Seek(file.Offset(), io.SeekStart)
 	t.bufferReader.SetReadahead(endBufferLength)
 	// t.bufferReader.Seek(file.Offset(), os.SEEK_SET)
 
-	t.postReader = t.NewReader(file)
+	t.postReader = t.NewReader(file, false)
 	t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, io.SeekStart)
 	t.postReader.SetReadahead(postBufferLength)
 	// t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
@@ -588,7 +599,7 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
 	log.Debugf("Offset: %#v", f.Offset())
-	if t.Service.config.DownloadStorage != StorageMemory {
+	if t.Service.config.DownloadStorage != estorage.StorageMemory {
 		f.Download()
 	}
 }

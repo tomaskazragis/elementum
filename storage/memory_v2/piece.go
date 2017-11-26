@@ -2,13 +2,16 @@ package memory
 
 import (
 	"errors"
-	"os"
+	"io"
+	"math"
 	"sync"
-	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/torrent/storage"
 )
+
+// CHUNK_SIZE Size of Chunk, comes from anacrolix/torrent
+const CHUNK_SIZE = 1024 * 16
 
 // Piece stores meta information about buffer contents
 type Piece struct {
@@ -21,44 +24,20 @@ type Piece struct {
 	Active    bool
 	Completed bool
 	Size      int64
-	Modified  time.Time
 
 	Chunks *roaring.Bitmap
 	mu     sync.Mutex
-
-	// Path      string
-	// Index     int64
-	// Position  int
-	// Active    bool
-	// Completed bool
-	// Size      int64
-	// Accessed  time.Time
-	// Chunks    *roaring.Bitmap
-	// mu        sync.Mutex
-}
-
-func (p *Piece) Stat() (os.FileInfo, error) {
-	if !p.Active {
-		return nil, errors.New("Not ready")
-	}
-
-	return &Stats{
-		path:     p.Hash,
-		size:     p.Size,
-		modified: p.Modified,
-	}, nil
 }
 
 func (p *Piece) Completion() storage.Completion {
-	fi, err := p.Stat()
+	// log.Debugf("Completion: %#v -- %#v -- %#v=%#v -- %#v", p.Index, p.Active, p.Size, p.Length, p.Completed)
 	return storage.Completion{
-		Complete: err == nil && fi.Size() == p.Length && p.Length != 0 && p.Completed,
+		Complete: p.Active && p.Completed && p.Size == p.Length && p.Length != 0,
 		Ok:       true,
 	}
 }
 
 func (p *Piece) MarkComplete() error {
-	// return resource.Move(s.i, s.c)
 	p.Completed = true
 	return nil
 }
@@ -68,53 +47,12 @@ func (p *Piece) MarkNotComplete() error {
 	return nil
 }
 
-func (p *Piece) ReadAt(b []byte, off int64) (int, error) {
-	buf, err := p.OpenBuffer(false)
-	if err != nil {
-		return 0, nil
-	}
-
-	return buf.ReadAt(b, off)
-
-	// log.Debugf("ReadAt: %#v, %#v, %#v", p.Index, off, len(b))
-	// return p.c.ReadAt(p.Index, b, off)
-	// if p.Completion().Complete {
-	// 	return p.c.ReadAt(b, off)
-	// } else {
-	// 	return p.c.ReadAt(b, off)
-	// }
-}
-
-func (p *Piece) WriteAt(b []byte, off int64) (n int, err error) {
-	buf, err := p.OpenBuffer(true)
-	if err != nil {
-		return 0, err
-	}
-
-	return buf.WriteAt(b, off)
-
-	// log.Debugf("WriteAt: %#v, %#v, %#v", p.Index, off, len(b))
-	// p.c.mu.Lock()
-	// defer p.c.mu.Unlock()
-	// p.OpenBuffer(true)
-	// log.Debugf("WriteAt2: %#v, %#v", p.pi.Index, len(p.c.pieces))
-	// return p.c.WriteAt(p.Index, b, off)
-
-	// buf, err := p.OpenBuffer(true)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	//
-	// return buf.WriteAt(b, off)
-
-}
-
-func (p *Piece) OpenBuffer(iswrite bool) (ret *Buffer, err error) {
+func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
 
 	if p.Index >= len(p.c.pieces) {
-		return nil, errors.New("Piece index not valid")
+		return false, errors.New("Piece index not valid")
 	}
 
 	if !p.c.pieces[p.Index].Active && iswrite {
@@ -131,20 +69,119 @@ func (p *Piece) OpenBuffer(iswrite bool) (ret *Buffer, err error) {
 			selected.Position = index
 			selected.Active = true
 			selected.Size = 0
-			selected.Modified = time.Now()
 
 			break
 		}
 
 		if !p.c.pieces[p.Index].Active {
 			log.Debugf("Buffer not assigned: %#v", p.c.positions)
-			return nil, errors.New("Could not assign buffer")
+			return false, errors.New("Could not assign buffer")
 		}
 	}
 
-	ret = &Buffer{
-		c: p.c,
-		p: p,
+	return true, nil
+}
+
+func (p *Piece) IsPositioned() bool {
+	if p == nil || p.c == nil || !p.Active || p.Position == -1 {
+		return false
+	}
+
+	return true
+}
+
+// Seek File-like implementation
+func (p *Piece) Seek(offset int64, whence int) (ret int64, err error) {
+	return
+}
+
+// Write File-like implementation
+func (p *Piece) Write(b []byte) (n int, err error) {
+	return
+}
+
+// WriteAt File-like implementation
+func (p *Piece) WriteAt(b []byte, off int64) (n int, err error) {
+	buf, err := p.OpenBuffer(true)
+	if err != nil || !buf {
+		return 0, err
+	}
+
+	// me.p.mu.Lock()
+	// defer me.p.mu.Unlock()
+
+	if !p.IsPositioned() {
+		log.Debugf("Not positioned: %#v", p)
+		return 0, errors.New("Not positioned")
+	}
+
+	chunkId, _ := p.GetChunkForOffset(off)
+	p.Chunks.AddInt(chunkId)
+
+	n = copy(p.c.buffers[p.Position][off:], b[:])
+
+	p.Size += int64(n)
+	return
+}
+
+// Close File-like implementation
+func (p *Piece) Close() error {
+	return nil
+}
+
+// Read File-like implementation
+func (p *Piece) Read(b []byte) (n int, err error) {
+	return
+}
+
+// ReadAt File-like implementation
+func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
+	buf, err := p.OpenBuffer(false)
+	if err != nil || !buf {
+		return 0, nil
+	}
+
+	// me.p.mu.Lock()
+	// defer me.p.mu.Unlock()
+
+	if !p.IsPositioned() {
+		// log.Debugf("Not aligned ReadAt: %#v", p.Index)
+		return 0, io.EOF
+	}
+
+	requested := len(b)
+	startIndex, _ := p.GetChunkForOffset(off)
+	lastIndex, _ := p.GetChunkForOffset(off + int64(requested-CHUNK_SIZE))
+
+	if lastIndex < startIndex {
+		lastIndex = startIndex
+	}
+
+	// me.c.mu.Lock()
+	// defer me.c.mu.Unlock()
+
+	for i := startIndex; i <= lastIndex; i++ {
+		if !p.Chunks.ContainsInt(i) {
+			// log.Debugf("ReadAt not contains: %#v -- %#v -- %#v -- %#v -- %#v", p.Hash, off, i, startIndex, lastIndex)
+			// return 0, errors.New("Chunk not available")
+			return 0, io.EOF
+		}
+	}
+
+	n = copy(b, p.c.buffers[p.Position][off:][:])
+	if n != requested {
+		log.Debugf("ReadAt return: %#v -- %#v -- %#v -- %#v -- %#v -- %#v", p.Hash, off, n, requested, startIndex, lastIndex)
+		return 0, errors.New("Output size differs")
+	}
+
+	return n, nil
+}
+
+func (p *Piece) GetChunkForOffset(offset int64) (index, margin int) {
+	index = int(math.Ceil(float64(offset) / float64(CHUNK_SIZE)))
+	margin = int(math.Mod(float64(offset), float64(CHUNK_SIZE)))
+	if margin > 0 {
+		index--
 	}
 
 	return

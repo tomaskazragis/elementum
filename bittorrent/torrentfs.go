@@ -19,6 +19,7 @@ var tfsLog = logging.MustGetLogger("torrentfs")
 
 func TorrentFSHandler(btService *BTService, downloadPath string) http.Handler {
 	return http.StripPrefix("/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Close = true
 		entry, err := NewTorrentFS(btService, downloadPath, r)
 
 		if err == nil && entry != nil {
@@ -32,6 +33,7 @@ func TorrentFSHandler(btService *BTService, downloadPath string) http.Handler {
 }
 
 func NewTorrentFS(service *BTService, path string, r *http.Request) (*FileEntry, error) {
+	r.Close = true
 	tfs := &TorrentFS{
 		service: service,
 		Dir:     http.Dir(path),

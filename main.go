@@ -1,13 +1,15 @@
 package main
 
 import (
-	"net/http"
 	// _ "net/http/pprof"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/api"
 	"github.com/elgatito/elementum/bittorrent"
@@ -17,7 +19,6 @@ import (
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("main")

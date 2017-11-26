@@ -23,8 +23,10 @@ var log = logging.MustGetLogger("memory")
 
 // Cache main object
 type Cache struct {
-	mu sync.Mutex
+	Type int
+	mu   sync.Mutex
 
+	running  bool
 	capacity int64
 
 	pieceCount    int
@@ -145,6 +147,10 @@ func (c *Cache) Info() (ret CacheInfo) {
 
 // Close proxies Close from storage engine
 func (c *Cache) Close() error {
+	if !c.running {
+		return nil
+	}
+
 	c.Stop()
 
 	return nil
@@ -156,7 +162,7 @@ func (c *Cache) RemovePiece(idx int) {
 
 	if idx < len(c.pieces) && c.pieces[idx].Position != -1 {
 		go func() {
-			delay := time.NewTicker(100 * time.Millisecond)
+			delay := time.NewTicker(150 * time.Millisecond)
 			defer delay.Stop()
 
 			for {
@@ -167,8 +173,6 @@ func (c *Cache) RemovePiece(idx int) {
 				}
 			}
 		}()
-
-		// c.remove(idx)
 	}
 }
 
@@ -187,6 +191,7 @@ func (c *Cache) SyncPieces(active map[int]bool) {
 func (c *Cache) Start() {
 	log.Debugf("StorageStart")
 
+	c.running = true
 	c.closing = make(chan struct{}, 1)
 	progressTicker := time.NewTicker(1 * time.Second)
 
@@ -209,6 +214,7 @@ func (c *Cache) Start() {
 			// log.Debugf("Memory: %s, %s, %s, %s", humanize.Bytes(m.HeapSys), humanize.Bytes(m.HeapAlloc), humanize.Bytes(m.HeapIdle), humanize.Bytes(m.HeapReleased))
 
 		case <-c.closing:
+			c.running = false
 			return
 
 		}
@@ -227,67 +233,9 @@ func (c *Cache) Stop() {
 	c.buffers = nil
 	c.pieces = nil
 	c.positions = nil
-	// c.piecesIdx = map[key]int{}
 
 	debug.FreeOSMemory()
 }
-
-// func (c *Cache) ReadAt(pi int, b []byte, off int64) (int, error) {
-// 	buf, err := c.OpenBuffer(pi, false)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-//
-// 	return buf.ReadAt(b, off)
-// }
-//
-// func (c *Cache) WriteAt(pi int, b []byte, off int64) (n int, err error) {
-// 	buf, err := c.OpenBuffer(pi, true)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-//
-// 	return buf.WriteAt(b, off)
-// }
-
-// func (c *Cache) OpenBuffer(pi int, iswrite bool) (ret *Buffer, err error) {
-// 	c.mu.Lock()
-// 	defer c.mu.Unlock()
-//
-// 	if pi >= len(c.pieces) {
-// 		return nil, errors.New("Piece index not valid")
-// 	}
-//
-// 	if !c.pieces[pi].Active && iswrite {
-// 		for index, v := range c.positions {
-// 			if v.Used {
-// 				continue
-// 			}
-//
-// 			v.Used = true
-// 			v.Index = pi
-//
-// 			c.pieces[pi].Position = index
-// 			c.pieces[pi].Active = true
-// 			c.pieces[pi].Size = 0
-// 			c.pieces[pi].Modified = time.Now()
-//
-// 			break
-// 		}
-//
-// 		if !c.pieces[pi].Active {
-// 			log.Debugf("Buffer not assigned: %#v", c.positions)
-// 			return nil, errors.New("Could not assign buffer")
-// 		}
-// 	}
-//
-// 	ret = &Buffer{
-// 		c: c,
-// 		p: c.pieces[pi],
-// 	}
-//
-// 	return
-// }
 
 func (c *Cache) remove(pi int) {
 	// Don't allow to delete first piece, it's used everywhere
@@ -295,7 +243,7 @@ func (c *Cache) remove(pi int) {
 		return
 	}
 
-	log.Debugf("Removing element: %#v", pi)
+	// log.Debugf("Removing element: %#v", pi)
 
 	if c.pieces[pi].Position != -1 {
 		c.positions[c.pieces[pi].Position].Used = false
