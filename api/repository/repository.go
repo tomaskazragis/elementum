@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
+	// githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
+	githubUserContentURL = "http://%s.github.io/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
 
@@ -67,14 +68,14 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
-	_, lastReleaseBranch := getLastRelease(user, "plugin.video.elementum")
-	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.elementum", lastReleaseBranch) + "/addon.xml")
+	// _, lastReleaseBranch := getLastRelease(user, "plugin.video.elementum")
+	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.elementum") + "/addon.xml")
 	if err == nil && resp.StatusCode != 200 {
 		err = errors.New(resp.Status)
 	}
 
-	_, lastReleaseBranch = getLastRelease(user, "script.elementum.burst")
-	respBurst, errBurst := http.Get(fmt.Sprintf(githubUserContentURL, user, "script.elementum.burst", lastReleaseBranch) + "/addon.xml")
+	// _, lastReleaseBranch = getLastRelease(user, "script.elementum.burst")
+	respBurst, errBurst := http.Get(fmt.Sprintf(githubUserContentURL, user, "script.elementum.burst") + "/addon.xml")
 	if errBurst == nil && respBurst.StatusCode != 200 {
 		errBurst = errors.New(respBurst.Status)
 	}
