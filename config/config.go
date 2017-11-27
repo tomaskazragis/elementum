@@ -49,6 +49,8 @@ type Configuration struct {
 	// SeedTimeRatioLimit  int
 	SeedTimeLimit int
 	DisableDHT    bool
+	DisableTCP    bool
+	DisableUTP    bool
 	// DisableUPNP         bool
 	EncryptionPolicy   int
 	BTListenPortMin    int
@@ -139,7 +141,7 @@ func Reload() *Configuration {
 		}
 	}
 
-	downloadPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("download_path")))
+	downloadPath := filepath.Dir(TranslatePath(xbmc.GetSettingString("download_path")))
 	if downloadPath == "." {
 		xbmc.Dialog("Elementum", "LOCALIZE[30113]")
 		xbmc.AddonSettings("plugin.video.elementum")
@@ -155,7 +157,7 @@ func Reload() *Configuration {
 	}
 	log.Infof("Using download path: %s", downloadPath)
 
-	libraryPath := filepath.Dir(xbmc.TranslatePath(xbmc.GetSettingString("library_path")))
+	libraryPath := filepath.Dir(TranslatePath(xbmc.GetSettingString("library_path")))
 	if libraryPath == "." {
 		libraryPath = downloadPath
 	} else if err := IsWritablePath(libraryPath); err != nil {
@@ -250,6 +252,8 @@ func Reload() *Configuration {
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit: settings["seed_time_limit"].(int),
 		DisableDHT:    settings["disable_dht"].(bool),
+		DisableTCP:    settings["disable_tcp"].(bool),
+		DisableUTP:    settings["disable_utp"].(bool),
 		// DisableUPNP:         settings["disable_upnp"].(bool),
 		EncryptionPolicy:   settings["encryption_policy"].(int),
 		BTListenPortMin:    settings["listen_port_min"].(int),
@@ -322,6 +326,15 @@ func AddonIcon() string {
 
 func AddonResource(args ...string) string {
 	return filepath.Join(Get().Info.Path, "resources", filepath.Join(args...))
+}
+
+func TranslatePath(path string) string {
+	// Do not translate nfs/smb path
+	if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
+		return path
+	} else {
+		return xbmc.TranslatePath(xbmc.GetSettingString("download_path"))
+	}
 }
 
 func IsWritablePath(path string) error {

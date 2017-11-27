@@ -93,6 +93,8 @@ type BTConfiguration struct {
 	ConnectionsLimit    int
 	SeedTimeLimit       int
 	DisableDHT          bool
+	DisableTCP          bool
+	DisableUTP          bool
 	EncryptionPolicy    int
 	LowerListenPort     int
 	UpperListenPort     int
@@ -349,7 +351,8 @@ func (s *BTService) configure() {
 		ListenAddr: listenInterfacesStrings[0],
 		Debug:      true,
 
-		DisableUTP: true,
+		DisableTCP: s.config.DisableTCP,
+		DisableUTP: s.config.DisableUTP,
 
 		NoDHT: s.config.DisableDHT,
 		DHTConfig: dht.ServerConfig{
