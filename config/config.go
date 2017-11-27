@@ -141,7 +141,7 @@ func Reload() *Configuration {
 		}
 	}
 
-	downloadPath := filepath.Dir(TranslatePath(xbmc.GetSettingString("download_path")))
+	downloadPath := TranslatePath(xbmc.GetSettingString("download_path"))
 	if downloadPath == "." {
 		xbmc.Dialog("Elementum", "LOCALIZE[30113]")
 		xbmc.AddonSettings("plugin.video.elementum")
@@ -157,7 +157,7 @@ func Reload() *Configuration {
 	}
 	log.Infof("Using download path: %s", downloadPath)
 
-	libraryPath := filepath.Dir(TranslatePath(xbmc.GetSettingString("library_path")))
+	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
 	if libraryPath == "." {
 		libraryPath = downloadPath
 	} else if err := IsWritablePath(libraryPath); err != nil {
@@ -330,10 +330,13 @@ func AddonResource(args ...string) string {
 
 func TranslatePath(path string) string {
 	// Do not translate nfs/smb path
-	if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
+	if strings.HasPrefix(path, "nfs:") || strings.HasPrefix(path, "smb:") {
+		if !strings.HasSuffix(path, "/") {
+			path += "/"
+		}
 		return path
 	} else {
-		return xbmc.TranslatePath(xbmc.GetSettingString("download_path"))
+		return filepath.Dir(xbmc.TranslatePath(path))
 	}
 }
 
