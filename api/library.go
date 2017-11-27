@@ -1200,6 +1200,15 @@ func UpdateLibrary(ctx *gin.Context) {
 	}
 }
 
+func UpdateTrakt(ctx *gin.Context) {
+	if err := doSyncTrakt(); err != nil {
+		ctx.String(200, err.Error())
+	}
+	if xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+		xbmc.VideoLibraryScan()
+	}
+}
+
 func CloseLibrary() {
 	libraryLog.Info("Closing library...")
 	close(closing)

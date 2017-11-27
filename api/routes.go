@@ -2,19 +2,19 @@ package api
 
 import (
 	"fmt"
-	"path"
-	"time"
-	"net/url"
 	"net/http"
+	"net/url"
+	"path"
 	"path/filepath"
+	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/api/repository"
+	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/providers"
-	"github.com/elgatito/elementum/bittorrent"
-	"github.com/elgatito/elementum/api/repository"
+	"github.com/elgatito/elementum/util"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -44,7 +44,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		web.GET("/", func(c *gin.Context) {
 			c.HTML(http.StatusOK, "index.html", nil)
 		})
-	  web.Static("/static", filepath.Join(config.Get().Info.Path, "resources", "web", "static"))
+		web.Static("/static", filepath.Join(config.Get().Info.Path, "resources", "web", "static"))
 		web.StaticFile("/favicon.ico", filepath.Join(config.Get().Info.Path, "resources", "web", "favicon.ico"))
 	}
 
@@ -225,6 +225,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	trakt := r.Group("/trakt")
 	{
 		trakt.GET("/authorize", AuthorizeTrakt)
+		trakt.GET("/update", UpdateTrakt)
 	}
 
 	r.GET("/setviewmode/:content_type", SetViewMode)
