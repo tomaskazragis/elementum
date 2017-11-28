@@ -164,10 +164,14 @@ func (c *Cache) Info() (ret CacheInfo) {
 
 // Close proxies Close from storage engine
 func (c *Cache) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if !c.running {
 		return nil
 	}
 
+	c.running = false
 	c.Stop()
 
 	return nil
