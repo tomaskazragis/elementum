@@ -342,6 +342,8 @@ func (s *BTService) configure() {
 		s.DefaultStorage = memory.NewMemoryStorage(memSize)
 	} else if s.config.DownloadStorage == estorage.StorageFat32 {
 		s.DefaultStorage = estorage.NewFat32Storage(config.Get().DownloadPath)
+	} else if s.config.DownloadStorage == estorage.StorageMMap {
+		s.DefaultStorage = estorage.NewMMapStorage(config.Get().DownloadPath, s.PieceCompletion)
 	} else {
 		s.DefaultStorage = estorage.NewFileStorage(config.Get().DownloadPath, s.PieceCompletion)
 	}

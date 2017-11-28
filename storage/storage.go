@@ -10,6 +10,7 @@ const (
 	StorageFile = iota
 	StorageMemory
 	StorageFat32
+	StorageMMap
 )
 
 type ElementumStorage interface {
@@ -35,6 +36,10 @@ func NewFat32Storage(path string) ElementumStorage {
 
 func NewFileStorage(path string, pc storage.PieceCompletion) ElementumStorage {
 	return &DummyStorage{storage.NewFileWithCompletion(path, pc), StorageFile, 0}
+}
+
+func NewMMapStorage(path string, pc storage.PieceCompletion) ElementumStorage {
+	return &DummyStorage{storage.NewMMapWithCompletion(path, pc), StorageMMap, 0}
 }
 
 func (me *DummyStorage) Start()                    {}
