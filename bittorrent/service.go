@@ -25,7 +25,8 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	estorage "github.com/elgatito/elementum/storage"
-	memory "github.com/elgatito/elementum/storage/memory_v2"
+	// memory "github.com/elgatito/elementum/storage/memory_v2"
+	memory "github.com/elgatito/elementum/storage/memory_v3"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -236,7 +237,7 @@ func (s *BTService) configure() {
 	s.log.Info("Configuring client...")
 
 	var listenPorts []string
-	for p := s.config.LowerListenPort; p <= s.config.UpperListenPort; p++ {
+	for p := s.config.UpperListenPort; p >= s.config.LowerListenPort; p-- {
 		ln, err := net.Listen("tcp", ":"+strconv.Itoa(p))
 		if err != nil {
 			continue
@@ -330,7 +331,7 @@ func (s *BTService) configure() {
 		s.config.SeedTimeLimit = 0
 
 		memSize := int64(config.Get().MemorySize)
-		needSize := s.config.BufferSize + endBufferSize + 5*1024*1024
+		needSize := s.config.BufferSize + endBufferSize + 6*1024*1024
 
 		if memSize < needSize {
 			s.log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
@@ -344,6 +345,7 @@ func (s *BTService) configure() {
 	} else {
 		s.DefaultStorage = estorage.NewFileStorage(config.Get().DownloadPath, s.PieceCompletion)
 	}
+	s.DefaultStorage.SetReadaheadSize(s.GetBufferSize())
 
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
@@ -883,16 +885,6 @@ func (s *BTService) GetMemorySize() int64 {
 	return s.config.MemorySize
 }
 
-func (s *BTService) GetReadaheadSize() int64 {
-	if s.config.DownloadStorage == estorage.StorageMemory {
-		// return s.GetMemorySize()
-		// return int64(float64(s.GetMemorySize()) * 0.5)
-		return int64(float64(s.GetMemorySize()) * 0.8)
-	} else {
-		return s.GetBufferSize()
-	}
-}
-
 func (s *BTService) GetStorageType() int {
 	return s.config.DownloadStorage
 }
@@ -900,13 +892,15 @@ func (s *BTService) GetStorageType() int {
 func (s *BTService) PlayerStop() {
 	log.Debugf("PlayerStop")
 
-	s.DefaultStorage.Stop()
+	// if s.config.DownloadStorage == estorage.StorageMemory {
+	// 	s.DefaultStorage.Close()
+	// }
 }
 
 func (s *BTService) PlayerSeek() {
 	log.Debugf("PlayerSeek")
 
-	for _, t := range s.Torrents {
-		go t.SeekEvent()
-	}
+	// for _, t := range s.Torrents {
+	// 	go t.SeekEvent()
+	// }
 }

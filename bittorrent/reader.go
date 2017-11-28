@@ -12,8 +12,7 @@ type Reader struct {
 	*gotorrent.File
 	*Torrent
 
-	id     int32
-	curPos int64
+	id int32
 }
 
 func (t *Torrent) NewReader(f *gotorrent.File, isget bool) *Reader {

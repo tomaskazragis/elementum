@@ -19,7 +19,7 @@ import (
 	// "encoding/base32"
 	"path/filepath"
 
-	"github.com/anacrolix/missinggo/pubsub"
+	// "github.com/anacrolix/missinggo/pubsub"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/op/go-logging"
 	// "github.com/dustin/go-humanize"
@@ -63,8 +63,7 @@ type Torrent struct {
 	*gotorrent.Torrent
 	readers []*Reader
 
-	bufferReader *Reader
-	postReader   *Reader
+	bufferReaders []*Reader
 
 	ChosenFiles []*gotorrent.File
 	TorrentPath string
@@ -77,6 +76,7 @@ type Torrent struct {
 	BufferLength         int64
 	BufferProgress       float64
 	BufferPiecesProgress map[int]float64
+	BufferEndPieces      []int
 
 	IsPlaying   bool
 	IsPaused    bool
@@ -104,7 +104,7 @@ type Torrent struct {
 	dbidTries      int
 
 	pieceLength float64
-	pieceChange *pubsub.Subscription
+	// pieceChange *pubsub.Subscription
 
 	closing        chan struct{}
 	bufferFinished chan struct{}
@@ -122,9 +122,11 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		Torrent:     handle,
 		TorrentPath: path,
 
+		bufferReaders:        []*Reader{},
 		readers:              []*Reader{},
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
+		BufferEndPieces:      []int{},
 
 		needSeeding: true,
 		needDBID:    true,
@@ -161,7 +163,7 @@ func (t *Torrent) Watch() {
 	t.dbidTries = 0
 
 	t.pieceLength = float64(t.Torrent.Info().PieceLength)
-	t.pieceChange = t.Torrent.SubscribePieceStateChanges()
+	// t.pieceChange = t.Torrent.SubscribePieceStateChanges()
 
 	// defer t.pieceChange.Close()
 	defer t.progressTicker.Stop()
@@ -172,8 +174,8 @@ func (t *Torrent) Watch() {
 
 	for {
 		select {
-		case _i, ok := <-t.pieceChange.Values:
-			go t.pieceChangeEvent(_i, ok)
+		// case _i, ok := <-t.pieceChange.Values:
+		// 	go t.pieceChangeEvent(_i, ok)
 
 		case <-t.bufferTicker.C:
 			go t.bufferTickerEvent()
@@ -182,7 +184,7 @@ func (t *Torrent) Watch() {
 			go t.bufferFinishedEvent()
 
 		case <-t.progressTicker.C:
-			go t.progressTickerEvent()
+			go t.progressEvent()
 
 		case <-t.seedTicker.C:
 			go t.seedTickerEvent()
@@ -257,46 +259,54 @@ func (t *Torrent) SeekEvent() {
 	}
 
 	// Closing existing readers, except the last which is a new one
-	for len(t.readers) > 1 {
-		t.readers[0].Close()
-	}
-
-	go t.SyncPieces()
-}
-
-func (t *Torrent) SyncPieces() {
-	active := map[int]bool{}
-
-	for i := 0; i < t.Torrent.NumPieces(); i++ {
-		st := t.Torrent.PieceState(i)
-		if st.Priority != 0 {
-			active[i] = true
-		}
-	}
-
-	t.Storage.SyncPieces(active)
-}
-
-func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
-	// if !t.IsPlaying || !t.IsOnlyReader || len(t.readers) > 1 || !ok {
-	// 	return
+	// for len(t.readers) > 1 {
+	// 	t.readers[0].Close()
 	// }
-	if !t.IsPlaying || !ok {
-		return
-	}
-	pc := _i.(gotorrent.PieceStateChange)
-	// if t.IsPlaying {
-	// 	log.Debugf("PieceChange: %#v == %#v", pc.Index, pc.Priority)
-	// }
-	if pc.PieceState.Priority == gotorrent.PiecePriorityNone {
-		go func() {
-			t.Storage.RemovePiece(pc.Index)
-			// t.Torrent.UpdatePieceCompletion(pc.Index)
-		}()
-	}
+
+	// go t.SyncPieces()
 }
 
-func (t *Torrent) progressTickerEvent() {
+func (t *Torrent) CleanupBuffer() {
+	for _, v := range t.BufferEndPieces {
+		t.Storage.RemovePiece(v)
+	}
+
+	t.BufferEndPieces = []int{}
+}
+
+// func (t *Torrent) SyncPieces() {
+// 	active := map[int]bool{}
+//
+// 	for i := 0; i < t.Torrent.NumPieces(); i++ {
+// 		st := t.Torrent.PieceState(i)
+// 		if st.Priority != 0 {
+// 			active[i] = true
+// 		}
+// 	}
+//
+// 	t.Storage.SyncPieces(active)
+// }
+
+// func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
+// 	// if !t.IsPlaying || !t.IsOnlyReader || len(t.readers) > 1 || !ok {
+// 	// 	return
+// 	// }
+// 	if !t.IsPlaying || !ok {
+// 		return
+// 	}
+// 	pc := _i.(gotorrent.PieceStateChange)
+// 	// if t.IsPlaying {
+// 	// 	log.Debugf("PieceChange: %#v == %#v", pc.Index, pc.Priority)
+// 	// }
+// 	if pc.PieceState.Priority == gotorrent.PiecePriorityNone {
+// 		go func() {
+// 			t.Storage.RemovePiece(pc.Index)
+// 			// t.Torrent.UpdatePieceCompletion(pc.Index)
+// 		}()
+// 	}
+// }
+
+func (t *Torrent) progressEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 	// for i := 0; i < 10; i++ {
 	// 	log.Debugf("Progress Piece: %d, %#v", i, t.PieceState(i))
@@ -330,7 +340,7 @@ func (t *Torrent) progressTickerEvent() {
 	// 	// }
 	// }
 	// str += "\n"
-	// for i := t.Torrent.NumPieces() - 50; i < t.Torrent.NumPieces(); i++ {
+	// for i := 0; i < 40; i++ {
 	// 	st := t.Torrent.PieceState(i)
 	// 	// if st.Priority > 0 {
 	// 	str += fmt.Sprintf("%d:%d  ", i, st.Priority)
@@ -387,14 +397,12 @@ func (t *Torrent) bufferFinishedEvent() {
 	t.bufferTicker.Stop()
 	t.Service.RestoreLimits()
 
-	if t.bufferReader != nil {
-		t.bufferReader.Close()
-		t.bufferReader = nil
+	for _, r := range t.bufferReaders {
+		if r != nil {
+			r.Close()
+		}
 	}
-	if t.postReader != nil {
-		t.postReader.Close()
-		t.postReader = nil
-	}
+	t.bufferReaders = []*Reader{}
 }
 
 func (t *Torrent) dbidEvent() {
@@ -436,64 +444,119 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 		return
 	}
 
-	pieceLength := file.Torrent().Info().PieceLength
-	bufferPieces := int64(math.Ceil(float64(t.Service.GetBufferSize()) / float64(pieceLength)))
-
-	startPiece, endPiece, _ := t.getFilePiecesAndOffset(file)
-
-	endBufferPiece := startPiece + bufferPieces - 1
-	endBufferLength := bufferPieces * int64(pieceLength)
-
-	// postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - 5*1024*1024)
-	postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - endBufferSize)
-	// postBufferOffset := postBufferPiece * int64(pieceLength)
-	postBufferLength := (endPiece - postBufferPiece + 1) * int64(pieceLength)
+	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file, 0, t.Service.GetBufferSize())
+	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file, file.Length()-endBufferSize, endBufferSize)
 
 	t.muBuffer.Lock()
 	t.IsBuffering = true
 	t.BufferProgress = 0
-	t.BufferLength = endBufferLength + postBufferLength
+	t.BufferLength = preBufferSize + postBufferSize
 
-	for i := startPiece; i <= endBufferPiece; i++ {
+	for i := preBufferStart; i <= preBufferEnd; i++ {
 		t.BufferPiecesProgress[int(i)] = 0
 	}
-	for i := postBufferPiece; i <= endPiece; i++ {
+	for i := postBufferStart; i <= postBufferEnd; i++ {
 		t.BufferPiecesProgress[int(i)] = 0
+		t.BufferEndPieces = append(t.BufferEndPieces, int(i))
 	}
-
-	// if t.Service.GetStorageType() == StorageMemory {
-	// 	log.Debug("Sending event for initializing memory storage")
-	// 	t.Service.bufferEvents <- len(t.BufferPiecesProgress)
-	// }
 
 	t.muBuffer.Unlock()
 
-	log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v, Offset: %#v ", file.DisplayPath(), t.Service.GetBufferSize(), startPiece, endBufferPiece, postBufferPiece, endPiece, pieceLength, endBufferLength, file.Offset())
+	// log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v ", file.DisplayPath(), t.Service.GetBufferSize(), startPiece, endBufferPiece, postBufferPiece, endPiece, pieceLength, endBufferLength, postBufferLength, file.Offset())
+	log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v ", file.DisplayPath(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset)
 
 	t.Service.SetBufferingLimits()
 
-	t.bufferReader = t.NewReader(file, false)
-	t.bufferReader.Seek(file.Offset(), io.SeekStart)
-	t.bufferReader.SetReadahead(endBufferLength)
-	// t.bufferReader.Seek(file.Offset(), os.SEEK_SET)
+	t.bufferReaders = append(t.bufferReaders, t.NewReader(file, false))
+	t.bufferReaders[0].Seek(preBufferOffset, io.SeekStart)
+	t.bufferReaders[0].SetReadahead(preBufferSize)
 
-	t.postReader = t.NewReader(file, false)
-	t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, io.SeekStart)
-	t.postReader.SetReadahead(postBufferLength)
-	// t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
+	t.bufferReaders = append(t.bufferReaders, t.NewReader(file, false))
+	t.bufferReaders[1].Seek(postBufferOffset, io.SeekStart)
+	t.bufferReaders[1].SetReadahead(postBufferSize)
+
+	// pieceLength := file.Torrent().Info().PieceLength
+	// bufferPieces := int64(math.Ceil(float64(t.Service.GetBufferSize()) / float64(pieceLength)))
+	//
+	// startPiece, endPiece, _ := t.getFilePiecesAndOffset(file)
+	//
+	// endBufferPiece := startPiece + bufferPieces - 1
+	// endBufferLength := bufferPieces * int64(pieceLength)
+	//
+	// // postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - 5*1024*1024)
+	// postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - endBufferSize)
+	// // postBufferOffset := postBufferPiece * int64(pieceLength)
+	// postBufferLength := (endPiece - postBufferPiece + 1) * int64(pieceLength)
+	//
+	// t.muBuffer.Lock()
+	// t.IsBuffering = true
+	// t.BufferProgress = 0
+	// t.BufferLength = endBufferLength + postBufferLength
+	//
+	// for i := startPiece; i <= endBufferPiece; i++ {
+	// 	t.BufferPiecesProgress[int(i)] = 0
+	// }
+	// for i := postBufferPiece; i <= endPiece; i++ {
+	// 	t.BufferPiecesProgress[int(i)] = 0
+	// }
+	//
+	// // if t.Service.GetStorageType() == StorageMemory {
+	// // 	log.Debug("Sending event for initializing memory storage")
+	// // 	t.Service.bufferEvents <- len(t.BufferPiecesProgress)
+	// // }
+	//
+	// t.muBuffer.Unlock()
+	//
+	// log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v ", file.DisplayPath(), t.Service.GetBufferSize(), startPiece, endBufferPiece, postBufferPiece, endPiece, pieceLength, endBufferLength, postBufferLength, file.Offset())
+	//
+	// t.Service.SetBufferingLimits()
+	//
+	// t.bufferReader = t.NewReader(file, false)
+	// t.bufferReader.Seek(file.Offset(), io.SeekStart)
+	// t.bufferReader.SetReadahead(endBufferLength)
+	// // t.bufferReader.Seek(file.Offset(), os.SEEK_SET)
+	//
+	// t.postReader = t.NewReader(file, false)
+	// t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, io.SeekStart)
+	// t.postReader.SetReadahead(postBufferLength)
+	// // t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
 }
 
-func (t *Torrent) pieceFromOffset(offset int64) (int64, int64) {
+// func (t *Torrent) pieceFromOffset(offset int64) (int64, int64) {
+// 	pieceLength := int64(t.Info().PieceLength)
+// 	piece := offset / pieceLength
+// 	pieceOffset := offset % pieceLength
+// 	return piece, pieceOffset
+// }
+//
+// func (t *Torrent) getFilePiecesAndOffset(f *gotorrent.File) (int64, int64, int64) {
+// 	startPiece, offset := t.pieceFromOffset(f.Offset())
+// 	endPiece, _ := t.pieceFromOffset(f.Offset() + f.Length())
+// 	return startPiece, endPiece, offset
+// }
+//
+func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiece, endPiece int, offset, size int64) {
 	pieceLength := int64(t.Info().PieceLength)
-	piece := offset / pieceLength
-	pieceOffset := offset % pieceLength
-	return piece, pieceOffset
-}
 
-func (t *Torrent) getFilePiecesAndOffset(f *gotorrent.File) (int64, int64, int64) {
-	startPiece, offset := t.pieceFromOffset(f.Offset())
-	endPiece, _ := t.pieceFromOffset(f.Offset() + f.Length())
-	return startPiece, endPiece, offset
+	offsetStart := f.Offset() + off
+	startPiece = int(offsetStart / pieceLength)
+	pieceOffset := offsetStart % pieceLength
+	offset = offsetStart - pieceOffset
+
+	offsetEnd := offset + length
+	pieceOffsetEnd := offsetEnd % pieceLength
+	endPiece = int(math.Ceil(float64(offsetEnd) / float64(pieceLength)))
+	if pieceOffsetEnd == 0 {
+		endPiece--
+	}
+
+	size = int64(endPiece-startPiece+1) * pieceLength
+
+	if size+offset > f.Torrent().Length() {
+		size = f.Torrent().Length() - offset
+	}
+
+	return
 }
 
 func (t *Torrent) GetState() int {
@@ -621,6 +684,12 @@ func (t *Torrent) Drop(removeFiles bool) {
 	}
 
 	t.closing <- struct{}{}
+
+	for _, r := range t.readers {
+		if r != nil {
+			r.Close()
+		}
+	}
 	t.Torrent.Drop()
 
 	if removeFiles {
@@ -631,6 +700,10 @@ func (t *Torrent) Drop(removeFiles bool) {
 				os.Remove(path)
 			}
 		}
+	}
+
+	if t.Service.config.DownloadStorage == estorage.StorageMemory {
+		t.Storage.Close()
 	}
 }
 

@@ -20,13 +20,14 @@ import (
 
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
+	estorage "github.com/elgatito/elementum/storage"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
 	// endBufferSize      int64 = 10 * 1024 * 1024 // 10mb
-	endBufferSize    int64 = 5 * 1024 * 1024 // 5mb
+	endBufferSize    int64 = 5400276 // ~5.5mb
 	playbackMaxWait        = 30 * time.Second
 	minCandidateSize       = 100 * 1024 * 1024
 )
@@ -429,7 +430,7 @@ func (btp *BTPlayer) Close() {
 		}
 	}
 
-	if keepDownloading == false || deleteAnswer == true || btp.notEnoughSpace {
+	if keepDownloading == false || deleteAnswer == true || btp.notEnoughSpace || btp.bts.config.DownloadStorage == estorage.StorageMemory {
 		// Delete torrent file
 		if len(btp.torrentFile) > 0 {
 			if _, err := os.Stat(btp.torrentFile); err == nil {
@@ -622,7 +623,8 @@ playbackWaitLoop:
 		trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
 	}
 
-	go btp.Torrent.SyncPieces()
+	go btp.Torrent.CleanupBuffer()
+	// go btp.Torrent.SyncPieces()
 	btp.Torrent.IsPlaying = true
 
 playbackLoop:

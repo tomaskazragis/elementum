@@ -1,16 +1,16 @@
 package bittorrent
 
 import (
-	"net"
-	"time"
 	"bufio"
 	"bytes"
-	"errors"
-	"strings"
-	"net/url"
-	"math/rand"
-	"encoding/hex"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"math/rand"
+	"net"
+	"net/url"
+	"strings"
+	"time"
 )
 
 const (
@@ -175,7 +175,7 @@ func (tracker *Tracker) Scrape(torrents []*TorrentFile) []ScrapeResponseEntry {
 		infoHashes = append(infoHashes, bhash)
 	}
 
-	for i := 0; i <= len(infoHashes) / maxScrapedHashes; i++ {
+	for i := 0; i <= len(infoHashes)/maxScrapedHashes; i++ {
 		idx := i * maxScrapedHashes
 		max := idx + maxScrapedHashes
 		if max > len(infoHashes) {
