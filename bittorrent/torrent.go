@@ -3,7 +3,7 @@ package bittorrent
 import (
 	// "fmt"
 	"io"
-	"math"
+	// "math"
 	"os"
 	"sync"
 	"time"
@@ -462,8 +462,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.muBuffer.Unlock()
 
-	// log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v ", file.DisplayPath(), t.Service.GetBufferSize(), startPiece, endBufferPiece, postBufferPiece, endPiece, pieceLength, endBufferLength, postBufferLength, file.Offset())
-	log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v ", file.DisplayPath(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset)
+	log.Debugf("Setting buffer for file: %s (%#v). Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v ", file.DisplayPath(), file.Length(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset)
 
 	t.Service.SetBufferingLimits()
 
@@ -543,11 +542,14 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 	pieceOffset := offsetStart % pieceLength
 	offset = offsetStart - pieceOffset
 
-	offsetEnd := offset + length
+	offsetEnd := offsetStart + length
 	pieceOffsetEnd := offsetEnd % pieceLength
-	endPiece = int(math.Ceil(float64(offsetEnd) / float64(pieceLength)))
+	endPiece = int(float64(offsetEnd) / float64(pieceLength))
 	if pieceOffsetEnd == 0 {
 		endPiece--
+	}
+	if endPiece >= t.Torrent.NumPieces() {
+		endPiece = t.Torrent.NumPieces() - 1
 	}
 
 	size = int64(endPiece-startPiece+1) * pieceLength
