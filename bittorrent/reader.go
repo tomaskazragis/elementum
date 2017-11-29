@@ -30,10 +30,10 @@ func (t *Torrent) NewReader(f *gotorrent.File, isget bool) *Reader {
 
 	if isget {
 		t.readers = append(t.readers, reader)
-		log.Debugf("Active readers: %#v", t.readers)
-		for i, r := range t.readers {
-			log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
-		}
+		log.Debugf("Active readers: %#v", len(t.readers))
+		// for i, r := range t.readers {
+		// 	log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
+		// }
 	}
 
 	return reader
