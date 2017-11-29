@@ -2,7 +2,7 @@ package main
 
 import (
 	"net/http"
-	// _ "net/http/pprof"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
