@@ -3,17 +3,17 @@ package repository
 import (
 	"bufio"
 	"context"
-	"errors"
-	"fmt"
-	"net/http"
-	"os"
-	"regexp"
-	"strings"
-	// "io/ioutil"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
@@ -24,7 +24,7 @@ import (
 
 const (
 	// githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
-	githubUserContentURL = "http://%s.github.io/%s"
+	githubUserContentURL = "http://elementum.surge.sh/packages/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )
 
@@ -38,16 +38,17 @@ func getGithubClient() *github.Client {
 	return github.NewClient(nil)
 }
 
-func getLastRelease(user string, repository string) (string, string) {
-	client := getGithubClient()
-	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
-
-	if err != nil || len(releases) == 0 {
-		return "", "master"
+func getLastRelease(user string, repository string) string {
+	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/release")
+	if err != nil || resp == nil {
+		return ""
+	} else if err == nil && resp.StatusCode != 200 {
+		return ""
 	}
+	defer resp.Body.Close()
 
-	lastRelease := releases[0]
-	return *lastRelease.TagName, *lastRelease.TargetCommitish
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	return string(bodyBytes)
 }
 
 func getReleaseByTag(user string, repository string, tagName string) *github.RepositoryRelease {
@@ -65,31 +66,31 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 	return nil
 }
 
+func getAddonXml(user string, repository string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/addon.xml")
+	if resp == nil {
+		return "", errors.New("Not found")
+	} else if err == nil && resp.StatusCode != 200 {
+		return "", errors.New(resp.Status)
+	}
+
+	defer resp.Body.Close()
+	retBytes, _ := ioutil.ReadAll(resp.Body)
+	return string(retBytes), nil
+}
+
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
-	// _, lastReleaseBranch := getLastRelease(user, "plugin.video.elementum")
-	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, "plugin.video.elementum") + "/addon.xml")
-	if err == nil && resp.StatusCode != 200 {
-		err = errors.New(resp.Status)
-	}
+	for _, repo := range []string{"plugin.video.elementum", "script.elementum.burst"} {
+		addonXml, err := getAddonXml("elgatito", repo)
+		if err != nil {
+			continue
+		}
 
-	// _, lastReleaseBranch = getLastRelease(user, "script.elementum.burst")
-	respBurst, errBurst := http.Get(fmt.Sprintf(githubUserContentURL, user, "script.elementum.burst") + "/addon.xml")
-	if errBurst == nil && respBurst.StatusCode != 200 {
-		errBurst = errors.New(respBurst.Status)
-	}
-
-	if err == nil {
 		addon := xbmc.Addon{}
-		xml.NewDecoder(resp.Body).Decode(&addon)
+		xml.Unmarshal([]byte(addonXml), &addon)
 		addons = append(addons, addon)
-	}
-
-	if errBurst == nil {
-		burst := xbmc.Addon{}
-		xml.NewDecoder(respBurst.Body).Decode(&burst)
-		addons = append(addons, burst)
 	}
 
 	return &xbmc.AddonList{
@@ -130,27 +131,7 @@ func GetAddonFiles(ctx *gin.Context) {
 	repository := ctx.Params.ByName("repository")
 	filepath := ctx.Params.ByName("filepath")[1:] // strip the leading "/"
 
-	lastReleaseTag := ""
-	if repository == "plugin.video.elementum" {
-		lastReleaseTag, _ = getLastRelease(user, repository)
-		if lastReleaseTag == "" {
-			// Get last release from addons.xml on master
-			log.Warning("Unable to find a last tag, using master.")
-			addons, err := getAddons(user, repository)
-			if err != nil || len(addons.Addons) < 1 || addons.Addons[0].Version == "" {
-				ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addon.xml file."))
-				return
-			}
-			lastReleaseTag = "v" + addons.Addons[0].Version
-		}
-	} else {
-		addons, err := getAddons(user, repository)
-		if err != nil || len(addons.Addons) < 2 || addons.Addons[1].Version == "" {
-			ctx.AbortWithError(404, errors.New("Unable to retrieve the addon.xml file."))
-			return
-		}
-		lastReleaseTag = "v" + addons.Addons[1].Version
-	}
+	lastReleaseTag := getLastRelease(user, repository)
 
 	switch filepath {
 	case "addons.xml":
