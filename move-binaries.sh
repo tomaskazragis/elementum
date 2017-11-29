@@ -5,6 +5,9 @@ cd build/
 if [ "$USER" = "travis" ]; then
 	sudo chown -R travis:travis ../
 fi
+if [ "$USER" = "jenkins" ]; then
+	sudo chown -R jenkins:jenkins ../
+fi
 
 for file in *; do
 	if [ ! -d "$file" ]; then
