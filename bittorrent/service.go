@@ -480,6 +480,8 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	if strings.HasPrefix(uri, "magnet:") {
 		if torrentHandle, err = s.Client.AddMagnet(uri); err != nil {
 			return nil, err
+		} else if torrentHandle == nil {
+			return nil, errors.New("Could not add torrent")
 		}
 		uri = ""
 	} else {
@@ -499,6 +501,8 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
 			s.log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err
+		} else if torrentHandle == nil {
+			return nil, errors.New("Could not add torrent")
 		}
 	}
 

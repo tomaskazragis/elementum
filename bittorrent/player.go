@@ -142,7 +142,7 @@ func (btp *BTPlayer) addTorrent() error {
 	}
 
 	btp.Torrent = torrent
-	if btp.Torrent == nil {
+	if btp.Torrent == nil || btp.Torrent.Torrent == nil {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.uri)
 	}
 
