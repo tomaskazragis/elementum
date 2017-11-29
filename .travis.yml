@@ -50,7 +50,7 @@ script:
   - go tool vet -unsafeptr=false .
   - make $PLATFORM
   - sudo chown -R travis:travis /home/travis/
-  - |
-    if [ "${TRAVIS_PULL_REQUEST}" = "false" ] && [ -n "${TRAVIS_TAG}" ]; then
-      travis_retry ./push-binaries.sh
-    fi
+  # - |
+  #   if [ "${TRAVIS_PULL_REQUEST}" = "false" ] && [ -n "${TRAVIS_TAG}" ]; then
+  #     travis_retry ./push-binaries.sh
+  #   fi
