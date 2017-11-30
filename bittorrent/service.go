@@ -3,6 +3,7 @@ package bittorrent
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -909,4 +910,8 @@ func (s *BTService) PlayerSeek() {
 	// for _, t := range s.Torrents {
 	// 	go t.SeekEvent()
 	// }
+}
+
+func (s *BTService) ClientInfo(w io.Writer) {
+	s.Client.WriteStatus(w)
 }

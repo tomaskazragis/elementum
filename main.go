@@ -156,6 +156,9 @@ func main() {
 	go watchParentProcess()
 
 	http.Handle("/", api.Routes(btService))
+	http.Handle("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		btService.ClientInfo(w)
+	}))
 	http.Handle("/files/", bittorrent.TorrentFSHandler(btService, config.Get().DownloadPath))
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.Reconfigure(*makeBTConfiguration(config.Reload()))
