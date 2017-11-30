@@ -38,9 +38,10 @@ func AddonSettings(addonId string) (retVal string) {
 	return
 }
 
-func AddonSettingsOpened() (retVal bool) {
+func AddonSettingsOpened() bool {
+	retVal := 0
 	executeJSONRPCEx("AddonSettingsOpened", &retVal, nil)
-	return
+	return retVal != 0
 }
 
 func AddonFailure(addonId string) (failures int) {

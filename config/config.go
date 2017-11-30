@@ -123,6 +123,25 @@ func Get() *Configuration {
 func Reload() *Configuration {
 	log.Info("Reloading configuration...")
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warningf("Addon settings not properly set, opening settings window: %#v", r)
+
+			message := "LOCALIZE[30314]"
+			if settingsWarning != "" {
+				message = settingsWarning
+			}
+
+			xbmc.AddonSettings("plugin.video.elementum")
+			xbmc.Dialog("Elementum", message)
+
+			waitForSettingsClosed()
+
+			// Custom code to say python not to report this error
+			os.Exit(5)
+		}
+	}()
+
 	info := xbmc.GetAddonInfo()
 	info.Path = xbmc.TranslatePath(info.Path)
 	info.Profile = xbmc.TranslatePath(info.Profile)
@@ -143,15 +162,15 @@ func Reload() *Configuration {
 
 	downloadPath := TranslatePath(xbmc.GetSettingString("download_path"))
 	if downloadPath == "." {
-		xbmc.Dialog("Elementum", "LOCALIZE[30113]")
-		xbmc.AddonSettings("plugin.video.elementum")
+		// xbmc.AddonSettings("plugin.video.elementum")
+		// xbmc.Dialog("Elementum", "LOCALIZE[30113]")
 		settingsWarning = "LOCALIZE[30113]"
 		panic(settingsWarning)
 		// go waitSettingsSet()
 	} else if err := IsWritablePath(downloadPath); err != nil {
 		log.Errorf("Cannot write to location '%s': %#v", downloadPath, err)
-		xbmc.Dialog("Elementum", err.Error())
-		xbmc.AddonSettings("plugin.video.elementum")
+		// xbmc.AddonSettings("plugin.video.elementum")
+		// xbmc.Dialog("Elementum", err.Error())
 		settingsWarning = err.Error()
 		panic(settingsWarning)
 	}
@@ -162,8 +181,8 @@ func Reload() *Configuration {
 		libraryPath = downloadPath
 	} else if err := IsWritablePath(libraryPath); err != nil {
 		log.Error(err)
-		xbmc.Dialog("Elementum", err.Error())
-		xbmc.AddonSettings("plugin.video.elementum")
+		// xbmc.Dialog("Elementum", err.Error())
+		// xbmc.AddonSettings("plugin.video.elementum")
 		settingsWarning = err.Error()
 		panic(settingsWarning)
 	}
@@ -202,24 +221,6 @@ func Reload() *Configuration {
 			settings[setting.Key] = setting.Value
 		}
 	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			log.Warningf("Addon settings not properly set, opening settings window: %#v", r)
-
-			message := "LOCALIZE[30314]"
-			if settingsWarning != "" {
-				message = settingsWarning
-			}
-
-			xbmc.Dialog("Elementum", message)
-			xbmc.AddonSettings("plugin.video.elementum")
-
-			waitForSettingsClosed()
-
-			os.Exit(0)
-		}
-	}()
 
 	newConfig := Configuration{
 		DownloadPath:        downloadPath,
@@ -365,7 +366,7 @@ func IsWritablePath(path string) error {
 }
 
 func waitForSettingsClosed() {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for {
