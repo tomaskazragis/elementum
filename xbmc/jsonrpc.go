@@ -1,8 +1,9 @@
 package xbmc
 
 import (
-	"net"
 	"errors"
+	"net"
+	"time"
 
 	"github.com/elgatito/elementum/jsonrpc"
 )
@@ -25,7 +26,7 @@ func getConnection(hosts ...string) (net.Conn, error) {
 	var err error
 
 	for _, host := range hosts {
-		c, err := net.Dial("tcp", host)
+		c, err := net.DialTimeout("tcp", host, time.Second*5)
 		if err == nil {
 			return c, nil
 		}

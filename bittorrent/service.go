@@ -124,14 +124,14 @@ type BTService struct {
 	// StorageEvents   *pubsub.PubSub
 	DownloadLimiter *rate.Limiter
 	UploadLimiter   *rate.Limiter
-	Torrents        []*Torrent
+	Torrents        map[string]*Torrent
 	UserAgent       string
 
 	config           *BTConfiguration
 	log              *logging.Logger
 	dialogProgressBG *xbmc.DialogProgressBG
 	SpaceChecked     map[string]bool
-	MarkedToMove     int
+	MarkedToMove     string
 
 	// closing      chan struct{}
 	// bufferEvents chan int
@@ -177,10 +177,10 @@ func NewBTService(conf BTConfiguration) *BTService {
 		config: &conf,
 
 		SpaceChecked: make(map[string]bool, 0),
-		MarkedToMove: -1,
+		MarkedToMove: "",
 		// StorageEvents: pubsub.NewPubSub(),
 
-		Torrents: []*Torrent{},
+		Torrents: map[string]*Torrent{},
 
 		// TODO: cleanup when limiting is finished
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
@@ -220,14 +220,14 @@ func NewBTService(conf BTConfiguration) *BTService {
 	return s
 }
 
-func (s *BTService) Close() {
+func (s *BTService) Close(shutdown bool) {
 	s.log.Info("Stopping BT Services...")
-	s.stopServices()
+	s.stopServices(shutdown)
 	s.Client.Close()
 }
 
 func (s *BTService) Reconfigure(config BTConfiguration) {
-	s.stopServices()
+	s.stopServices(false)
 	s.config = &config
 	s.configure()
 	s.loadTorrentFiles()
@@ -393,14 +393,21 @@ func (s *BTService) configure() {
 	}
 }
 
-func (s *BTService) stopServices() {
-	if s.dialogProgressBG != nil {
-		s.dialogProgressBG.Close()
+func (s *BTService) stopServices(shutdown bool) {
+	// TODO: cleanup these messages after windows hang is fixed
+	// Don't need to execute RPC calls when Kodi is closing
+	if !shutdown {
+		if s.dialogProgressBG != nil {
+			s.dialogProgressBG.Close()
+		}
+		s.dialogProgressBG = nil
+		s.log.Debugf("Cleaning up DialogBG")
+		xbmc.DialogProgressBGCleanup()
+		s.log.Debugf("Resetting RPC")
+		xbmc.ResetRPC()
 	}
-	s.dialogProgressBG = nil
-	xbmc.DialogProgressBGCleanup()
-	xbmc.ResetRPC()
 
+	s.log.Debugf("Closing Client")
 	if s.Client != nil {
 		s.Client.Close()
 	}
@@ -515,7 +522,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)
 	}
 
-	s.Torrents = append(s.Torrents, torrent)
+	s.Torrents[torrent.infoHash] = torrent
 
 	go torrent.Watch()
 
@@ -528,26 +535,32 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 		return false
 	}
 
-	query := torrent.InfoHash()
-	matched := -1
-	for i, t := range s.Torrents {
-		if t.InfoHash() == query {
-			matched = i
-			break
-		}
-	}
-
-	if matched > -1 {
-		t := s.Torrents[matched]
-
-		go func() {
-			t.Drop(removeFiles)
-			t = nil
-		}()
-
-		s.Torrents = append(s.Torrents[:matched], s.Torrents[matched+1:]...)
+	if t, ok := s.Torrents[torrent.infoHash]; ok {
+		delete(s.Torrents, torrent.infoHash)
+		t.Drop(removeFiles)
 		return true
 	}
+
+	// query := torrent.InfoHash()
+	// matched := -1
+	// for i := range s.Torrents {
+	// 	if s.Torrents[i] == query {
+	// 		matched = i
+	// 		break
+	// 	}
+	// }
+	//
+	// if matched > -1 {
+	// 	t := s.Torrents[matched]
+	//
+	// 	go func() {
+	// 		t.Drop(removeFiles)
+	// 		t = nil
+	// 	}()
+	//
+	// 	s.Torrents = append(s.Torrents[:matched], s.Torrents[matched+1:]...)
+	// 	return true
+	// }
 
 	return false
 }
@@ -574,7 +587,7 @@ func (s *BTService) loadTorrentFiles() {
 
 		torrent := NewTorrent(s, torrentHandle, torrentFile)
 
-		s.Torrents = append(s.Torrents, torrent)
+		s.Torrents[torrent.infoHash] = torrent
 	}
 }
 
@@ -624,8 +637,8 @@ func (s *BTService) downloadProgress() {
 					continue
 				}
 
-				if s.MarkedToMove >= 0 && i == s.MarkedToMove {
-					s.MarkedToMove = -1
+				if s.MarkedToMove != "" && i == s.MarkedToMove {
+					s.MarkedToMove = ""
 					status = STATUS_SEEDING
 				}
 

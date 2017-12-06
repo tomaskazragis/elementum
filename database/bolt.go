@@ -106,6 +106,7 @@ func NewDB() (*Database, error) {
 }
 
 func (database *Database) Close() {
+	databaseLog.Debug("Closing Database")
 	quit <- struct{}{}
 	database.db.Close()
 }

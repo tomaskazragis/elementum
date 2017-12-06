@@ -189,7 +189,10 @@ func (btp *BTPlayer) Buffer() error {
 
 	if err := <-buffered; err != nil {
 		return err.(error)
+	} else if !btp.HasChosenFile() {
+		return errors.New("File not chosen")
 	}
+
 	return nil
 }
 
@@ -292,6 +295,10 @@ func (btp *BTPlayer) statusStrings(progress float64) (string, string, string) {
 		line3 = btp.torrentName
 	}
 	return line1, line2, line3
+}
+
+func (btp *BTPlayer) HasChosenFile() bool {
+	return btp.hasChosenFile && btp.chosenFile != nil
 }
 
 func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {

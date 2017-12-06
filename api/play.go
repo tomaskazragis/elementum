@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
 )
 
 func Play(btService *bittorrent.BTService) gin.HandlerFunc {
@@ -75,19 +75,20 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		params := bittorrent.BTPlayerParams{
-			URI: uri,
+			URI:         uri,
 			FromLibrary: fromLibrary,
-			FileIndex: fileIndex,
+			FileIndex:   fileIndex,
 			ResumeIndex: resumeIndex,
 			ContentType: contentType,
-			TMDBId: tmdbId,
-			ShowID: showId,
-			Season: seasonNumber,
-			Episode: episodeNumber,
+			TMDBId:      tmdbId,
+			ShowID:      showId,
+			Season:      seasonNumber,
+			Episode:     episodeNumber,
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)
-		if player.Buffer() != nil {
+		if player.Buffer() != nil || !player.HasChosenFile() {
+			player.Close()
 			return
 		}
 
@@ -119,17 +120,16 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 			xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "uri", uri, "index", index))
 		} else {
 			var (
-				tmdb string
-				show string
-				season string
-				episode string
+				tmdb        string
+				show        string
+				season      string
+				episode     string
 				contentType string
 			)
-			resumeIndex, _ := strconv.Atoi(resume)
-			torrentHandle := btService.Client.Torrents()[resumeIndex]
+			torrentHandle := btService.Torrents[resume]
 
 			if torrentHandle != nil {
-				infoHash := torrentHandle.InfoHash().AsString()
+				infoHash := torrentHandle.Torrent.InfoHash().AsString()
 				dbItem := btService.GetDBItem(infoHash)
 				if dbItem.Type != "" {
 					contentType = dbItem.Type

@@ -137,7 +137,7 @@ func main() {
 	var shutdown = func() {
 		log.Info("Shutting down...")
 		api.CloseLibrary()
-		btService.Close()
+		btService.Close(true)
 		db.Close()
 		log.Info("Goodbye")
 		os.Exit(0)
