@@ -45,6 +45,10 @@ func (dp *DialogProgress) Close() {
 	executeJSONRPCEx("DialogProgress_Close", &retVal, Args{dp.hWnd})
 }
 
+func DialogProgressBGCleanup() {
+	retVal := -1
+	executeJSONRPCEx("DialogProgressBG_Cleanup", &retVal, Args{})
+}
 
 func NewDialogProgressBG(title, message string, translations ...string) *DialogProgressBG {
 	retVal := int64(-1)
@@ -72,7 +76,6 @@ func (dp *DialogProgressBG) Close() {
 	retVal := -1
 	executeJSONRPCEx("DialogProgressBG_Close", &retVal, Args{dp.hWnd})
 }
-
 
 func NewOverlayStatus() *OverlayStatus {
 	retVal := int64(-1)
@@ -104,7 +107,6 @@ func (ov *OverlayStatus) Close() {
 	retVal := -1
 	executeJSONRPCEx("OverlayStatus_Close", &retVal, Args{ov.hWnd})
 }
-
 
 func Notify(header string, message string, image string) {
 	var retVal string

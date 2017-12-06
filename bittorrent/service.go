@@ -398,6 +398,7 @@ func (s *BTService) stopServices() {
 		s.dialogProgressBG.Close()
 	}
 	s.dialogProgressBG = nil
+	xbmc.DialogProgressBGCleanup()
 	xbmc.ResetRPC()
 
 	if s.Client != nil {

@@ -175,6 +175,7 @@ func main() {
 			xbmc.UpdateAddonRepos()
 		}
 
+		xbmc.DialogProgressBGCleanup()
 		xbmc.ResetRPC()
 	}()
 

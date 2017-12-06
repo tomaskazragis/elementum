@@ -46,12 +46,6 @@ func (r *Reader) Close() error {
 	defer r.Torrent.mu.Unlock()
 
 	delete(r.Torrent.readers, r.id)
-	// for i := 0; i < len(r.Torrent.readers); i++ {
-	// 	if r.Torrent.readers[i].id == r.id {
-	// 		r.Torrent.readers = append(r.Torrent.readers[:i], r.Torrent.readers[i+1:]...)
-	// 		break
-	// 	}
-	// }
 
 	return r.Reader.Close()
 }

@@ -59,23 +59,16 @@ var StatusStrings = []string{
 	"Stalled",
 }
 
-type logWriter struct{ *logging.Logger }
-
-func (w logWriter) Write(b []byte) (int, error) {
-	w.Debugf("%s", b)
-	return len(b), nil
-}
-
 type Torrent struct {
 	*gotorrent.Torrent
 
+	infoHash      string
 	readers       map[int]*Reader
 	bufferReaders map[string]*Reader
 
 	ChosenFiles []*gotorrent.File
 	TorrentPath string
 
-	Storage      estorage.ElementumStorage
 	Service      *BTService
 	DownloadRate int64
 	UploadRate   int64
@@ -111,7 +104,6 @@ type Torrent struct {
 	dbidTries      int
 
 	pieceLength float64
-	// pieceChange *pubsub.Subscription
 
 	closing        chan struct{}
 	bufferFinished chan struct{}
@@ -124,7 +116,8 @@ type Torrent struct {
 
 func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Torrent {
 	t := &Torrent{
-		Storage:     service.DefaultStorage.GetTorrentStorage(handle.InfoHash().HexString()),
+		infoHash: handle.InfoHash().HexString(),
+
 		Service:     service,
 		Torrent:     handle,
 		TorrentPath: path,
@@ -153,6 +146,10 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 	return t
 }
 
+func (t *Torrent) Storage() estorage.ElementumStorage {
+	return t.Service.DefaultStorage.GetTorrentStorage(t.infoHash)
+}
+
 func (t *Torrent) Watch() {
 	// log.Debugf("Starting watch timers")
 	// debug.PrintStack()
@@ -171,9 +168,7 @@ func (t *Torrent) Watch() {
 	t.dbidTries = 0
 
 	t.pieceLength = float64(t.Torrent.Info().PieceLength)
-	// t.pieceChange = t.Torrent.SubscribePieceStateChanges()
 
-	// defer t.pieceChange.Close()
 	defer detailsTicker.Stop()
 	defer t.progressTicker.Stop()
 	defer t.bufferTicker.Stop()
@@ -183,9 +178,6 @@ func (t *Torrent) Watch() {
 
 	for {
 		select {
-		// case _i, ok := <-t.pieceChange.Values:
-		// 	go t.pieceChangeEvent(_i, ok)
-
 		case <-t.bufferTicker.C:
 			go t.bufferTickerEvent()
 
@@ -265,19 +257,6 @@ func (t *Torrent) bufferTickerEvent() {
 	t.muBuffer.Unlock()
 }
 
-func (t *Torrent) SeekEvent() {
-	if !t.IsPlaying {
-		return
-	}
-
-	// Closing existing readers, except the last which is a new one
-	// for len(t.readers) > 1 {
-	// 	t.readers[0].Close()
-	// }
-
-	// go t.SyncPieces()
-}
-
 func (t *Torrent) CleanupBuffer() {
 	// for _, v := range t.BufferEndPieces {
 	// 	t.Storage.RemovePiece(v)
@@ -285,38 +264,6 @@ func (t *Torrent) CleanupBuffer() {
 
 	t.BufferEndPieces = []int{}
 }
-
-// func (t *Torrent) SyncPieces() {
-// 	active := map[int]bool{}
-//
-// 	for i := 0; i < t.Torrent.NumPieces(); i++ {
-// 		st := t.Torrent.PieceState(i)
-// 		if st.Priority != 0 {
-// 			active[i] = true
-// 		}
-// 	}
-//
-// 	t.Storage.SyncPieces(active)
-// }
-
-// func (t *Torrent) pieceChangeEvent(_i interface{}, ok bool) {
-// 	// if !t.IsPlaying || !t.IsOnlyReader || len(t.readers) > 1 || !ok {
-// 	// 	return
-// 	// }
-// 	if !t.IsPlaying || !ok {
-// 		return
-// 	}
-// 	pc := _i.(gotorrent.PieceStateChange)
-// 	// if t.IsPlaying {
-// 	// 	log.Debugf("PieceChange: %#v == %#v", pc.Index, pc.Priority)
-// 	// }
-// 	if pc.PieceState.Priority == gotorrent.PiecePriorityNone {
-// 		go func() {
-// 			t.Storage.RemovePiece(pc.Index)
-// 			// t.Torrent.UpdatePieceCompletion(pc.Index)
-// 		}()
-// 	}
-// }
 
 func (t *Torrent) detailsEvent() {
 	// str := ""
@@ -419,7 +366,6 @@ func (t *Torrent) bufferFinishedEvent() {
 
 	t.muBuffer.Unlock()
 
-	// t.pieceChange.Close()
 	t.bufferTicker.Stop()
 	t.Service.RestoreLimits()
 
@@ -547,19 +493,6 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	// // t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
 }
 
-// func (t *Torrent) pieceFromOffset(offset int64) (int64, int64) {
-// 	pieceLength := int64(t.Info().PieceLength)
-// 	piece := offset / pieceLength
-// 	pieceOffset := offset % pieceLength
-// 	return piece, pieceOffset
-// }
-//
-// func (t *Torrent) getFilePiecesAndOffset(f *gotorrent.File) (int64, int64, int64) {
-// 	startPiece, offset := t.pieceFromOffset(f.Offset())
-// 	endPiece, _ := t.pieceFromOffset(f.Offset() + f.Length())
-// 	return startPiece, endPiece, offset
-// }
-//
 func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiece, endPiece int, offset, size int64) {
 	if off < 0 {
 		off = 0
@@ -695,7 +628,7 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
 	log.Debugf("Offset: %#v", f.Offset())
-	if t.Service.config.DownloadStorage != estorage.StorageMemory {
+	if t.Storage != nil && t.Service.config.DownloadStorage != estorage.StorageMemory {
 		f.Download()
 	}
 }
@@ -735,8 +668,8 @@ func (t *Torrent) Drop(removeFiles bool) {
 		}
 	}
 
-	if t.Service.config.DownloadStorage == estorage.StorageMemory {
-		t.Storage.Close()
+	if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
+		s.Close()
 	}
 }
 
@@ -788,18 +721,6 @@ func (t *Torrent) GetPlayingItem() *PlayingItem {
 		Duration:    VideoDuration,
 	}
 }
-
-// func (t *Torrent) CurrentPos(pos int64, f *gotorrent.File) {
-// 	// log.Debugf("CurrentPos: %#v, %#v, %#v", pos, t.IsBuffering, t.IsPlaying)
-// 	// if t.IsBuffering == false && t.IsPlaying == true {
-// 	// 	t.Service.StorageEvents.Publish(qstorage.StorageChange{
-// 	// 		InfoHash:   t.InfoHash(),
-// 	// 		Pos:        pos,
-// 	// 		FileLength: f.Length(),
-// 	// 		FileOffset: f.Offset(),
-// 	// 	})
-// 	// }
-// }
 
 func average(xs []int64) float64 {
 	var total int64

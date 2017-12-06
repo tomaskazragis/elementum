@@ -100,6 +100,10 @@ func ExistingTorrent(btService *bittorrent.BTService, longName string) (existing
 func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		items := make(xbmc.ListItems, 0, len(btService.Torrents))
+		if len(btService.Torrents) == 0 {
+			ctx.JSON(200, xbmc.NewView("", items))
+			return
+		}
 
 		torrentsLog.Info("Currently downloading:")
 		for i, torrent := range btService.Torrents {
@@ -204,6 +208,12 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		torrents := make([]*TorrentsWeb, 0, len(btService.Torrents))
+
+		if len(btService.Torrents) == 0 {
+			ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			ctx.JSON(200, torrents)
+			return
+		}
 
 		torrentsLog.Info("Currently downloading:")
 		for _, torrent := range btService.Torrents {
