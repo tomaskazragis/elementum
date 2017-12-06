@@ -628,7 +628,7 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
 	log.Debugf("Offset: %#v", f.Offset())
-	if t.Storage != nil && t.Service.config.DownloadStorage != estorage.StorageMemory {
+	if t.Storage() != nil && t.Service.config.DownloadStorage != estorage.StorageMemory {
 		f.Download()
 	}
 }
