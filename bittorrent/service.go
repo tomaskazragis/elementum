@@ -26,8 +26,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	estorage "github.com/elgatito/elementum/storage"
-	// memory "github.com/elgatito/elementum/storage/memory_v2"
-	memory "github.com/elgatito/elementum/storage/memory_v3"
+	memory "github.com/elgatito/elementum/storage/memory"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -350,6 +349,8 @@ func (s *BTService) configure() {
 	}
 	s.DefaultStorage.SetReadaheadSize(s.GetBufferSize())
 
+	// TODO: Forcing no upload for the moment
+	s.config.SeedTimeLimit = 0
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
@@ -507,6 +508,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		}
 	}
 
+	log.Debugf("Making new torrent item: %#v", uri)
 	torrent := NewTorrent(s, torrentHandle, uri)
 	if s.config.ConnectionsLimit > 0 {
 		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)

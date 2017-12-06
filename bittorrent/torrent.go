@@ -1,7 +1,7 @@
 package bittorrent
 
 import (
-	"fmt"
+	// "fmt"
 	"io"
 	// "math"
 	"os"
@@ -124,7 +124,7 @@ type Torrent struct {
 
 func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Torrent {
 	t := &Torrent{
-		Storage:     service.DefaultStorage,
+		Storage:     service.DefaultStorage.GetTorrentStorage(handle.InfoHash().HexString()),
 		Service:     service,
 		Torrent:     handle,
 		TorrentPath: path,
@@ -279,9 +279,9 @@ func (t *Torrent) SeekEvent() {
 }
 
 func (t *Torrent) CleanupBuffer() {
-	for _, v := range t.BufferEndPieces {
-		t.Storage.RemovePiece(v)
-	}
+	// for _, v := range t.BufferEndPieces {
+	// 	t.Storage.RemovePiece(v)
+	// }
 
 	t.BufferEndPieces = []int{}
 }
@@ -319,15 +319,15 @@ func (t *Torrent) CleanupBuffer() {
 // }
 
 func (t *Torrent) detailsEvent() {
-	str := ""
-	for i := 0; i < t.Torrent.NumPieces(); i++ {
-		st := t.Torrent.PieceState(i)
-		if st.Priority > 0 {
-			str += fmt.Sprintf("%d:%d  ", i, st.Priority)
-		}
-	}
-	log.Debugf("Priorities: %s  \n", str)
-	t.Service.ClientInfo(logWriter{log})
+	// str := ""
+	// for i := 0; i < t.Torrent.NumPieces(); i++ {
+	// 	st := t.Torrent.PieceState(i)
+	// 	if st.Priority > 0 {
+	// 		str += fmt.Sprintf("%d:%d  ", i, st.Priority)
+	// 	}
+	// }
+	// log.Debugf("Priorities: %s  \n", str)
+	// t.Service.ClientInfo(logWriter{log})
 }
 
 func (t *Torrent) progressEvent() {

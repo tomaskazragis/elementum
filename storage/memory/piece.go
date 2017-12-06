@@ -3,9 +3,9 @@ package memory
 import (
 	"errors"
 	"io"
-	"math"
-	"sync"
 	"time"
+	// "math"
+	// "sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/torrent/storage"
@@ -29,7 +29,6 @@ type Piece struct {
 	Accessed  time.Time
 
 	Chunks *roaring.Bitmap
-	mu     sync.Mutex
 }
 
 func (p *Piece) Completion() storage.Completion {
@@ -40,11 +39,13 @@ func (p *Piece) Completion() storage.Completion {
 }
 
 func (p *Piece) MarkComplete() error {
+	log.Debugf("Complete: %#v", p.Index)
 	p.Completed = true
 	return nil
 }
 
 func (p *Piece) MarkNotComplete() error {
+	log.Debugf("NotComplete: %#v", p.Index)
 	p.Completed = false
 	return nil
 }
@@ -84,8 +85,6 @@ func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 		}
 	}
 
-	// p.c.mu.Lock()
-	// defer p.c.mu.Unlock()
 	p.c.updateItem(p.Key, func(i *itemState, ok bool) bool {
 		if !ok {
 			*i = p.GetState()
@@ -107,36 +106,44 @@ func (p *Piece) IsPositioned() bool {
 
 // Seek File-like implementation
 func (p *Piece) Seek(offset int64, whence int) (ret int64, err error) {
+	log.Debugf("Seek lone: %#v", offset)
 	return
 }
 
 // Write File-like implementation
 func (p *Piece) Write(b []byte) (n int, err error) {
+	log.Debugf("Write lone: %#v", len(b))
 	return
 }
 
 // WriteAt File-like implementation
 func (p *Piece) WriteAt(b []byte, off int64) (n int, err error) {
+	p.c.bmu.Lock()
+
 	buf, err := p.OpenBuffer(true)
 	if err != nil || !buf {
+		log.Debugf("Can't get buffer write: %#v", p.Index)
+		p.c.bmu.Unlock()
 		return 0, err
 	}
 
-	// me.p.mu.Lock()
-	// defer me.p.mu.Unlock()
+	p.c.bmu.Unlock()
 
 	if !p.IsPositioned() {
-		log.Debugf("Not positioned: %#v", p)
+		log.Debugf("Not positioned write: %#v", p.Index)
 		return 0, errors.New("Not positioned")
 	}
+
+	p.c.buffers[p.Position].mu.Lock()
 
 	chunkId, _ := p.GetChunkForOffset(off)
 	p.Chunks.AddInt(chunkId)
 
-	n = copy(p.c.buffers[p.Position][off:], b[:])
+	n = copy(p.c.buffers[p.Position].body[off:], b[:])
 
 	p.Size += int64(n)
 	p.onWrite()
+	p.c.buffers[p.Position].mu.Unlock()
 	return
 }
 
@@ -147,22 +154,30 @@ func (p *Piece) Close() error {
 
 // Read File-like implementation
 func (p *Piece) Read(b []byte) (n int, err error) {
+	log.Debugf("Read lone: %#v", len(b))
 	return
 }
 
 // ReadAt File-like implementation
 func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
+	p.c.bmu.Lock()
+
 	buf, err := p.OpenBuffer(false)
 	if err != nil || !buf {
+		log.Debugf("No buffer read: %#v", p.Index)
+		p.c.bmu.Unlock()
 		return 0, nil
+		// return 0, io.EOF
 	}
 
-	// me.p.mu.Lock()
-	// defer me.p.mu.Unlock()
+	p.c.bmu.Unlock()
 
 	if !p.IsPositioned() {
+		log.Debugf("No position read: %#v", p.Index)
 		return 0, io.EOF
 	}
+
+	p.c.buffers[p.Position].mu.Lock()
 
 	requested := len(b)
 	startIndex, _ := p.GetChunkForOffset(off)
@@ -172,30 +187,35 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 		lastIndex = startIndex
 	}
 
+	// log.Debugf("Read: %#v: %#v, O: %#v, I: %#v-%#v", p.Index, requested, off, startIndex, lastIndex)
+
 	// me.c.mu.Lock()
 	// defer me.c.mu.Unlock()
 
 	for i := startIndex; i <= lastIndex; i++ {
 		if !p.Chunks.ContainsInt(i) {
+			log.Debugf("No contain read: %#v", p.Index)
+			p.c.buffers[p.Position].mu.Unlock()
 			return 0, io.EOF
 		}
 	}
 
-	n = copy(b, p.c.buffers[p.Position][off:][:])
+	// n = copy(b, p.c.buffers[p.Position][off:][:])
+	n = copy(b, p.c.buffers[p.Position].body[off:][:])
 	if n != requested {
+		log.Debugf("No matched read: %#v", p.Index)
+		p.c.buffers[p.Position].mu.Unlock()
 		return 0, io.EOF
 	}
 
 	p.onRead()
+	p.c.buffers[p.Position].mu.Unlock()
 	return n, nil
 }
 
 func (p *Piece) GetChunkForOffset(offset int64) (index, margin int) {
-	index = int(math.Ceil(float64(offset) / float64(CHUNK_SIZE)))
-	margin = int(math.Mod(float64(offset), float64(CHUNK_SIZE)))
-	if margin > 0 {
-		index--
-	}
+	index = int(offset / CHUNK_SIZE)
+	margin = int(offset % CHUNK_SIZE)
 
 	return
 }

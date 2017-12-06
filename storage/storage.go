@@ -16,12 +16,17 @@ const (
 type ElementumStorage interface {
 	storage.ClientImpl
 
-	Start()
-	Stop()
-	SyncPieces(map[int]bool)
-	RemovePiece(int)
+	// Start()
+	// Stop()
+	// SyncPieces(map[int]bool)
+	// RemovePiece(int)
+	GetTorrentStorage(string) TorrentStorage
 	GetReadaheadSize() int64
 	SetReadaheadSize(int64)
+}
+
+type TorrentStorage interface {
+	ElementumStorage
 }
 
 type DummyStorage struct {
@@ -42,10 +47,12 @@ func NewMMapStorage(path string, pc storage.PieceCompletion) ElementumStorage {
 	return &DummyStorage{storage.NewMMapWithCompletion(path, pc), StorageMMap, 0}
 }
 
-func (me *DummyStorage) Start()                    {}
-func (me *DummyStorage) Stop()                     {}
-func (me *DummyStorage) SyncPieces(a map[int]bool) {}
-func (me *DummyStorage) RemovePiece(idx int)       {}
+func (me *DummyStorage) Start() {}
+func (me *DummyStorage) Stop()  {}
+
+// func (me *DummyStorage) SyncPieces(a map[int]bool)                    {}
+// func (me *DummyStorage) RemovePiece(idx int)                          {}
+func (me *DummyStorage) GetTorrentStorage(hash string) TorrentStorage { return me }
 
 func (me *DummyStorage) GetReadaheadSize() int64 {
 	return me.readahead

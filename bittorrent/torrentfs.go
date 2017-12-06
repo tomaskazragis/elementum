@@ -24,7 +24,6 @@ func TorrentFSHandler(btService *BTService, downloadPath string) http.Handler {
 
 		if err == nil && entry != nil {
 			defer entry.Close()
-			// http.ServeContent(w, r, file.File.DisplayPath(), time.Now(), file)
 			http.ServeContent(w, r, entry.File.DisplayPath(), time.Now(), entry.rs)
 		} else {
 			tfsLog.Noticef("Could not find torrent for requested file %s: %#v", r.URL.Path, err)

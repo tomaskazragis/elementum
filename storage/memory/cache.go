@@ -16,16 +16,16 @@ import (
 	"github.com/anacrolix/torrent/storage"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/op/go-logging"
+
+	estorage "github.com/elgatito/elementum/storage"
 )
 
-var log = logging.MustGetLogger("memory")
-
-// Cache main object
 type Cache struct {
-	Type int
-	mu   sync.Mutex
+	s   *Storage
+	mu  sync.Mutex
+	bmu sync.Mutex
 
+	id        string
 	running   bool
 	capacity  int64
 	filled    int64
@@ -41,8 +41,13 @@ type Cache struct {
 	closing chan struct{}
 
 	bufferSize int
-	buffers    [][]byte
+	buffers    []BufferItem
 	positions  []*BufferPosition
+}
+
+type BufferItem struct {
+	mu   sync.Mutex
+	body []byte
 }
 
 type BufferPosition struct {
@@ -63,20 +68,9 @@ type itemState struct {
 	Size     int64
 }
 
-// NewMemoryStorage initializer function
-func NewMemoryStorage(maxMemorySize int64) *Cache {
-	log.Debugf("Memory: %#v", maxMemorySize)
-	c := &Cache{}
-
-	c.SetCapacity(maxMemorySize)
-
-	return c
-}
-
-// SetCapacity for cache
 func (c *Cache) SetCapacity(capacity int64) {
-	// c.mu.Lock()
-	// defer c.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	log.Debugf("Setting max memory size to %#v bytes", capacity)
 	c.capacity = capacity
@@ -90,12 +84,12 @@ func (c *Cache) SetReadaheadSize(size int64) {
 	c.readahead = size
 }
 
-// OpenTorrent proxies OpenTorrent from storage to prepare buffers for storing chunks
-func (c *Cache) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
-	c.Init(info)
-	go c.Start()
+func (c *Cache) GetTorrentStorage(hash string) estorage.TorrentStorage {
+	return nil
+}
 
-	return c, nil
+func (c *Cache) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
+	return nil, nil
 }
 
 func (c *Cache) Piece(m metainfo.Piece) storage.PieceImpl {
@@ -126,10 +120,9 @@ func (c *Cache) Init(info *metainfo.Info) {
 	if c.bufferSize > c.pieceCount {
 		c.bufferSize = c.pieceCount
 	}
-	// c.readahead = int64((c.bufferSize/2)-1) * c.pieceLength
 	c.readahead = int64(float64(c.capacity) * 0.4)
 
-	c.buffers = make([][]byte, c.bufferSize)
+	c.buffers = make([]BufferItem, c.bufferSize)
 	c.positions = make([]*BufferPosition, c.bufferSize)
 	c.pieces = map[key]*Piece{}
 
@@ -146,7 +139,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	}
 
 	for i := range c.buffers {
-		c.buffers[i] = make([]byte, c.pieceLength)
+		c.buffers[i].body = make([]byte, c.pieceLength)
 		c.positions[i] = &BufferPosition{}
 	}
 }
@@ -162,10 +155,15 @@ func (c *Cache) Info() (ret CacheInfo) {
 	return
 }
 
-// Close proxies Close from storage engine
 func (c *Cache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if _, ok := c.s.items[c.id]; ok {
+		c.s.mu.Lock()
+		defer c.s.mu.Unlock()
+		delete(c.s.items, c.id)
+	}
 
 	if !c.running {
 		return nil
@@ -185,32 +183,18 @@ func (c *Cache) RemovePiece(idx int) {
 	if _, ok := c.pieces[k]; ok {
 		c.remove(k)
 	}
-	// if idx < len(c.pieces) && c.pieces[idx].Position != -1 {
-	// 	go func() {
-	// 		delay := time.NewTicker(150 * time.Millisecond)
-	// 		defer delay.Stop()
-	//
-	// 		for {
-	// 			select {
-	// 			case <-delay.C:
-	// 				c.remove(idx)
-	// 				return
-	// 			}
-	// 		}
-	// 	}()
-	// }
 }
 
-func (c *Cache) SyncPieces(active map[int]bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// for _, v := range c.positions {
-	// 	if _, ok := active[v.Index]; v.Used && !ok {
-	// 		c.remove(v.Key)
-	// 	}
-	// }
-}
+// func (c *Cache) SyncPieces(active map[int]bool) {
+// 	c.mu.Lock()
+// 	defer c.mu.Unlock()
+//
+// 	// for _, v := range c.positions {
+// 	// 	if _, ok := active[v.Index]; v.Used && !ok {
+// 	// 		c.remove(v.Key)
+// 	// 	}
+// 	// }
+// }
 
 // Start is watching Cache statistics
 func (c *Cache) Start() {
