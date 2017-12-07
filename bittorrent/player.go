@@ -74,6 +74,7 @@ type BTPlayer struct {
 	notEnoughSpace       bool
 	bufferEvents         *broadcast.Broadcaster
 	closing              chan interface{}
+	closed               bool
 
 	DBID   int
 	DBTYPE string
@@ -409,6 +410,12 @@ func (btp *BTPlayer) findSubtitlesFile() *gotorrent.File {
 }
 
 func (btp *BTPlayer) Close() {
+	// Prevent double-closing
+	if btp.closed {
+		return
+	}
+
+	btp.closed = true
 	close(btp.closing)
 
 	isWatched := btp.IsWatched()

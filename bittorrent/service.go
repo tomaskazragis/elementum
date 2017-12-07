@@ -222,12 +222,19 @@ func NewBTService(conf BTConfiguration) *BTService {
 
 func (s *BTService) Close(shutdown bool) {
 	s.log.Info("Stopping BT Services...")
-	s.stopServices(shutdown)
-	s.Client.Close()
+	if !shutdown {
+		s.stopServices()
+	}
+
+	s.log.Debugf("Closing Client")
+	if s.Client != nil {
+		s.Client.Close()
+		s.Client = nil
+	}
 }
 
 func (s *BTService) Reconfigure(config BTConfiguration) {
-	s.stopServices(false)
+	s.stopServices()
 	s.config = &config
 	s.configure()
 	s.loadTorrentFiles()
@@ -393,23 +400,25 @@ func (s *BTService) configure() {
 	}
 }
 
-func (s *BTService) stopServices(shutdown bool) {
+func (s *BTService) stopServices() {
 	// TODO: cleanup these messages after windows hang is fixed
 	// Don't need to execute RPC calls when Kodi is closing
-	if !shutdown {
-		if s.dialogProgressBG != nil {
-			s.dialogProgressBG.Close()
-		}
-		s.dialogProgressBG = nil
-		s.log.Debugf("Cleaning up DialogBG")
-		xbmc.DialogProgressBGCleanup()
-		s.log.Debugf("Resetting RPC")
-		xbmc.ResetRPC()
+	if s.dialogProgressBG != nil {
+		s.log.Debugf("Closing existing Dialog")
+		s.dialogProgressBG.Close()
 	}
+	s.dialogProgressBG = nil
+
+	s.log.Debugf("Cleaning up all DialogBG")
+	xbmc.DialogProgressBGCleanup()
+
+	s.log.Debugf("Resetting RPC")
+	xbmc.ResetRPC()
 
 	s.log.Debugf("Closing Client")
 	if s.Client != nil {
 		s.Client.Close()
+		s.Client = nil
 	}
 }
 

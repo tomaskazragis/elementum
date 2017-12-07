@@ -11,9 +11,6 @@ import (
 	"github.com/anacrolix/torrent/storage"
 )
 
-// CHUNK_SIZE Size of Chunk, comes from anacrolix/torrent
-const CHUNK_SIZE = 1024 * 16
-
 // Piece stores meta information about buffer contents
 type Piece struct {
 	c *Cache

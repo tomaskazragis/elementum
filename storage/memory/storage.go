@@ -20,6 +20,11 @@ import (
 	estorage "github.com/elgatito/elementum/storage"
 )
 
+const (
+	CHUNK_SIZE      = 1024 * 16
+	READAHEAD_RATIO = 0.33
+)
+
 var log = logging.MustGetLogger("memory")
 
 // Cache main object

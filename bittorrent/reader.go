@@ -26,7 +26,7 @@ func (t *Torrent) NewReader(f *gotorrent.File, isget bool) *Reader {
 		id: int(rand.Int31()),
 	}
 	reader.Reader.SetReadahead(1)
-	log.Debugf("NewReader: %#v", reader)
+	log.Debugf("NewReader: %#v", reader.id)
 
 	if isget {
 		t.readers[reader.id] = reader
