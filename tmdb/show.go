@@ -1,20 +1,20 @@
 package tmdb
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"path"
-	"sync"
-	"time"
 	"runtime"
 	"strconv"
 	"strings"
-	"math/rand"
-	"encoding/json"
+	"sync"
+	"time"
 
-	"github.com/jmcvetta/napping"
-	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
 )
 
 func LogError(err error) {
@@ -31,11 +31,11 @@ func GetShowImages(showId int) *Images {
 	if err := cacheStore.Get(key, &images); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
-				"api_key": apiKey,
+				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint + "tv/" + strconv.Itoa(showId) + "/images",
+				tmdbEndpoint+"tv/"+strconv.Itoa(showId)+"/images",
 				&urlValues,
 				&images,
 				nil,
@@ -71,24 +71,24 @@ func GetShow(showId int, language string) (show *Show) {
 	if err := cacheStore.Get(key, &show); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
-				"api_key": apiKey,
+				"api_key":            apiKey,
 				"append_to_response": "credits,images,alternative_titles,translations,external_ids",
-				"language": language,
+				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint + "tv/" + strconv.Itoa(showId),
+				tmdbEndpoint+"tv/"+strconv.Itoa(showId),
 				&urlValues,
 				&show,
 				nil,
 			)
 			if err != nil {
 				switch e := err.(type) {
-					case *json.UnmarshalTypeError:
-						log.Errorf("UnmarshalTypeError: Value[%s] Type[%v] Offset[%d] for %d", e.Value, e.Type, e.Offset, showId)
-					case *json.InvalidUnmarshalError:
-						log.Errorf("InvalidUnmarshalError: Type[%v]", e.Type)
-					default:
-						log.Error(err)
+				case *json.UnmarshalTypeError:
+					log.Errorf("UnmarshalTypeError: Value[%s] Type[%v] Offset[%d] for %d", e.Value, e.Type, e.Offset, showId)
+				case *json.InvalidUnmarshalError:
+					log.Errorf("InvalidUnmarshalError: Type[%v]", e.Type)
+				default:
+					log.Error(err)
 				}
 				LogError(err)
 				xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
@@ -141,11 +141,11 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 	rateLimiter.Call(func() {
 		urlValues := napping.Params{
 			"api_key": apiKey,
-			"query": query,
-			"page": strconv.Itoa(page),
+			"query":   query,
+			"page":    strconv.Itoa(page),
 		}.AsUrlValues()
 		resp, err := napping.Get(
-			tmdbEndpoint + "search/tv",
+			tmdbEndpoint+"search/tv",
 			&urlValues,
 			&results,
 			nil,
@@ -177,7 +177,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 		genre = "all"
 	}
 	limit := ResultsPerPage * PagesAtOnce
-	pageGroup := (page - 1) * ResultsPerPage / limit + 1
+	pageGroup := (page-1)*ResultsPerPage/limit + 1
 
 	shows := make(Shows, limit)
 
@@ -188,7 +188,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 		wg := sync.WaitGroup{}
 		for p := 0; p < PagesAtOnce; p++ {
 			wg.Add(1)
-			currentPage := (pageGroup - 1) * ResultsPerPage + p + 1
+			currentPage := (pageGroup-1)*ResultsPerPage + p + 1
 			go func(p int) {
 				defer wg.Done()
 				var results *EntityList
@@ -201,7 +201,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 				urlParams := pageParams.AsUrlValues()
 				rateLimiter.Call(func() {
 					resp, err := napping.Get(
-						tmdbEndpoint + endpoint,
+						tmdbEndpoint+endpoint,
 						&urlParams,
 						&results,
 						nil,
@@ -224,7 +224,10 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 						cacheStore.Set(totalKey, totalResults, recentExpiration)
 					}
 					for s, show := range results.Results {
-						shows[p * ResultsPerPage + s] = GetShow(show.Id, params["language"])
+						if show == nil {
+							continue
+						}
+						shows[p*ResultsPerPage+s] = GetShow(show.Id, params["language"])
 					}
 				}
 			}(p)
@@ -283,13 +286,13 @@ func RecentEpisodes(genre string, language string, page int) (Shows, int) {
 	if genre == "" {
 		p = napping.Params{
 			"language":           language,
-			"air_date.gte": time.Now().UTC().AddDate(0, 0, -3).Format("2006-01-02"),
+			"air_date.gte":       time.Now().UTC().AddDate(0, 0, -3).Format("2006-01-02"),
 			"first_air_date.lte": time.Now().UTC().Format("2006-01-02"),
 		}
 	} else {
 		p = napping.Params{
 			"language":           language,
-			"air_date.gte": time.Now().UTC().AddDate(0, 0, -3).Format("2006-01-02"),
+			"air_date.gte":       time.Now().UTC().AddDate(0, 0, -3).Format("2006-01-02"),
 			"first_air_date.lte": time.Now().UTC().Format("2006-01-02"),
 			"with_genres":        genre,
 		}
@@ -318,11 +321,11 @@ func GetTVGenres(language string) []*Genre {
 	if err := cacheStore.Get(key, &genres); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
-				"api_key": apiKey,
+				"api_key":  apiKey,
 				"language": language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint + "genre/tv/list",
+				tmdbEndpoint+"genre/tv/list",
 				&urlValues,
 				&genres,
 				nil,
