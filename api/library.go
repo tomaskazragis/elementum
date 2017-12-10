@@ -240,7 +240,7 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) (ep
 	episode := tmdb.GetEpisode(tmdbShowId, seasonNumber, episodeNumber, "en")
 	noExternalIDs := fmt.Sprintf("No external IDs found for S%02dE%02d (%d)", seasonNumber, episodeNumber, tmdbShowId)
 	if episode == nil || episode.ExternalIDs == nil {
-		libraryLog.Warning(noExternalIDs)
+		libraryLog.Warning(noExternalIDs + ". No ExternalIDs")
 		return
 	}
 
@@ -250,7 +250,7 @@ func isDuplicateEpisode(tmdbShowId int, seasonNumber int, episodeNumber int) (ep
 		break
 	case TVDBScraper:
 		if episode.ExternalIDs == nil || episode.ExternalIDs.TVDBID == nil {
-			libraryLog.Warningf(noExternalIDs)
+			libraryLog.Warningf(noExternalIDs + ". No ExternalIDs for TVDB")
 			return
 		}
 		episodeId = strconv.Itoa(util.StrInterfaceToInt(episode.ExternalIDs.TVDBID))
