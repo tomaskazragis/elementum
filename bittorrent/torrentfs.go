@@ -2,44 +2,50 @@ package bittorrent
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/anacrolix/missinggo"
+	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/op/go-logging"
 )
 
-type TorrentFS struct {
-	http.Dir
-	service *BTService
-}
-
 var tfsLog = logging.MustGetLogger("torrentfs")
 
-func TorrentFSHandler(btService *BTService, downloadPath string) http.Handler {
+func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 	return http.StripPrefix("/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Close = true
-		entry, err := NewTorrentFS(btService, downloadPath, r)
+		url := r.URL.Path
 
-		if err == nil && entry != nil {
-			defer entry.Close()
-			http.ServeContent(w, r, entry.File.DisplayPath(), time.Now(), entry.rs)
-		} else {
-			tfsLog.Noticef("Could not find torrent for requested file %s: %#v", r.URL.Path, err)
+		fr, err := GetTorrentForPath(s, downloadPath, url, r)
+		if err != nil || fr == nil {
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
 		}
+		w.Header().Set("ETag", httptoo.EncodeQuotedString(fmt.Sprintf("%s/%s", fr.Torrent.infoHash, url[1:])))
+
+		rs := missinggo.NewSectionReadSeeker(struct {
+			io.Reader
+			io.Seeker
+		}{
+			Reader: missinggo.ContextedReader{
+				R:   fr.Reader,
+				Ctx: r.Context(),
+			},
+			Seeker: fr.Reader,
+		}, fr.File.Offset(), fr.File.Length())
+
+		defer fr.Close()
+		http.ServeContent(w, r, url, time.Time{}, rs)
 	}))
 }
 
-func NewTorrentFS(service *BTService, path string, r *http.Request) (*FileEntry, error) {
-	r.Close = true
-	tfs := &TorrentFS{
-		service: service,
-		Dir:     http.Dir(path),
-	}
-
-	url := r.URL.Path
-	if file, err := os.Open(filepath.Join(string(tfs.Dir), url)); err == nil {
+func GetTorrentForPath(s *BTService, path string, url string, r *http.Request) (*FileReader, error) {
+	dir := string(http.Dir(path))
+	if file, err := os.Open(filepath.Join(dir, url)); err == nil {
 		// make sure we don't open a file that's locked, as it can happen
 		// on BSD systems (darwin included)
 		if unlockerr := unlockFile(file); unlockerr != nil {
@@ -48,14 +54,11 @@ func NewTorrentFS(service *BTService, path string, r *http.Request) (*FileEntry,
 	}
 
 	tfsLog.Infof("Opening %s", url)
-	for _, torrent := range tfs.service.Torrents {
+	for _, torrent := range s.Torrents {
 		for _, f := range torrent.Files() {
 			if url[1:] == f.Path() {
 				tfsLog.Noticef("%s belongs to torrent %s", url, torrent.Name())
-				if entry, createerr := NewFileReader(torrent, &f, !torrent.IsRarArchive, r.Method == "GET"); createerr == nil {
-					torrent.GetDBID()
-					return entry, nil
-				}
+				return NewFileReader(torrent, &f, r.Method)
 			}
 		}
 	}

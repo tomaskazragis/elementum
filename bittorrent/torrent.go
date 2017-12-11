@@ -63,8 +63,8 @@ type Torrent struct {
 	*gotorrent.Torrent
 
 	infoHash      string
-	readers       map[int]*Reader
-	bufferReaders map[string]*Reader
+	readers       map[int]*FileReader
+	bufferReaders map[string]*FileReader
 
 	ChosenFiles []*gotorrent.File
 	TorrentPath string
@@ -122,8 +122,8 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		Torrent:     handle,
 		TorrentPath: path,
 
-		bufferReaders:        map[string]*Reader{},
-		readers:              map[int]*Reader{},
+		bufferReaders:        map[string]*FileReader{},
+		readers:              map[int]*FileReader{},
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
 		BufferEndPieces:      []int{},
@@ -374,7 +374,7 @@ func (t *Torrent) bufferFinishedEvent() {
 			r.Close()
 		}
 	}
-	t.bufferReaders = map[string]*Reader{}
+	t.bufferReaders = map[string]*FileReader{}
 }
 
 func (t *Torrent) dbidEvent() {
@@ -438,11 +438,11 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.Service.SetBufferingLimits()
 
-	t.bufferReaders["pre"] = t.NewReader(file, false)
+	t.bufferReaders["pre"], _ = NewFileReader(t, file, "")
 	t.bufferReaders["pre"].Seek(preBufferOffset, io.SeekStart)
 	t.bufferReaders["pre"].SetReadahead(preBufferSize)
 
-	t.bufferReaders["post"] = t.NewReader(file, false)
+	t.bufferReaders["post"], _ = NewFileReader(t, file, "")
 	t.bufferReaders["post"].Seek(postBufferOffset, io.SeekStart)
 	t.bufferReaders["post"].SetReadahead(postBufferSize)
 

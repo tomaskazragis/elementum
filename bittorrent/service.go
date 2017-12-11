@@ -226,7 +226,7 @@ func (s *BTService) Close(shutdown bool) {
 		s.stopServices()
 	}
 
-	s.log.Debugf("Closing Client")
+	s.log.Info("Closing Client")
 	if s.Client != nil {
 		s.Client.Close()
 		s.Client = nil
