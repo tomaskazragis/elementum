@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/tvdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -133,6 +133,7 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 	for _, title := range movie.AlternativeTitles.Titles {
 		sObject.Titles[strings.ToLower(title.ISO_3166_1)] = NormalizeTitle(title.Title)
 	}
+	sObject.Titles["Original"] = title
 	return sObject
 }
 
@@ -144,11 +145,12 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 	}
 
 	return &SeasonSearchObject{
-		IMDBId:         show.ExternalIDs.IMDBId,
-		TVDBId:         util.StrInterfaceToInt(show.ExternalIDs.TVDBID),
-		Title:          NormalizeTitle(title),
-		Year:           year,
-		Season:         season.Season,
+		IMDBId: show.ExternalIDs.IMDBId,
+		TVDBId: util.StrInterfaceToInt(show.ExternalIDs.TVDBID),
+		Title:  NormalizeTitle(title),
+		Titles: map[string]string{"Original": title},
+		Year:   year,
+		Season: season.Season,
 	}
 }
 
@@ -180,10 +182,10 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 		}
 		if countryIsJP && genreIsAnim {
 			tvdbShow, err := tvdb.GetShow(tvdbId, config.Get().Language)
-			if err == nil && len(tvdbShow.Seasons) >= episode.SeasonNumber + 1 {
+			if err == nil && len(tvdbShow.Seasons) >= episode.SeasonNumber+1 {
 				tvdbSeason := tvdbShow.Seasons[episode.SeasonNumber]
 				if len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
-					tvdbEpisode := tvdbSeason.Episodes[episode.EpisodeNumber - 1]
+					tvdbEpisode := tvdbSeason.Episodes[episode.EpisodeNumber-1]
 					if tvdbEpisode.AbsoluteNumber > 0 {
 						absoluteNumber = tvdbEpisode.AbsoluteNumber
 					}
@@ -197,6 +199,7 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 		IMDBId:         show.ExternalIDs.IMDBId,
 		TVDBId:         tvdbId,
 		Title:          NormalizeTitle(title),
+		Titles:         map[string]string{"Original": title},
 		Season:         episode.SeasonNumber,
 		Episode:        episode.EpisodeNumber,
 		Year:           year,
