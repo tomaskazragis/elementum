@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	trailingApostrophe = regexp.MustCompile(`'([a-z]{1,2}\s)`)
+	// Remove only quotes outside of words
+	trailingApostrophe = regexp.MustCompile(`\s*'\B|\B'\s*`)
 )
 
 func RemoveTrailingApostrophe(str string) string {
-	return trailingApostrophe.ReplaceAllString(str, "$1")
+	return trailingApostrophe.ReplaceAllString(str, "")
 }
 
 func RemoveTrailingApostrophes(str string) string {
@@ -43,7 +44,7 @@ func NormalizeTitle(title string) string {
 	normalizedTitle = strings.ToLower(normalizedTitle)
 	normalizedTitle = regexp.MustCompile(`\(\d+\)`).ReplaceAllString(normalizedTitle, " ")
 	normalizedTitle = strings.Map(func(r rune) rune {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '.' {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '.' && r != '\'' {
 			return ' '
 		}
 		return r
