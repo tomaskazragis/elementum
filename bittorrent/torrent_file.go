@@ -3,6 +3,7 @@ package bittorrent
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/base32"
 	"encoding/hex"
 	"encoding/json"
@@ -162,8 +163,12 @@ var (
 )
 
 var (
+	tr = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	httpClient = &http.Client{
-		Timeout: 7 * time.Second,
+		Transport: tr,
+		Timeout:   7 * time.Second,
 	}
 )
 
