@@ -2,11 +2,11 @@ package memory
 
 import (
 	// "errors"
-	// "fmt"
 	// "os"
 	// "path"
 	// "runtime"
 	// "strings"
+	"fmt"
 	"math"
 	"runtime/debug"
 	"sync"
@@ -207,6 +207,9 @@ func (c *Cache) Start() {
 	defer progressTicker.Stop()
 	defer close(c.closing)
 
+	// var lastFilled int64 = 0
+	var lastFilled int64 = 1
+
 	for {
 		select {
 		case <-progressTicker.C:
@@ -216,6 +219,19 @@ func (c *Cache) Start() {
 
 			info := c.Info()
 			log.Debugf("Cap: %d | Size: %d | Items: %d | Capacity: %d \n", info.Capacity, info.Filled, info.Items, c.bufferSize)
+
+			// if info.Filled == lastFilled {
+			if lastFilled > 0 {
+				log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
+				locks := ""
+				for i, b := range c.buffers {
+					locks += fmt.Sprintf("%#v:%#v | ", i, b.mu)
+				}
+				log.Debugf("Locks: %#v", locks)
+
+			}
+
+			lastFilled = info.Filled
 
 			// str := ""
 			// for i := 0; i < 30; i++ {

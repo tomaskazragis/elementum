@@ -2,6 +2,7 @@ package bittorrent
 
 import (
 	// "fmt"
+	"bytes"
 	"io"
 	// "math"
 	"os"
@@ -96,6 +97,7 @@ type Torrent struct {
 	muBuffer  *sync.RWMutex
 	muSeeding *sync.RWMutex
 
+	lastDownRate   int64
 	downRates      []int64
 	upRates        []int64
 	rateCounter    int
@@ -301,6 +303,13 @@ func (t *Torrent) progressEvent() {
 	if t.rateCounter == len(t.downRates)-1 {
 		t.rateCounter = 0
 	}
+
+	if t.lastDownRate == t.downloadedSize {
+		buf := bytes.NewBuffer([]byte{})
+		t.Service.ClientInfo(buf)
+		log.Debug("Download stale. Client state:\n", buf.String())
+	}
+	t.lastDownRate = t.downloadedSize
 
 	// str := ""
 	// for i := 0; i < t.Torrent.NumPieces(); i++ {
