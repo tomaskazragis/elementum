@@ -18,6 +18,8 @@ var tfsLog = logging.MustGetLogger("torrentfs")
 
 func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 	return http.StripPrefix("/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
+		r.Close = true
 		url := r.URL.Path
 
 		fr, err := GetTorrentForPath(s, downloadPath, url, r)
