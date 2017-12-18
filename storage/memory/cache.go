@@ -22,8 +22,8 @@ import (
 
 type Cache struct {
 	s   *Storage
-	mu  sync.Mutex
-	bmu sync.Mutex
+	mu  *sync.Mutex
+	bmu *sync.Mutex
 
 	id        string
 	running   bool
@@ -46,7 +46,7 @@ type Cache struct {
 }
 
 type BufferItem struct {
-	mu   sync.Mutex
+	mu   *sync.Mutex
 	body []byte
 }
 
@@ -139,6 +139,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	}
 
 	for i := range c.buffers {
+		c.buffers[i].mu = &sync.Mutex{}
 		c.buffers[i].body = make([]byte, c.pieceLength)
 		c.positions[i] = &BufferPosition{}
 	}

@@ -30,7 +30,7 @@ var log = logging.MustGetLogger("memory")
 // Cache main object
 type Storage struct {
 	Type int
-	mu   sync.Mutex
+	mu   *sync.Mutex
 
 	items    map[string]*Cache
 	capacity int64
@@ -40,6 +40,7 @@ type Storage struct {
 func NewMemoryStorage(maxMemorySize int64) *Storage {
 	log.Debugf("Initializing memory storage of size: %#v", maxMemorySize)
 	s := &Storage{
+		mu:       &sync.Mutex{},
 		capacity: maxMemorySize,
 		items:    map[string]*Cache{},
 	}
@@ -70,6 +71,8 @@ func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (stor
 		s:        s,
 		capacity: s.capacity,
 		id:       infoHash.HexString(),
+		mu:       &sync.Mutex{},
+		bmu:      &sync.Mutex{},
 	}
 	c.Init(info)
 	go c.Start()
