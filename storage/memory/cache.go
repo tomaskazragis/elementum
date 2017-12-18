@@ -207,8 +207,7 @@ func (c *Cache) Start() {
 	defer progressTicker.Stop()
 	defer close(c.closing)
 
-	// var lastFilled int64 = 0
-	var lastFilled int64 = 1
+	var lastFilled int64 = 0
 
 	for {
 		select {
@@ -220,8 +219,7 @@ func (c *Cache) Start() {
 			info := c.Info()
 			log.Debugf("Cap: %d | Size: %d | Items: %d | Capacity: %d \n", info.Capacity, info.Filled, info.Items, c.bufferSize)
 
-			// if info.Filled == lastFilled {
-			if lastFilled > 0 {
+			if info.Filled == lastFilled {
 				log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
 				locks := ""
 				for i, b := range c.buffers {
