@@ -37,6 +37,7 @@ type Configuration struct {
 	AddSpecials         bool
 	ShowUnairedSeasons  bool
 	ShowUnairedEpisodes bool
+	SmartEpisodeMatch   bool
 	DownloadStorage     int
 	MemorySize          int
 	BufferSize          int
@@ -249,6 +250,7 @@ func Reload() *Configuration {
 		AddSpecials:         settings["add_specials"].(bool),
 		ShowUnairedSeasons:  settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes: settings["unaired_episodes"].(bool),
+		SmartEpisodeMatch:   settings["smart_episode_match"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit: settings["seed_time_limit"].(int),
@@ -302,7 +304,8 @@ func Reload() *Configuration {
 		CompletedShowsPath:  settings["completed_shows_path"].(string),
 	}
 
-	// For memory we are changing configuration
+	// For memory storage we are changing configuration
+	// 	to stop downloading after playback has stopped and so on
 	if newConfig.DownloadStorage == 1 {
 		newConfig.CompletedMove = false
 		newConfig.KeepDownloading = 2

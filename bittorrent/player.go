@@ -20,16 +20,19 @@ import (
 
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
 	estorage "github.com/elgatito/elementum/storage"
+	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
 	// endBufferSize      int64 = 10 * 1024 * 1024 // 10mb
-	endBufferSize    int64 = 5400276 // ~5.5mb
-	playbackMaxWait        = 30 * time.Second
-	minCandidateSize       = 100 * 1024 * 1024
+	endBufferSize     int64 = 5400276 // ~5.5mb
+	playbackMaxWait         = 30 * time.Second
+	minCandidateSize        = 100 * 1024 * 1024
+	episodeMatchRegex       = "(?i)(^|\\W)(S0*?%[1]dE0*?%[2]d|%[1]dx0*?%[2]d)\\W"
 )
 
 var (
@@ -41,6 +44,8 @@ var (
 	WatchedTime   float64
 	VideoDuration float64
 )
+
+var HistoryBucket = database.TorrentHistoryBucket
 
 type BTPlayer struct {
 	bts                  *BTService
@@ -347,11 +352,15 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 		}
 
 		if btp.episode > 0 {
+			// In episode search we are using smart-match to store found episodes
+			//   in the history bucket
+			go btp.smartMatch(choices)
+
 			var lastMatched int
 			var foundMatches int
 			// Case-insensitive, starting with a line-start or non-ascii, can have leading zeros, followed by non-ascii
 			// TODO: Add logic for matching S01E0102 (double episode filename)
-			re := regexp.MustCompile(fmt.Sprintf("(?i)(^|\\W)(S0*?%dE0*?%d|%dx0*?%d)\\W", btp.season, btp.episode, btp.season, btp.episode))
+			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, btp.season, btp.episode))
 			for index, choice := range choices {
 				if re.MatchString(choice.Filename) {
 					lastMatched = index
@@ -705,4 +714,63 @@ playbackLoop:
 
 func (btp *BTPlayer) IsWatched() bool {
 	return (100 * WatchedTime / VideoDuration) > 90
+}
+
+func (btp *BTPlayer) smartMatch(choices byFilename) {
+	if !config.Get().SmartEpisodeMatch {
+		return
+	}
+
+	b, err := ioutil.ReadFile(btp.Torrent.TorrentPath)
+	if err != nil {
+		return
+	}
+
+	show := tmdb.GetShow(btp.showId, "en")
+	if show == nil {
+		return
+	}
+
+	now := time.Now().UTC()
+	addSpecials := config.Get().AddSpecials
+
+	for _, season := range show.Seasons {
+		if season.EpisodeCount == 0 {
+			continue
+		}
+		if config.Get().ShowUnairedSeasons == false {
+			firstAired, _ := time.Parse("2006-01-02", show.FirstAirDate)
+			if firstAired.After(now) {
+				continue
+			}
+		}
+		if addSpecials == false && season.Season == 0 {
+			continue
+		}
+
+		episodes := tmdb.GetSeason(btp.showId, season.Season, "en").Episodes
+
+		for _, episode := range episodes {
+			if episode == nil {
+				continue
+			}
+			if config.Get().ShowUnairedEpisodes == false {
+				if episode.AirDate == "" {
+					continue
+				}
+				firstAired, _ := time.Parse("2006-01-02", episode.AirDate)
+				if firstAired.After(now) {
+					continue
+				}
+			}
+
+			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season.Season, episode.EpisodeNumber))
+			for _, choice := range choices {
+				if re.MatchString(choice.Filename) {
+					log.Debugf("Saving torrent entry for TMDB: %#v", episode.Id)
+					db.SetBytes(HistoryBucket, strconv.Itoa(episode.Id), b)
+				}
+			}
+		}
+	}
 }
