@@ -240,6 +240,11 @@ func (c *Cache) Start() {
 				}
 				log.Debugf("Locks: %#v", locks)
 
+				positions := ""
+				for i, p := range c.positions {
+					positions += fmt.Sprintf("%#v:%#v | ", i, p.Index)
+				}
+				log.Debugf("Positions: %#v", positions)
 			}
 
 			lastFilled = info.Filled
