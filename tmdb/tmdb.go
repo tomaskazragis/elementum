@@ -17,7 +17,9 @@ import (
 )
 
 const (
-	PagesAtOnce    = 5
+	// PagesAtOnce ...
+	PagesAtOnce = 5
+	// ResultsPerPage ...
 	ResultsPerPage = 20
 )
 
@@ -25,17 +27,25 @@ var (
 	log = logging.MustGetLogger("tmdb")
 )
 
+// Movies ...
 type Movies []*Movie
+
+// Shows ...
 type Shows []*Show
+
+// SeasonList ...
 type SeasonList []*Season
+
+// EpisodeList ...
 type EpisodeList []*Episode
 
+// Movie ...
 type Movie struct {
 	Entity
 
 	IMDBId              string       `json:"imdb_id"`
 	Overview            string       `json:"overview"`
-	ProductionCompanies []*IdName    `json:"production_companies"`
+	ProductionCompanies []*IDName    `json:"production_companies"`
 	Runtime             int          `json:"runtime"`
 	TagLine             string       `json:"tagline"`
 	RawPopularity       interface{}  `json:"popularity"`
@@ -61,6 +71,7 @@ type Movie struct {
 	ReleaseDates *ReleaseDatesResults `json:"release_dates"`
 }
 
+// Show ...
 type Show struct {
 	Entity
 
@@ -70,7 +81,7 @@ type Show struct {
 	InProduction        bool         `json:"in_production"`
 	FirstAirDate        string       `json:"first_air_date"`
 	LastAirDate         string       `json:"last_air_date"`
-	Networks            []*IdName    `json:"networks"`
+	Networks            []*IDName    `json:"networks"`
 	NumberOfEpisodes    int          `json:"number_of_episodes"`
 	NumberOfSeasons     int          `json:"number_of_seasons"`
 	OriginalName        string       `json:"original_name"`
@@ -78,7 +89,7 @@ type Show struct {
 	Overview            string       `json:"overview"`
 	RawPopularity       interface{}  `json:"popularity"`
 	Popularity          float64      `json:"-"`
-	ProductionCompanies []*IdName    `json:"production_companies"`
+	ProductionCompanies []*IDName    `json:"production_companies"`
 	Status              string       `json:"status"`
 	ExternalIDs         *ExternalIDs `json:"external_ids"`
 	Translations        *struct {
@@ -91,8 +102,9 @@ type Show struct {
 	Seasons SeasonList `json:"seasons"`
 }
 
+// Season ...
 type Season struct {
-	Id           int          `json:"id"`
+	ID           int          `json:"id"`
 	Name         string       `json:"name,omitempty"`
 	Season       int          `json:"season_number"`
 	EpisodeCount int          `json:"episode_count,omitempty"`
@@ -103,8 +115,9 @@ type Season struct {
 	Episodes EpisodeList `json:"episodes"`
 }
 
+// Episode ...
 type Episode struct {
-	Id            int          `json:"id"`
+	ID            int          `json:"id"`
 	Name          string       `json:"name"`
 	Overview      string       `json:"overview"`
 	AirDate       string       `json:"air_date"`
@@ -115,11 +128,12 @@ type Episode struct {
 	ExternalIDs   *ExternalIDs `json:"external_ids"`
 }
 
+// Entity ...
 type Entity struct {
 	IsAdult       bool      `json:"adult"`
 	BackdropPath  string    `json:"backdrop_path"`
-	Id            int       `json:"id"`
-	Genres        []*IdName `json:"genres"`
+	ID            int       `json:"id"`
+	Genres        []*IDName `json:"genres"`
 	OriginalTitle string    `json:"original_title,omitempty"`
 	ReleaseDate   string    `json:"release_date"`
 	FirstAirDate  string    `json:"first_air_date"`
@@ -131,6 +145,7 @@ type Entity struct {
 	Name          string    `json:"name,omitempty"`
 }
 
+// EntityList ...
 type EntityList struct {
 	Page         int       `json:"page"`
 	Results      []*Entity `json:"results"`
@@ -138,52 +153,61 @@ type EntityList struct {
 	TotalResults int       `json:"total_results"`
 }
 
-type IdName struct {
-	Id   int    `json:"id"`
+// IDName ...
+type IDName struct {
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-type Genre IdName
+// Genre ...
+type Genre IDName
 
+// GenreList ...
 type GenreList struct {
 	Genres []*Genre `json:"genres"`
 }
 
+// Image ...
 type Image struct {
-	FilePath  string `json:"file_path"`
-	Height    int    `json:"height"`
-	ISO_639_1 string `json:"iso_639_1"`
-	Width     int    `json:"width"`
+	FilePath string `json:"file_path"`
+	Height   int    `json:"height"`
+	Iso639_1 string `json:"iso_639_1"`
+	Width    int    `json:"width"`
 }
 
+// Images ...
 type Images struct {
 	Backdrops []*Image `json:"backdrops"`
 	Posters   []*Image `json:"posters"`
 	Stills    []*Image `json:"stills"`
 }
 
+// Cast ...
 type Cast struct {
-	IdName
-	CastId      int    `json:"cast_id"`
+	IDName
+	CastID      int    `json:"cast_id"`
 	Character   string `json:"character"`
-	CreditId    string `json:"credit_id"`
+	CreditID    string `json:"credit_id"`
 	Order       int    `json:"order"`
 	ProfilePath string `json:"profile_path"`
 }
 
+// Crew ...
 type Crew struct {
-	IdName
-	CreditId    string `json:"credit_id"`
+	IDName
+	CreditID    string `json:"credit_id"`
 	Department  string `json:"department"`
 	Job         string `json:"job"`
 	ProfilePath string `json:"profile_path"`
 }
 
+// Credits ...
 type Credits struct {
 	Cast []*Cast `json:"cast"`
 	Crew []*Crew `json:"crew"`
 }
 
+// ExternalIDs ...
 type ExternalIDs struct {
 	IMDBId      string      `json:"imdb_id"`
 	FreeBaseID  string      `json:"freebase_id"`
@@ -191,17 +215,20 @@ type ExternalIDs struct {
 	TVDBID      interface{} `json:"tvdb_id"`
 }
 
+// AlternativeTitle ...
 type AlternativeTitle struct {
-	ISO_3166_1 string `json:"iso_3166_1"`
-	Title      string `json:"title"`
+	Iso3166_1 string `json:"iso_3166_1"`
+	Title     string `json:"title"`
 }
 
+// Language ...
 type Language struct {
-	ISO_639_1   string `json:"iso_639_1"`
+	Iso639_1    string `json:"iso_639_1"`
 	Name        string `json:"name"`
 	EnglishName string `json:"english_name,omitempty"`
 }
 
+// FindResult ...
 type FindResult struct {
 	MovieResults     []*Entity `json:"movie_results"`
 	PersonResults    []*Entity `json:"person_results"`
@@ -210,18 +237,20 @@ type FindResult struct {
 	TVSeasonResults  []*Entity `json:"tv_season_results"`
 }
 
+// List ...
 type List struct {
 	CreatedBy     string    `json:"created_by"`
 	Description   string    `json:"description"`
 	FavoriteCount int       `json:"favorite_count"`
-	Id            string    `json:"id"`
+	ID            string    `json:"id"`
 	ItemCount     int       `json:"item_count"`
-	ISO_639_1     string    `json:"iso_639_1"`
+	Iso639_1      string    `json:"iso_639_1"`
 	Name          string    `json:"name"`
 	PosterPath    string    `json:"poster_path"`
 	Items         []*Entity `json:"items"`
 }
 
+// Trailer ...
 type Trailer struct {
 	Name   string `json:"name"`
 	Size   string `json:"size"`
@@ -229,18 +258,21 @@ type Trailer struct {
 	Type   string `json:"type"`
 }
 
+// ReleaseDatesResults ...
 type ReleaseDatesResults struct {
 	Results []*ReleaseDates `json:"results"`
 }
 
+// ReleaseDates ...
 type ReleaseDates struct {
-	ISO_3166_1   string         `json:"iso_3166_1"`
+	Iso3166_1    string         `json:"iso_3166_1"`
 	ReleaseDates []*ReleaseDate `json:"release_dates"`
 }
 
+// ReleaseDate ...
 type ReleaseDate struct {
 	Certification string `json:"certification"`
-	ISO_639_1     string `json:"iso_639_1"`
+	Iso639_1      string `json:"iso_639_1"`
 	Note          string `json:"note"`
 	ReleaseDate   string `json:"release_date"`
 	Type          int    `json:"type"`
@@ -263,19 +295,21 @@ var (
 		"ae4bd1b6fce2a5648671bfc171d15ba4",
 		"29a551a65eef108dd01b46e27eb0554a",
 	}
-	apiKey    = apiKeys[rand.Intn(len(apiKeys))]
+	apiKey = apiKeys[rand.Intn(len(apiKeys))]
+	// WarmingUp ...
 	WarmingUp = true
 )
 
 var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
-func CheckApiKey() {
+// CheckAPIKey ...
+func CheckAPIKey() {
 	log.Info("Checking TMDB API key...")
 
-	customApiKey := config.Get().TMDBApiKey
-	if customApiKey != "" {
-		apiKeys = append(apiKeys, customApiKey)
-		apiKey = customApiKey
+	customAPIKey := config.Get().TMDBApiKey
+	if customAPIKey != "" {
+		apiKeys = append(apiKeys, customAPIKey)
+		apiKey = customAPIKey
 	}
 
 	result := false
@@ -327,10 +361,12 @@ func tmdbCheck(key string) bool {
 	return true
 }
 
+// ImageURL ...
 func ImageURL(uri string, size string) string {
 	return imageEndpoint + size + uri
 }
 
+// ListEntities ...
 // TODO Unused...
 func ListEntities(endpoint string, params napping.Params) []*Entity {
 	var wg sync.WaitGroup
@@ -377,12 +413,13 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 	return entities
 }
 
+// Find ...
 // TODO Actually use this somewhere?
-func Find(externalId string, externalSource string) *FindResult {
+func Find(externalID string, externalSource string) *FindResult {
 	var result *FindResult
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tmdb.find.%s.%s", externalSource, externalId)
+	key := fmt.Sprintf("com.tmdb.find.%s.%s", externalSource, externalID)
 	if err := cacheStore.Get(key, &result); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
@@ -390,7 +427,7 @@ func Find(externalId string, externalSource string) *FindResult {
 				"external_source": externalSource,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint+"find/"+externalId,
+				tmdbEndpoint+"find/"+externalID,
 				&urlValues,
 				&result,
 				nil,

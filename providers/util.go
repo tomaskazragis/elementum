@@ -14,14 +14,17 @@ var (
 	trailingApostrophe = regexp.MustCompile(`\s*'\B|\B'\s*`)
 )
 
+// RemoveTrailingApostrophe ...
 func RemoveTrailingApostrophe(str string) string {
 	return trailingApostrophe.ReplaceAllString(str, "")
 }
 
+// RemoveTrailingApostrophes ...
 func RemoveTrailingApostrophes(str string) string {
 	return ""
 }
 
+// RomanizeHepburn ...
 // as per http://en.wikipedia.org/wiki/Hepburn_romanization#Variations
 func RomanizeHepburn(str string) string {
 	str = strings.Replace(str, "ō", "ou", -1)
@@ -29,10 +32,11 @@ func RomanizeHepburn(str string) string {
 	return str
 }
 
+// NormalizeTitle ...
 func NormalizeTitle(title string) string {
 	normalizedTitle := title
 	normalizedTitle = strings.ToLower(normalizedTitle)
-	normalizedTitle = RomanizeHepburn(title)
+	normalizedTitle = RomanizeHepburn(normalizedTitle)
 	normalizedTitle = strings.ToLower(normalizedTitle)
 	normalizedTitle = RemoveTrailingApostrophe(normalizedTitle)
 	normalizedTitle, _, _ = transform.String(transform.Chain(

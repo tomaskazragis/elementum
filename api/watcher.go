@@ -3,15 +3,16 @@ package api
 import (
 	"strconv"
 
-	"github.com/op/go-logging"
-	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/broadcast"
+	"github.com/op/go-logging"
 )
 
 var (
 	watcherLog = logging.MustGetLogger("watcher")
 )
 
+// LibraryListener ...
 func LibraryListener() {
 	broadcaster := broadcast.LocalBroadcasters[broadcast.WATCHED]
 
@@ -35,9 +36,9 @@ func updateWatchedForItem(item *bittorrent.PlayingItem) {
 		return
 	}
 
-	if item.DBTYPE == "movie" {
+	if item.DBTYPE == movieType {
 		if item.DBID == 0 {
-			xbmcItem := FindByIdMovieInLibrary(strconv.Itoa(item.TMDBID))
+			xbmcItem := FindByIDMovieInLibrary(strconv.Itoa(item.TMDBID))
 			if xbmcItem != nil {
 				item.DBID = xbmcItem.ID
 			}
@@ -46,9 +47,9 @@ func updateWatchedForItem(item *bittorrent.PlayingItem) {
 		if item.DBID != 0 {
 			UpdateMovieWatched(item.DBID, item.WatchedTime, item.Duration)
 		}
-	} else if item.DBTYPE == "episode" {
+	} else if item.DBTYPE == episodeType {
 		if item.DBID == 0 {
-			xbmcItem := FindByIdEpisodeInLibrary(item.TMDBID, item.Season, item.Episode)
+			xbmcItem := FindByIDEpisodeInLibrary(item.TMDBID, item.Season, item.Episode)
 			if xbmcItem != nil {
 				item.DBID = xbmcItem.ID
 			}

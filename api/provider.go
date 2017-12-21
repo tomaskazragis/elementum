@@ -1,16 +1,15 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"errors"
 	"strconv"
-	"encoding/json"
 
-	"github.com/gin-gonic/gin"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
 )
 
 type providerDebugResponse struct {
@@ -18,12 +17,13 @@ type providerDebugResponse struct {
 	Results interface{} `json:"results"`
 }
 
+// ProviderGetMovie ...
 func ProviderGetMovie(ctx *gin.Context) {
-	tmdbId := ctx.Params.ByName("tmdbId")
+	tmdbID := ctx.Params.ByName("tmdbId")
 	provider := ctx.Params.ByName("provider")
-	log.Println("Searching links for:", tmdbId)
-	movie := tmdb.GetMovieById(tmdbId, "en")
-	log.Printf("Resolved %s to %s", tmdbId, movie.Title)
+	log.Println("Searching links for:", tmdbID)
+	movie := tmdb.GetMovieByID(tmdbID, "en")
+	log.Printf("Resolved %s to %s", tmdbID, movie.Title)
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchMovieLinks(movie)
@@ -43,23 +43,24 @@ func ProviderGetMovie(ctx *gin.Context) {
 	ctx.Data(200, "application/json", data)
 }
 
+// ProviderGetEpisode ...
 func ProviderGetEpisode(ctx *gin.Context) {
 	provider := ctx.Params.ByName("provider")
-	showId, _ := strconv.Atoi(ctx.Params.ByName("showId"))
+	showID, _ := strconv.Atoi(ctx.Params.ByName("showId"))
 	seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 	episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-	log.Println("Searching links for TMDB Id:", showId)
+	log.Println("Searching links for TMDB Id:", showID)
 
-	show := tmdb.GetShow(showId, "en")
-	season := tmdb.GetSeason(showId, seasonNumber, "en")
+	show := tmdb.GetShow(showID, "en")
+	season := tmdb.GetSeason(showID, seasonNumber, "en")
 	if season == nil {
-		ctx.Error(errors.New(fmt.Sprintf("Unable to get season %d", seasonNumber)))
+		ctx.Error(fmt.Errorf("Unable to get season %d", seasonNumber))
 		return
 	}
-	episode := season.Episodes[episodeNumber - 1]
+	episode := season.Episodes[episodeNumber-1]
 
-	log.Printf("Resolved %d to %s", showId, show.Name)
+	log.Printf("Resolved %d to %s", showID, show.Name)
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchEpisodeLinks(show, episode)

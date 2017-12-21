@@ -28,15 +28,16 @@ func copyFile(from string, to string) error {
 	return nil
 }
 
+// MakeElementumRepositoryAddon ...
 func MakeElementumRepositoryAddon() error {
-	addonId := "repository.elementum"
+	addonID := "repository.elementum"
 	addonName := "Elementum Repository"
 
 	elementumHost := fmt.Sprintf("http://localhost:%d", config.ListenPort)
 	addon := &xbmc.Addon{
-		Id:           addonId,
+		ID:           addonID,
 		Name:         addonName,
-		Version:      util.Version[2:len(util.Version) - 1],
+		Version:      util.Version[2 : len(util.Version)-1],
 		ProviderName: config.Get().Info.Author,
 		Extensions: []*xbmc.AddonExtension{
 			&xbmc.AddonExtension{
@@ -65,7 +66,7 @@ func MakeElementumRepositoryAddon() error {
 		},
 	}
 
-	addonPath := filepath.Clean(filepath.Join(config.Get().Info.Path, "..", addonId))
+	addonPath := filepath.Clean(filepath.Join(config.Get().Info.Path, "..", addonID))
 	if err := os.MkdirAll(addonPath, 0777); err != nil {
 		return err
 	}
@@ -78,10 +79,10 @@ func MakeElementumRepositoryAddon() error {
 		return err
 	}
 
-	addonXmlFile, err := os.Create(filepath.Join(addonPath, "addon.xml"))
+	addonXMLFile, err := os.Create(filepath.Join(addonPath, "addon.xml"))
 	if err != nil {
 		return err
 	}
-	defer addonXmlFile.Close()
-	return xml.NewEncoder(addonXmlFile).Encode(addon)
+	defer addonXMLFile.Close()
+	return xml.NewEncoder(addonXMLFile).Encode(addon)
 }

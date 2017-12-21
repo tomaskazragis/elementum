@@ -1,4 +1,4 @@
-// This package implements broadcast type messaging (or event) in a Go idiomatic
+// Package broadcast implements broadcast type messaging (or event) in a Go idiomatic
 // way. This is based on the design invented at [1] and the actual implementation
 // from [2], modified to only expose channels, which are the prefered way of
 // communicating in Go.
@@ -35,14 +35,16 @@ type receiver struct {
 }
 
 const (
+	// WATCHED ...
 	WATCHED = iota
 )
 
+// LocalBroadcasters ...
 var LocalBroadcasters = map[int]*Broadcaster{
 	WATCHED: NewLocalBroadcaster(),
 }
 
-// New creates a new broadcaster with the necessary internal
+// NewBroadcaster creates a new broadcaster with the necessary internal
 // structure. The uninitialized broadcaster is unsuitable to be listened or
 // written to.
 func NewBroadcaster() *Broadcaster {
@@ -52,6 +54,7 @@ func NewBroadcaster() *Broadcaster {
 	}
 }
 
+// NewLocalBroadcaster ...
 func NewLocalBroadcaster() *Broadcaster {
 	return NewBroadcaster()
 }
@@ -66,10 +69,12 @@ func (b *Broadcaster) Write(v interface{}) {
 	b.c = c
 }
 
+// Broadcast ...
 func (b *Broadcaster) Broadcast(v interface{}) {
 	b.Write(v)
 }
 
+// Signal ...
 func (b *Broadcaster) Signal() {
 	b.Write(nil)
 }
@@ -107,7 +112,7 @@ func (b *Broadcaster) Listen() (<-chan interface{}, chan<- interface{}) {
 	return vc, cc
 }
 
-// Closes the broadcaster, this also closes all the listening channels.
+// Close Closes the broadcaster, this also closes all the listening channels.
 func (b *Broadcaster) Close() {
 	close(b.c)
 }

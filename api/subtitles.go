@@ -1,22 +1,22 @@
 package api
 
 import (
-	"io"
-	"os"
+	"compress/gzip"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"net/url"
-	"net/http"
-	"compress/gzip"
-	"path/filepath"
 
-	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/osdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
 
 var subLog = logging.MustGetLogger("subtitles")
@@ -77,6 +77,7 @@ func appendEpisodePayloads(labels map[string]string, payloads *[]osdb.SearchPayl
 	return nil
 }
 
+// SubtitlesIndex ...
 func SubtitlesIndex(ctx *gin.Context) {
 	q := ctx.Request.URL.Query()
 	searchString := q.Get("searchstring")
@@ -94,7 +95,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 
 	// Check if we are reading a file from Elementum
 	if strings.HasPrefix(playingFile, util.GetHTTPHost()) {
-		playingFile = strings.Replace(playingFile, util.GetHTTPHost() + "/files", config.Get().DownloadPath, 1)
+		playingFile = strings.Replace(playingFile, util.GetHTTPHost()+"/files", config.Get().DownloadPath, 1)
 		playingFile, _ = url.QueryUnescape(playingFile)
 	}
 
@@ -102,7 +103,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 		if lang == "Portuguese (Brazil)" {
 			languages[i] = "pob"
 		} else {
-			isoLang := xbmc.ConvertLanguage(lang, xbmc.ISO_639_2)
+			isoLang := xbmc.ConvertLanguage(lang, xbmc.Iso639_2)
 			if isoLang == "gre" {
 				isoLang = "ell"
 			}
@@ -160,7 +161,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 			Label2:    sub.SubFileName,
 			Icon:      strconv.Itoa(int((rating / 2) + 0.5)),
 			Thumbnail: sub.ISO639,
-			Path: UrlQuery(UrlForXBMC("/subtitle/%s", sub.IDSubtitleFile),
+			Path: URLQuery(URLForXBMC("/subtitle/%s", sub.IDSubtitleFile),
 				"file", sub.SubFileName,
 				"lang", sub.SubLanguageID,
 				"fmt", sub.SubFormat,
@@ -168,10 +169,10 @@ func SubtitlesIndex(ctx *gin.Context) {
 			Properties: make(map[string]string),
 		}
 		if sub.MatchedBy == "moviehash" {
-			item.Properties["sync"] = "true"
+			item.Properties["sync"] = trueType
 		}
 		if sub.SubHearingImpaired == "1" {
-			item.Properties["hearing_imp"] = "true"
+			item.Properties["hearing_imp"] = trueType
 		}
 		items = append(items, item)
 	}
@@ -179,6 +180,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 
+// SubtitleGet ...
 func SubtitleGet(ctx *gin.Context) {
 	q := ctx.Request.URL.Query()
 	file := q.Get("file")
@@ -201,8 +203,8 @@ func SubtitleGet(ctx *gin.Context) {
 	defer reader.Close()
 
 	subtitlesPath := filepath.Join(config.Get().DownloadPath, "Subtitles")
-	if _, err := os.Stat(subtitlesPath); os.IsNotExist(err) {
-		if err := os.Mkdir(subtitlesPath, 0755); err != nil{
+	if _, errStat := os.Stat(subtitlesPath); os.IsNotExist(errStat) {
+		if errMk := os.Mkdir(subtitlesPath, 0755); errMk != nil {
 			subLog.Error("Unable to create Subtitles folder")
 		}
 	}

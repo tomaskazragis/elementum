@@ -4,6 +4,7 @@ import (
 	"strconv"
 )
 
+// StrInterfaceToInt ...
 func StrInterfaceToInt(t interface{}) (i int) {
 	switch t := t.(type) {
 	case string:

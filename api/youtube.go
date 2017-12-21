@@ -1,13 +1,14 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/elgatito/elementum/youtube"
+	"github.com/gin-gonic/gin"
 )
 
+// PlayYoutubeVideo ...
 func PlayYoutubeVideo(ctx *gin.Context) {
-	youtubeId := ctx.Params.ByName("id")
-	streams, err := youtube.Resolve(youtubeId)
+	youtubeID := ctx.Params.ByName("id")
+	streams, err := youtube.Resolve(youtubeID)
 	if err != nil {
 		ctx.String(200, err.Error())
 	}

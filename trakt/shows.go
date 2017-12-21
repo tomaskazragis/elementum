@@ -2,18 +2,17 @@ package trakt
 
 import (
 	"fmt"
+	"math/rand"
 	"path"
-	"time"
-  "errors"
 	"strconv"
 	"strings"
-	"math/rand"
+	"time"
 
-	"github.com/jmcvetta/napping"
-	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
 )
 
 // Fill fanart from TMDB
@@ -46,7 +45,7 @@ func setShowFanart(show *Show) *Show {
 	if len(tmdbImages.Posters) > 0 {
 		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
 		for _, image := range tmdbImages.Posters {
-			if image.ISO_639_1 == config.Get().Language {
+			if image.Iso639_1 == config.Get().Language {
 				posterImage = tmdb.ImageURL(image.FilePath, "w500")
 			}
 		}
@@ -56,7 +55,7 @@ func setShowFanart(show *Show) *Show {
 	if len(tmdbImages.Backdrops) > 0 {
 		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
 		for _, image := range tmdbImages.Backdrops {
-			if image.ISO_639_1 == config.Get().Language {
+			if image.Iso639_1 == config.Get().Language {
 				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
 			}
 		}
@@ -80,20 +79,21 @@ func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
 	return shows
 }
 
-func GetShow(Id string) (show *Show) {
-	endPoint := fmt.Sprintf("shows/%s", Id)
+// GetShow ...
+func GetShow(ID string) (show *Show) {
+	endPoint := fmt.Sprintf("shows/%s", ID)
 
 	params := napping.Params{
 		"extended": "full,images",
 	}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.show.%s", Id)
+	key := fmt.Sprintf("com.trakt.show.%s", ID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", Id), config.AddonIcon())
+			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt show (%s), check your logs.", ID), config.AddonIcon())
 			return
 		}
 		if err := resp.Unmarshal(&show); err != nil {
@@ -106,13 +106,14 @@ func GetShow(Id string) (show *Show) {
 	return
 }
 
-func GetShowByTMDB(tmdbId string) (show *Show) {
-	endPoint := fmt.Sprintf("search/tmdb/%s?type=show", tmdbId)
+// GetShowByTMDB ...
+func GetShowByTMDB(tmdbID string) (show *Show) {
+	endPoint := fmt.Sprintf("search/tmdb/%s?type=show", tmdbID)
 
 	params := napping.Params{}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.show.tmdb.%s", tmdbId)
+	key := fmt.Sprintf("com.trakt.show.tmdb.%s", tmdbID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
@@ -128,13 +129,14 @@ func GetShowByTMDB(tmdbId string) (show *Show) {
 	return
 }
 
-func GetShowByTVDB(tvdbId string) (show *Show) {
-	endPoint := fmt.Sprintf("search/tvdb/%s?type=show", tvdbId)
+// GetShowByTVDB ...
+func GetShowByTVDB(tvdbID string) (show *Show) {
+	endPoint := fmt.Sprintf("search/tvdb/%s?type=show", tvdbID)
 
 	params := napping.Params{}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.show.tvdb.%s", tvdbId)
+	key := fmt.Sprintf("com.trakt.show.tvdb.%s", tvdbID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
@@ -150,6 +152,7 @@ func GetShowByTVDB(tvdbId string) (show *Show) {
 	return
 }
 
+// GetEpisode ...
 func GetEpisode(id string) (episode *Episode) {
 	endPoint := fmt.Sprintf("search/trakt/%s?type=episode", id)
 
@@ -172,13 +175,14 @@ func GetEpisode(id string) (episode *Episode) {
 	return
 }
 
-func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
-	endPoint := fmt.Sprintf("search/tmdb/%s?type=episode", tmdbId)
+// GetEpisodeByTMDB ...
+func GetEpisodeByTMDB(tmdbID string) (episode *Episode) {
+	endPoint := fmt.Sprintf("search/tmdb/%s?type=episode", tmdbID)
 
 	params := napping.Params{}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.episode.tmdb.%s", tmdbId)
+	key := fmt.Sprintf("com.trakt.episode.tmdb.%s", tmdbID)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
@@ -194,13 +198,14 @@ func GetEpisodeByTMDB(tmdbId string) (episode *Episode) {
 	return
 }
 
-func GetEpisodeByTVDB(tvdbId string) (episode *Episode) {
-	endPoint := fmt.Sprintf("search/tvdb/%s?type=episode", tvdbId)
+// GetEpisodeByTVDB ...
+func GetEpisodeByTVDB(tvdbID string) (episode *Episode) {
+	endPoint := fmt.Sprintf("search/tvdb/%s?type=episode", tvdbID)
 
 	params := napping.Params{}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.episode.tvdb.%s", tvdbId)
+	key := fmt.Sprintf("com.trakt.episode.tvdb.%s", tvdbID)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
@@ -216,14 +221,15 @@ func GetEpisodeByTVDB(tvdbId string) (episode *Episode) {
 	return
 }
 
+// SearchShows ...
 // TODO Actually use this somewhere
 func SearchShows(query string, page string) (shows []*Shows, err error) {
 	endPoint := "search"
 
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(config.Get().ResultsPerPage),
-		"query": query,
+		"page":     page,
+		"limit":    strconv.Itoa(config.Get().ResultsPerPage),
+		"query":    query,
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -233,7 +239,7 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 		return
 	} else if resp.Status() != 200 {
 		log.Error(err)
-		return shows, errors.New(fmt.Sprintf("Bad status searching Trakt shows: %d", resp.Status()))
+		return shows, fmt.Errorf("Bad status searching Trakt shows: %d", resp.Status())
 	}
 
 	if err := resp.Unmarshal(&shows); err != nil {
@@ -244,6 +250,7 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 	return
 }
 
+// TopShows ...
 func TopShows(topCategory string, page string) (shows []*Shows, total int, err error) {
 	endPoint := "shows/" + topCategory
 
@@ -253,10 +260,10 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 	if err != nil {
 		return shows, 0, err
 	}
-	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
+	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(limit),
+		"page":     page,
+		"limit":    strconv.Itoa(limit),
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -269,13 +276,13 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 		if err != nil {
 			return shows, 0, err
 		} else if resp.Status() != 200 {
-			return shows, 0, errors.New(fmt.Sprintf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status()))
+			return shows, 0, fmt.Errorf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status())
 		}
 
-	  if topCategory == "popular" {
+		if topCategory == "popular" {
 			var showList []*Show
-			if err := resp.Unmarshal(&showList); err != nil {
-				return shows, 0, err
+			if errUnm := resp.Unmarshal(&showList); errUnm != nil {
+				return shows, 0, errUnm
 			}
 
 			showListing := make([]*Shows, 0)
@@ -286,11 +293,11 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 				showListing = append(showListing, &showItem)
 			}
 			shows = showListing
-	  } else {
-			if err := resp.Unmarshal(&shows); err != nil {
-				log.Warning(err)
+		} else {
+			if errUnm := resp.Unmarshal(&shows); errUnm != nil {
+				log.Warning(errUnm)
 			}
-	  }
+		}
 
 		if page != "0" {
 			shows = setShowsFanart(shows)
@@ -313,6 +320,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 	return
 }
 
+// WatchlistShows ...
 func WatchlistShows() (shows []*Shows, err error) {
 	if err := Authorized(); err != nil {
 		return shows, err
@@ -333,7 +341,7 @@ func WatchlistShows() (shows []*Shows, err error) {
 			return shows, err
 		} else if resp.Status() != 200 {
 			log.Error(err)
-			return shows, errors.New(fmt.Sprintf("Bad status getting Trakt watchlist for shows: %d", resp.Status()))
+			return shows, fmt.Errorf("Bad status getting Trakt watchlist for shows: %d", resp.Status())
 		}
 
 		var watchlist []*WatchlistShow
@@ -352,12 +360,13 @@ func WatchlistShows() (shows []*Shows, err error) {
 
 		shows = setShowsFanart(shows)
 
-		cacheStore.Set(key, shows, 1 * time.Minute)
+		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
 	return
 }
 
+// CollectionShows ...
 func CollectionShows() (shows []*Shows, err error) {
 	if err := Authorized(); err != nil {
 		return shows, err
@@ -377,7 +386,7 @@ func CollectionShows() (shows []*Shows, err error) {
 		if err != nil {
 			return shows, err
 		} else if resp.Status() != 200 {
-			return shows, errors.New(fmt.Sprintf("Bad status getting Trakt collection for shows: %d", resp.Status()))
+			return shows, fmt.Errorf("Bad status getting Trakt collection for shows: %d", resp.Status())
 		}
 
 		var collection []*WatchlistShow
@@ -396,14 +405,15 @@ func CollectionShows() (shows []*Shows, err error) {
 
 		shows = setShowsFanart(shows)
 
-		cacheStore.Set(key, shows, 1 * time.Minute)
+		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
 	return
 }
 
-func ListItemsShows(listId string, withImages bool) (shows []*Shows, err error) {
-	endPoint := fmt.Sprintf("users/%s/lists/%s/items/shows", config.Get().TraktUsername, listId)
+// ListItemsShows ...
+func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) {
+	endPoint := fmt.Sprintf("users/%s/lists/%s/items/shows", config.Get().TraktUsername, listID)
 
 	params := napping.Params{}.AsUrlValues()
 
@@ -414,7 +424,7 @@ func ListItemsShows(listId string, withImages bool) (shows []*Shows, err error) 
 	if withImages {
 		full = ".full"
 	}
-	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listId, full)
+	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listID, full)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		if erra := Authorized(); erra != nil {
 			resp, err = Get(endPoint, params)
@@ -444,12 +454,13 @@ func ListItemsShows(listId string, withImages bool) (shows []*Shows, err error) 
 			shows = setShowsFanart(shows)
 		}
 
-		cacheStore.Set(key, shows, 1 * time.Minute)
+		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
 	return
 }
 
+// CalendarShows ...
 func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total int, err error) {
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
@@ -457,10 +468,10 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	if err != nil {
 		return shows, 0, err
 	}
-	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
+	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(limit),
+		"page":     page,
+		"limit":    strconv.Itoa(limit),
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -469,16 +480,16 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	key := fmt.Sprintf("com.trakt.myshows.%s.%s", endPointKey, page)
 	totalKey := fmt.Sprintf("com.trakt.myshows.%s.total", endPointKey)
 	if err := cacheStore.Get(key, &shows); err != nil {
-		resp, err := GetWithAuth("calendars/" + endPoint, params)
+		resp, err := GetWithAuth("calendars/"+endPoint, params)
 
 		if err != nil {
 			return shows, 0, err
 		} else if resp.Status() != 200 {
-			return shows, 0, errors.New(fmt.Sprintf("Bad status getting %s Trakt shows: %d", endPoint, resp.Status()))
+			return shows, 0, fmt.Errorf("Bad status getting %s Trakt shows: %d", endPoint, resp.Status())
 		}
 
-		if err := resp.Unmarshal(&shows); err != nil {
-			log.Warning(err)
+		if errUnm := resp.Unmarshal(&shows); errUnm != nil {
+			log.Warning(errUnm)
 		}
 
 		if page != "0" {
@@ -502,6 +513,7 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	return
 }
 
+// ToListItem ...
 func (show *Show) ToListItem() *xbmc.ListItem {
 	return &xbmc.ListItem{
 		Label: show.Title,
@@ -524,14 +536,15 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			Mediatype:     "tvshow",
 		},
 		Art: &xbmc.ListItemArt{
-			Poster: show.Images.Poster.Full,
-			FanArt: show.Images.FanArt.Full,
-			Banner: show.Images.Banner.Full,
+			Poster:    show.Images.Poster.Full,
+			FanArt:    show.Images.FanArt.Full,
+			Banner:    show.Images.Banner.Full,
 			Thumbnail: show.Images.Thumbnail.Full,
 		},
 	}
 }
 
+// ToListItem ...
 func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	seasonLabel := fmt.Sprintf("Season %d", season.Number)
 	return &xbmc.ListItem{
@@ -549,13 +562,14 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 			Mediatype:     "season",
 		},
 		Art: &xbmc.ListItemArt{
-			Poster: season.Images.Poster.Full,
+			Poster:    season.Images.Poster.Full,
 			Thumbnail: season.Images.Thumbnail.Full,
 			// FanArt: season.Images.FanArt.Full,
 		},
 	}
 }
 
+// ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	title := fmt.Sprintf("%dx%02d %s", episode.Season, episode.Number, episode.Title)
 	return &xbmc.ListItem{

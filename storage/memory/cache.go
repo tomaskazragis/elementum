@@ -20,6 +20,7 @@ import (
 	estorage "github.com/elgatito/elementum/storage"
 )
 
+// Cache ...
 type Cache struct {
 	s   *Storage
 	mu  *sync.Mutex
@@ -36,7 +37,7 @@ type Cache struct {
 	pieceLength   int64
 	piecePriority []int
 	pieces        map[key]*Piece
-	items         map[key]itemState
+	items         map[key]ItemState
 
 	closing chan struct{}
 
@@ -45,11 +46,13 @@ type Cache struct {
 	positions  []*BufferPosition
 }
 
+// BufferItem ...
 type BufferItem struct {
 	mu   *sync.Mutex
 	body []byte
 }
 
+// BufferPosition ...
 type BufferPosition struct {
 	Used  bool
 	Index int
@@ -63,11 +66,13 @@ type CacheInfo struct {
 	Items    int
 }
 
-type itemState struct {
+// ItemState ...
+type ItemState struct {
 	Accessed time.Time
 	Size     int64
 }
 
+// SetCapacity ...
 func (c *Cache) SetCapacity(capacity int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -76,22 +81,27 @@ func (c *Cache) SetCapacity(capacity int64) {
 	c.capacity = capacity
 }
 
+// GetReadaheadSize ...
 func (c *Cache) GetReadaheadSize() int64 {
 	return c.readahead
 }
 
+// SetReadaheadSize ...
 func (c *Cache) SetReadaheadSize(size int64) {
 	c.readahead = size
 }
 
+// GetTorrentStorage ...
 func (c *Cache) GetTorrentStorage(hash string) estorage.TorrentStorage {
 	return nil
 }
 
+// OpenTorrent ...
 func (c *Cache) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
 	return nil, nil
 }
 
+// Piece ...
 func (c *Cache) Piece(m metainfo.Piece) storage.PieceImpl {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -108,7 +118,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.items = make(map[key]itemState)
+	c.items = make(map[key]ItemState)
 	c.policy = new(lru)
 
 	c.pieceCount = info.NumPieces()
@@ -120,7 +130,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	if c.bufferSize > c.pieceCount {
 		c.bufferSize = c.pieceCount
 	}
-	c.readahead = int64(float64(c.capacity) * READAHEAD_RATIO)
+	c.readahead = int64(float64(c.capacity) * ReadaheadRatio)
 
 	c.buffers = make([]BufferItem, c.bufferSize)
 	c.positions = make([]*BufferPosition, c.bufferSize)
@@ -156,6 +166,7 @@ func (c *Cache) Info() (ret CacheInfo) {
 	return
 }
 
+// Close ...
 func (c *Cache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -176,6 +187,7 @@ func (c *Cache) Close() error {
 	return nil
 }
 
+// RemovePiece ...
 func (c *Cache) RemovePiece(idx int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -208,7 +220,7 @@ func (c *Cache) Start() {
 	defer progressTicker.Stop()
 	defer close(c.closing)
 
-	var lastFilled int64 = 0
+	var lastFilled int64
 
 	for {
 		select {
@@ -296,12 +308,12 @@ func (c *Cache) remove(pi key) {
 	c.pieces[pi].Active = false
 	c.pieces[pi].Size = 0
 
-	c.updateItem(c.pieces[pi].Key, func(*itemState, bool) bool {
+	c.updateItem(c.pieces[pi].Key, func(*ItemState, bool) bool {
 		return false
 	})
 }
 
-func (c *Cache) updateItem(k key, u func(*itemState, bool) bool) {
+func (c *Cache) updateItem(k key, u func(*ItemState, bool) bool) {
 	ii, ok := c.items[k]
 	c.filled -= ii.Size
 	if u(&ii, ok) {
@@ -318,6 +330,7 @@ func (c *Cache) updateItem(k key, u func(*itemState, bool) bool) {
 	c.trimToCapacity()
 }
 
+// TrimToCapacity ...
 func (c *Cache) TrimToCapacity() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

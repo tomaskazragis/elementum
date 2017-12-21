@@ -2,41 +2,42 @@ package tmdb
 
 import (
 	"fmt"
+	"math/rand"
 	"path"
 	"time"
-	"math/rand"
 
-	"github.com/jmcvetta/napping"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
 )
 
-func GetEpisode(showId int, seasonNumber int, episodeNumber int, language string) *Episode {
+// GetEpisode ...
+func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string) *Episode {
 	var episode *Episode
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tmdb.episode.%d.%d.%d.%s", showId, seasonNumber, episodeNumber, language)
+	key := fmt.Sprintf("com.tmdb.episode.%d.%d.%d.%s", showID, seasonNumber, episodeNumber, language)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
-				"api_key": apiKey,
+				"api_key":            apiKey,
 				"append_to_response": "credits,images,videos,external_ids",
-				"language": language,
+				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				fmt.Sprintf("%stv/%d/season/%d/episode/%d", tmdbEndpoint, showId, seasonNumber, episodeNumber),
+				fmt.Sprintf("%stv/%d/season/%d/episode/%d", tmdbEndpoint, showID, seasonNumber, episodeNumber),
 				&urlValues,
 				&episode,
 				nil,
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showId), config.AddonIcon())
+				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showID), config.AddonIcon())
 			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting S%02dE%02d of %d, cooling down...", seasonNumber, episodeNumber, showId)
+				log.Warningf("Rate limit exceeded getting S%02dE%02d of %d, cooling down...", seasonNumber, episodeNumber, showID)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showId, resp.Status())
+				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
@@ -49,6 +50,7 @@ func GetEpisode(showId int, seasonNumber int, episodeNumber int, language string
 	return episode
 }
 
+// ToListItems ...
 func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.ListItem {
 	items := make([]*xbmc.ListItem, 0, len(episodes))
 	if len(episodes) == 0 {
@@ -90,16 +92,17 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 	return items
 }
 
+// ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
 
 	runtime := 1800
 	if len(show.EpisodeRunTime) > 0 {
-		runtime = show.EpisodeRunTime[len(show.EpisodeRunTime) - 1] * 60
+		runtime = show.EpisodeRunTime[len(show.EpisodeRunTime)-1] * 60
 	}
 
 	item := &xbmc.ListItem{
-		Label: episodeLabel,
+		Label:  episodeLabel,
 		Label2: fmt.Sprintf("%f", episode.VoteAverage),
 		Info: &xbmc.ListItemInfo{
 			Count:         rand.Int(),

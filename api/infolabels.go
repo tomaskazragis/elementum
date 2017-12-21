@@ -1,16 +1,16 @@
 package api
 
 import (
-	"errors"
-	"strings"
-	"strconv"
 	"encoding/json"
+	"errors"
+	"strconv"
+	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -62,6 +62,7 @@ func encodeItem(item *xbmc.ListItem) string {
 	return string(data)
 }
 
+// InfoLabelsStored ...
 func InfoLabelsStored(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		labelsString := "{}"
@@ -87,20 +88,21 @@ func InfoLabelsStored(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// InfoLabelsEpisode ...
 func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		tmdbId := ctx.Params.ByName("showId")
-		showId, _ := strconv.Atoi(tmdbId)
+		tmdbID := ctx.Params.ByName("showId")
+		showID, _ := strconv.Atoi(tmdbID)
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-		show := tmdb.GetShow(showId, config.Get().Language)
+		show := tmdb.GetShow(showID, config.Get().Language)
 		if show == nil {
 			ctx.Error(errors.New("Unable to find show"))
 			return
 		}
 
-		episode := tmdb.GetEpisode(showId, seasonNumber, episodeNumber, config.Get().Language)
+		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
 		if episode == nil {
 			ctx.Error(errors.New("Unable to find episode"))
 			return
@@ -117,11 +119,12 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// InfoLabelsMovie ...
 func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		tmdbId := ctx.Params.ByName("tmdbId")
+		tmdbID := ctx.Params.ByName("tmdbId")
 
-		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
+		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {
 			ctx.Error(errors.New("Unable to find movie"))
 			return

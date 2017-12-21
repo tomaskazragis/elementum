@@ -4,20 +4,22 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
 
 var searchLog = logging.MustGetLogger("search")
 var historyMaxSize = 50
 
+// SearchHistory ...
 type SearchHistory []string
 
+// Search ...
 func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -40,7 +42,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		existingTorrent := ExistingTorrent(btService, query)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
-			xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "uri", existingTorrent))
+			xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", existingTorrent))
 			return
 		}
 
@@ -80,7 +82,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 
 			multi := ""
 			if torrent.Multi {
-				multi = "\nmulti"
+				multi = multiType
 			}
 
 			label := fmt.Sprintf("%s(%d / %d) %s\n%s\n%s%s",
@@ -97,21 +99,21 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		choice := xbmc.ListDialogLarge("LOCALIZE[30228]", query, choices...)
 		if choice >= 0 {
-			xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "uri", torrents[choice].URI))
+			xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", torrents[choice].URI))
 		}
 	}
 }
 
 func searchHistoryEmpty(historyType string) bool {
 	historyList := SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list" + historyType, &historyList)
+	db.GetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
 	return historyList == nil || len(historyList) == 0
 }
 
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 	historyList := SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list" + historyType, &historyList)
+	db.GetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
 	found := -1
 	for i, v := range historyList {
@@ -132,34 +134,34 @@ func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 		historyList = append(SearchHistory{query}, historyList[:historyMaxSize-1]...)
 	}
 
-	db.SetObject(database.HistoryBucket, "list" + historyType, &historyList)
+	db.SetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
-	xbmc.UpdatePath(searchHistoryGetXbmcUrl(historyType, query))
+	xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
 	ctx.String(200, "")
 	return
 }
 
 func searchHistoryList(ctx *gin.Context, historyType string) {
 	historyList := &SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list" + historyType, historyList)
+	db.GetObject(database.HistoryBucket, "list"+historyType, historyList)
 
 	urlPrefix := ""
 	if len(historyType) > 0 {
 		urlPrefix = "/" + historyType
 	}
 
-	items := make(xbmc.ListItems, 0, len(*historyList) + 1)
+	items := make(xbmc.ListItems, 0, len(*historyList)+1)
 	items = append(items, &xbmc.ListItem{
-		Label: "LOCALIZE[30323]",
-		Path: UrlQuery(UrlForXBMC(urlPrefix + "/search"), "keyboard", "1"),
+		Label:     "LOCALIZE[30323]",
+		Path:      URLQuery(URLForXBMC(urlPrefix+"/search"), "keyboard", "1"),
 		Thumbnail: config.AddonResource("img", "search.png"),
-		Icon: config.AddonResource("img", "search.png"),
+		Icon:      config.AddonResource("img", "search.png"),
 	})
 
 	for _, query := range *historyList {
 		item := &xbmc.ListItem{
 			Label: query,
-			Path: searchHistoryGetXbmcUrl(historyType, query),
+			Path:  searchHistoryGetXbmcURL(historyType, query),
 		}
 		items = append(items, item)
 	}
@@ -167,13 +169,13 @@ func searchHistoryList(ctx *gin.Context, historyType string) {
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 
-func searchHistoryGetXbmcUrl(historyType string, query string) string {
+func searchHistoryGetXbmcURL(historyType string, query string) string {
 	urlPrefix := ""
 	if len(historyType) > 0 {
 		urlPrefix = "/" + historyType
 	}
 
-	return UrlQuery(UrlForXBMC(urlPrefix + "/search"), "q", query)
+	return URLQuery(URLForXBMC(urlPrefix+"/search"), "q", query)
 }
 
 func searchHistoryGetHTTPUrl(historyType string, query string) string {
@@ -182,5 +184,5 @@ func searchHistoryGetHTTPUrl(historyType string, query string) string {
 		urlPrefix = "/" + historyType
 	}
 
-	return UrlQuery(UrlForHTTP(urlPrefix + "/search"), "q", query)
+	return URLQuery(URLForHTTP(urlPrefix+"/search"), "q", query)
 }

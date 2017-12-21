@@ -66,7 +66,7 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 	return nil
 }
 
-func getAddonXml(user string, repository string) (string, error) {
+func getAddonXML(user string, repository string) (string, error) {
 	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/addon.xml")
 	if resp == nil {
 		return "", errors.New("Not found")
@@ -83,13 +83,13 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
 	for _, repo := range []string{"plugin.video.elementum", "script.elementum.burst"} {
-		addonXml, err := getAddonXml("elgatito", repo)
+		addonXML, err := getAddonXML("elgatito", repo)
 		if err != nil {
 			continue
 		}
 
 		addon := xbmc.Addon{}
-		xml.Unmarshal([]byte(addonXml), &addon)
+		xml.Unmarshal([]byte(addonXML), &addon)
 		addons = append(addons, addon)
 	}
 
@@ -98,16 +98,18 @@ func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	}, nil
 }
 
+// GetAddonsXML ...
 func GetAddonsXML(ctx *gin.Context) {
 	user := ctx.Params.ByName("user")
 	repository := ctx.Params.ByName("repository")
 	addons, err := getAddons(user, repository)
 	if err != nil {
-		ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addons.xml file."))
+		ctx.AbortWithError(404, errors.New("Unable to retrieve the remote's addons.xml file"))
 	}
 	ctx.XML(200, addons)
 }
 
+// GetAddonsXMLChecksum ...
 func GetAddonsXMLChecksum(ctx *gin.Context) {
 	user := ctx.Params.ByName("user")
 	repository := ctx.Params.ByName("repository")
@@ -119,13 +121,14 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 		log.Infof("Last available release of script.elementum.burst: v%s", addons.Addons[1].Version)
 	}
 	if err != nil {
-		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file."))
+		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file"))
 	}
 	hasher := md5.New()
 	xml.NewEncoder(hasher).Encode(addons)
 	ctx.String(200, hex.EncodeToString(hasher.Sum(nil)))
 }
 
+// GetAddonFiles ...
 func GetAddonFiles(ctx *gin.Context) {
 	user := ctx.Params.ByName("user")
 	repository := ctx.Params.ByName("repository")
@@ -160,6 +163,7 @@ func GetAddonFiles(ctx *gin.Context) {
 	}
 }
 
+// GetAddonFilesHead ...
 func GetAddonFilesHead(ctx *gin.Context) {
 	ctx.String(200, "")
 }

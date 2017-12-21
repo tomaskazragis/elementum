@@ -1,9 +1,9 @@
 package osdb
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -12,14 +12,19 @@ import (
 )
 
 const (
+	// DefaultOSDBServer ...
 	DefaultOSDBServer = "https://api.opensubtitles.org/xml-rpc"
-	DefaultUserAgent  = "XBMC_Subtitles_Login_v5.0.16" // XBMC OpenSubtitles Agent
-	SearchLimit       = 100
-	StatusSuccess     = "200 OK"
+	// DefaultUserAgent ...
+	DefaultUserAgent = "XBMC_Subtitles_Login_v5.0.16" // XBMC OpenSubtitles Agent
+	// SearchLimit ...
+	SearchLimit = 100
+	// StatusSuccess ...
+	StatusSuccess = "200 OK"
 )
 
 var log = logging.MustGetLogger("osdb")
 
+// Client ...
 type Client struct {
 	UserAgent string
 	Token     string
@@ -29,8 +34,9 @@ type Client struct {
 	*xmlrpc.Client
 }
 
+// Movie ...
 type Movie struct {
-	Id             string            `xmlrpc:"id"`
+	ID             string            `xmlrpc:"id"`
 	Title          string            `xmlrpc:"title"`
 	Cover          string            `xmlrpc:"cover"`
 	Year           string            `xmlrpc:"year"`
@@ -49,6 +55,7 @@ type Movie struct {
 	Certifications []string          `xmlrpc:"certification"`
 }
 
+// SearchPayload ...
 type SearchPayload struct {
 	Query     string `xmlrpc:"query"`
 	Hash      string `xmlrpc:"moviehash"`
@@ -57,13 +64,15 @@ type SearchPayload struct {
 	Languages string `xmlrpc:"sublanguageid"`
 }
 
-// A collection of movies.
+// Movies A collection of movies.
 type Movies []Movie
 
+// Empty ...
 func (m Movies) Empty() bool {
 	return len(m) == 0
 }
 
+// NewClient ...
 func NewClient() (*Client, error) {
 	rpc, err := xmlrpc.NewClient(DefaultOSDBServer, nil)
 	if err != nil {
@@ -78,6 +87,7 @@ func NewClient() (*Client, error) {
 	return c, nil
 }
 
+// SearchSubtitles ...
 func (c *Client) SearchSubtitles(payloads []SearchPayload) (Subtitles, error) {
 	res := struct {
 		Data Subtitles `xmlrpc:"data"`
@@ -96,7 +106,7 @@ func (c *Client) SearchSubtitles(payloads []SearchPayload) (Subtitles, error) {
 	return res.Data, nil
 }
 
-// Search movies on IMDB.
+// SearchOnImdb Search movies on IMDB.
 func (c *Client) SearchOnImdb(q string) (Movies, error) {
 	params := []interface{}{c.Token, q}
 	res := struct {
@@ -112,7 +122,7 @@ func (c *Client) SearchOnImdb(q string) (Movies, error) {
 	return res.Data, nil
 }
 
-// Get movie details from IMDB.
+// GetImdbMovieDetails Get movie details from IMDB.
 func (c *Client) GetImdbMovieDetails(id string) (*Movie, error) {
 	params := []interface{}{c.Token, id}
 	res := struct {
@@ -128,7 +138,7 @@ func (c *Client) GetImdbMovieDetails(id string) (*Movie, error) {
 	return &res.Data, nil
 }
 
-// Download subtitles by file ID.
+// DownloadSubtitles Download subtitles by file ID.
 func (c *Client) DownloadSubtitles(ids []int) ([]SubtitleFile, error) {
 	params := []interface{}{c.Token, ids}
 	res := struct {
@@ -144,12 +154,12 @@ func (c *Client) DownloadSubtitles(ids []int) ([]SubtitleFile, error) {
 	return res.Data, nil
 }
 
-// Save subtitle file to disk, using the OSDB specified name.
+// Download Save subtitle file to disk, using the OSDB specified name.
 func (c *Client) Download(s *Subtitle) error {
 	return c.DownloadTo(s, s.SubFileName)
 }
 
-// Save subtitle file to disk, using the specified path.
+// DownloadTo Save subtitle file to disk, using the specified path.
 func (c *Client) DownloadTo(s *Subtitle, path string) (err error) {
 	id, err := strconv.Atoi(s.IDSubtitleFile)
 	if err != nil {
@@ -182,17 +192,17 @@ func (c *Client) DownloadTo(s *Subtitle, path string) (err error) {
 	return
 }
 
-// Checks whether OSDB already has subtitles for a movie and subtitle
+// HasSubtitlesForFiles Checks whether OSDB already has subtitles for a movie and subtitle
 // files.
-func (c *Client) HasSubtitlesForFiles(movie_file string, sub_file string) (bool, error) {
-	subtitle, err := NewSubtitleWithFile(movie_file, sub_file)
+func (c *Client) HasSubtitlesForFiles(movieFile string, subFile string) (bool, error) {
+	subtitle, err := NewSubtitleWithFile(movieFile, subFile)
 	if err != nil {
 		return true, err
 	}
 	return c.HasSubtitles(Subtitles{subtitle})
 }
 
-// Checks whether subtitles already exists in OSDB. The mandatory fields in the
+// HasSubtitles Checks whether subtitles already exists in OSDB. The mandatory fields in the
 // received Subtitle slice are: SubHash, SubFileName, MovieHash, MovieByteSize,
 // and MovieFileName.
 func (c *Client) HasSubtitles(subs Subtitles) (bool, error) {
@@ -215,7 +225,7 @@ func (c *Client) HasSubtitles(subs Subtitles) (bool, error) {
 	return res.Exists == 1, nil
 }
 
-// Keep session alive
+// Noop Keep session alive
 func (c *Client) Noop() (err error) {
 	res := struct {
 		Status string `xmlrpc:"status"`
@@ -227,7 +237,7 @@ func (c *Client) Noop() (err error) {
 	return
 }
 
-// Login to the API, and return a session token.
+// LogIn to the API, and return a session token.
 func (c *Client) LogIn(user string, pass string, lang string) (err error) {
 	c.Login = user
 	c.Password = pass
@@ -248,7 +258,7 @@ func (c *Client) LogIn(user string, pass string, lang string) (err error) {
 	return
 }
 
-// Logout...
+// LogOut ...
 func (c *Client) LogOut() (err error) {
 	args := []interface{}{c.Token}
 	res := struct {

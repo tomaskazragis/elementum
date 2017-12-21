@@ -25,6 +25,7 @@ import (
 var torrentsLog = logging.MustGetLogger("torrents")
 var cachedTorrents = map[int]string{}
 
+// TorrentsWeb ...
 type TorrentsWeb struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name"`
@@ -44,27 +45,30 @@ type TorrentsWeb struct {
 	PeersTotal    int     `json:"peers_total"`
 }
 
+// HistoryBucket ...
 var HistoryBucket = database.TorrentHistoryBucket
 
-func AddToTorrentsMap(tmdbId string, torrent *bittorrent.TorrentFile) {
+// AddToTorrentsMap ...
+func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	b, err := ioutil.ReadFile(torrent.URI)
 	if err != nil {
 		return
 	}
 
-	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbId)
-	db.SetBytes(HistoryBucket, tmdbId, b)
+	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
+	db.SetBytes(HistoryBucket, tmdbID, b)
 }
 
-func InTorrentsMap(tmdbId string) (torrents []*bittorrent.TorrentFile) {
-	if b, err := db.GetBytes(HistoryBucket, tmdbId); err == nil && len(b) > 0 {
+// InTorrentsMap ...
+func InTorrentsMap(tmdbID string) (torrents []*bittorrent.TorrentFile) {
+	if b, err := db.GetBytes(HistoryBucket, tmdbID); err == nil && len(b) > 0 {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
 		if len(torrent.URI) > 0 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name)) {
 			torrents = append(torrents, torrent)
 		} else {
-			db.Delete(HistoryBucket, tmdbId)
+			db.Delete(HistoryBucket, tmdbID)
 		}
 	}
 
@@ -86,6 +90,7 @@ func nameMatch(torrentName string, itemName string) bool {
 	return len(found) >= len(patterns)
 }
 
+// ExistingTorrent ...
 func ExistingTorrent(btService *bittorrent.BTService, longName string) (existingTorrent string) {
 	for _, torrent := range btService.Torrents {
 		if nameMatch(torrent.Name(), longName) {
@@ -99,6 +104,7 @@ func ExistingTorrent(btService *bittorrent.BTService, longName string) (existing
 	return ""
 }
 
+// ListTorrents ...
 func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		items := make(xbmc.ListItems, 0, len(btService.Torrents))
@@ -119,40 +125,40 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			progress := torrent.GetProgress()
 			status := torrent.GetStateString()
 
-			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause/%s", i))}
-			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/pause"))}
+			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause/%s", i))}
+			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause"))}
 
 			if status == "Paused" {
-				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume"))}
+				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume"))}
 			} else if status != "Finished" {
 				if progress >= 100 {
 					status = "Finished"
 				} else {
 					status = "Downloading"
 				}
-				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/resume/%s", i))}
-			} else if status == "Finished" || progress >= 100 {
-				status = "Seeding"
+				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume/%s", i))}
+			} else if status == statusFinished || progress >= 100 {
+				status = statusSeeding
 			}
 
 			color := "white"
 			switch status {
-			case "Paused":
+			case statusPaused:
 				fallthrough
-			case "Finished":
+			case statusFinished:
 				color = "grey"
-			case "Seeding":
+			case statusSeeding:
 				color = "green"
-			case "Buffering":
+			case statusBuffering:
 				color = "blue"
-			case "Finding":
+			case statusFinding:
 				color = "orange"
-			case "Checking":
+			case statusChecking:
 				color = "teal"
-			case "Queued":
-			case "Allocating":
+			case statusQueued:
+			case statusAllocating:
 				color = "black"
-			case "Stalled":
+			case statusStalled:
 				color = "red"
 			}
 
@@ -169,7 +175,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 
 			if torrent.DBItem != nil && torrent.DBItem.Type != "" {
 				contentType = torrent.DBItem.Type
-				if contentType == "movie" {
+				if contentType == movieType {
 					tmdb = strconv.Itoa(torrent.DBItem.ID)
 				} else {
 					show = strconv.Itoa(torrent.DBItem.ShowID)
@@ -179,7 +185,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			cachedTorrents[counter] = torrent.InfoHash()
-			playUrl := UrlQuery(UrlForXBMC("/play"),
+			playURL := URLQuery(URLForXBMC("/play"),
 				"resume", i,
 				"type", contentType,
 				"tmdb", tmdb,
@@ -189,17 +195,17 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 
 			item := xbmc.ListItem{
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %s", progress, color, status, torrentName),
-				Path:  playUrl,
+				Path:  playURL,
 				Info: &xbmc.ListItemInfo{
 					Title: torrentName,
 				},
 			}
 			item.ContextMenu = [][]string{
-				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playUrl)},
+				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playURL)},
 				torrentAction,
-				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%s", i))},
-				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/delete/%s?files=1", i))},
-				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/torrents/move/%s", i))},
+				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s", i))},
+				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s?files=1", i))},
+				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/move/%s", i))},
 				sessionAction,
 			}
 			item.IsPlayable = true
@@ -210,6 +216,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// ListTorrentsWeb ...
 func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		torrents := make([]*TorrentsWeb, 0, len(btService.Torrents))
@@ -232,14 +239,14 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			progress := torrent.GetProgress()
 			status := torrent.GetStateString()
 
-			if status != "Finished" {
+			if status != statusFinished {
 				if progress >= 100 {
-					status = "Finished"
+					status = statusFinished
 				} else {
-					status = "Downloading"
+					status = statusDownloading
 				}
-			} else if status == "Finished" || progress >= 100 {
-				status = "Seeding"
+			} else if status == statusFinished || progress >= 100 {
+				status = statusSeeding
 			}
 
 			size := humanize.Bytes(uint64(torrent.Length()))
@@ -271,6 +278,7 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// PauseSession ...
 func PauseSession(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// TODO: Add Global Pause
@@ -280,6 +288,7 @@ func PauseSession(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// ResumeSession ...
 func ResumeSession(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// TODO: Add Global Resume
@@ -289,6 +298,7 @@ func ResumeSession(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// AddTorrent ...
 func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
@@ -319,12 +329,13 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// ResumeTorrent ...
 func ResumeTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		torrentId := ctx.Params.ByName("torrentId")
-		torrent, err := GetTorrentFromParam(btService, torrentId)
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(btService, torrentID)
 		if err != nil {
-			ctx.Error(errors.New(fmt.Sprintf("Unable to resume torrent with index %s", torrentId)))
+			ctx.Error(fmt.Errorf("Unable to resume torrent with index %s", torrentID))
 			return
 		}
 
@@ -336,12 +347,13 @@ func ResumeTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// MoveTorrent ...
 func MoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		torrentId := ctx.Params.ByName("torrentId")
-		torrent, err := GetTorrentFromParam(btService, torrentId)
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(btService, torrentID)
 		if err != nil {
-			ctx.Error(errors.New(fmt.Sprintf("Unable to move torrent with index %s", torrentId)))
+			ctx.Error(fmt.Errorf("Unable to move torrent with index %s", torrentID))
 			return
 		}
 
@@ -354,12 +366,13 @@ func MoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// PauseTorrent ...
 func PauseTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		torrentId := ctx.Params.ByName("torrentId")
-		torrent, err := GetTorrentFromParam(btService, torrentId)
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(btService, torrentID)
 		if err != nil {
-			ctx.Error(errors.New(fmt.Sprintf("Unable to pause torrent with index %s", torrentId)))
+			ctx.Error(fmt.Errorf("Unable to pause torrent with index %s", torrentID))
 			return
 		}
 
@@ -371,14 +384,15 @@ func PauseTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// RemoveTorrent ...
 func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		deleteFiles := ctx.Query("files")
 
-		torrentId := ctx.Params.ByName("torrentId")
-		torrent, err := GetTorrentFromParam(btService, torrentId)
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(btService, torrentID)
 		if err != nil {
-			ctx.Error(errors.New(fmt.Sprintf("Unable to remove torrent with index %s", torrentId)))
+			ctx.Error(fmt.Errorf("Unable to remove torrent with index %s", torrentID))
 			return
 		}
 
@@ -402,7 +416,7 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			deleteAnswer = true
 		}
 
-		if deleteAnswer == true || deleteFiles == "true" {
+		if deleteAnswer == true || deleteFiles == trueType {
 			torrentsLog.Info("Removing the torrent and deleting files...")
 			btService.RemoveTorrent(torrent, true)
 		} else {
@@ -416,6 +430,7 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// Versions ...
 func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		type Versions struct {
@@ -431,6 +446,7 @@ func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
 	}
 }
 
+// GetTorrentFromParam ...
 func GetTorrentFromParam(btService *bittorrent.BTService, param string) (*bittorrent.Torrent, error) {
 	if len(param) == 0 {
 		return nil, errors.New("Empty param")
@@ -442,16 +458,16 @@ func GetTorrentFromParam(btService *bittorrent.BTService, param string) (*bittor
 			return nil, errors.New("Wrong int param")
 		}
 
-		if v, ok := cachedTorrents[id]; !ok {
+		v, ok := cachedTorrents[id]
+		if !ok {
 			return nil, errors.New("Wrong int index")
-		} else {
-			param = v
 		}
+		param = v
 	}
 
-	if t, ok := btService.Torrents[param]; !ok {
+	t, ok := btService.Torrents[param]
+	if !ok {
 		return nil, errors.New("Torrent not found")
-	} else {
-		return t, nil
 	}
+	return t, nil
 }

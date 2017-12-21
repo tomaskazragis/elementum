@@ -28,6 +28,7 @@ type Piece struct {
 	Chunks *roaring.Bitmap
 }
 
+// Completion ...
 func (p *Piece) Completion() storage.Completion {
 	return storage.Completion{
 		Complete: p.Active && p.Completed && p.Size == p.Length && p.Length != 0,
@@ -35,18 +36,21 @@ func (p *Piece) Completion() storage.Completion {
 	}
 }
 
+// MarkComplete ...
 func (p *Piece) MarkComplete() error {
 	log.Debugf("Complete: %#v", p.Index)
 	p.Completed = true
 	return nil
 }
 
+// MarkNotComplete ...
 func (p *Piece) MarkNotComplete() error {
 	log.Debugf("NotComplete: %#v", p.Index)
 	p.Completed = false
 	return nil
 }
 
+// OpenBuffer ...
 func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
@@ -71,7 +75,7 @@ func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 			selected.Active = true
 			selected.Size = 0
 
-			p.c.items[p.Key] = itemState{}
+			p.c.items[p.Key] = ItemState{}
 
 			break
 		}
@@ -82,7 +86,7 @@ func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 		}
 	}
 
-	p.c.updateItem(p.Key, func(i *itemState, ok bool) bool {
+	p.c.updateItem(p.Key, func(i *ItemState, ok bool) bool {
 		if !ok {
 			*i = p.GetState()
 		}
@@ -93,6 +97,7 @@ func (p *Piece) OpenBuffer(iswrite bool) (ret bool, err error) {
 	return true, nil
 }
 
+// IsPositioned ...
 func (p *Piece) IsPositioned() bool {
 	if p == nil || p.c == nil || !p.Active || p.Position == -1 {
 		return false
@@ -133,8 +138,8 @@ func (p *Piece) WriteAt(b []byte, off int64) (n int, err error) {
 
 	p.c.buffers[p.Position].mu.Lock()
 
-	chunkId, _ := p.GetChunkForOffset(off)
-	p.Chunks.AddInt(chunkId)
+	chunkID, _ := p.GetChunkForOffset(off)
+	p.Chunks.AddInt(chunkID)
 
 	n = copy(p.c.buffers[p.Position].body[off:], b[:])
 
@@ -178,7 +183,7 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 
 	requested := len(b)
 	startIndex, _ := p.GetChunkForOffset(off)
-	lastIndex, _ := p.GetChunkForOffset(off + int64(requested-CHUNK_SIZE))
+	lastIndex, _ := p.GetChunkForOffset(off + int64(requested-ChunkSize))
 
 	if lastIndex < startIndex {
 		lastIndex = startIndex
@@ -210,15 +215,17 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 	return n, nil
 }
 
+// GetChunkForOffset ...
 func (p *Piece) GetChunkForOffset(offset int64) (index, margin int) {
-	index = int(offset / CHUNK_SIZE)
-	margin = int(offset % CHUNK_SIZE)
+	index = int(offset / ChunkSize)
+	margin = int(offset % ChunkSize)
 
 	return
 }
 
-func (p *Piece) GetState() itemState {
-	return itemState{
+// GetState ...
+func (p *Piece) GetState() ItemState {
+	return ItemState{
 		Size:     p.Size,
 		Accessed: p.Accessed,
 	}
@@ -227,7 +234,7 @@ func (p *Piece) GetState() itemState {
 func (p *Piece) onRead() {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
-	p.c.updateItem(p.Key, func(i *itemState, ok bool) bool {
+	p.c.updateItem(p.Key, func(i *ItemState, ok bool) bool {
 		i.Accessed = time.Now()
 		return ok
 	})
@@ -236,7 +243,7 @@ func (p *Piece) onRead() {
 func (p *Piece) onWrite() {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
-	p.c.updateItem(p.Key, func(i *itemState, ok bool) bool {
+	p.c.updateItem(p.Key, func(i *ItemState, ok bool) bool {
 		i.Accessed = time.Now()
 		i.Size = p.Size
 		return ok

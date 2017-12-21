@@ -2,6 +2,7 @@ package xbmc
 
 import "encoding/xml"
 
+// AddonsList ...
 type AddonsList struct {
 	Addons []*struct {
 		ID      string `json:"addonid"`
@@ -12,35 +13,41 @@ type AddonsList struct {
 	} `json:"addons"`
 }
 
+// GetAddons ...
 func GetAddons(args ...interface{}) *AddonsList {
 	addons := AddonsList{}
 	executeJSONRPC("Addons.GetAddons", &addons, args)
 	return &addons
 }
 
+// UpdateLocalAddons ...
 func UpdateLocalAddons() (ret string) {
 	executeJSONRPCEx("UpdateLocalAddons", &ret, nil)
 	return
 }
 
-func InstallAddon(addonId string) (ret string) {
-	executeJSONRPCEx("InstallAddon", &ret, Args{addonId})
+// InstallAddon ...
+func InstallAddon(addonID string) (ret string) {
+	executeJSONRPCEx("InstallAddon", &ret, Args{addonID})
 	return
 }
 
-func SetAddonEnabled(addonId string, enabled bool) (retval string) {
-	executeJSONRPC("Addons.SetAddonEnabled", &retval, Args{addonId, enabled})
+// SetAddonEnabled ...
+func SetAddonEnabled(addonID string, enabled bool) (retval string) {
+	executeJSONRPC("Addons.SetAddonEnabled", &retval, Args{addonID, enabled})
 	return
 }
 
-func ExecuteAddon(addonId string, args ...interface{}) {
+// ExecuteAddon ...
+func ExecuteAddon(addonID string, args ...interface{}) {
 	var retVal string
-	executeJSONRPC("Addons.ExecuteAddon", &retVal, Args{addonId, args})
+	executeJSONRPC("Addons.ExecuteAddon", &retVal, Args{addonID, args})
 }
 
+// Addon ...
 type Addon struct {
 	XMLName      xml.Name          `xml:"addon"`
-	Id           string            `xml:"id,attr"`
+	ID           string            `xml:"id,attr"`
 	Name         string            `xml:"name,attr"`
 	Version      string            `xml:"version,attr"`
 	ProviderName string            `xml:"provider-name,attr"`
@@ -48,6 +55,7 @@ type Addon struct {
 	Extensions   []*AddonExtension `xml:"extension"`
 }
 
+// AddonImport ...
 type AddonImport struct {
 	XMLName  xml.Name `xml:"import"`
 	Addon    string   `xml:"addon,attr"`
@@ -55,23 +63,27 @@ type AddonImport struct {
 	Optional string   `xml:"optional,attr,omitempty"`
 }
 
+// AddonText ...
 type AddonText struct {
 	Text string `xml:",chardata"`
 	Lang string `xml:"lang,attr"`
 }
 
+// AddonRepositoryInfo ...
 type AddonRepositoryInfo struct {
 	XMLName    xml.Name `xml:"info"`
 	Text       string   `xml:",chardata"`
 	Compressed bool     `xml:"compressed,attr"`
 }
 
+// AddonRepositoryDataDir ...
 type AddonRepositoryDataDir struct {
 	XMLName xml.Name `xml:"datadir"`
 	Text    string   `xml:",chardata"`
 	Zip     bool     `xml:"zip,attr"`
 }
 
+// AddonSkinResolution ...
 type AddonSkinResolution struct {
 	XMLName xml.Name `xml:"res"`
 	Width   int      `xml:"width,attr"`
@@ -81,6 +93,7 @@ type AddonSkinResolution struct {
 	Folder  string   `xml:"folder,attr"`
 }
 
+// AddonExtension ...
 type AddonExtension struct {
 	Point string `xml:"point,attr"`
 
@@ -122,6 +135,7 @@ type AddonExtension struct {
 	Resolutions           []*AddonSkinResolution `xml:"res,omitempty"`
 }
 
+// AddonList ...
 type AddonList struct {
 	XMLName xml.Name `xml:"addons"`
 	Addons  []Addon

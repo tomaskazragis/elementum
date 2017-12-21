@@ -1,31 +1,36 @@
 package lockfile
 
 import (
-	"os"
 	"errors"
+	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
-	"io/ioutil"
 )
 
 var (
-	ErrLocked          = errors.New("already locked by another process")
-	ErrAlreadyLocked   = errors.New("the lockfile is already locked")
+	// ErrLocked ...
+	ErrLocked = errors.New("already locked by another process")
+	// ErrAlreadyLocked ...
+	ErrAlreadyLocked = errors.New("the lockfile is already locked")
+	// ErrAlreadyUnlocked ...
 	ErrAlreadyUnlocked = errors.New("already unlocked")
-	ErrInvalidPID      = errors.New("invalid pid")
+	// ErrInvalidPID ...
+	ErrInvalidPID = errors.New("invalid pid")
 )
 
+// LockFile ...
 type LockFile struct {
 	File   string
 	locked bool
 }
 
-// Creates a new lockfile.
+// New Creates a new lockfile.
 func New(file string) (*LockFile, error) {
 	return &LockFile{File: file}, nil
 }
 
-// LockFile.Lock attempts to lock the lockfile. If the lockfile was already locked by this process,
+// Lock attempts to lock the lockfile. If the lockfile was already locked by this process,
 // it returns ErrAlreadyLocked.
 // Otherwise it typically returns ErrLocked if already locked by another process, and nil if not locked.
 func (lf *LockFile) Lock() (int, error) {
@@ -63,7 +68,7 @@ func (lf *LockFile) Lock() (int, error) {
 	return ownPID, nil
 }
 
-// LockFile.Unlock unlocks the lockfile. If the lockfile was not locked it returns ErrAlreadyUnlocked.
+// Unlock LockFile.Unlock unlocks the lockfile. If the lockfile was not locked it returns ErrAlreadyUnlocked.
 // Unlock will delete the lockfile if it is not already unlocked.
 func (lf *LockFile) Unlock() error {
 	if !lf.locked {

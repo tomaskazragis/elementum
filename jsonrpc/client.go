@@ -46,7 +46,7 @@ type clientRequest struct {
 	JSONRPC string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params"`
-	Id      uint64      `json:"id"`
+	ID      uint64      `json:"id"`
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
@@ -56,18 +56,18 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 	c.req.JSONRPC = "2.0"
 	c.req.Method = r.ServiceMethod
 	c.req.Params = param
-	c.req.Id = r.Seq
+	c.req.ID = r.Seq
 	return c.enc.Encode(&c.req)
 }
 
 type clientResponse struct {
-	Id     uint64           `json:"id"`
+	ID     uint64           `json:"id"`
 	Result *json.RawMessage `json:"result"`
 	Error  interface{}      `json:"error"`
 }
 
 func (r *clientResponse) reset() {
-	r.Id = 0
+	r.ID = 0
 	r.Result = nil
 	r.Error = nil
 }
@@ -79,12 +79,12 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 	}
 
 	c.mutex.Lock()
-	r.ServiceMethod = c.pending[c.resp.Id]
-	delete(c.pending, c.resp.Id)
+	r.ServiceMethod = c.pending[c.resp.ID]
+	delete(c.pending, c.resp.ID)
 	c.mutex.Unlock()
 
 	r.Error = ""
-	r.Seq = c.resp.Id
+	r.Seq = c.resp.ID
 	if c.resp.Error != nil || c.resp.Result == nil {
 		x, ok := c.resp.Error.(string)
 		if !ok {

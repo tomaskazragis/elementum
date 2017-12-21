@@ -2,31 +2,37 @@ package xbmc
 
 import "time"
 
+// UpdateAddonRepos ...
 func UpdateAddonRepos() (retVal string) {
 	executeJSONRPCEx("UpdateAddonRepos", &retVal, nil)
 	return
 }
 
+// ResetRPC ...
 func ResetRPC() (retVal string) {
 	executeJSONRPCEx("Reset", &retVal, nil)
 	return
 }
 
+// Refresh ...
 func Refresh() (retVal string) {
 	executeJSONRPCEx("Refresh", &retVal, nil)
 	return
 }
 
+// VideoLibraryScan ...
 func VideoLibraryScan() (retVal string) {
 	executeJSONRPC("VideoLibrary.Scan", &retVal, nil)
 	return
 }
 
+// VideoLibraryClean ...
 func VideoLibraryClean() (retVal string) {
 	executeJSONRPC("VideoLibrary.Clean", &retVal, nil)
 	return
 }
 
+// VideoLibraryGetMovies ...
 func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
 	params := map[string]interface{}{"properties": []interface{}{
 		"imdbnumber",
@@ -41,19 +47,21 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
 	return movies
 }
 
-func PlayerGetActive() (int) {
+// PlayerGetActive ...
+func PlayerGetActive() int {
 	params := map[string]interface{}{}
 	items := ActivePlayers{}
 	executeJSONRPCO("Player.GetActivePlayers", &items, params)
 	for _, v := range items {
 		if v.Type == "video" {
-			return v.Id
+			return v.ID
 		}
 	}
 
 	return -1
 }
 
+// PlayerGetItem ...
 func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 	params := map[string]interface{}{
 		"playerid": playerid,
@@ -62,6 +70,7 @@ func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 	return
 }
 
+// VideoLibraryGetShows ...
 func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 	params := map[string]interface{}{"properties": []interface{}{"imdbnumber", "episode"}}
 	err := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
@@ -71,8 +80,9 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 	return
 }
 
-func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
-	params := map[string]interface{}{"tvshowid": tvshowId, "properties": []interface{}{
+// VideoLibraryGetEpisodes ...
+func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes) {
+	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
 		"tvshowid",
 		"uniqueid",
 		"season",
@@ -88,13 +98,14 @@ func VideoLibraryGetEpisodes(tvshowId int) (episodes *VideoLibraryEpisodes) {
 	return
 }
 
-func SetMovieWatched(movieId int, playcount int, position int, total int) (ret string) {
+// SetMovieWatched ...
+func SetMovieWatched(movieID int, playcount int, position int, total int) (ret string) {
 	params := map[string]interface{}{
-		"movieid": movieId,
+		"movieid":   movieID,
 		"playcount": playcount,
 		"resume": map[string]interface{}{
 			"position": position,
-			"total": total,
+			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
 	}
@@ -102,13 +113,14 @@ func SetMovieWatched(movieId int, playcount int, position int, total int) (ret s
 	return
 }
 
-func SetEpisodeWatched(episodeId int, playcount int, position int, total int) (ret string) {
+// SetEpisodeWatched ...
+func SetEpisodeWatched(episodeID int, playcount int, position int, total int) (ret string) {
 	params := map[string]interface{}{
-		"episodeid": episodeId,
+		"episodeid": episodeID,
 		"playcount": playcount,
 		"resume": map[string]interface{}{
 			"position": position,
-			"total": total,
+			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
 	}
@@ -116,14 +128,15 @@ func SetEpisodeWatched(episodeId int, playcount int, position int, total int) (r
 	return
 }
 
+// SetFileWatched ...
 func SetFileWatched(file string, position int, total int) (ret string) {
 	params := map[string]interface{}{
-		"file": file,
-		"media": "video",
+		"file":      file,
+		"media":     "video",
 		"playcount": 0,
 		"resume": map[string]interface{}{
 			"position": position,
-			"total": total,
+			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
 	}
@@ -131,58 +144,82 @@ func SetFileWatched(file string, position int, total int) (ret string) {
 	return
 }
 
+// TranslatePath ...
 func TranslatePath(path string) (retVal string) {
 	executeJSONRPCEx("TranslatePath", &retVal, Args{path})
 	return
 }
 
+// UpdatePath ...
 func UpdatePath(path string) (retVal string) {
 	executeJSONRPCEx("Update", &retVal, Args{path})
 	return
 }
 
+// PlayURL ...
 func PlayURL(url string) {
 	retVal := ""
 	executeJSONRPCEx("Player_Open", &retVal, Args{url})
 }
 
 const (
-	ISO_639_1 = iota
-	ISO_639_2
+	// Iso639_1 ...
+	Iso639_1 = iota
+	// Iso639_2 ...
+	Iso639_2
+	// EnglishName ...
 	EnglishName
 )
 
+// ConvertLanguage ...
 func ConvertLanguage(language string, format int) string {
 	retVal := ""
 	executeJSONRPCEx("ConvertLanguage", &retVal, Args{language, format})
 	return retVal
 }
 
+// GetLanguage ...
 func GetLanguage(format int) string {
 	retVal := ""
 	executeJSONRPCEx("GetLanguage", &retVal, Args{format})
 	return retVal
 }
 
-func GetLanguageISO_639_1() string{
-	language := GetLanguage(ISO_639_1)
+// GetLanguageISO639_1 ...
+func GetLanguageISO639_1() string {
+	language := GetLanguage(Iso639_1)
 	if language == "" {
 		switch GetLanguage(EnglishName) {
-		case "Chinese (Simple)":      return "zh"
-		case "Chinese (Traditional)": return "zh"
-		case "English (Australia)":   return "en"
-		case "English (New Zealand)": return "en"
-		case "English (US)":          return "en"
-		case "French (Canada)":       return "fr"
-		case "Hindi (Devanagiri)":    return "hi"
-		case "Mongolian (Mongolia)":  return "mn"
-		case "Persian (Iran)":        return "fa"
-		case "Portuguese (Brazil)":   return "pt"
-		case "Serbian (Cyrillic)":    return "sr"
-		case "Spanish (Argentina)":   return "es"
-		case "Spanish (Mexico)":      return "es"
-		case "Tamil (India)":         return "ta"
-		default:                      return "en"
+		case "Chinese (Simple)":
+			return "zh"
+		case "Chinese (Traditional)":
+			return "zh"
+		case "English (Australia)":
+			return "en"
+		case "English (New Zealand)":
+			return "en"
+		case "English (US)":
+			return "en"
+		case "French (Canada)":
+			return "fr"
+		case "Hindi (Devanagiri)":
+			return "hi"
+		case "Mongolian (Mongolia)":
+			return "mn"
+		case "Persian (Iran)":
+			return "fa"
+		case "Portuguese (Brazil)":
+			return "pt"
+		case "Serbian (Cyrillic)":
+			return "sr"
+		case "Spanish (Argentina)":
+			return "es"
+		case "Spanish (Mexico)":
+			return "es"
+		case "Tamil (India)":
+			return "ta"
+		default:
+			return "en"
 		}
 	}
 	return language

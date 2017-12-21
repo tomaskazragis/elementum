@@ -16,6 +16,7 @@ import (
 
 var tfsLog = logging.MustGetLogger("torrentfs")
 
+// ServeTorrent ...
 func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 	return http.StripPrefix("/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
@@ -45,6 +46,7 @@ func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 	}))
 }
 
+// GetTorrentForPath ...
 func GetTorrentForPath(s *BTService, path string, url string, r *http.Request) (*FileReader, error) {
 	dir := string(http.Dir(path))
 	if file, err := os.Open(filepath.Join(dir, url)); err == nil {

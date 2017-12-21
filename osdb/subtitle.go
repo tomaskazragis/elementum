@@ -1,44 +1,44 @@
 package osdb
 
 import (
-	"io"
-	"os"
+	"compress/gzip"
+	"crypto/md5"
+	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
-	"net/http"
-	"crypto/md5"
-	"compress/gzip"
-	"encoding/base64"
 )
 
 // A Subtitle with its many OSDB attributes...
 type Subtitle struct {
-	IDMovie            string `xmlrpc:"IDMovie"`
-	IDMovieImdb        string `xmlrpc:"IDMovieImdb"`
-	IDSubMovieFile     string `xmlrpc:"IDSubMovieFile"`
-	IDSubtitle         string `xmlrpc:"IDSubtitle"`
-	IDSubtitleFile     string `xmlrpc:"IDSubtitleFile"`
-	ISO639             string `xmlrpc:"ISO639"`
-	LanguageName       string `xmlrpc:"LanguageName"`
-	MatchedBy          string `xmlrpc:"MatchedBy"`
-	MovieByteSize      string `xmlrpc:"MovieByteSize"`
-	MovieFPS           string `xmlrpc:"MovieFPS"`
-	MovieHash          string `xmlrpc:"MovieHash"`
-	MovieImdbRating    string `xmlrpc:"MovieImdbRating"`
-	MovieKind          string `xmlrpc:"MovieKind"`
-	MovieName          string `xmlrpc:"MovieName"`
-	MovieNameEng       string `xmlrpc:"MovieNameEng"`
-	MovieReleaseName   string `xmlrpc:"MovieReleaseName"`
-	MovieTimeMS        string `xmlrpc:"MovieTimeMS"`
-	MovieYear          string `xmlrpc:"MovieYear"`
-	MovieFileName      string `xmlrpc:"MovieName"`
-	QueryNumber        string `xmlrpc:"QueryNumber"`
-	QueryParameters    struct {
-	                       query          string `xmlrpc:"query"`
-	                       sublanguageid  string `xmlrpc:"sublanguageid"`
-	                   } `xmlrpc:"QueryParameters"`
+	IDMovie          string `xmlrpc:"IDMovie"`
+	IDMovieImdb      string `xmlrpc:"IDMovieImdb"`
+	IDSubMovieFile   string `xmlrpc:"IDSubMovieFile"`
+	IDSubtitle       string `xmlrpc:"IDSubtitle"`
+	IDSubtitleFile   string `xmlrpc:"IDSubtitleFile"`
+	ISO639           string `xmlrpc:"ISO639"`
+	LanguageName     string `xmlrpc:"LanguageName"`
+	MatchedBy        string `xmlrpc:"MatchedBy"`
+	MovieByteSize    string `xmlrpc:"MovieByteSize"`
+	MovieFPS         string `xmlrpc:"MovieFPS"`
+	MovieHash        string `xmlrpc:"MovieHash"`
+	MovieImdbRating  string `xmlrpc:"MovieImdbRating"`
+	MovieKind        string `xmlrpc:"MovieKind"`
+	MovieName        string `xmlrpc:"MovieName"`
+	MovieNameEng     string `xmlrpc:"MovieNameEng"`
+	MovieReleaseName string `xmlrpc:"MovieReleaseName"`
+	MovieTimeMS      string `xmlrpc:"MovieTimeMS"`
+	MovieYear        string `xmlrpc:"MovieYear"`
+	MovieFileName    string `xmlrpc:"MovieName"`
+	QueryNumber      string `xmlrpc:"QueryNumber"`
+	QueryParameters  struct {
+		query         string `xmlrpc:"query"`
+		sublanguageid string `xmlrpc:"sublanguageid"`
+	} `xmlrpc:"QueryParameters"`
 	SeriesEpisode      string `xmlrpc:"SeriesEpisode"`
 	SeriesIMDBParent   string `xmlrpc:"SeriesIMDBParent"`
 	SeriesSeason       string `xmlrpc:"SeriesSeason"`
@@ -68,9 +68,10 @@ type Subtitle struct {
 	ZipDownloadLink    string `xmlrpc:"ZipDownloadLink"`
 }
 
-// A collection of subtitles
+// Subtitles A collection of subtitles
 type Subtitles []Subtitle
 
+// Best ...
 // The best subtitle of the collection, for some definition of "best" at
 // least.
 func (subs Subtitles) Best() *Subtitle {
@@ -80,6 +81,7 @@ func (subs Subtitles) Best() *Subtitle {
 	return nil
 }
 
+// NewSubtitleReader ...
 func NewSubtitleReader(s *Subtitle) (io.Reader, error) {
 	resp, err := http.Get(s.SubDownloadLink)
 	if err != nil {
@@ -91,12 +93,12 @@ func NewSubtitleReader(s *Subtitle) (io.Reader, error) {
 // SubtitleFile contains file data as returned by OSDB's API, that is to
 // say: gzip-ped and base64-encoded text.
 type SubtitleFile struct {
-	Id     string `xmlrpc:"idsubtitlefile"`
+	ID     string `xmlrpc:"idsubtitlefile"`
 	Data   string `xmlrpc:"data"`
 	reader *gzip.Reader
 }
 
-// A Reader for the subtitle file contents (decoded, and decompressed).
+// Reader for the subtitle file contents (decoded, and decompressed).
 func (sf *SubtitleFile) Reader() (r *gzip.Reader, err error) {
 	if sf.reader != nil {
 		return sf.reader, err
@@ -108,39 +110,39 @@ func (sf *SubtitleFile) Reader() (r *gzip.Reader, err error) {
 	return sf.reader, err
 }
 
-// Build a Subtitle struct for a file, suitable for osdb.HasSubtitles()
-func NewSubtitleWithFile(movie_file string, sub_file string) (s Subtitle, err error) {
-	s.SubFileName = path.Base(sub_file)
+// NewSubtitleWithFile Build a Subtitle struct for a file, suitable for osdb.HasSubtitles()
+func NewSubtitleWithFile(movieFile string, subFile string) (s Subtitle, err error) {
+	s.SubFileName = path.Base(subFile)
 	// Compute md5 sum
-	sub_io, err := os.Open(sub_file)
+	subIo, err := os.Open(subFile)
 	if err != nil {
 		return
 	}
-	defer sub_io.Close()
+	defer subIo.Close()
 	h := md5.New()
-	_, err = io.Copy(h, sub_io)
+	_, err = io.Copy(h, subIo)
 	if err != nil {
 		return
 	}
 	s.SubHash = fmt.Sprintf("%x", h.Sum(nil))
 
 	// Movie filename, byte-size, & hash.
-	s.MovieFileName = path.Base(movie_file)
-	movie_io, err := os.Open(movie_file)
+	s.MovieFileName = path.Base(movieFile)
+	movieIo, err := os.Open(movieFile)
 	if err != nil {
 		return
 	}
-	defer movie_io.Close()
-	stat, err := movie_io.Stat()
+	defer movieIo.Close()
+	stat, err := movieIo.Stat()
 	if err != nil {
 		return
 	}
 	s.MovieByteSize = strconv.FormatInt(stat.Size(), 10)
-	movie_hash, err := HashFile(movie_io)
+	movieHash, err := HashFile(movieIo)
 	if err != nil {
 		return
 	}
-	s.MovieHash = fmt.Sprintf("%x", movie_hash)
+	s.MovieHash = fmt.Sprintf("%x", movieHash)
 	return
 }
 

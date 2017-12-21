@@ -1,5 +1,6 @@
 package xbmc
 
+// Platform ...
 type Platform struct {
 	OS      string
 	Arch    string
@@ -8,6 +9,7 @@ type Platform struct {
 	Build   string
 }
 
+// GetPlatform ...
 func GetPlatform() *Platform {
 	retVal := Platform{}
 	executeJSONRPCEx("GetPlatform", &retVal, nil)

@@ -112,7 +112,7 @@ func main() {
 
 	conf := config.Reload()
 
-	log.Infof("Addon: %s v%s", conf.Info.Id, conf.Info.Version)
+	log.Infof("Addon: %s v%s", conf.Info.ID, conf.Info.Version)
 
 	lock, err := ensureSingleInstance(conf)
 	defer lock.Unlock()

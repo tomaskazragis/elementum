@@ -35,18 +35,34 @@ import (
 var log = logging.MustGetLogger("torrent")
 
 const (
-	STATUS_QUEUED = iota
-	STATUS_CHECKING
-	STATUS_FINDING
-	STATUS_PAUSED
-	STATUS_BUFFERING
-	STATUS_DOWNLOADING
-	STATUS_FINISHED
-	STATUS_SEEDING
-	STATUS_ALLOCATING
-	STATUS_STALLED
+	movieType = "movie"
+	showType  = "show"
 )
 
+const (
+	// StatusQueued ...
+	StatusQueued = iota
+	// StatusChecking ...
+	StatusChecking
+	// StatusFinding ...
+	StatusFinding
+	// StatusPaused ...
+	StatusPaused
+	// StatusBuffering ...
+	StatusBuffering
+	// StatusDownloading ...
+	StatusDownloading
+	// StatusFinished ...
+	StatusFinished
+	// StatusSeeding ...
+	StatusSeeding
+	// StatusAllocating ...
+	StatusAllocating
+	// StatusStalled ...
+	StatusStalled
+)
+
+// StatusStrings ...
 var StatusStrings = []string{
 	"Queued",
 	"Checking",
@@ -60,6 +76,7 @@ var StatusStrings = []string{
 	"Stalled",
 }
 
+// Torrent ...
 type Torrent struct {
 	*gotorrent.Torrent
 
@@ -116,6 +133,7 @@ type Torrent struct {
 	dbidTicker     *time.Ticker
 }
 
+// NewTorrent ...
 func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Torrent {
 	t := &Torrent{
 		infoHash: handle.InfoHash().HexString(),
@@ -148,10 +166,12 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 	return t
 }
 
+// Storage ...
 func (t *Torrent) Storage() estorage.ElementumStorage {
 	return t.Service.DefaultStorage.GetTorrentStorage(t.infoHash)
 }
 
+// Watch ...
 func (t *Torrent) Watch() {
 	// log.Debugf("Starting watch timers")
 	// debug.PrintStack()
@@ -259,6 +279,7 @@ func (t *Torrent) bufferTickerEvent() {
 	t.muBuffer.Unlock()
 }
 
+// CleanupBuffer ...
 func (t *Torrent) CleanupBuffer() {
 	// for _, v := range t.BufferEndPieces {
 	// 	t.Storage.RemovePiece(v)
@@ -400,7 +421,7 @@ func (t *Torrent) dbidEvent() {
 	}
 
 	if item := xbmc.PlayerGetItem(playerID); item != nil {
-		t.DBID = item.Info.Id
+		t.DBID = item.Info.ID
 		t.DBTYPE = item.Info.Type
 
 		t.dbidTicker.Stop()
@@ -534,11 +555,12 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 	return
 }
 
+// GetState ...
 func (t *Torrent) GetState() int {
 	// log.Debugf("Status: %#v, %#v, %#v, %#v ", t.IsBuffering, t.BytesCompleted(), t.BytesMissing(), t.Stats())
 
 	if t.IsBuffering {
-		return STATUS_BUFFERING
+		return StatusBuffering
 	}
 
 	havePartial := false
@@ -549,7 +571,7 @@ func (t *Torrent) GetState() int {
 		}
 
 		if state.Checking == true {
-			return STATUS_CHECKING
+			return StatusChecking
 		} else if state.Partial == true {
 			havePartial = true
 		}
@@ -557,33 +579,34 @@ func (t *Torrent) GetState() int {
 
 	progress := t.GetProgress()
 	if progress == 0 {
-		return STATUS_QUEUED
+		return StatusQueued
 	} else if progress < 100 {
 		if havePartial {
-			return STATUS_DOWNLOADING
+			return StatusDownloading
 		} else if t.BytesCompleted() == 0 {
-			return STATUS_QUEUED
+			return StatusQueued
 		}
 	} else {
 		if t.IsSeeding {
-			return STATUS_SEEDING
-		} else {
-			return STATUS_FINISHED
+			return StatusSeeding
 		}
+		return StatusFinished
 	}
 
-	return STATUS_QUEUED
+	return StatusQueued
 }
 
+// GetStateString ...
 func (t *Torrent) GetStateString() string {
 	return StatusStrings[t.GetState()]
 }
 
+// GetBufferProgress ...
 func (t *Torrent) GetBufferProgress() float64 {
 	progress := t.BufferProgress
 	state := t.GetState()
 
-	if state == STATUS_CHECKING {
+	if state == StatusChecking {
 		total := 0
 		checking := 0
 
@@ -611,6 +634,7 @@ func (t *Torrent) GetBufferProgress() float64 {
 	return progress
 }
 
+// GetProgress ...
 func (t *Torrent) GetProgress() float64 {
 	if t == nil {
 		return 0
@@ -633,6 +657,7 @@ func (t *Torrent) GetProgress() float64 {
 	return progress
 }
 
+// DownloadFile ...
 func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
@@ -642,14 +667,17 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	}
 }
 
+// InfoHash ...
 func (t *Torrent) InfoHash() string {
 	return t.Torrent.InfoHash().HexString()
 }
 
+// Name ...
 func (t *Torrent) Name() string {
 	return t.Torrent.Name()
 }
 
+// Drop ...
 func (t *Torrent) Drop(removeFiles bool) {
 	log.Infof("Dropping torrent: %s", t.Name())
 
@@ -682,6 +710,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 	}
 }
 
+// Pause ...
 func (t *Torrent) Pause() {
 	if t.Torrent != nil {
 		t.Torrent.SetMaxEstablishedConns(0)
@@ -689,6 +718,7 @@ func (t *Torrent) Pause() {
 	t.IsPaused = true
 }
 
+// Resume ...
 func (t *Torrent) Resume() {
 	if t.Torrent != nil {
 		t.Torrent.SetMaxEstablishedConns(1000)
@@ -696,6 +726,7 @@ func (t *Torrent) Resume() {
 	t.IsPaused = false
 }
 
+// GetDBID ...
 func (t *Torrent) GetDBID() {
 	if t.DBID == 0 && t.needDBID == true {
 		log.Debugf("Getting DBID for torrent: %s", t.Name())
@@ -704,17 +735,19 @@ func (t *Torrent) GetDBID() {
 	}
 }
 
+// GetDBItem ...
 func (t *Torrent) GetDBItem() {
 	t.DBItem = t.Service.GetDBItem(t.InfoHash())
 }
 
+// GetPlayingItem ...
 func (t *Torrent) GetPlayingItem() *PlayingItem {
 	if t.DBItem == nil {
 		return nil
 	}
 
 	TMDBID := t.DBItem.ID
-	if t.DBItem.Type != "movie" {
+	if t.DBItem.Type != movieType {
 		TMDBID = t.DBItem.ShowID
 	}
 

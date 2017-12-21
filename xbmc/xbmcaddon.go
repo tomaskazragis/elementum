@@ -2,6 +2,7 @@ package xbmc
 
 import "strconv"
 
+// AddonInfo ...
 type AddonInfo struct {
 	Author      string `xml:"id,attr"`
 	Changelog   string
@@ -9,7 +10,7 @@ type AddonInfo struct {
 	Disclaimer  string
 	Fanart      string
 	Icon        string
-	Id          string
+	ID          string
 	Name        string
 	Path        string
 	Profile     string
@@ -20,6 +21,7 @@ type AddonInfo struct {
 	Version     string
 }
 
+// Setting ...
 type Setting struct {
 	Key    string `json:"key"`
 	Type   string `json:"type"`
@@ -27,62 +29,74 @@ type Setting struct {
 	Option string `json:"option"`
 }
 
+// GetAddonInfo ...
 func GetAddonInfo() *AddonInfo {
 	retVal := AddonInfo{}
 	executeJSONRPCEx("GetAddonInfo", &retVal, nil)
 	return &retVal
 }
 
-func AddonSettings(addonId string) (retVal string) {
-	executeJSONRPCEx("AddonSettings", &retVal, Args{addonId})
+// AddonSettings ...
+func AddonSettings(addonID string) (retVal string) {
+	executeJSONRPCEx("AddonSettings", &retVal, Args{addonID})
 	return
 }
 
+// AddonSettingsOpened ...
 func AddonSettingsOpened() bool {
 	retVal := 0
 	executeJSONRPCEx("AddonSettingsOpened", &retVal, nil)
 	return retVal != 0
 }
 
-func AddonFailure(addonId string) (failures int) {
-	executeJSONRPCEx("AddonFailure", &failures, Args{addonId})
+// AddonFailure ...
+func AddonFailure(addonID string) (failures int) {
+	executeJSONRPCEx("AddonFailure", &failures, Args{addonID})
 	return
 }
 
-func AddonCheck(addonId string) (failures int) {
-	executeJSONRPCEx("AddonCheck", &failures, Args{addonId})
+// AddonCheck ...
+func AddonCheck(addonID string) (failures int) {
+	executeJSONRPCEx("AddonCheck", &failures, Args{addonID})
 	return
 }
 
+// GetLocalizedString ...
 func GetLocalizedString(id int) (retVal string) {
 	executeJSONRPCEx("GetLocalizedString", &retVal, Args{id})
 	return
 }
 
+// GetAllSettings ...
 func GetAllSettings() (retVal []*Setting) {
 	executeJSONRPCEx("GetAllSettings", &retVal, nil)
 	return
 }
 
+// GetSettingString ...
 func GetSettingString(id string) (retVal string) {
 	executeJSONRPCEx("GetSetting", &retVal, Args{id})
 	return
 }
 
+// GetSettingInt ...
 func GetSettingInt(id string) int {
 	val, _ := strconv.Atoi(GetSettingString(id))
 	return val
 }
 
+// GetSettingBool ...
 func GetSettingBool(id string) bool {
 	return GetSettingString(id) == "true"
 }
 
+// SetSetting ...
 func SetSetting(id string, value interface{}) {
 	retVal := 0
 	executeJSONRPCEx("SetSetting", &retVal, Args{id, value})
 }
 
+// GetCurrentView ...
 func GetCurrentView() (viewMode string) {
 	executeJSONRPCEx("GetCurrentView", &viewMode, nil)
 	return

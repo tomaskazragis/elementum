@@ -7,12 +7,17 @@ import (
 )
 
 const (
+	// StorageFile Default file storage
 	StorageFile = iota
+	// StorageMemory In-memory storage
 	StorageMemory
+	// StorageFat32 file splitted into small files
 	StorageFat32
+	// StorageMMap MMap file storage
 	StorageMMap
 )
 
+// ElementumStorage basic interface for storages, used in the plugin
 type ElementumStorage interface {
 	storage.ClientImpl
 
@@ -25,39 +30,51 @@ type ElementumStorage interface {
 	SetReadaheadSize(int64)
 }
 
+// TorrentStorage ...
 type TorrentStorage interface {
 	ElementumStorage
 }
 
+// DummyStorage ...
 type DummyStorage struct {
 	storage.ClientImpl
 	Type      int
 	readahead int64
 }
 
+// NewFat32Storage ...
 func NewFat32Storage(path string) ElementumStorage {
 	return &DummyStorage{fat32storage.NewFat32Storage(path), StorageFat32, 0}
 }
 
+// NewFileStorage ...
 func NewFileStorage(path string, pc storage.PieceCompletion) ElementumStorage {
 	return &DummyStorage{storage.NewFileWithCompletion(path, pc), StorageFile, 0}
 }
 
+// NewMMapStorage ...
 func NewMMapStorage(path string, pc storage.PieceCompletion) ElementumStorage {
 	return &DummyStorage{storage.NewMMapWithCompletion(path, pc), StorageMMap, 0}
 }
 
+// Start ...
 func (me *DummyStorage) Start() {}
-func (me *DummyStorage) Stop()  {}
+
+// Stop ...
+func (me *DummyStorage) Stop() {}
 
 // func (me *DummyStorage) SyncPieces(a map[int]bool)                    {}
 // func (me *DummyStorage) RemovePiece(idx int)                          {}
+
+// GetTorrentStorage ...
 func (me *DummyStorage) GetTorrentStorage(hash string) TorrentStorage { return me }
 
+// GetReadaheadSize ...
 func (me *DummyStorage) GetReadaheadSize() int64 {
 	return me.readahead
 }
 
+// SetReadaheadSize ...
 func (me *DummyStorage) SetReadaheadSize(size int64) {
 	me.readahead = size
 }

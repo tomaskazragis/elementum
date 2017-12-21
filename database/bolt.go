@@ -23,12 +23,14 @@ import (
 type callBack func([]byte, []byte)
 type callBackWithError func([]byte, []byte) error
 
-type DatabaseWriter struct {
+// DWriter ...
+type DWriter struct {
 	bucket   []byte
 	key      []byte
 	database *Database
 }
 
+// Database ...
 type Database struct {
 	db *bolt.DB
 }
@@ -41,13 +43,19 @@ var (
 )
 
 var (
-	LibraryBucket        = []byte("Library")
-	BitTorrentBucket     = []byte("BitTorrent")
-	HistoryBucket        = []byte("History")
+	// LibraryBucket ...
+	LibraryBucket = []byte("Library")
+	// BitTorrentBucket ...
+	BitTorrentBucket = []byte("BitTorrent")
+	// HistoryBucket ...
+	HistoryBucket = []byte("History")
+	// TorrentHistoryBucket ...
 	TorrentHistoryBucket = []byte("TorrentHistory")
-	SearchCacheBucket    = []byte("SearchCache")
+	// SearchCacheBucket ...
+	SearchCacheBucket = []byte("SearchCache")
 )
 
+// Buckets ...
 var Buckets = [][]byte{
 	LibraryBucket,
 	BitTorrentBucket,
@@ -63,6 +71,7 @@ var (
 	once        sync.Once
 )
 
+// InitDB ...
 func InitDB(conf *config.Configuration) (*Database, error) {
 	databasePath = filepath.Join(conf.Info.Profile, databaseFileName)
 	backupPath = filepath.Join(conf.Info.Profile, backupFileName)
@@ -97,6 +106,7 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 	return database, nil
 }
 
+// NewDB ...
 func NewDB() (*Database, error) {
 	if database == nil {
 		return InitDB(config.Reload())
@@ -105,12 +115,14 @@ func NewDB() (*Database, error) {
 	return database, nil
 }
 
+// Close ...
 func (database *Database) Close() {
 	databaseLog.Debug("Closing Database")
 	quit <- struct{}{}
 	database.db.Close()
 }
 
+// CheckBucket ...
 func (database *Database) CheckBucket(bucket []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucket)
@@ -118,31 +130,33 @@ func (database *Database) CheckBucket(bucket []byte) error {
 	})
 }
 
+// MaintenanceRefreshHandler ...
 func (database *Database) MaintenanceRefreshHandler() {
 	database.CreateBackup()
 	database.CacheCleanup()
 
-	ticker_backup := time.NewTicker(1 * time.Hour)
-	defer ticker_backup.Stop()
+	tickerBackup := time.NewTicker(1 * time.Hour)
+	defer tickerBackup.Stop()
 
-	ticker_cache := time.NewTicker(1 * time.Hour)
-	defer ticker_cache.Stop()
+	tickerCache := time.NewTicker(1 * time.Hour)
+	defer tickerCache.Stop()
 	defer close(quit)
 
 	for {
 		select {
-		case <-ticker_backup.C:
+		case <-tickerBackup.C:
 			go database.CreateBackup()
-		case <-ticker_cache.C:
+		case <-tickerCache.C:
 			go database.CacheCleanup()
 		case <-quit:
-			ticker_backup.Stop()
-			ticker_cache.Stop()
+			tickerBackup.Stop()
+			tickerCache.Stop()
 			return
 		}
 	}
 }
 
+// RestoreBackup ...
 func RestoreBackup() {
 	databaseLog.Debug("Restoring backup")
 
@@ -186,6 +200,7 @@ func RestoreBackup() {
 	}
 }
 
+// CreateBackup ...
 func (database *Database) CreateBackup() {
 	if err := database.CheckBucket(LibraryBucket); err == nil {
 		database.db.View(func(tx *bolt.Tx) error {
@@ -196,6 +211,7 @@ func (database *Database) CreateBackup() {
 	}
 }
 
+// CacheCleanup ...
 func (database *Database) CacheCleanup() {
 	now := util.NowInt()
 	for _, bucket := range Buckets {
@@ -203,18 +219,18 @@ func (database *Database) CacheCleanup() {
 			continue
 		}
 
-		to_remove := []string{}
+		toRemove := []string{}
 		database.ForEach(bucket, func(key []byte, value []byte) error {
 			expire, _ := ParseCacheItem(value)
 			if expire > 0 && expire < now {
-				to_remove = append(to_remove, string(key))
+				toRemove = append(toRemove, string(key))
 			}
 
 			return nil
 		})
 
-		if len(to_remove) > 0 {
-			database.BatchDelete(bucket, to_remove)
+		if len(toRemove) > 0 {
+			database.BatchDelete(bucket, toRemove)
 		}
 	}
 }
@@ -222,6 +238,8 @@ func (database *Database) CacheCleanup() {
 //
 //	Callback operations
 //
+
+// Seek ...
 func (database *Database) Seek(bucket []byte, prefix string, callback callBack) error {
 	return database.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(bucket).Cursor()
@@ -233,6 +251,7 @@ func (database *Database) Seek(bucket []byte, prefix string, callback callBack) 
 	})
 }
 
+// ForEach ...
 func (database *Database) ForEach(bucket []byte, callback callBackWithError) error {
 	return database.db.View(func(tx *bolt.Tx) error {
 		tx.Bucket(bucket).ForEach(callback)
@@ -243,11 +262,14 @@ func (database *Database) ForEach(bucket []byte, callback callBackWithError) err
 //
 // Cache operations
 //
+
+// ParseCacheItem ...
 func ParseCacheItem(item []byte) (int, []byte) {
 	expire, _ := strconv.Atoi(string(item[0:10]))
 	return expire, item[11:]
 }
 
+// GetCachedBytes ...
 func (database *Database) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
 	var value []byte
 	err = database.db.View(func(tx *bolt.Tx) error {
@@ -268,11 +290,13 @@ func (database *Database) GetCachedBytes(bucket []byte, key string) (cacheValue 
 	return v, nil
 }
 
+// GetCached ...
 func (database *Database) GetCached(bucket []byte, key string) (string, error) {
 	value, err := database.GetCachedBytes(bucket, key)
 	return string(value), err
 }
 
+// GetCachedObject ...
 func (database *Database) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
 	v, err := database.GetCachedBytes(bucket, key)
 	if err != nil {
@@ -290,6 +314,8 @@ func (database *Database) GetCachedObject(bucket []byte, key string, item interf
 //
 // Get/Set operations
 //
+
+// GetBytes ...
 func (database *Database) GetBytes(bucket []byte, key string) (value []byte, err error) {
 	err = database.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
@@ -300,11 +326,13 @@ func (database *Database) GetBytes(bucket []byte, key string) (value []byte, err
 	return
 }
 
+// Get ...
 func (database *Database) Get(bucket []byte, key string) (string, error) {
 	value, err := database.GetBytes(bucket, key)
 	return string(value), err
 }
 
+// GetObject ...
 func (database *Database) GetObject(bucket []byte, key string, item interface{}) (err error) {
 	v, err := database.GetBytes(bucket, key)
 	if err != nil {
@@ -323,6 +351,7 @@ func (database *Database) GetObject(bucket []byte, key string, item interface{})
 	return
 }
 
+// SetCachedBytes ...
 func (database *Database) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		value = append([]byte(strconv.Itoa(util.NowPlusSecondsInt(seconds))+"|"), value...)
@@ -330,10 +359,12 @@ func (database *Database) SetCachedBytes(bucket []byte, seconds int, key string,
 	})
 }
 
+// SetCached ...
 func (database *Database) SetCached(bucket []byte, seconds int, key string, value string) error {
 	return database.SetCachedBytes(bucket, seconds, key, []byte(value))
 }
 
+// SetCachedObject ...
 func (database *Database) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
@@ -344,16 +375,19 @@ func (database *Database) SetCachedObject(bucket []byte, seconds int, key string
 	return nil
 }
 
+// SetBytes ...
 func (database *Database) SetBytes(bucket []byte, key string, value []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Put([]byte(key), value)
 	})
 }
 
+// Set ...
 func (database *Database) Set(bucket []byte, key string, value string) error {
 	return database.SetBytes(bucket, key, []byte(value))
 }
 
+// SetObject ...
 func (database *Database) SetObject(bucket []byte, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
@@ -364,6 +398,7 @@ func (database *Database) SetObject(bucket []byte, key string, item interface{})
 	return nil
 }
 
+// BatchSet ...
 func (database *Database) BatchSet(bucket []byte, objects map[string]string) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
@@ -376,6 +411,7 @@ func (database *Database) BatchSet(bucket []byte, objects map[string]string) err
 	})
 }
 
+// BatchSetBytes ...
 func (database *Database) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
@@ -388,6 +424,7 @@ func (database *Database) BatchSetBytes(bucket []byte, objects map[string][]byte
 	})
 }
 
+// BatchSetObject ...
 func (database *Database) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
 	serialized := map[string][]byte{}
 	for k, item := range objects {
@@ -401,12 +438,14 @@ func (database *Database) BatchSetObject(bucket []byte, objects map[string]inter
 	return database.BatchSetBytes(bucket, serialized)
 }
 
+// Delete ...
 func (database *Database) Delete(bucket []byte, key string) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Delete([]byte(key))
 	})
 }
 
+// BatchDelete ...
 func (database *Database) BatchDelete(bucket []byte, keys []string) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
@@ -419,15 +458,17 @@ func (database *Database) BatchDelete(bucket []byte, keys []string) error {
 	})
 }
 
-func (database *Database) AsWriter(bucket []byte, key string) *DatabaseWriter {
-	return &DatabaseWriter{
+// AsWriter ...
+func (database *Database) AsWriter(bucket []byte, key string) *DWriter {
+	return &DWriter{
 		database: database,
 		bucket:   bucket,
 		key:      []byte(key),
 	}
 }
 
-func (w *DatabaseWriter) Write(b []byte) (n int, err error) {
+// Write ...
+func (w *DWriter) Write(b []byte) (n int, err error) {
 	return len(b), w.database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(w.bucket).Put(w.key, b)
 	})

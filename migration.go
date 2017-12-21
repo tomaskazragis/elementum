@@ -4,11 +4,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elgatito/elementum/xbmc"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/repository"
+	"github.com/elgatito/elementum/xbmc"
 )
 
+// Migrate ...
 func Migrate() bool {
 	firstRun := filepath.Join(config.Get().Info.Path, ".firstrun")
 	if _, err := os.Stat(firstRun); err == nil {

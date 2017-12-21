@@ -2,18 +2,17 @@ package trakt
 
 import (
 	"fmt"
+	"math/rand"
 	"path"
-	"time"
-	"errors"
 	"strconv"
 	"strings"
-	"math/rand"
+	"time"
 
-	"github.com/jmcvetta/napping"
-	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
 )
 
 // Fill fanart from TMDB
@@ -46,7 +45,7 @@ func setFanart(movie *Movie) *Movie {
 	if len(tmdbImages.Posters) > 0 {
 		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
 		for _, image := range tmdbImages.Posters {
-			if image.ISO_639_1 == config.Get().Language {
+			if image.Iso639_1 == config.Get().Language {
 				posterImage = tmdb.ImageURL(image.FilePath, "w500")
 			}
 		}
@@ -56,7 +55,7 @@ func setFanart(movie *Movie) *Movie {
 	if len(tmdbImages.Backdrops) > 0 {
 		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
 		for _, image := range tmdbImages.Backdrops {
-			if image.ISO_639_1 == config.Get().Language {
+			if image.Iso639_1 == config.Get().Language {
 				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
 			}
 		}
@@ -80,21 +79,22 @@ func setCalendarFanarts(movies []*CalendarMovie) []*CalendarMovie {
 	return movies
 }
 
-func GetMovie(Id string) (movie *Movie) {
-	endPoint := fmt.Sprintf("movies/%s", Id)
+// GetMovie ...
+func GetMovie(ID string) (movie *Movie) {
+	endPoint := fmt.Sprintf("movies/%s", ID)
 
 	params := napping.Params{
 		"extended": "full,images",
 	}.AsUrlValues()
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.trakt.movie.%s", Id)
+	key := fmt.Sprintf("com.trakt.movie.%s", ID)
 	if err := cacheStore.Get(key, &movie); err != nil {
 		resp, err := Get(endPoint, params)
 
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", Id), config.AddonIcon())
+			xbmc.Notify("Elementum", fmt.Sprintf("Failed getting Trakt movie (%s), check your logs.", ID), config.AddonIcon())
 		}
 
 		if err := resp.Unmarshal(&movie); err != nil {
@@ -109,13 +109,14 @@ func GetMovie(Id string) (movie *Movie) {
 	return
 }
 
+// SearchMovies ...
 func SearchMovies(query string, page string) (movies []*Movies, err error) {
 	endPoint := "search"
 
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(config.Get().ResultsPerPage),
-		"query": query,
+		"page":     page,
+		"limit":    strconv.Itoa(config.Get().ResultsPerPage),
+		"query":    query,
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -124,12 +125,12 @@ func SearchMovies(query string, page string) (movies []*Movies, err error) {
 	if err != nil {
 		return
 	} else if resp.Status() != 200 {
-		return movies, errors.New(fmt.Sprintf("Bad status searching Trakt movies: %d", resp.Status()))
+		return movies, fmt.Errorf("Bad status searching Trakt movies: %d", resp.Status())
 	}
 
-  // TODO use response headers for pagination limits:
-  // X-Pagination-Page-Count:10
-  // X-Pagination-Item-Count:100
+	// TODO use response headers for pagination limits:
+	// X-Pagination-Page-Count:10
+	// X-Pagination-Item-Count:100
 
 	if err := resp.Unmarshal(&movies); err != nil {
 		log.Warning(err)
@@ -142,6 +143,7 @@ func SearchMovies(query string, page string) (movies []*Movies, err error) {
 	return
 }
 
+// TopMovies ...
 func TopMovies(topCategory string, page string) (movies []*Movies, total int, err error) {
 	endPoint := "movies/" + topCategory
 
@@ -151,10 +153,10 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 	if err != nil {
 		return
 	}
-	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
+	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(limit),
+		"page":     page,
+		"limit":    strconv.Itoa(limit),
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -167,26 +169,26 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 		if err != nil {
 			return movies, 0, err
 		} else if resp.Status() != 200 {
-			return movies, 0, errors.New(fmt.Sprintf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status()))
+			return movies, 0, fmt.Errorf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status())
 		}
 
 		if topCategory == "popular" {
 			var movieList []*Movie
-			if err := resp.Unmarshal(&movieList); err != nil {
-				log.Warning(err)
+			if errUnm := resp.Unmarshal(&movieList); errUnm != nil {
+				log.Warning(errUnm)
 			}
 
-		  movieListing := make([]*Movies, 0)
-		  for _, movie := range movieList {
+			movieListing := make([]*Movies, 0)
+			for _, movie := range movieList {
 				movieItem := Movies{
-		      Movie: movie,
-		    }
-		    movieListing = append(movieListing, &movieItem)
-		  }
+					Movie: movie,
+				}
+				movieListing = append(movieListing, &movieItem)
+			}
 			movies = movieListing
 		} else {
-			if err := resp.Unmarshal(&movies); err != nil {
-				log.Warning(err)
+			if errUnm := resp.Unmarshal(&movies); errUnm != nil {
+				log.Warning(errUnm)
 			}
 		}
 
@@ -211,6 +213,7 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 	return
 }
 
+// WatchlistMovies ...
 func WatchlistMovies() (movies []*Movies, err error) {
 	if err := Authorized(); err != nil {
 		return movies, err
@@ -230,7 +233,7 @@ func WatchlistMovies() (movies []*Movies, err error) {
 		if err != nil {
 			return movies, err
 		} else if resp.Status() != 200 {
-			return movies, errors.New(fmt.Sprintf("Bad status getting Trakt watchlist for movies: %d", resp.Status()))
+			return movies, fmt.Errorf("Bad status getting Trakt watchlist for movies: %d", resp.Status())
 		}
 
 		var watchlist []*WatchlistMovie
@@ -255,9 +258,10 @@ func WatchlistMovies() (movies []*Movies, err error) {
 	return
 }
 
+// CollectionMovies ...
 func CollectionMovies() (movies []*Movies, err error) {
-	if err := Authorized(); err != nil {
-		return movies, err
+	if errAuth := Authorized(); errAuth != nil {
+		return movies, errAuth
 	}
 
 	endPoint := "sync/collection/movies"
@@ -268,13 +272,13 @@ func CollectionMovies() (movies []*Movies, err error) {
 
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := "com.trakt.movies.collection"
-	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
+	if errGet := cacheStore.Get(key, &movies); errGet != nil {
+		resp, errGet := GetWithAuth(endPoint, params)
 
-		if err != nil {
-			return movies, err
+		if errGet != nil {
+			return movies, errGet
 		} else if resp.Status() != 200 {
-			return movies, errors.New(fmt.Sprintf("Bad status getting Trakt collection for movies: %d", resp.Status()))
+			return movies, fmt.Errorf("Bad status getting Trakt collection for movies: %d", resp.Status())
 		}
 
 		var collection []*CollectionMovie
@@ -297,6 +301,7 @@ func CollectionMovies() (movies []*Movies, err error) {
 	return movies, err
 }
 
+// Userlists ...
 func Userlists() (lists []*List) {
 	traktUsername := config.Get().TraktUsername
 	if traktUsername == "" {
@@ -335,8 +340,9 @@ func Userlists() (lists []*List) {
 	return lists
 }
 
-func ListItemsMovies(listId string, withImages bool) (movies []*Movies, err error) {
-	endPoint := fmt.Sprintf("users/%s/lists/%s/items/movies", config.Get().TraktUsername, listId)
+// ListItemsMovies ...
+func ListItemsMovies(listID string, withImages bool) (movies []*Movies, err error) {
+	endPoint := fmt.Sprintf("users/%s/lists/%s/items/movies", config.Get().TraktUsername, listID)
 
 	params := napping.Params{}.AsUrlValues()
 
@@ -347,16 +353,16 @@ func ListItemsMovies(listId string, withImages bool) (movies []*Movies, err erro
 	if withImages {
 		full = ".full"
 	}
-	key := fmt.Sprintf("com.trakt.movies.list.%s%s", listId, full)
-	if err := cacheStore.Get(key, &movies); err != nil {
+	key := fmt.Sprintf("com.trakt.movies.list.%s%s", listID, full)
+	if errGet := cacheStore.Get(key, &movies); errGet != nil {
 		if erra := Authorized(); erra != nil {
-			resp, err = Get(endPoint, params)
+			resp, errGet = Get(endPoint, params)
 		} else {
-			resp, err = GetWithAuth(endPoint, params)
+			resp, errGet = GetWithAuth(endPoint, params)
 		}
 
-		if err != nil || resp.Status() != 200 {
-			return movies, err
+		if errGet != nil || resp.Status() != 200 {
+			return movies, errGet
 		}
 
 		var list []*ListItem
@@ -380,12 +386,13 @@ func ListItemsMovies(listId string, withImages bool) (movies []*Movies, err erro
 			movies = setFanarts(movies)
 		}
 
-		cacheStore.Set(key, movies, 1 * time.Minute)
+		cacheStore.Set(key, movies, 1*time.Minute)
 	}
 
 	return movies, err
 }
 
+// CalendarMovies ...
 func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, total int, err error) {
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
@@ -393,10 +400,10 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 	if err != nil {
 		return
 	}
-	page = strconv.Itoa((pageInt - 1) * resultsPerPage / limit + 1)
+	page = strconv.Itoa((pageInt-1)*resultsPerPage/limit + 1)
 	params := napping.Params{
-		"page": page,
-		"limit": strconv.Itoa(limit),
+		"page":     page,
+		"limit":    strconv.Itoa(limit),
 		"extended": "full,images",
 	}.AsUrlValues()
 
@@ -405,18 +412,18 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 	key := fmt.Sprintf("com.trakt.mymovies.%s.%s", endPointKey, page)
 	totalKey := fmt.Sprintf("com.trakt.mymovies.%s.total", endPointKey)
 	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := GetWithAuth("calendars/" + endPoint, params)
+		resp, err := GetWithAuth("calendars/"+endPoint, params)
 
 		if err != nil {
 			log.Error(err)
 			return movies, 0, err
 		} else if resp.Status() != 200 {
 			log.Warning(resp.Status())
-			return movies, 0, errors.New(fmt.Sprintf("Bad status getting %s Trakt movies: %d", endPoint, resp.Status()))
+			return movies, 0, fmt.Errorf("Bad status getting %s Trakt movies: %d", endPoint, resp.Status())
 		}
 
-		if err := resp.Unmarshal(&movies); err != nil {
-			log.Warning(err)
+		if errUnm := resp.Unmarshal(&movies); errUnm != nil {
+			log.Warning(errUnm)
 		}
 
 		if page != "0" {
@@ -440,6 +447,7 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 	return
 }
 
+// ToListItem ...
 func (movie *Movie) ToListItem() *xbmc.ListItem {
 	return &xbmc.ListItem{
 		Label: movie.Title,
@@ -463,9 +471,9 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 			Mediatype:     "movie",
 		},
 		Art: &xbmc.ListItemArt{
-			Poster: movie.Images.Poster.Full,
-			FanArt: movie.Images.FanArt.Full,
-			Banner: movie.Images.Banner.Full,
+			Poster:    movie.Images.Poster.Full,
+			FanArt:    movie.Images.FanArt.Full,
+			Banner:    movie.Images.Banner.Full,
 			Thumbnail: movie.Images.Thumbnail.Full,
 		},
 	}

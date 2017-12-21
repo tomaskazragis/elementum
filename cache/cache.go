@@ -1,20 +1,23 @@
 package cache
 
 import (
-	"time"
 	"errors"
-	"strings"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/elgatito/elementum/util"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
-	"github.com/elgatito/elementum/util"
 )
 
 const (
-	DEFAULT              = time.Duration(0)
-	FOREVER              = time.Duration(-1)
-	CACHE_MIDDLEWARE_KEY = "gincontrib.cache"
+	// DEFAULT ...
+	DEFAULT = time.Duration(0)
+	// FOREVER ...
+	FOREVER = time.Duration(-1)
+	// CacheMiddlewareKey ...
+	CacheMiddlewareKey = "gincontrib.cache"
 )
 
 var (
@@ -25,7 +28,8 @@ var (
 	log             = logging.MustGetLogger("cache")
 )
 
-type CacheStore interface {
+// CStore ...
+type CStore interface {
 	Get(key string, value interface{}) error
 	Set(key string, value interface{}, expire time.Duration) error
 	Add(key string, value interface{}, expire time.Duration) error
@@ -46,7 +50,7 @@ type cachedWriter struct {
 	gin.ResponseWriter
 	status  int
 	written bool
-	store   CacheStore
+	store   CStore
 	expire  time.Duration
 	key     string
 }
@@ -60,7 +64,7 @@ func cacheKey(prefix string, u string) string {
 	return prefix + "." + util.ToFileName(u)
 }
 
-func newCachedWriter(store CacheStore, expire time.Duration, writer gin.ResponseWriter, key string) *cachedWriter {
+func newCachedWriter(store CStore, expire time.Duration, writer gin.ResponseWriter, key string) *cachedWriter {
 	return &cachedWriter{writer, 0, false, store, expire, key}
 }
 
@@ -97,7 +101,7 @@ func (w *cachedWriter) Write(data []byte) (int, error) {
 }
 
 // Cache Middleware
-func Cache(store CacheStore, expire time.Duration) gin.HandlerFunc {
+func Cache(store CStore, expire time.Duration) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var cache responseCache
 		key := cacheKey(pageCachePrefix, ctx.Request.URL.RequestURI())

@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-// disk usage of path/disk
+// DiskUsage shows disk usage of path/disk
 func DiskUsage(path string) (*DiskStatus, error) {
 	fs := syscall.Statfs_t{}
 	err := syscall.Statfs(path, &fs)

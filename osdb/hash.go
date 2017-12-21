@@ -1,18 +1,19 @@
 package osdb
 
 import (
-	"os"
-	"io"
-	"fmt"
 	"bytes"
-	"errors"
 	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+	"os"
 )
 
 const (
 	chunkSize = 65536 // 64k
 )
 
+// Hash ...
 func Hash(r io.ReaderAt, size int64) (string, error) {
 	var hash uint64
 
@@ -42,6 +43,7 @@ func Hash(r io.ReaderAt, size int64) (string, error) {
 	return fmt.Sprintf("%016x", hash+uint64(size)), nil
 }
 
+// HashFile ...
 func HashFile(file *os.File) (string, error) {
 	stats, err := file.Stat()
 	if err != nil {

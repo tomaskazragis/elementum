@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Play ...
 func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
@@ -46,17 +47,17 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			fromLibrary = true
 		}
 
-		tmdbId := 0
+		tmdbID := 0
 		if tmdb != "" {
 			if id, err := strconv.Atoi(tmdb); err == nil && id > 0 {
-				tmdbId = id
+				tmdbID = id
 			}
 		}
 
-		showId := 0
+		showID := 0
 		if show != "" {
 			if id, err := strconv.Atoi(show); err == nil && id > 0 {
-				showId = id
+				showID = id
 			}
 		}
 
@@ -80,8 +81,8 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			FileIndex:   fileIndex,
 			ResumeIndex: resumeIndex,
 			ContentType: contentType,
-			TMDBId:      tmdbId,
-			ShowID:      showId,
+			TMDBId:      tmdbID,
+			ShowID:      showID,
 			Season:      seasonNumber,
 			Episode:     episodeNumber,
 		}
@@ -92,19 +93,21 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		rUrl, _ := url.Parse(fmt.Sprintf("%s/files/%s", util.GetHTTPHost(), player.PlayURL()))
-		ctx.Redirect(302, rUrl.String())
+		rURL, _ := url.Parse(fmt.Sprintf("%s/files/%s", util.GetHTTPHost(), player.PlayURL()))
+		ctx.Redirect(302, rURL.String())
 	}
 }
 
+// PlayTorrent ...
 func PlayTorrent(ctx *gin.Context) {
 	retval := xbmc.DialogInsert()
 	if retval["path"] == "" {
 		return
 	}
-	xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "uri", retval["path"]))
+	xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", retval["path"]))
 }
 
+// PlayURI ...
 func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
@@ -117,7 +120,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		if uri != "" {
-			xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"), "uri", uri, "index", index))
+			xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", uri, "index", index))
 		} else {
 			var (
 				tmdb        string
@@ -133,7 +136,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				dbItem := btService.GetDBItem(infoHash)
 				if dbItem.Type != "" {
 					contentType = dbItem.Type
-					if contentType == "movie" {
+					if contentType == movieType {
 						tmdb = strconv.Itoa(dbItem.ID)
 					} else {
 						show = strconv.Itoa(dbItem.ShowID)
@@ -142,7 +145,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 					}
 				}
 			}
-			xbmc.PlayURL(UrlQuery(UrlForXBMC("/play"),
+			xbmc.PlayURL(URLQuery(URLForXBMC("/play"),
 				"resume", resume,
 				"index", index,
 				"tmdb", tmdb,

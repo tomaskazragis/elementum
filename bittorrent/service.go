@@ -33,13 +33,18 @@ import (
 )
 
 const (
+	// Delete ...
 	Delete = iota
+	// Update ...
 	Update
+	// RemoveFromLibrary ...
 	RemoveFromLibrary
 )
 
 const (
+	// Remove ...
 	Remove = iota
+	// Active ...
 	Active
 )
 
@@ -51,6 +56,7 @@ const (
 // 	ipToSLowCost     = 1 << iota
 // )
 
+// DefaultTrackers ...
 var DefaultTrackers = []string{
 	"udp://tracker.opentrackr.org:1337/announce",
 	"udp://tracker.coppersurfer.tk:6969/announce",
@@ -61,7 +67,8 @@ var DefaultTrackers = []string{
 }
 
 var (
-	db     *database.Database
+	db *database.Database
+	// Bucket that represents bittorrent database
 	Bucket = database.BitTorrentBucket
 )
 
@@ -83,6 +90,7 @@ var (
 // 	Password string
 // }
 
+// BTConfiguration ...
 type BTConfiguration struct {
 	SpoofUserAgent      int
 	DownloadStorage     int
@@ -116,6 +124,7 @@ type BTConfiguration struct {
 	// Proxy               *ProxySettings
 }
 
+// BTService ...
 type BTService struct {
 	Client          *gotorrent.Client
 	ClientConfig    *gotorrent.Config
@@ -138,6 +147,7 @@ type BTService struct {
 	// pieceEvents  chan qstorage.PieceChange
 }
 
+// DBItem ...
 type DBItem struct {
 	ID      int    `json:"id"`
 	State   int    `json:"state"`
@@ -148,6 +158,7 @@ type DBItem struct {
 	Episode int    `json:"episode"`
 }
 
+// PlayingItem ...
 type PlayingItem struct {
 	DBID   int
 	DBTYPE string
@@ -167,10 +178,12 @@ type activeTorrent struct {
 	progress     int
 }
 
+// InitDB ...
 func InitDB() {
 	db, _ = database.NewDB()
 }
 
+// NewBTService ...
 func NewBTService(conf BTConfiguration) *BTService {
 	s := &BTService{
 		log:    logging.MustGetLogger("btservice"),
@@ -212,7 +225,7 @@ func NewBTService(conf BTConfiguration) *BTService {
 
 	s.configure()
 
-	tmdb.CheckApiKey()
+	tmdb.CheckAPIKey()
 
 	go s.loadTorrentFiles()
 	go s.downloadProgress()
@@ -220,6 +233,7 @@ func NewBTService(conf BTConfiguration) *BTService {
 	return s
 }
 
+// Close ...
 func (s *BTService) Close(shutdown bool) {
 	s.log.Info("Stopping BT Services...")
 	if !shutdown {
@@ -233,6 +247,7 @@ func (s *BTService) Close(shutdown bool) {
 	}
 }
 
+// Reconfigure ...
 func (s *BTService) Reconfigure(config BTConfiguration) {
 	s.stopServices()
 	s.config = &config
@@ -440,13 +455,12 @@ func (s *BTService) stopServices() {
 // 	}
 // }
 
+// CheckAvailableSpace ...
 func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
-	diskStatus := &diskusage.DiskStatus{}
-	if status, err := diskusage.DiskUsage(config.Get().DownloadPath); err != nil {
+	diskStatus, err := diskusage.DiskUsage(config.Get().DownloadPath)
+	if err != nil {
 		s.log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
 		return false
-	} else {
-		diskStatus = status
 	}
 
 	if torrent == nil || torrent.Info() == nil {
@@ -486,6 +500,7 @@ func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 	return true
 }
 
+// AddTorrent ...
 func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	s.log.Infof("Adding torrent from %s", uri)
 
@@ -538,6 +553,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	return torrent, nil
 }
 
+// RemoveTorrent ...
 func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 	s.log.Debugf("Removing torrent: %s", torrent.Name())
 	if torrent == nil {
@@ -581,8 +597,8 @@ func (s *BTService) loadTorrentFiles() {
 	for _, torrentFile := range files {
 		s.log.Infof("Loading torrent file %s", torrentFile)
 
-		torrentHandle := &gotorrent.Torrent{}
 		var err error
+		var torrentHandle *gotorrent.Torrent
 		if torrentHandle, err = s.Client.AddTorrentFromFile(torrentFile); err != nil || torrentHandle == nil {
 			s.log.Errorf("Error adding torrent file for %s", torrentFile)
 			if _, err := os.Stat(torrentFile); err == nil {
@@ -635,7 +651,7 @@ func (s *BTService) downloadProgress() {
 				totalDownloadRate += torrentHandle.DownloadRate
 				totalUploadRate += torrentHandle.UploadRate
 
-				if progress < 100 && status != STATUS_PAUSED {
+				if progress < 100 && status != StatusPaused {
 					activeTorrents = append(activeTorrents, &activeTorrent{
 						torrentName:  torrentName,
 						downloadRate: float64(torrentHandle.DownloadRate),
@@ -648,13 +664,13 @@ func (s *BTService) downloadProgress() {
 
 				if s.MarkedToMove != "" && i == s.MarkedToMove {
 					s.MarkedToMove = ""
-					status = STATUS_SEEDING
+					status = StatusSeeding
 				}
 
 				//
 				// Handle moving completed downloads
 				//
-				if !s.config.CompletedMove || status != STATUS_SEEDING || Playing {
+				if !s.config.CompletedMove || status != StatusSeeding || Playing {
 					continue
 				}
 				if xbmc.PlayerIsPlaying() {
@@ -677,115 +693,114 @@ func (s *BTService) downloadProgress() {
 					if item.Type == "" {
 						s.log.Error(errMsg)
 						return errors.New(errMsg)
-					} else {
-						s.log.Warning(torrentName, "finished seeding, moving files...")
-
-						// Check paths are valid and writable, and only once
-						if _, exists := pathChecked[item.Type]; !exists {
-							if item.Type == "movie" {
-								if err := config.IsWritablePath(s.config.CompletedMoviesPath); err != nil {
-									warnedMissing[infoHash] = true
-									pathChecked[item.Type] = true
-									s.log.Error(err)
-									return err
-								}
-								pathChecked[item.Type] = true
-							} else {
-								if err := config.IsWritablePath(s.config.CompletedShowsPath); err != nil {
-									warnedMissing[infoHash] = true
-									pathChecked[item.Type] = true
-									s.log.Error(err)
-									return err
-								}
-								pathChecked[item.Type] = true
-							}
-						}
-
-						s.log.Info("Removing the torrent without deleting files...")
-						s.RemoveTorrent(torrentHandle, false)
-
-						// Delete torrent file
-						torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-						if _, err := os.Stat(torrentFile); err == nil {
-							s.log.Info("Deleting torrent file at ", torrentFile)
-							if err := os.Remove(torrentFile); err != nil {
-								s.log.Error(err)
-								return err
-							}
-						}
-
-						filePath := torrentHandle.Files()[item.File].Path()
-						fileName := filepath.Base(filePath)
-
-						extracted := ""
-						re := regexp.MustCompile("(?i).*\\.rar")
-						if re.MatchString(fileName) {
-							extractedPath := filepath.Join(s.config.DownloadPath, filepath.Dir(filePath), "extracted")
-							files, err := ioutil.ReadDir(extractedPath)
-							if err != nil {
-								return err
-							}
-							if len(files) == 1 {
-								extracted = files[0].Name()
-							} else {
-								for _, file := range files {
-									fileName := file.Name()
-									re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
-									if re.MatchString(fileName) {
-										extracted = fileName
-										break
-									}
-								}
-							}
-							if extracted != "" {
-								filePath = filepath.Join(filepath.Dir(filePath), "extracted", extracted)
-							} else {
-								return errors.New("No extracted file to move")
-							}
-						}
-
-						var dstPath string
-						if item.Type == "movie" {
-							dstPath = filepath.Dir(s.config.CompletedMoviesPath)
-						} else {
-							dstPath = filepath.Dir(s.config.CompletedShowsPath)
-							if item.ShowID > 0 {
-								show := tmdb.GetShow(item.ShowID, "en")
-								if show != nil {
-									showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
-									seasonPath := filepath.Join(showPath, fmt.Sprintf("Season %d", item.Season))
-									if item.Season == 0 {
-										seasonPath = filepath.Join(showPath, "Specials")
-									}
-									dstPath = filepath.Join(dstPath, seasonPath)
-									os.MkdirAll(dstPath, 0755)
-								}
-							}
-						}
-
-						go func() {
-							s.log.Infof("Moving %s to %s", fileName, dstPath)
-							srcPath := filepath.Join(s.config.DownloadPath, filePath)
-							if dst, err := util.Move(srcPath, dstPath); err != nil {
-								s.log.Error(err)
-							} else {
-								// Remove leftover folders
-								if dirPath := filepath.Dir(filePath); dirPath != "." {
-									os.RemoveAll(filepath.Dir(srcPath))
-									if extracted != "" {
-										parentPath := filepath.Clean(filepath.Join(filepath.Dir(srcPath), ".."))
-										if parentPath != "." && parentPath != s.config.DownloadPath {
-											os.RemoveAll(parentPath)
-										}
-									}
-								}
-								s.log.Warning(fileName, "moved to", dst)
-
-								s.log.Infof("Marking %s for removal from library and database...", torrentName)
-								s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
-							}
-						}()
 					}
+					s.log.Warning(torrentName, "finished seeding, moving files...")
+
+					// Check paths are valid and writable, and only once
+					if _, exists := pathChecked[item.Type]; !exists {
+						if item.Type == "movie" {
+							if err := config.IsWritablePath(s.config.CompletedMoviesPath); err != nil {
+								warnedMissing[infoHash] = true
+								pathChecked[item.Type] = true
+								s.log.Error(err)
+								return err
+							}
+							pathChecked[item.Type] = true
+						} else {
+							if err := config.IsWritablePath(s.config.CompletedShowsPath); err != nil {
+								warnedMissing[infoHash] = true
+								pathChecked[item.Type] = true
+								s.log.Error(err)
+								return err
+							}
+							pathChecked[item.Type] = true
+						}
+					}
+
+					s.log.Info("Removing the torrent without deleting files...")
+					s.RemoveTorrent(torrentHandle, false)
+
+					// Delete torrent file
+					torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+					if _, err := os.Stat(torrentFile); err == nil {
+						s.log.Info("Deleting torrent file at ", torrentFile)
+						if err := os.Remove(torrentFile); err != nil {
+							s.log.Error(err)
+							return err
+						}
+					}
+
+					filePath := torrentHandle.Files()[item.File].Path()
+					fileName := filepath.Base(filePath)
+
+					extracted := ""
+					re := regexp.MustCompile("(?i).*\\.rar")
+					if re.MatchString(fileName) {
+						extractedPath := filepath.Join(s.config.DownloadPath, filepath.Dir(filePath), "extracted")
+						files, err := ioutil.ReadDir(extractedPath)
+						if err != nil {
+							return err
+						}
+						if len(files) == 1 {
+							extracted = files[0].Name()
+						} else {
+							for _, file := range files {
+								fileNameCurrent := file.Name()
+								re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
+								if re.MatchString(fileNameCurrent) {
+									extracted = fileNameCurrent
+									break
+								}
+							}
+						}
+						if extracted != "" {
+							filePath = filepath.Join(filepath.Dir(filePath), "extracted", extracted)
+						} else {
+							return errors.New("No extracted file to move")
+						}
+					}
+
+					var dstPath string
+					if item.Type == "movie" {
+						dstPath = filepath.Dir(s.config.CompletedMoviesPath)
+					} else {
+						dstPath = filepath.Dir(s.config.CompletedShowsPath)
+						if item.ShowID > 0 {
+							show := tmdb.GetShow(item.ShowID, "en")
+							if show != nil {
+								showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+								seasonPath := filepath.Join(showPath, fmt.Sprintf("Season %d", item.Season))
+								if item.Season == 0 {
+									seasonPath = filepath.Join(showPath, "Specials")
+								}
+								dstPath = filepath.Join(dstPath, seasonPath)
+								os.MkdirAll(dstPath, 0755)
+							}
+						}
+					}
+
+					go func() {
+						s.log.Infof("Moving %s to %s", fileName, dstPath)
+						srcPath := filepath.Join(s.config.DownloadPath, filePath)
+						if dst, err := util.Move(srcPath, dstPath); err != nil {
+							s.log.Error(err)
+						} else {
+							// Remove leftover folders
+							if dirPath := filepath.Dir(filePath); dirPath != "." {
+								os.RemoveAll(filepath.Dir(srcPath))
+								if extracted != "" {
+									parentPath := filepath.Clean(filepath.Join(filepath.Dir(srcPath), ".."))
+									if parentPath != "." && parentPath != s.config.DownloadPath {
+										os.RemoveAll(parentPath)
+									}
+								}
+							}
+							s.log.Warning(fileName, "moved to", dst)
+
+							s.log.Infof("Marking %s for removal from library and database...", torrentName)
+							s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
+						}
+					}()
 					return nil
 				}()
 			}
@@ -803,7 +818,7 @@ func (s *BTService) downloadProgress() {
 						torrentName = torrentName[:30] + "..."
 					}
 					showTorrent = fmt.Sprintf("%s - %s - %s", torrentName, humanize.Bytes(uint64(activeTorrents[showNext].downloadRate))+"/s", humanize.Bytes(uint64(activeTorrents[showNext].uploadRate))+"/s")
-					showNext += 1
+					showNext++
 				}
 				if !s.config.DisableBgProgress {
 					if s.dialogProgressBG == nil {
@@ -822,6 +837,8 @@ func (s *BTService) downloadProgress() {
 //
 // Database updates
 //
+
+// UpdateDB ...
 func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) error {
 	switch Operation {
 	case Delete:
@@ -851,6 +868,7 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 	return nil
 }
 
+// GetDBItem ...
 func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
 	if err := db.GetObject(Bucket, infoHash, dbItem); err != nil {
 		return nil
@@ -858,6 +876,7 @@ func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
 	return dbItem
 }
 
+// SetDownloadLimit ...
 func (s *BTService) SetDownloadLimit(i int) {
 	if i == 0 {
 		// s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
@@ -868,6 +887,7 @@ func (s *BTService) SetDownloadLimit(i int) {
 	}
 }
 
+// SetUploadLimit ...
 func (s *BTService) SetUploadLimit(i int) {
 	if i == 0 {
 		// s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
@@ -878,6 +898,7 @@ func (s *BTService) SetUploadLimit(i int) {
 	}
 }
 
+// RestoreLimits ...
 func (s *BTService) RestoreLimits() {
 	if s.config.MaxDownloadRate > 0 {
 		s.SetDownloadLimit(s.config.MaxDownloadRate)
@@ -894,6 +915,7 @@ func (s *BTService) RestoreLimits() {
 	}
 }
 
+// SetBufferingLimits ...
 func (s *BTService) SetBufferingLimits() {
 	if s.config.LimitAfterBuffering {
 		s.SetDownloadLimit(0)
@@ -901,26 +923,30 @@ func (s *BTService) SetBufferingLimits() {
 	}
 }
 
+// GetSeedTime ...
 func (s *BTService) GetSeedTime() int64 {
 	return int64(s.config.SeedTimeLimit)
 }
 
+// GetBufferSize ...
 func (s *BTService) GetBufferSize() int64 {
 	if s.config.BufferSize < endBufferSize {
 		return endBufferSize
-	} else {
-		return s.config.BufferSize
 	}
+	return s.config.BufferSize
 }
 
+// GetMemorySize ...
 func (s *BTService) GetMemorySize() int64 {
 	return s.config.MemorySize
 }
 
+// GetStorageType ...
 func (s *BTService) GetStorageType() int {
 	return s.config.DownloadStorage
 }
 
+// PlayerStop ...
 func (s *BTService) PlayerStop() {
 	log.Debugf("PlayerStop")
 
@@ -929,6 +955,7 @@ func (s *BTService) PlayerStop() {
 	// }
 }
 
+// PlayerSeek ...
 func (s *BTService) PlayerSeek() {
 	log.Debugf("PlayerSeek")
 
@@ -937,6 +964,7 @@ func (s *BTService) PlayerSeek() {
 	// }
 }
 
+// ClientInfo ...
 func (s *BTService) ClientInfo(w io.Writer) {
 	s.Client.WriteStatus(w)
 }

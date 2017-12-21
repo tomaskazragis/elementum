@@ -1,43 +1,51 @@
 package util
 
 import (
-	"io"
-	"os"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
+// SameFileError ...
 type SameFileError struct {
 	Src string
 	Dst string
 }
 
+// Error ...
 func (e SameFileError) Error() string {
 	return fmt.Sprintf("%s and %s are the same file", e.Src, e.Dst)
 }
 
+// SpecialFileError ...
 type SpecialFileError struct {
-	File string
+	File     string
 	FileInfo os.FileInfo
 }
 
+// Error ...
 func (e SpecialFileError) Error() string {
 	return fmt.Sprintf("`%s` is a named pipe", e.File)
 }
 
+// NotADirectoryError ...
 type NotADirectoryError struct {
 	Src string
 }
 
+// Error ...
 func (e NotADirectoryError) Error() string {
 	return fmt.Sprintf("`%s` is not a directory", e.Src)
 }
 
+// AlreadyExistsError ...
 type AlreadyExistsError struct {
 	Dst string
 }
 
+// Error ...
 func (e AlreadyExistsError) Error() string {
 	return fmt.Sprintf("`%s` already exists", e.Dst)
 }
@@ -61,17 +69,17 @@ func stringInSlice(a string, list []string) bool {
 	return false
 }
 
+// IsSymlink ...
 func IsSymlink(fi os.FileInfo) bool {
 	return (fi.Mode() & os.ModeSymlink) == os.ModeSymlink
 }
 
-
-// Copy data from src to dst
+// CopyFile Copy data from src to dst
 //
 // If followSymlinks is not set and src is a symbolic link, a
 // new symlink will be created instead of copying the file it points
 // to.
-func CopyFile(src, dst string, followSymlinks bool) (error) {
+func CopyFile(src, dst string, followSymlinks bool) error {
 	if samefile(src, dst) {
 		return &SameFileError{src, dst}
 	}
@@ -136,8 +144,7 @@ func CopyFile(src, dst string, followSymlinks bool) (error) {
 	return nil
 }
 
-
-// Copy mode bits from src to dst.
+// CopyMode bits from src to dst.
 //
 // If followSymlinks is false, symlinks aren't followed if and only
 // if both `src` and `dst` are symlinks. If `lchmod` isn't available
@@ -164,7 +171,6 @@ func CopyMode(src, dst string, followSymlinks bool) error {
 	err = os.Chmod(dst, srcStat.Mode())
 	return err
 }
-
 
 // Copy data and mode bits ("cp src dst"). Return the file's destination.
 //
@@ -199,7 +205,6 @@ func Copy(src, dst string, followSymlinks bool) (string, error) {
 	return dst, nil
 }
 
-
 // Move a file from src to dst
 //
 // Simply tries os.Rename first in case the file is getting moved
@@ -225,9 +230,9 @@ func Move(src, dst string) (string, error) {
 	if srcInfo.Mode().IsDir() {
 		if err := os.Rename(src, dst); err != nil {
 			if err = CopyTree(src, dst, &CopyTreeOptions{Symlinks: false,
-			                                             Ignore: nil,
-			                                             CopyFunction: Copy,
-			                                             IgnoreDanglingSymlinks: true}); err != nil {
+				Ignore:                 nil,
+				CopyFunction:           Copy,
+				IgnoreDanglingSymlinks: true}); err != nil {
 				return dst, err
 			}
 			if err = os.RemoveAll(src); err != nil {
@@ -247,7 +252,6 @@ func Move(src, dst string) (string, error) {
 
 	return dst, nil
 }
-
 
 // Recursively copy a directory tree.
 //
@@ -281,19 +285,21 @@ func Move(src, dst string) (string, error) {
 // function that supports the same signature (like Copy2() when it
 // exists) can be used.
 
+// CopyTreeOptions ...
 type CopyTreeOptions struct {
-	Symlinks bool
+	Symlinks               bool
 	IgnoreDanglingSymlinks bool
-	CopyFunction func (string, string, bool) (string, error)
-	Ignore func (string, []os.FileInfo) []string
+	CopyFunction           func(string, string, bool) (string, error)
+	Ignore                 func(string, []os.FileInfo) []string
 }
 
+// CopyTree ...
 func CopyTree(src, dst string, options *CopyTreeOptions) error {
 	if options == nil {
 		options = &CopyTreeOptions{Symlinks: false,
-		                           Ignore: nil,
-		                           CopyFunction: Copy,
-		                           IgnoreDanglingSymlinks: false}
+			Ignore:                 nil,
+			CopyFunction:           Copy,
+			IgnoreDanglingSymlinks: false}
 	}
 
 	srcFileInfo, err := os.Stat(src)
@@ -339,9 +345,9 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
 
 		// Deal with symlinks
 		if IsSymlink(entryFileInfo) {
-			linkTo, err := os.Readlink(srcPath)
-			if err != nil {
-				return err
+			linkTo, errRead := os.Readlink(srcPath)
+			if errRead != nil {
+				return errRead
 			}
 			if options.Symlinks {
 				os.Symlink(linkTo, dstPath)

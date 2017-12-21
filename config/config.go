@@ -16,6 +16,7 @@ import (
 
 var log = logging.MustGetLogger("config")
 
+// Configuration ...
 type Configuration struct {
 	DownloadPath        string
 	TorrentsPath        string
@@ -97,6 +98,7 @@ type Configuration struct {
 	CompletedShowsPath  string
 }
 
+// Addon ...
 type Addon struct {
 	ID      string
 	Name    string
@@ -112,15 +114,18 @@ var (
 )
 
 const (
+	// ListenPort ...
 	ListenPort = 65220
 )
 
+// Get ...
 func Get() *Configuration {
 	lock.RLock()
 	defer lock.RUnlock()
 	return config
 }
 
+// Reload ...
 func Reload() *Configuration {
 	log.Info("Reloading configuration...")
 
@@ -229,7 +234,7 @@ func Reload() *Configuration {
 		TorrentsPath:        filepath.Join(downloadPath, "Torrents"),
 		Info:                info,
 		Platform:            platform,
-		Language:            xbmc.GetLanguageISO_639_1(),
+		Language:            xbmc.GetLanguageISO639_1(),
 		ProfilePath:         info.Profile,
 		DownloadStorage:     settings["download_storage"].(int),
 		MemorySize:          settings["memory_size"].(int) * 1024 * 1024,
@@ -324,14 +329,17 @@ func Reload() *Configuration {
 	return config
 }
 
+// AddonIcon ...
 func AddonIcon() string {
 	return filepath.Join(Get().Info.Path, "icon.png")
 }
 
+// AddonResource ...
 func AddonResource(args ...string) string {
 	return filepath.Join(Get().Info.Path, "resources", filepath.Join(args...))
 }
 
+// TranslatePath ...
 func TranslatePath(path string) string {
 	// Do not translate nfs/smb path
 	if strings.HasPrefix(path, "nfs:") || strings.HasPrefix(path, "smb:") {
@@ -339,11 +347,11 @@ func TranslatePath(path string) string {
 			path += "/"
 		}
 		return path
-	} else {
-		return filepath.Dir(xbmc.TranslatePath(path))
 	}
+	return filepath.Dir(xbmc.TranslatePath(path))
 }
 
+// IsWritablePath ...
 func IsWritablePath(path string) error {
 	if path == "." {
 		return errors.New("Path not set")
@@ -356,15 +364,15 @@ func IsWritablePath(path string) error {
 		if err != nil {
 			return err
 		}
-		return errors.New(fmt.Sprintf("%s is not a valid directory", path))
+		return fmt.Errorf("%s is not a valid directory", path)
 	}
 	writableFile := filepath.Join(path, ".writable")
-	if writable, err := os.Create(writableFile); err != nil {
+	writable, err := os.Create(writableFile)
+	if err != nil {
 		return err
-	} else {
-		writable.Close()
-		os.Remove(writableFile)
 	}
+	writable.Close()
+	os.Remove(writableFile)
 	return nil
 }
 
@@ -382,6 +390,7 @@ func waitForSettingsClosed() {
 	}
 }
 
+// CheckBurst ...
 func CheckBurst() {
 	// Check for enabled providers and Elementum Burst
 	hasBurst := false

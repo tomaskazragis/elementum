@@ -8,6 +8,7 @@ import (
 	"github.com/elgatito/elementum/config"
 )
 
+// LocalIP ...
 func LocalIP() (net.IP, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -35,6 +36,7 @@ func LocalIP() (net.IP, error) {
 	return nil, errors.New("cannot find local IP address")
 }
 
+// GetHTTPHost ...
 func GetHTTPHost() string {
 	hostname := "localhost"
 	// if localIP, err := LocalIP(); err == nil {

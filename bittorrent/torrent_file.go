@@ -27,6 +27,7 @@ import (
 
 var torrentFileLog = logging.MustGetLogger("torrentFile")
 
+// TorrentFile represents a physical torrent file
 type TorrentFile struct {
 	URI       string   `json:"uri"`
 	InfoHash  string   `json:"info_hash"`
@@ -53,6 +54,7 @@ type TorrentFile struct {
 // Used to avoid infinite recursion in UnmarshalJSON
 type torrent TorrentFile
 
+// TorrentFileRaw ...
 type TorrentFileRaw struct {
 	Announce     string                 `bencode:"announce"`
 	AnnounceList [][]string             `bencode:"announce-list"`
@@ -60,12 +62,19 @@ type TorrentFileRaw struct {
 }
 
 const (
+	// ResolutionUnknown ...
 	ResolutionUnknown = iota
+	// Resolution240p ...
 	Resolution240p
+	// Resolution480p ...
 	Resolution480p
+	// Resolution720p ...
 	Resolution720p
+	// Resolution1080p ...
 	Resolution1080p
+	// Resolution1440p ...
 	Resolution1440p
+	// Resolution4k ...
 	Resolution4k
 )
 
@@ -85,20 +94,32 @@ var (
 		regexp.MustCompile(`\W+2K\W*`):                      Resolution1440p,
 		regexp.MustCompile(`\W+4K\W*`):                      Resolution4k,
 	}
+	// Resolutions ...
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "1440p", "4K"}
-	Colors      = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
+	// Colors ...
+	Colors = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
 )
 
 const (
+	// RipUnknown ...
 	RipUnknown = iota
+	// RipCam ...
 	RipCam
+	// RipTS ...
 	RipTS
+	// RipTC ...
 	RipTC
+	// RipScr ...
 	RipScr
+	// RipDVDScr ...
 	RipDVDScr
+	// RipDVD ...
 	RipDVD
+	// RipHDTV ...
 	RipHDTV
+	// RipWeb ...
 	RipWeb
+	// RipBluRay ...
 	RipBluRay
 )
 
@@ -114,12 +135,16 @@ var (
 		regexp.MustCompile(`\W+(web\W*dl|web\W*rip)\W*`): RipWeb,
 		regexp.MustCompile(`\W+(bluray|b[rd]rip)\W*`):    RipBluRay,
 	}
+	// Rips ...
 	Rips = []string{"", "Cam", "TeleSync", "TeleCine", "Screener", "DVD Screener", "DVDRip", "HDTV", "WebDL", "Blu-Ray"}
 )
 
 const (
+	// RatingUnkown ...
 	RatingUnkown = iota
+	// RatingProper ...
 	RatingProper
+	// RatingNuked ...
 	RatingNuked
 )
 
@@ -131,17 +156,27 @@ var (
 )
 
 const (
+	// CodecUnknown ...
 	CodecUnknown = iota
 
+	// CodecXVid ...
 	CodecXVid
+	// CodecH264 ...
 	CodecH264
+	// CodecH265 ...
 	CodecH265
 
+	// CodecMp3 ...
 	CodecMp3
+	// CodecAAC ...
 	CodecAAC
+	// CodecAC3 ...
 	CodecAC3
+	// CodecDTS ...
 	CodecDTS
+	// CodecDTSHD ...
 	CodecDTSHD
+	// CodecDTSHDMA ...
 	CodecDTSHDMA
 )
 
@@ -159,6 +194,7 @@ var (
 		regexp.MustCompile(`\W+dts\W+hd\W*`):         CodecDTSHD,
 		regexp.MustCompile(`\W+dts\W+hd\W+ma\W*`):    CodecDTSHDMA,
 	}
+	// Codecs ...
 	Codecs = []string{"", "Xvid", "H.264", "H.265", "MP3", "AAC", "AC3", "DTS", "DTS HD", "DTS HD MA"}
 )
 
@@ -177,6 +213,7 @@ const (
 	torCache = "http://itorrents.org/torrent/%s.torrent"
 )
 
+// UnmarshalJSON ...
 func (t *TorrentFile) UnmarshalJSON(b []byte) error {
 	tmp := torrent{}
 	if err := json.Unmarshal(b, &tmp); err != nil {
@@ -187,6 +224,7 @@ func (t *TorrentFile) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// MarshalJSON ...
 func (t *TorrentFile) MarshalJSON() ([]byte, error) {
 	tmp := torrent(*t)
 	log.Debugf("Marshalling: %#v", tmp)
@@ -197,11 +235,12 @@ func (t *TorrentFile) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 
+// IsMagnet ...
 func (t *TorrentFile) IsMagnet() bool {
 	return strings.HasPrefix(t.URI, "magnet:")
 }
 
-// From anacrolix/torrent
+// IsValidMagnet Taken from anacrolix/torrent
 func (t *TorrentFile) IsValidMagnet() (err error) {
 	u, err := url.Parse(t.URI)
 	if err != nil {
@@ -245,6 +284,7 @@ func (t *TorrentFile) IsValidMagnet() (err error) {
 	return
 }
 
+// NewTorrentFile ...
 func NewTorrentFile(uri string) *TorrentFile {
 	t := &TorrentFile{
 		URI: uri,
@@ -303,6 +343,7 @@ func (t *TorrentFile) initializeFromMagnet() {
 	}
 }
 
+// Magnet ...
 func (t *TorrentFile) Magnet() {
 	if t.hasResolved == false {
 		t.Resolve()
@@ -329,6 +370,7 @@ func (t *TorrentFile) Magnet() {
 	}
 }
 
+// LoadFromBytes ...
 func (t *TorrentFile) LoadFromBytes(in []byte) error {
 
 	var torrentFile *TorrentFileRaw
@@ -385,6 +427,7 @@ func (t *TorrentFile) LoadFromBytes(in []byte) error {
 	return nil
 }
 
+// Resolve ...
 func (t *TorrentFile) Resolve() error {
 	if t.IsMagnet() {
 		t.hasResolved = true
@@ -427,8 +470,8 @@ func (t *TorrentFile) Resolve() error {
 
 	var torrentFile *TorrentFileRaw
 
-	if err := dec.Decode(&torrentFile); err != nil {
-		return err
+	if errDec := dec.Decode(&torrentFile); errDec != nil {
+		return errDec
 	}
 
 	if t.InfoHash == "" {
@@ -492,6 +535,7 @@ func matchTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
 	return codec
 }
 
+// StreamInfo ...
 func (t *TorrentFile) StreamInfo() *xbmc.StreamInfo {
 	sie := &xbmc.StreamInfo{
 		Video: &xbmc.StreamInfoEntry{

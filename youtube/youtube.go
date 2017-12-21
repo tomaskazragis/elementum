@@ -20,26 +20,29 @@ var (
 	paramsRe = regexp.MustCompile("ytplayer.config = ({.*?});")
 )
 
+// YTPlayerConfig ...
 type YTPlayerConfig struct {
 	Args struct {
 		FmtList                string `json:"fmt_list"`
-		UrlEncodedFmtStreamMap string `json:"url_encoded_fmt_stream_map"`
+		URLEncodedFmtStreamMap string `json:"url_encoded_fmt_stream_map"`
 	} `json:"args"`
 }
 
+// YTSearchItems ...
 type YTSearchItems struct {
-    Item[]struct{
-    	ID struct{
-    		Kind    string `json:"kind"`
-    		VideoID string `json:"videoId"`
-    	} `json:"id"`
-    } `json:"items"`
+	Item []struct {
+		ID struct {
+			Kind    string `json:"kind"`
+			VideoID string `json:"videoId"`
+		} `json:"id"`
+	} `json:"items"`
 }
 
-func Search(name string) (string, error){
-    url := fmt.Sprintf(searchLink, url.QueryEscape(name + " trailer"), youtubeKey)
+// Search ...
+func Search(name string) (string, error) {
+	url := fmt.Sprintf(searchLink, url.QueryEscape(name+" trailer"), youtubeKey)
 
- 	r, err := http.Get(url)
+	r, err := http.Get(url)
 	if err != nil {
 		return "", err
 	}
@@ -56,11 +59,12 @@ func Search(name string) (string, error){
 		}
 	}
 
-    return "", fmt.Errorf("Unable to find youtube#video !")
+	return "", fmt.Errorf("Unable to find youtube#video")
 }
 
-func Resolve(youtubeId string) ([]string, error) {
-	resp, err := http.Get(fmt.Sprintf(watchLink, youtubeId))
+// Resolve ...
+func Resolve(youtubeID string) ([]string, error) {
+	resp, err := http.Get(fmt.Sprintf(watchLink, youtubeID))
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +74,7 @@ func Resolve(youtubeId string) ([]string, error) {
 	}
 	matches := paramsRe.FindSubmatch(body)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("Unable to find player config !")
+		return nil, fmt.Errorf("Unable to find player config")
 	}
 
 	cfg := YTPlayerConfig{}
@@ -79,7 +83,7 @@ func Resolve(youtubeId string) ([]string, error) {
 	}
 
 	streams := make([]string, 0)
-	for _, stream := range strings.Split(cfg.Args.UrlEncodedFmtStreamMap, ",") {
+	for _, stream := range strings.Split(cfg.Args.URLEncodedFmtStreamMap, ",") {
 		v, err := url.ParseQuery(stream)
 		if err != nil {
 			return nil, err

@@ -36,17 +36,26 @@ const (
 )
 
 var (
-	Paused        bool
-	Seeked        bool
-	Playing       bool
-	WasPlaying    bool
-	FromLibrary   bool
-	WatchedTime   float64
+	// Paused ...
+	Paused bool
+	// Seeked ...
+	Seeked bool
+	// Playing ...
+	Playing bool
+	// WasPlaying ...
+	WasPlaying bool
+	// FromLibrary ...
+	FromLibrary bool
+	// WatchedTime ...
+	WatchedTime float64
+	// VideoDuration ...
 	VideoDuration float64
 )
 
+// HistoryBucket ...
 var HistoryBucket = database.TorrentHistoryBucket
 
+// BTPlayer ...
 type BTPlayer struct {
 	bts                  *BTService
 	log                  *logging.Logger
@@ -57,8 +66,8 @@ type BTPlayer struct {
 	contentType          string
 	fileIndex            int
 	resumeIndex          int
-	tmdbId               int
-	showId               int
+	tmdbID               int
+	showID               int
 	season               int
 	episode              int
 	scrobble             bool
@@ -85,6 +94,7 @@ type BTPlayer struct {
 	DBTYPE string
 }
 
+// BTPlayerParams ...
 type BTPlayerParams struct {
 	URI         string
 	FileIndex   int
@@ -108,6 +118,7 @@ func (a byFilename) Len() int           { return len(a) }
 func (a byFilename) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byFilename) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
+// NewBTPlayer ...
 func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 	Playing = true
 	if params.FromLibrary {
@@ -127,8 +138,8 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 		keepFilesFinished:    config.Get().KeepFilesFinished,
 		scrobble:             config.Get().Scrobble == true && params.TMDBId > 0 && config.Get().TraktToken != "",
 		contentType:          params.ContentType,
-		tmdbId:               params.TMDBId,
-		showId:               params.ShowID,
+		tmdbID:               params.TMDBId,
+		showID:               params.ShowID,
 		season:               params.Season,
 		episode:              params.Episode,
 		torrentFile:          "",
@@ -164,15 +175,16 @@ func (btp *BTPlayer) addTorrent() error {
 	return nil
 }
 
+// PlayURL ...
 func (btp *BTPlayer) PlayURL() string {
 	if btp.Torrent.IsRarArchive {
 		extractedPath := filepath.Join(filepath.Dir(btp.chosenFile.Path()), "extracted", btp.extracted)
 		return strings.Join(strings.Split(extractedPath, string(os.PathSeparator)), "/")
-	} else {
-		return strings.Join(strings.Split(btp.chosenFile.Path(), string(os.PathSeparator)), "/")
 	}
+	return strings.Join(strings.Split(btp.chosenFile.Path(), string(os.PathSeparator)), "/")
 }
 
+// Buffer ...
 func (btp *BTPlayer) Buffer() error {
 	if btp.resumeIndex >= 0 {
 		btp.Torrent.Resume()
@@ -212,7 +224,7 @@ func (btp *BTPlayer) waitCheckAvailableSpace() {
 			if btp.hasChosenFile && btp.isDownloading {
 				status := btp.bts.CheckAvailableSpace(btp.Torrent)
 				if !status {
-					btp.bufferEvents.Broadcast(errors.New("Not enough space on download destination."))
+					btp.bufferEvents.Broadcast(errors.New("Not enough space on download destination"))
 					btp.notEnoughSpace = true
 				}
 
@@ -250,7 +262,7 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Infof("Chosen file: %s", btp.fileName)
 	btp.log.Infof("Saving torrent to database")
 
-	btp.bts.UpdateDB(Update, infoHash, btp.tmdbId, btp.contentType, int(btp.chosenFile.Offset()), btp.showId, btp.season, btp.episode)
+	btp.bts.UpdateDB(Update, infoHash, btp.tmdbID, btp.contentType, int(btp.chosenFile.Offset()), btp.showID, btp.season, btp.episode)
 
 	if btp.Torrent.IsRarArchive {
 		// Just disable sequential download for RAR archives
@@ -294,15 +306,14 @@ func (btp *BTPlayer) statusStrings(progress float64) (string, string, string) {
 		btp.Torrent.Stats().ActivePeers,
 		btp.Torrent.Stats().TotalPeers,
 	)
-	line3 := ""
+	line3 := btp.torrentName
 	if btp.fileName != "" && !btp.Torrent.IsRarArchive {
 		line3 = btp.fileName
-	} else {
-		line3 = btp.torrentName
 	}
 	return line1, line2, line3
 }
 
+// HasChosenFile ...
 func (btp *BTPlayer) HasChosenFile() bool {
 	return btp.hasChosenFile && btp.chosenFile != nil
 }
@@ -383,9 +394,8 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 		choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
 		if choice >= 0 {
 			return &files[choices[choice].Index], nil
-		} else {
-			return nil, fmt.Errorf("User cancelled")
 		}
+		return nil, fmt.Errorf("User cancelled")
 	}
 
 	return &files[biggestFile], nil
@@ -418,6 +428,7 @@ func (btp *BTPlayer) findSubtitlesFile() *gotorrent.File {
 	return nil
 }
 
+// Close ...
 func (btp *BTPlayer) Close() {
 	// Prevent double-closing
 	if btp.closed {
@@ -433,15 +444,11 @@ func (btp *BTPlayer) Close() {
 		keepDownloading = false
 	} else if btp.keepDownloading == 0 || xbmc.DialogConfirm("Elementum", "LOCALIZE[30146]") {
 		keepDownloading = true
-	} else {
-		keepDownloading = false
 	}
 
-	keepSetting := 1
+	keepSetting := btp.keepFilesPlaying
 	if isWatched {
 		keepSetting = btp.keepFilesFinished
-	} else {
-		keepSetting = btp.keepFilesPlaying
 	}
 
 	deleteAnswer := false
@@ -498,7 +505,7 @@ func (btp *BTPlayer) bufferDialog() {
 			status := btp.Torrent.GetState()
 
 			// Handle "Checking" state for resumed downloads
-			if status == STATUS_CHECKING || btp.Torrent.IsRarArchive {
+			if status == StatusChecking || btp.Torrent.IsRarArchive {
 				progress := btp.Torrent.GetBufferProgress()
 				line1, line2, line3 := btp.statusStrings(progress)
 				btp.dialogProgress.Update(int(progress), line1, line2, line3)
@@ -511,16 +518,15 @@ func (btp *BTPlayer) bufferDialog() {
 						btp.findExtracted(destPath)
 						btp.bufferEvents.Signal()
 						return
-					} else {
-						os.MkdirAll(destPath, 0755)
 					}
+					os.MkdirAll(destPath, 0755)
 
 					cmdName := "unrar"
 					cmdArgs := []string{"e", archivePath, destPath}
-					cmd := exec.Command(cmdName, cmdArgs...)
 					if platform := xbmc.GetPlatform(); platform.OS == "windows" {
 						cmdName = "unrar.exe"
 					}
+					cmd := exec.Command(cmdName, cmdArgs...)
 
 					cmdReader, err := cmd.StdoutPipe()
 					if err != nil {
@@ -560,7 +566,7 @@ func (btp *BTPlayer) bufferDialog() {
 			} else {
 				line1, line2, line3 := btp.statusStrings(btp.Torrent.BufferProgress)
 				btp.dialogProgress.Update(int(btp.Torrent.BufferProgress), line1, line2, line3)
-				if !btp.Torrent.IsBuffering && btp.Torrent.GetState() != STATUS_CHECKING {
+				if !btp.Torrent.IsBuffering && btp.Torrent.GetState() != StatusChecking {
 					btp.bufferEvents.Signal()
 					return
 				}
@@ -629,7 +635,7 @@ playbackWaitLoop:
 		select {
 		case <-playbackTimeout:
 			btp.log.Warningf("Playback was unable to start after %d seconds. Aborting...", playbackMaxWait/time.Second)
-			btp.bufferEvents.Broadcast(errors.New("Playback was unable to start before timeout."))
+			btp.bufferEvents.Broadcast(errors.New("Playback was unable to start before timeout"))
 			return
 		case <-oneSecond.C:
 		}
@@ -643,7 +649,7 @@ playbackWaitLoop:
 
 	btp.log.Infof("Got playback: %fs / %fs", WatchedTime, VideoDuration)
 	if btp.scrobble {
-		trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+		trakt.Scrobble("start", btp.contentType, btp.tmdbID, WatchedTime, VideoDuration)
 	}
 
 	go btp.Torrent.CleanupBuffer()
@@ -662,14 +668,14 @@ playbackLoop:
 				Seeked = false
 				updateWatchTimes()
 				if btp.scrobble {
-					trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+					trakt.Scrobble("start", btp.contentType, btp.tmdbID, WatchedTime, VideoDuration)
 				}
 			} else if xbmc.PlayerIsPaused() {
 				if playing == true {
 					playing = false
 					updateWatchTimes()
 					if btp.scrobble {
-						trakt.Scrobble("pause", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+						trakt.Scrobble("pause", btp.contentType, btp.tmdbID, WatchedTime, VideoDuration)
 					}
 				}
 				if btp.overlayStatusEnabled == true {
@@ -686,7 +692,7 @@ playbackLoop:
 				if playing == false {
 					playing = true
 					if btp.scrobble {
-						trakt.Scrobble("start", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+						trakt.Scrobble("start", btp.contentType, btp.tmdbID, WatchedTime, VideoDuration)
 					}
 				}
 				if overlayStatusActive == true {
@@ -699,7 +705,7 @@ playbackLoop:
 
 	btp.log.Info("Stopped playback")
 	if btp.scrobble {
-		trakt.Scrobble("stop", btp.contentType, btp.tmdbId, WatchedTime, VideoDuration)
+		trakt.Scrobble("stop", btp.contentType, btp.tmdbID, WatchedTime, VideoDuration)
 	}
 	Paused = false
 	Seeked = false
@@ -712,6 +718,7 @@ playbackLoop:
 	btp.overlayStatus.Close()
 }
 
+// IsWatched ...
 func (btp *BTPlayer) IsWatched() bool {
 	return (100 * WatchedTime / VideoDuration) > 90
 }
@@ -726,7 +733,7 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 		return
 	}
 
-	show := tmdb.GetShow(btp.showId, "en")
+	show := tmdb.GetShow(btp.showID, "en")
 	if show == nil {
 		return
 	}
@@ -748,7 +755,7 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 			continue
 		}
 
-		episodes := tmdb.GetSeason(btp.showId, season.Season, "en").Episodes
+		episodes := tmdb.GetSeason(btp.showID, season.Season, "en").Episodes
 
 		for _, episode := range episodes {
 			if episode == nil {
@@ -767,8 +774,8 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season.Season, episode.EpisodeNumber))
 			for _, choice := range choices {
 				if re.MatchString(choice.Filename) {
-					log.Debugf("Saving torrent entry for TMDB: %#v", episode.Id)
-					db.SetBytes(HistoryBucket, strconv.Itoa(episode.Id), b)
+					log.Debugf("Saving torrent entry for TMDB: %#v", episode.ID)
+					db.SetBytes(HistoryBucket, strconv.Itoa(episode.ID), b)
 				}
 			}
 		}

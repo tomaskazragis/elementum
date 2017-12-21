@@ -18,12 +18,17 @@ import (
 )
 
 const (
-	DefaultCacheExpiration    = 6 * time.Hour
-	RecentCacheExpiration     = 5 * time.Minute
+	// DefaultCacheExpiration ...
+	DefaultCacheExpiration = 6 * time.Hour
+	// RecentCacheExpiration ...
+	RecentCacheExpiration = 5 * time.Minute
+	// RepositoryCacheExpiration ...
 	RepositoryCacheExpiration = 20 * time.Minute
-	IndexCacheExpiration      = 15 * 24 * time.Hour // 15 days caching for index
+	// IndexCacheExpiration ...
+	IndexCacheExpiration = 15 * 24 * time.Hour // 15 days caching for index
 )
 
+// Routes ...
 func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -254,17 +259,20 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	return r
 }
 
-func UrlForHTTP(pattern string, args ...interface{}) string {
+// URLForHTTP ...
+func URLForHTTP(pattern string, args ...interface{}) string {
 	u, _ := url.Parse(fmt.Sprintf(pattern, args...))
 	return util.GetHTTPHost() + u.String()
 }
 
-func UrlForXBMC(pattern string, args ...interface{}) string {
+// URLForXBMC ...
+func URLForXBMC(pattern string, args ...interface{}) string {
 	u, _ := url.Parse(fmt.Sprintf(pattern, args...))
-	return "plugin://" + config.Get().Info.Id + u.String()
+	return "plugin://" + config.Get().Info.ID + u.String()
 }
 
-func UrlQuery(route string, query ...string) string {
+// URLQuery ...
+func URLQuery(route string, query ...string) string {
 	v := url.Values{}
 	for i := 0; i < len(query); i += 2 {
 		v.Add(query[i], query[i+1])

@@ -21,13 +21,15 @@ import (
 )
 
 const (
-	CHUNK_SIZE      = 1024 * 16
-	READAHEAD_RATIO = 0.33
+	// ChunkSize ...
+	ChunkSize = 1024 * 16
+	// ReadaheadRatio ...
+	ReadaheadRatio = 0.33
 )
 
 var log = logging.MustGetLogger("memory")
 
-// Cache main object
+// Storage main object
 type Storage struct {
 	Type int
 	mu   *sync.Mutex
@@ -48,6 +50,7 @@ func NewMemoryStorage(maxMemorySize int64) *Storage {
 	return s
 }
 
+// GetTorrentStorage ...
 func (s *Storage) GetTorrentStorage(hash string) estorage.TorrentStorage {
 	if i, ok := s.items[hash]; ok {
 		return i
@@ -56,16 +59,20 @@ func (s *Storage) GetTorrentStorage(hash string) estorage.TorrentStorage {
 	return nil
 }
 
+// Close ...
 func (s *Storage) Close() error {
 	return nil
 }
 
+// GetReadaheadSize ...
 func (s *Storage) GetReadaheadSize() int64 {
 	return 0
 }
 
+// SetReadaheadSize ...
 func (s *Storage) SetReadaheadSize(size int64) {}
 
+// OpenTorrent ...
 func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
 	c := &Cache{
 		s:        s,

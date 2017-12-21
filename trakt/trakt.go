@@ -1,35 +1,40 @@
 package trakt
 
 import (
-	"fmt"
-	"time"
 	"bytes"
 	"errors"
-	"strconv"
-	"net/url"
+	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
+	"time"
 
-	"github.com/op/go-logging"
-	"github.com/jmcvetta/napping"
 	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
+	"github.com/op/go-logging"
 )
 
 const (
-	ApiUrl       = "https://api.trakt.tv"
-	ClientId     = "4407ab20a3a971e7c92d4996b36b76d0312ea085cb139d7c38a1a4c9f8428f60"
+	// APIURL ...
+	APIURL = "https://api.trakt.tv"
+	// ClientID ...
+	ClientID = "4407ab20a3a971e7c92d4996b36b76d0312ea085cb139d7c38a1a4c9f8428f60"
+	// ClientSecret ...
 	ClientSecret = "83f5993015942fe1320772c9c9886dce08252fa95445afab81a1603f8671e490"
-	ApiVersion   = "2"
+	// APIVersion ...
+	APIVersion = "2"
 )
 
 var log = logging.MustGetLogger("trakt")
 
 var (
+	// PagesAtOnce ...
+	PagesAtOnce             = 5
 	clearance, _            = cloudhole.GetClearance()
 	retriesLeft             = 3
-	PagesAtOnce             = 5
 	burstRate               = 50
 	burstTime               = 10 * time.Second
 	simultaneousConnections = 25
@@ -40,119 +45,131 @@ var (
 
 var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
+// Object ...
 type Object struct {
 	Title string `json:"title"`
 	Year  int    `json:"year"`
 	IDs   *IDs   `json:"ids"`
 }
 
+// Movie ...
 type Movie struct {
 	Object
 
-	Released      string      `json:"released"`
-	URL           string      `json:"homepage"`
-	Trailer       string      `json:"trailer"`
-	Runtime       int         `json:"runtime"`
-	TagLine       string      `json:"tagline"`
-	Overview      string      `json:"overview"`
-	Certification string      `json:"certification"`
-	Rating        float32     `json:"rating"`
-	Votes         int         `json:"votes"`
-	Genres        []string    `json:"genres"`
-	Language      string      `json:"language"`
-	Translations  []string    `json:"available_translations"`
+	Released      string   `json:"released"`
+	URL           string   `json:"homepage"`
+	Trailer       string   `json:"trailer"`
+	Runtime       int      `json:"runtime"`
+	TagLine       string   `json:"tagline"`
+	Overview      string   `json:"overview"`
+	Certification string   `json:"certification"`
+	Rating        float32  `json:"rating"`
+	Votes         int      `json:"votes"`
+	Genres        []string `json:"genres"`
+	Language      string   `json:"language"`
+	Translations  []string `json:"available_translations"`
 
-	Images        *Images     `json:"images"`
+	Images *Images `json:"images"`
 }
 
+// Show ...
 type Show struct {
 	Object
 
-	FirstAired    string      `json:"first_aired"`
-	URL           string      `json:"homepage"`
-	Trailer       string      `json:"trailer"`
-	Runtime       int         `json:"runtime"`
-	Overview      string      `json:"overview"`
-	Certification string      `json:"certification"`
-	Status        string      `json:"status"`
-	Network       string      `json:"network"`
-	AiredEpisodes int         `json:"aired_episodes"`
-	Airs          *Airs       `json:"airs"`
-	Rating        float32     `json:"rating"`
-	Votes         int         `json:"votes"`
-	Genres        []string    `json:"genres"`
-	Country       string      `json:"country"`
-	Language      string      `json:"language"`
-	Translations  []string    `json:"available_translations"`
+	FirstAired    string   `json:"first_aired"`
+	URL           string   `json:"homepage"`
+	Trailer       string   `json:"trailer"`
+	Runtime       int      `json:"runtime"`
+	Overview      string   `json:"overview"`
+	Certification string   `json:"certification"`
+	Status        string   `json:"status"`
+	Network       string   `json:"network"`
+	AiredEpisodes int      `json:"aired_episodes"`
+	Airs          *Airs    `json:"airs"`
+	Rating        float32  `json:"rating"`
+	Votes         int      `json:"votes"`
+	Genres        []string `json:"genres"`
+	Country       string   `json:"country"`
+	Language      string   `json:"language"`
+	Translations  []string `json:"available_translations"`
 
-	Images        *Images     `json:"images"`
+	Images *Images `json:"images"`
 }
 
+// Season ...
 type Season struct {
 	// Show          *Show   `json:"-"`
-	Number        int         `json:"number"`
-	Overview      string      `json:"overview"`
-	EpisodeCount  int         `json:"episode_count"`
-	AiredEpisodes int         `json:"aired_episodes"`
-	Rating        float32     `json:"rating"`
-	Votes         int         `json:"votes"`
+	Number        int     `json:"number"`
+	Overview      string  `json:"overview"`
+	EpisodeCount  int     `json:"episode_count"`
+	AiredEpisodes int     `json:"aired_episodes"`
+	Rating        float32 `json:"rating"`
+	Votes         int     `json:"votes"`
 
-	Images        *Images     `json:"images"`
-	IDs           *IDs        `json:"ids"`
+	Images *Images `json:"images"`
+	IDs    *IDs    `json:"ids"`
 }
 
+// Episode ...
 type Episode struct {
 	// Show          *Show       `json:"-"`
 	// Season        *ShowSeason `json:"-"`
-	Number        int         `json:"number"`
-	Season        int         `json:"season"`
-	Title         string      `json:"title"`
-	Overview      string      `json:"overview"`
-	Absolute      int         `json:"number_abs"`
-	FirstAired    string      `json:"first_aired"`
-	Translations  []string    `json:"available_translations"`
+	Number       int      `json:"number"`
+	Season       int      `json:"season"`
+	Title        string   `json:"title"`
+	Overview     string   `json:"overview"`
+	Absolute     int      `json:"number_abs"`
+	FirstAired   string   `json:"first_aired"`
+	Translations []string `json:"available_translations"`
 
-	Rating        float32     `json:"rating"`
-	Votes         int         `json:"votes"`
+	Rating float32 `json:"rating"`
+	Votes  int     `json:"votes"`
 
-	Images        *Images     `json:"images"`
-	IDs           *IDs        `json:"ids"`
+	Images *Images `json:"images"`
+	IDs    *IDs    `json:"ids"`
 }
 
+// Airs ...
 type Airs struct {
-	Day           string      `json:"day"`
-	Time          string      `json:"time"`
-	Timezone      string      `json:"timezone"`
+	Day      string `json:"day"`
+	Time     string `json:"time"`
+	Timezone string `json:"timezone"`
 }
 
+// Movies ...
 type Movies struct {
 	Watchers int    `json:"watchers"`
 	Movie    *Movie `json:"movie"`
 }
 
+// Shows ...
 type Shows struct {
 	Watchers int   `json:"watchers"`
 	Show     *Show `json:"show"`
 }
 
+// Watchlist ...
 type Watchlist struct {
 	Movies   []*Movie   `json:"movies"`
 	Shows    []*Show    `json:"shows"`
 	Episodes []*Episode `json:"episodes"`
 }
 
+// WatchlistMovie ...
 type WatchlistMovie struct {
-	ListedAt string  `json:"listed_at"`
-	Type     string  `json:"type"`
-	Movie    *Movie  `json:"movie"`
+	ListedAt string `json:"listed_at"`
+	Type     string `json:"type"`
+	Movie    *Movie `json:"movie"`
 }
 
+// WatchlistShow ...
 type WatchlistShow struct {
-	ListedAt string  `json:"listed_at"`
-	Type     string  `json:"type"`
-	Show     *Show   `json:"show"`
+	ListedAt string `json:"listed_at"`
+	Type     string `json:"type"`
+	Show     *Show  `json:"show"`
 }
 
+// WatchlistSeason ...
 type WatchlistSeason struct {
 	ListedAt string  `json:"listed_at"`
 	Type     string  `json:"type"`
@@ -160,6 +177,7 @@ type WatchlistSeason struct {
 	Show     *Object `json:"show"`
 }
 
+// WatchlistEpisode ...
 type WatchlistEpisode struct {
 	ListedAt string   `json:"listed_at"`
 	Type     string   `json:"type"`
@@ -167,27 +185,32 @@ type WatchlistEpisode struct {
 	Show     *Object  `json:"show"`
 }
 
+// CollectionMovie ...
 type CollectionMovie struct {
 	CollectedAt string `json:"collected_at"`
 	Movie       *Movie `json:"movie"`
 }
 
+// CollectionShow ...
 type CollectionShow struct {
 	CollectedAt string             `json:"last_collected_at"`
 	Show        *Show              `json:"show"`
 	Seasons     []*CollectedSeason `json:"seasons"`
 }
 
+// CollectedSeason ...
 type CollectedSeason struct {
 	Number   int                 `json:"number"`
 	Episodes []*CollectedEpisode `json:"episodes"`
 }
 
+// CollectedEpisode ...
 type CollectedEpisode struct {
 	CollectedAt string `json:"collected_at"`
 	Number      int    `json:"number"`
 }
 
+// Images ...
 type Images struct {
 	Poster     *Sizes `json:"poster"`
 	FanArt     *Sizes `json:"fanart"`
@@ -200,21 +223,24 @@ type Images struct {
 	Avatar     *Sizes `json:"avatar"`
 }
 
+// Sizes ...
 type Sizes struct {
 	Full      string `json:"full"`
 	Medium    string `json:"medium"`
 	Thumbnail string `json:"thumb"`
 }
 
+// IDs ...
 type IDs struct {
-  Trakt  int    `json:"trakt"`
-  IMDB   string `json:"imdb"`
+	Trakt  int    `json:"trakt"`
+	IMDB   string `json:"imdb"`
 	TMDB   int    `json:"tmdb"`
-  TVDB   int    `json:"tvdb"`
+	TVDB   int    `json:"tvdb"`
 	TVRage int    `json:"tvrage"`
-  Slug   string `json:"slug"`
+	Slug   string `json:"slug"`
 }
 
+// Code ...
 type Code struct {
 	DeviceCode      string `json:"device_code"`
 	UserCode        string `json:"user_code"`
@@ -223,6 +249,7 @@ type Code struct {
 	Interval        int    `json:"interval"`
 }
 
+// Token ...
 type Token struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
@@ -231,14 +258,16 @@ type Token struct {
 	Scope        string `json:"scope"`
 }
 
+// TokenRefresh ...
 type TokenRefresh struct {
 	RefreshToken string `json:"refresh_token"`
-	ClientId     string `json:"client_id"`
+	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	RedirectURI  string `json:"redirect_uri"`
 	GrantType    string `json:"grant_type"`
 }
 
+// List ...
 type List struct {
 	Name           string `json:"name"`
 	Description    string `json:"description"`
@@ -255,25 +284,28 @@ type List struct {
 	IDs            *IDs
 }
 
+// ListItem ...
 type ListItem struct {
-	Rank      int      `json:"rank"`
-	ListedAt  string   `json:"listed_at"`
-	Type      string   `json:"type"`
-	Movie     *Movie   `json:"movie"`
-	Show      *Show    `json:"show"`
+	Rank     int    `json:"rank"`
+	ListedAt string `json:"listed_at"`
+	Type     string `json:"type"`
+	Movie    *Movie `json:"movie"`
+	Show     *Show  `json:"show"`
 	// Season    *Season  `json:"season"`
 	// Episode   *Episode `json:"episode"`
 }
 
+// CalendarShow ...
 type CalendarShow struct {
-	FirstAired  string   `json:"first_aired"`
-	Episode     *Episode `json:"episode"`
-	Show        *Show    `json:"show"`
+	FirstAired string   `json:"first_aired"`
+	Episode    *Episode `json:"episode"`
+	Show       *Show    `json:"show"`
 }
 
+// CalendarMovie ...
 type CalendarMovie struct {
-	Released   string `json:"released"`
-	Movie      *Movie `json:"movie"`
+	Released string `json:"released"`
+	Movie    *Movie `json:"movie"`
 }
 
 func totalFromHeaders(headers http.Header) (total int, err error) {
@@ -291,12 +323,12 @@ func totalFromHeaders(headers http.Header) (total int, err error) {
 }
 
 func newClearance() (err error) {
-	retriesLeft -= 1
+	retriesLeft--
 	log.Warningf("CloudFlared! User-Agent: %s - Cookies: %s", clearance.UserAgent, clearance.Cookies)
 
 	if config.Get().UseCloudHole == false {
 		retriesLeft = 0
-		return errors.New("CloudFlared! Enable CloudHole in the add-on's settings.")
+		return errors.New("CloudFlared! Enable CloudHole in the add-on's settings")
 	}
 
 	clearance, err = cloudhole.GetClearance()
@@ -308,17 +340,18 @@ func newClearance() (err error) {
 	return err
 }
 
+// Get ...
 func Get(endPoint string, params url.Values) (resp *napping.Response, err error) {
 	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"trakt-api-key": []string{ClientId},
-		"trakt-api-version": []string{ApiVersion},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"Content-type":      []string{"application/json"},
+		"trakt-api-key":     []string{ClientID},
+		"trakt-api-version": []string{APIVersion},
+		"User-Agent":        []string{clearance.UserAgent},
+		"Cookie":            []string{clearance.Cookies},
 	}
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
 		Method: "GET",
 		Params: &params,
 		Header: &header,
@@ -341,18 +374,19 @@ func Get(endPoint string, params url.Values) (resp *napping.Response, err error)
 	return
 }
 
+// GetWithAuth ...
 func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, err error) {
 	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"Authorization": []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
-		"trakt-api-key": []string{ClientId},
-		"trakt-api-version": []string{ApiVersion},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"Content-type":      []string{"application/json"},
+		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
+		"trakt-api-key":     []string{ClientID},
+		"trakt-api-version": []string{APIVersion},
+		"User-Agent":        []string{clearance.UserAgent},
+		"Cookie":            []string{clearance.Cookies},
 	}
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
 		Method: "GET",
 		Params: &params,
 		Header: &header,
@@ -375,22 +409,23 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 	return
 }
 
+// Post ...
 func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err error) {
 	header := http.Header{
-		"Content-type": []string{"application/json"},
-		"Authorization": []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
-		"trakt-api-key": []string{ClientId},
-		"trakt-api-version": []string{ApiVersion},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"Content-type":      []string{"application/json"},
+		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
+		"trakt-api-key":     []string{ClientID},
+		"trakt-api-version": []string{APIVersion},
+		"User-Agent":        []string{clearance.UserAgent},
+		"Cookie":            []string{clearance.Cookies},
 	}
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
-		Method: "POST",
+		Url:        fmt.Sprintf("%s/%s", APIURL, endPoint),
+		Method:     "POST",
 		RawPayload: true,
-		Payload: payload,
-		Header: &header,
+		Payload:    payload,
+		Header:     &header,
 	}
 
 	rateLimiter.Call(func() {
@@ -410,19 +445,20 @@ func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err e
 	return
 }
 
+// GetCode ...
 func GetCode() (code *Code, err error) {
 	endPoint := "oauth/device/code"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"User-Agent":   []string{clearance.UserAgent},
+		"Cookie":       []string{clearance.Cookies},
 	}
 	params := napping.Params{
-		"client_id": ClientId,
+		"client_id": ClientID,
 	}.AsUrlValues()
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
 		Method: "POST",
 		Params: &params,
 		Header: &header,
@@ -447,31 +483,31 @@ func GetCode() (code *Code, err error) {
 		}
 	})
 	if err == nil && resp.Status() != 200 {
-		err = errors.New(fmt.Sprintf("Unable to get Trakt code: %d", resp.Status()))
+		err = fmt.Errorf("Unable to get Trakt code: %d", resp.Status())
 	}
 	return
 }
 
+// GetToken ...
 func GetToken(code string) (resp *napping.Response, err error) {
 	endPoint := "oauth/device/token"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"User-Agent":   []string{clearance.UserAgent},
+		"Cookie":       []string{clearance.Cookies},
 	}
 	params := napping.Params{
-		"code": code,
-		"client_id": ClientId,
+		"code":          code,
+		"client_id":     ClientID,
 		"client_secret": ClientSecret,
 	}.AsUrlValues()
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
 		Method: "POST",
 		Params: &params,
 		Header: &header,
 	}
-
 
 	rateLimiter.Call(func() {
 		resp, err = napping.Send(&req)
@@ -490,6 +526,7 @@ func GetToken(code string) (resp *napping.Response, err error) {
 	return
 }
 
+// PollToken ...
 func PollToken(code *Code) (token *Token, err error) {
 	startInterval := code.Interval
 	interval := time.NewTicker(time.Duration(startInterval) * time.Second)
@@ -500,9 +537,9 @@ func PollToken(code *Code) (token *Token, err error) {
 	for {
 		select {
 		case <-interval.C:
-			resp, err := GetToken(code.DeviceCode)
-			if err != nil {
-				return nil, err
+			resp, errGet := GetToken(code.DeviceCode)
+			if errGet != nil {
+				return nil, errGet
 			}
 			if resp.Status() == 200 {
 				resp.Unmarshal(&token)
@@ -510,53 +547,53 @@ func PollToken(code *Code) (token *Token, err error) {
 			} else if resp.Status() == 400 {
 				break
 			} else if resp.Status() == 404 {
-				err = errors.New("Invalid device code.")
+				err = errors.New("Invalid device code")
 				return nil, err
 			} else if resp.Status() == 409 {
-				err = errors.New("Code already used.")
+				err = errors.New("Code already used")
 				return nil, err
 			} else if resp.Status() == 410 {
-				err = errors.New("Code expired.")
+				err = errors.New("Code expired")
 				return nil, err
 			} else if resp.Status() == 418 {
-				err = errors.New("Code denied.")
+				err = errors.New("Code denied")
 				return nil, err
 			} else if resp.Status() == 429 {
 				// err = errors.New("Polling too quickly.")
 				interval.Stop()
-				interval = time.NewTicker(time.Duration(startInterval + 5) * time.Second)
+				interval = time.NewTicker(time.Duration(startInterval+5) * time.Second)
 				break
 			}
 
 		case <-expired.C:
-			err = errors.New("Code expired, please try again.")
+			err = errors.New("Code expired, please try again")
 			return nil, err
 		}
 	}
 }
 
+// RefreshToken ...
 func RefreshToken() (resp *napping.Response, err error) {
 	endPoint := "oauth/token"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent": []string{clearance.UserAgent},
-		"Cookie": []string{clearance.Cookies},
+		"User-Agent":   []string{clearance.UserAgent},
+		"Cookie":       []string{clearance.Cookies},
 	}
 	params := napping.Params{
 		"refresh_token": config.Get().TraktRefreshToken,
-		"client_id": ClientId,
+		"client_id":     ClientID,
 		"client_secret": ClientSecret,
-		"redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
-		"grant_type": "refresh_token",
+		"redirect_uri":  "urn:ietf:wg:oauth:2.0:oob",
+		"grant_type":    "refresh_token",
 	}.AsUrlValues()
 
 	req := napping.Request{
-		Url: fmt.Sprintf("%s/%s", ApiUrl, endPoint),
+		Url:    fmt.Sprintf("%s/%s", APIURL, endPoint),
 		Method: "POST",
 		Params: &params,
 		Header: &header,
 	}
-
 
 	resp, err = napping.Send(&req)
 	if err != nil {
@@ -570,6 +607,7 @@ func RefreshToken() (resp *napping.Response, err error) {
 	return
 }
 
+// TokenRefreshHandler ...
 func TokenRefreshHandler() {
 	if config.Get().TraktToken == "" {
 		return
@@ -580,35 +618,36 @@ func TokenRefreshHandler() {
 	for {
 		select {
 		case <-ticker.C:
-			if time.Now().Unix() > int64(config.Get().TraktTokenExpiry) - int64(259200) {
+			if time.Now().Unix() > int64(config.Get().TraktTokenExpiry)-int64(259200) {
 				resp, err := RefreshToken()
 				if err != nil {
 					xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 					log.Error(err)
 					return
-				} else {
-					if resp.Status() == 200 {
-						if err := resp.Unmarshal(&token); err != nil {
-							xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-							log.Error(err)
-						} else {
-							expiry := time.Now().Unix() + int64(token.ExpiresIn)
-							xbmc.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
-							xbmc.SetSetting("trakt_token", token.AccessToken)
-							xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
-							log.Noticef("Token refreshed for Trakt authorization, next refresh in %s", time.Duration(token.ExpiresIn - 259200) * time.Second)
-						}
+				}
+
+				if resp.Status() == 200 {
+					if errUnm := resp.Unmarshal(&token); errUnm != nil {
+						xbmc.Notify("Elementum", errUnm.Error(), config.AddonIcon())
+						log.Error(errUnm)
 					} else {
-						err = errors.New(fmt.Sprintf("Bad status while refreshing Trakt token: %d", resp.Status()))
-						xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-						log.Error(err)
+						expiry := time.Now().Unix() + int64(token.ExpiresIn)
+						xbmc.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
+						xbmc.SetSetting("trakt_token", token.AccessToken)
+						xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
+						log.Noticef("Token refreshed for Trakt authorization, next refresh in %s", time.Duration(token.ExpiresIn-259200)*time.Second)
 					}
+				} else {
+					err = fmt.Errorf("Bad status while refreshing Trakt token: %d", resp.Status())
+					xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+					log.Error(err)
 				}
 			}
 		}
 	}
 }
 
+// Authorize ...
 func Authorize(fromSettings bool) error {
 	code, err := GetCode()
 
@@ -619,7 +658,7 @@ func Authorize(fromSettings bool) error {
 	log.Noticef("Got code for %s: %s", code.VerificationURL, code.UserCode)
 
 	if xbmc.Dialog("LOCALIZE[30058]", fmt.Sprintf("Visit %s and enter your code: %s", code.VerificationURL, code.UserCode)) == false {
-		return errors.New("Authentication canceled.")
+		return errors.New("Authentication canceled")
 	}
 
 	token, err := PollToken(code)
@@ -643,6 +682,7 @@ func Authorize(fromSettings bool) error {
 	return nil
 }
 
+// Authorized ...
 func Authorized() error {
 	if config.Get().TraktToken == "" {
 		err := Authorize(false)
@@ -653,43 +693,48 @@ func Authorized() error {
 	return nil
 }
 
-func AddToWatchlist(itemType string, tmdbId string) (resp *napping.Response, err error) {
+// AddToWatchlist ...
+func AddToWatchlist(itemType string, tmdbID string) (resp *napping.Response, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
 	endPoint := "sync/watchlist"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbId)))
+	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
 }
 
-func RemoveFromWatchlist(itemType string, tmdbId string) (resp *napping.Response, err error) {
+// RemoveFromWatchlist ...
+func RemoveFromWatchlist(itemType string, tmdbID string) (resp *napping.Response, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
 	endPoint := "sync/watchlist/remove"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbId)))
+	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
 }
 
-func AddToCollection(itemType string, tmdbId string) (resp *napping.Response, err error) {
+// AddToCollection ...
+func AddToCollection(itemType string, tmdbID string) (resp *napping.Response, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
 	endPoint := "sync/collection"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbId)))
+	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
 }
 
-func RemoveFromCollection(itemType string, tmdbId string) (resp *napping.Response, err error) {
+// RemoveFromCollection ...
+func RemoveFromCollection(itemType string, tmdbID string) (resp *napping.Response, err error) {
 	if err := Authorized(); err != nil {
 		return nil, err
 	}
 
 	endPoint := "sync/collection/remove"
-	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbId)))
+	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
 }
 
-func Scrobble(action string, contentType string, tmdbId int, watched float64, runtime float64) {
+// Scrobble ...
+func Scrobble(action string, contentType string, tmdbID int, watched float64, runtime float64) {
 	if err := Authorized(); err != nil {
 		return
 	}
@@ -703,12 +748,12 @@ func Scrobble(action string, contentType string, tmdbId int, watched float64, ru
 
 	endPoint := fmt.Sprintf("scrobble/%s", action)
 	payload := fmt.Sprintf(`{"%s": {"ids": {"tmdb": %d}}, "progress": %f, "app_version": "%s"}`,
-	                       contentType, tmdbId, progress, util.Version[1:len(util.Version) - 1])
+		contentType, tmdbID, progress, util.Version[1:len(util.Version)-1])
 	resp, err := Post(endPoint, bytes.NewBufferString(payload))
 	if err != nil {
 		log.Error(err.Error())
 		xbmc.Notify("Elementum", "Scrobble failed, check your logs.", config.AddonIcon())
 	} else if resp.Status() != 201 {
-		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbId, action, progress, resp.Status())
+		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbID, action, progress, resp.Status())
 	}
 }

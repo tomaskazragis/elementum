@@ -49,85 +49,89 @@ var genreSlugs = map[int]string{
 	37:    "western",
 }
 
+// MoviesIndex ...
 func MoviesIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30056]", Path: UrlForXBMC("/movies/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
-		{Label: "LOCALIZE[30209]", Path: UrlForXBMC("/movies/search"), Thumbnail: config.AddonResource("img", "search.png")},
-		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
-		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/movies/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
-		{Label: "LOCALIZE[30211]", Path: UrlForXBMC("/movies/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
-		{Label: "LOCALIZE[30212]", Path: UrlForXBMC("/movies/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
-		{Label: "LOCALIZE[30236]", Path: UrlForXBMC("/movies/recent"), Thumbnail: config.AddonResource("img", "clock.png")},
-		{Label: "LOCALIZE[30213]", Path: UrlForXBMC("/movies/imdb250"), Thumbnail: config.AddonResource("img", "imdb.png")},
-		{Label: "LOCALIZE[30289]", Path: UrlForXBMC("/movies/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
+		{Label: "LOCALIZE[30056]", Path: URLForXBMC("/movies/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{Label: "LOCALIZE[30209]", Path: URLForXBMC("/movies/search"), Thumbnail: config.AddonResource("img", "search.png")},
+		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
+		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/movies/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
+		{Label: "LOCALIZE[30211]", Path: URLForXBMC("/movies/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
+		{Label: "LOCALIZE[30212]", Path: URLForXBMC("/movies/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
+		{Label: "LOCALIZE[30236]", Path: URLForXBMC("/movies/recent"), Thumbnail: config.AddonResource("img", "clock.png")},
+		{Label: "LOCALIZE[30213]", Path: URLForXBMC("/movies/imdb250"), Thumbnail: config.AddonResource("img", "imdb.png")},
+		{Label: "LOCALIZE[30289]", Path: URLForXBMC("/movies/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
 	}
 	itemsWithContext := make(xbmc.ListItems, 0)
 	for _, item := range items {
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30142]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_movies"))},
+			[]string{"LOCALIZE[30142]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies"))},
 		}
 		itemsWithContext = append(itemsWithContext, item)
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies", itemsWithContext))
 }
 
+// MovieGenres ...
 func MovieGenres(ctx *gin.Context) {
 	items := make(xbmc.ListItems, 0)
 	for _, genre := range tmdb.GetMovieGenres(config.Get().Language) {
-		slug, _ := genreSlugs[genre.Id]
+		slug, _ := genreSlugs[genre.ID]
 		items = append(items, &xbmc.ListItem{
 			Label:     genre.Name,
-			Path:      UrlForXBMC("/movies/popular/%s", strconv.Itoa(genre.Id)),
+			Path:      URLForXBMC("/movies/popular/%s", strconv.Itoa(genre.ID)),
 			Thumbnail: config.AddonResource("img", fmt.Sprintf("genre_%s.png", slug)),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", UrlForXBMC("/movies/recent/%s", strconv.Itoa(genre.Id)))},
-				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/menus_movies_genres"))},
+				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/movies/recent/%s", strconv.Itoa(genre.ID)))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies_genres"))},
 			},
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies_genres", items))
 }
 
+// MoviesTrakt ...
 func MoviesTrakt(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30263]", Path: UrlForXBMC("/movies/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png")},
+		{Label: "LOCALIZE[30263]", Path: URLForXBMC("/movies/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png")},
 		{
 			Label:     "LOCALIZE[30254]",
-			Path:      UrlForXBMC("/movies/trakt/watchlist"),
+			Path:      URLForXBMC("/movies/trakt/watchlist"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/watchlist"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/watchlist"))},
 			},
 		},
 		{
 			Label:     "LOCALIZE[30257]",
-			Path:      UrlForXBMC("/movies/trakt/collection"),
+			Path:      URLForXBMC("/movies/trakt/collection"),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/collection"))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/collection"))},
 			},
 		},
-		{Label: "LOCALIZE[30290]", Path: UrlForXBMC("/movies/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
-		{Label: "LOCALIZE[30246]", Path: UrlForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
-		{Label: "LOCALIZE[30210]", Path: UrlForXBMC("/movies/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
-		{Label: "LOCALIZE[30247]", Path: UrlForXBMC("/movies/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
-		{Label: "LOCALIZE[30248]", Path: UrlForXBMC("/movies/trakt/watched"), Thumbnail: config.AddonResource("img", "most_watched.png")},
-		{Label: "LOCALIZE[30249]", Path: UrlForXBMC("/movies/trakt/collected"), Thumbnail: config.AddonResource("img", "most_collected.png")},
-		{Label: "LOCALIZE[30250]", Path: UrlForXBMC("/movies/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
-		{Label: "LOCALIZE[30251]", Path: UrlForXBMC("/movies/trakt/boxoffice"), Thumbnail: config.AddonResource("img", "box_office.png")},
+		{Label: "LOCALIZE[30290]", Path: URLForXBMC("/movies/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
+		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
+		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/movies/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
+		{Label: "LOCALIZE[30247]", Path: URLForXBMC("/movies/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
+		{Label: "LOCALIZE[30248]", Path: URLForXBMC("/movies/trakt/watched"), Thumbnail: config.AddonResource("img", "most_watched.png")},
+		{Label: "LOCALIZE[30249]", Path: URLForXBMC("/movies/trakt/collected"), Thumbnail: config.AddonResource("img", "most_collected.png")},
+		{Label: "LOCALIZE[30250]", Path: URLForXBMC("/movies/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
+		{Label: "LOCALIZE[30251]", Path: URLForXBMC("/movies/trakt/boxoffice"), Thumbnail: config.AddonResource("img", "box_office.png")},
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
+// MoviesTraktLists ...
 func MoviesTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
 	for _, list := range trakt.Userlists() {
 		item := &xbmc.ListItem{
 			Label:     list.Name,
-			Path:      UrlForXBMC("/movies/trakt/lists/id/%d", list.IDs.Trakt),
+			Path:      URLForXBMC("/movies/trakt/lists/id/%d", list.IDs.Trakt),
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/list/add/%d", list.IDs.Trakt))},
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/%d", list.IDs.Trakt))},
 			},
 		}
 		items = append(items, item)
@@ -135,12 +139,13 @@ func MoviesTraktLists(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
 
+// CalendarMovies ...
 func CalendarMovies(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30291]", Path: UrlForXBMC("/movies/trakt/calendars/movies"), Thumbnail: config.AddonResource("img", "box_office.png")},
-		{Label: "LOCALIZE[30292]", Path: UrlForXBMC("/movies/trakt/calendars/releases"), Thumbnail: config.AddonResource("img", "tv.png")},
-		{Label: "LOCALIZE[30293]", Path: UrlForXBMC("/movies/trakt/calendars/allmovies"), Thumbnail: config.AddonResource("img", "box_office.png")},
-		{Label: "LOCALIZE[30294]", Path: UrlForXBMC("/movies/trakt/calendars/allreleases"), Thumbnail: config.AddonResource("img", "tv.png")},
+		{Label: "LOCALIZE[30291]", Path: URLForXBMC("/movies/trakt/calendars/movies"), Thumbnail: config.AddonResource("img", "box_office.png")},
+		{Label: "LOCALIZE[30292]", Path: URLForXBMC("/movies/trakt/calendars/releases"), Thumbnail: config.AddonResource("img", "tv.png")},
+		{Label: "LOCALIZE[30293]", Path: URLForXBMC("/movies/trakt/calendars/allmovies"), Thumbnail: config.AddonResource("img", "box_office.png")},
+		{Label: "LOCALIZE[30294]", Path: URLForXBMC("/movies/trakt/calendars/allreleases"), Thumbnail: config.AddonResource("img", "tv.png")},
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies", items))
 }
@@ -178,9 +183,9 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 		item := movie.ToListItem()
 
 		playLabel := "LOCALIZE[30023]"
-		playURL := UrlForXBMC("/movie/%d/play", movie.Id)
+		playURL := URLForXBMC("/movie/%d/play", movie.ID)
 		linksLabel := "LOCALIZE[30202]"
-		linksURL := UrlForXBMC("/movie/%d/links", movie.Id)
+		linksURL := URLForXBMC("/movie/%d/links", movie.ID)
 
 		defaultURL := linksURL
 		contextLabel := playLabel
@@ -193,20 +198,20 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 
 		item.Path = defaultURL
 
-		tmdbId := strconv.Itoa(movie.Id)
-		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/add/%d", movie.Id))}
-		if _, err := isDuplicateMovie(tmdbId); err != nil || isAddedToLibrary(tmdbId, Movie) {
-			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/library/movie/remove/%d", movie.Id))}
+		tmdbID := strconv.Itoa(movie.ID)
+		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movie.ID))}
+		if _, err := isDuplicateMovie(tmdbID); err != nil || isAddedToLibrary(tmdbID, Movie) {
+			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movie.ID))}
 		}
 
-		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/add", movie.Id))}
-		if inMoviesWatchlist(movie.Id) {
-			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/watchlist/remove", movie.Id))}
+		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/movie/%d/watchlist/add", movie.ID))}
+		if inMoviesWatchlist(movie.ID) {
+			watchlistAction = []string{"LOCALIZE[30256]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/movie/%d/watchlist/remove", movie.ID))}
 		}
 
-		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/add", movie.Id))}
-		if inMoviesCollection(movie.Id) {
-			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/movie/%d/collection/remove", movie.Id))}
+		collectionAction := []string{"LOCALIZE[30258]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/movie/%d/collection/add", movie.ID))}
+		if inMoviesCollection(movie.ID) {
+			collectionAction = []string{"LOCALIZE[30259]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/movie/%d/collection/remove", movie.ID))}
 		}
 
 		if config.Get().Platform.Kodi < 17 {
@@ -214,7 +219,7 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
 				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
-				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
+				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/movies"))},
 				libraryAction,
 				watchlistAction,
 				collectionAction,
@@ -225,18 +230,18 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 				libraryAction,
 				watchlistAction,
 				collectionAction,
-				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/setviewmode/movies"))},
+				[]string{"LOCALIZE[30034]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/movies"))},
 			}
 		}
-		item.Info.Trailer = UrlForHTTP("/youtube/%s", item.Info.Trailer)
+		item.Info.Trailer = URLForHTTP("/youtube/%s", item.Info.Trailer)
 		item.IsPlayable = true
 		items = append(items, item)
 	}
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
-		nextPath := UrlForXBMC(fmt.Sprintf("%s?page=%d", path, page+1))
+		nextPath := URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1))
 		if query != "" {
-			nextPath = UrlForXBMC(fmt.Sprintf("%s?q=%s&page=%d", path, query, page+1))
+			nextPath = URLForXBMC(fmt.Sprintf("%s?q=%s&page=%d", path, query, page+1))
 		}
 		next := &xbmc.ListItem{
 			Label:     "LOCALIZE[30218]",
@@ -248,6 +253,7 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 	ctx.JSON(200, xbmc.NewView("movies", items))
 }
 
+// PopularMovies ...
 func PopularMovies(ctx *gin.Context) {
 	genre := ctx.Params.ByName("genre")
 	if genre == "0" {
@@ -258,6 +264,7 @@ func PopularMovies(ctx *gin.Context) {
 	renderMovies(ctx, movies, page, total, "")
 }
 
+// RecentMovies ...
 func RecentMovies(ctx *gin.Context) {
 	genre := ctx.Params.ByName("genre")
 	if genre == "0" {
@@ -268,6 +275,7 @@ func RecentMovies(ctx *gin.Context) {
 	renderMovies(ctx, movies, page, total, "")
 }
 
+// TopRatedMovies ...
 func TopRatedMovies(ctx *gin.Context) {
 	genre := ctx.Params.ByName("genre")
 	if genre == "0" {
@@ -278,18 +286,21 @@ func TopRatedMovies(ctx *gin.Context) {
 	renderMovies(ctx, movies, page, total, "")
 }
 
+// IMDBTop250 ...
 func IMDBTop250(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.GetIMDBList("522effe419c2955e9922fcf3", config.Get().Language, page)
 	renderMovies(ctx, movies, page, total, "")
 }
 
+// MoviesMostVoted ...
 func MoviesMostVoted(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.MostVotedMovies("", config.Get().Language, page)
 	renderMovies(ctx, movies, page, total, "")
 }
 
+// SearchMovies ...
 func SearchMovies(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	query := ctx.Query("q")
@@ -314,12 +325,12 @@ func SearchMovies(ctx *gin.Context) {
 	renderMovies(ctx, movies, page, total, query)
 }
 
-func movieLinks(tmdbId string) []*bittorrent.TorrentFile {
-	log.Println("Searching links for:", tmdbId)
+func movieLinks(tmdbID string) []*bittorrent.TorrentFile {
+	log.Println("Searching links for:", tmdbID)
 
-	movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
+	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 
-	log.Printf("Resolved %s to %s", tmdbId, movie.Title)
+	log.Printf("Resolved %s to %s", tmdbID, movie.Title)
 
 	searchers := providers.GetMovieSearchers()
 	if len(searchers) == 0 {
@@ -329,6 +340,7 @@ func movieLinks(tmdbId string) []*bittorrent.TorrentFile {
 	return providers.SearchMovie(searchers, movie)
 }
 
+// MoviePlaySelector ...
 func MoviePlaySelector(link string, btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	play := link == "play"
 
@@ -342,57 +354,57 @@ func MoviePlaySelector(link string, btService *bittorrent.BTService, fromLibrary
 
 	if play {
 		return MoviePlay(btService, fromLibrary)
-	} else {
-		return MovieLinks(btService, fromLibrary)
 	}
+	return MovieLinks(btService, fromLibrary)
 }
 
+// MovieLinks ...
 func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		tmdbId := ctx.Params.ByName("tmdbId")
+		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
 		library := ""
 		if fromLibrary {
 			library = "1"
 		}
 
-		movie := tmdb.GetMovieById(tmdbId, config.Get().Language)
+		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {
 			return
 		}
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
-			rUrl := UrlQuery(
-				UrlForXBMC("/play"), "uri", existingTorrent,
-				"tmdb", tmdbId,
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", existingTorrent,
+				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
 			if external != "" {
-				xbmc.PlayURL(rUrl)
+				xbmc.PlayURL(rURL)
 			} else {
-				ctx.Redirect(302, rUrl)
+				ctx.Redirect(302, rURL)
 			}
 			return
 		}
 
-		if torrents := InTorrentsMap(tmdbId); len(torrents) > 0 {
-			rUrl := UrlQuery(
-				UrlForXBMC("/play"), "uri", torrents[0].URI,
-				"tmdb", tmdbId,
+		if torrents := InTorrentsMap(tmdbID); len(torrents) > 0 {
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", torrents[0].URI,
+				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
 			if external != "" {
-				xbmc.PlayURL(rUrl)
+				xbmc.PlayURL(rURL)
 			} else {
-				ctx.Redirect(302, rUrl)
+				ctx.Redirect(302, rURL)
 			}
 			return
 		}
 
-		torrents := movieLinks(tmdbId)
+		torrents := movieLinks(tmdbID)
 
 		if len(torrents) == 0 {
 			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
@@ -425,7 +437,7 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 
 			multi := ""
 			if torrent.Multi {
-				multi = "\nmulti"
+				multi = multiType
 			}
 
 			label := fmt.Sprintf("%s(%d / %d) %s\n%s\n%s%s",
@@ -442,68 +454,69 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 
 		choice := xbmc.ListDialogLarge("LOCALIZE[30228]", movie.Title, choices...)
 		if choice >= 0 {
-			AddToTorrentsMap(tmdbId, torrents[choice])
+			AddToTorrentsMap(tmdbID, torrents[choice])
 
-			rUrl := UrlQuery(
-				UrlForXBMC("/play"), "uri", torrents[choice].URI,
-				"tmdb", tmdbId,
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", torrents[choice].URI,
+				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
 			if external != "" {
-				xbmc.PlayURL(rUrl)
+				xbmc.PlayURL(rURL)
 			} else {
-				ctx.Redirect(302, rUrl)
+				ctx.Redirect(302, rURL)
 			}
 		}
 	}
 }
 
+// MoviePlay ...
 func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		tmdbId := ctx.Params.ByName("tmdbId")
+		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
 		library := ""
 		if fromLibrary {
 			library = "1"
 		}
 
-		movie := tmdb.GetMovieById(tmdbId, "")
+		movie := tmdb.GetMovieByID(tmdbID, "")
 		if movie == nil {
 			return
 		}
 
 		existingTorrent := ExistingTorrent(btService, movie.Title)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
-			rUrl := UrlQuery(
-				UrlForXBMC("/play"), "uri", existingTorrent,
-				"tmdb", tmdbId,
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", existingTorrent,
+				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
 			if external != "" {
-				xbmc.PlayURL(rUrl)
+				xbmc.PlayURL(rURL)
 			} else {
-				ctx.Redirect(302, rUrl)
+				ctx.Redirect(302, rURL)
 			}
 			return
 		}
 
-		if torrents := InTorrentsMap(tmdbId); len(torrents) > 0 {
-			rUrl := UrlQuery(
-				UrlForXBMC("/play"), "uri", torrents[0].URI,
-				"tmdb", tmdbId,
+		if torrents := InTorrentsMap(tmdbID); len(torrents) > 0 {
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", torrents[0].URI,
+				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
 			if external != "" {
-				xbmc.PlayURL(rUrl)
+				xbmc.PlayURL(rURL)
 			} else {
-				ctx.Redirect(302, rUrl)
+				ctx.Redirect(302, rURL)
 			}
 			return
 		}
 
-		torrents := movieLinks(tmdbId)
+		torrents := movieLinks(tmdbID)
 		if len(torrents) == 0 {
 			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return
@@ -511,17 +524,17 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 
 		sort.Sort(sort.Reverse(providers.ByQuality(torrents)))
 
-		AddToTorrentsMap(tmdbId, torrents[0])
+		AddToTorrentsMap(tmdbID, torrents[0])
 
-		rUrl := UrlQuery(
-			UrlForXBMC("/play"), "uri", torrents[0].URI,
-			"tmdb", tmdbId,
+		rURL := URLQuery(
+			URLForXBMC("/play"), "uri", torrents[0].URI,
+			"tmdb", tmdbID,
 			"library", library,
 			"type", "movie")
 		if external != "" {
-			xbmc.PlayURL(rUrl)
+			xbmc.PlayURL(rURL)
 		} else {
-			ctx.Redirect(302, rUrl)
+			ctx.Redirect(302, rURL)
 		}
 	}
 }

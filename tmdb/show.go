@@ -17,6 +17,7 @@ import (
 	"github.com/jmcvetta/napping"
 )
 
+// LogError ...
 func LogError(err error) {
 	if err != nil {
 		pc, fn, line, _ := runtime.Caller(1)
@@ -24,10 +25,11 @@ func LogError(err error) {
 	}
 }
 
-func GetShowImages(showId int) *Images {
+// GetShowImages ...
+func GetShowImages(showID int) *Images {
 	var images *Images
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tmdb.show.%d.images", showId)
+	key := fmt.Sprintf("com.tmdb.show.%d.images", showID)
 	if err := cacheStore.Get(key, &images); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
@@ -35,7 +37,7 @@ func GetShowImages(showId int) *Images {
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showId)+"/images",
+				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/images",
 				&urlValues,
 				&images,
 				nil,
@@ -44,10 +46,10 @@ func GetShowImages(showId int) *Images {
 				log.Error(err)
 				xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showId)
+				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showID)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
-				log.Warningf("Bad status getting images for %d: %d", showId, resp.Status())
+				log.Warningf("Bad status getting images for %d: %d", showID, resp.Status())
 			}
 			if images != nil {
 				cacheStore.Set(key, images, imagesCacheExpiration)
@@ -57,17 +59,19 @@ func GetShowImages(showId int) *Images {
 	return images
 }
 
-func GetShowById(tmdbId string, language string) *Show {
-	id, _ := strconv.Atoi(tmdbId)
+// GetShowByID ...
+func GetShowByID(tmdbID string, language string) *Show {
+	id, _ := strconv.Atoi(tmdbID)
 	return GetShow(id, language)
 }
 
-func GetShow(showId int, language string) (show *Show) {
-	if showId == 0 {
+// GetShow ...
+func GetShow(showID int, language string) (show *Show) {
+	if showID == 0 {
 		return
 	}
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tmdb.show.%d.%s", showId, language)
+	key := fmt.Sprintf("com.tmdb.show.%d.%s", showID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
@@ -76,7 +80,7 @@ func GetShow(showId int, language string) (show *Show) {
 				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showId),
+				tmdbEndpoint+"tv/"+strconv.Itoa(showID),
 				&urlValues,
 				&show,
 				nil,
@@ -84,7 +88,7 @@ func GetShow(showId int, language string) (show *Show) {
 			if err != nil {
 				switch e := err.(type) {
 				case *json.UnmarshalTypeError:
-					log.Errorf("UnmarshalTypeError: Value[%s] Type[%v] Offset[%d] for %d", e.Value, e.Type, e.Offset, showId)
+					log.Errorf("UnmarshalTypeError: Value[%s] Type[%v] Offset[%d] for %d", e.Value, e.Type, e.Offset, showID)
 				case *json.InvalidUnmarshalError:
 					log.Errorf("InvalidUnmarshalError: Type[%v]", e.Type)
 				default:
@@ -93,10 +97,10 @@ func GetShow(showId int, language string) (show *Show) {
 				LogError(err)
 				xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showId)
+				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showID)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting show for %d: %d", showId, resp.Status())
+				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
 				log.Warning(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
@@ -122,20 +126,22 @@ func GetShow(showId int, language string) (show *Show) {
 	return show
 }
 
+// GetShows ...
 func GetShows(showIds []int, language string) Shows {
 	var wg sync.WaitGroup
 	shows := make(Shows, len(showIds))
 	wg.Add(len(showIds))
-	for i, showId := range showIds {
+	for i, showID := range showIds {
 		go func(i int, showId int) {
 			defer wg.Done()
 			shows[i] = GetShow(showId, language)
-		}(i, showId)
+		}(i, showID)
 	}
 	wg.Wait()
 	return shows
 }
 
+// SearchShows ...
 func SearchShows(query string, language string, page int) (Shows, int) {
 	var results EntityList
 	rateLimiter.Call(func() {
@@ -164,7 +170,7 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 	})
 	tmdbIds := make([]int, 0, len(results.Results))
 	for _, entity := range results.Results {
-		tmdbIds = append(tmdbIds, entity.Id)
+		tmdbIds = append(tmdbIds, entity.ID)
 	}
 	return GetShows(tmdbIds, language), results.TotalResults
 }
@@ -227,7 +233,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 						if show == nil {
 							continue
 						}
-						shows[p*ResultsPerPage+s] = GetShow(show.Id, params["language"])
+						shows[p*ResultsPerPage+s] = GetShow(show.ID, params["language"])
 					}
 				}
 			}(p)
@@ -242,6 +248,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 	return shows, totalResults
 }
 
+// PopularShows ...
 func PopularShows(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 	if genre == "" {
@@ -261,6 +268,7 @@ func PopularShows(genre string, language string, page int) (Shows, int) {
 	return listShows("discover/tv", "popular", p, page)
 }
 
+// RecentShows ...
 func RecentShows(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 	if genre == "" {
@@ -280,6 +288,7 @@ func RecentShows(genre string, language string, page int) (Shows, int) {
 	return listShows("discover/tv", "recent.shows", p, page)
 }
 
+// RecentEpisodes ...
 func RecentEpisodes(genre string, language string, page int) (Shows, int) {
 	var p napping.Params
 
@@ -300,10 +309,12 @@ func RecentEpisodes(genre string, language string, page int) (Shows, int) {
 	return listShows("discover/tv", "recent.episodes", p, page)
 }
 
+// TopRatedShows ...
 func TopRatedShows(genre string, language string, page int) (Shows, int) {
 	return listShows("tv/top_rated", "toprated", napping.Params{"language": language}, page)
 }
 
+// MostVotedShows ...
 func MostVotedShows(genre string, language string, page int) (Shows, int) {
 	return listShows("discover/tv", "mostvoted", napping.Params{
 		"language":           language,
@@ -313,6 +324,7 @@ func MostVotedShows(genre string, language string, page int) (Shows, int) {
 	}, page)
 }
 
+// GetTVGenres ...
 func GetTVGenres(language string) []*Genre {
 	genres := GenreList{}
 
@@ -349,6 +361,7 @@ func GetTVGenres(language string) []*Genre {
 	return genres.Genres
 }
 
+// ToListItem ...
 func (show *Show) ToListItem() *xbmc.ListItem {
 	year, _ := strconv.Atoi(strings.Split(show.FirstAirDate, "-")[0])
 

@@ -5,11 +5,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/gin-gonic/gin"
 )
 
+const providerPrefix = "plugin://plugin.video.elementum/provider/"
+
+// Addon ...
 type Addon struct {
 	ID      string
 	Name    string
@@ -18,12 +21,16 @@ type Addon struct {
 	Status  int
 }
 
+// ByEnabled ...
 type ByEnabled []Addon
+
 func (a ByEnabled) Len() int           { return len(a) }
 func (a ByEnabled) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByEnabled) Less(i, j int) bool { return a[i].Enabled }
 
+// ByStatus ...
 type ByStatus []Addon
+
 func (a ByStatus) Len() int           { return len(a) }
 func (a ByStatus) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByStatus) Less(i, j int) bool { return a[i].Status < a[j].Status }
@@ -33,11 +40,11 @@ func getProviders() []Addon {
 	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
 		if strings.HasPrefix(addon.ID, "script.elementum.") {
 			list = append(list, Addon{
-				ID: addon.ID,
-				Name: addon.Name,
+				ID:      addon.ID,
+				Name:    addon.Name,
 				Version: addon.Version,
 				Enabled: addon.Enabled,
-				Status: xbmc.AddonCheck(addon.ID),
+				Status:  xbmc.AddonCheck(addon.ID),
 			})
 		}
 	}
@@ -46,6 +53,7 @@ func getProviders() []Addon {
 	return list
 }
 
+// ProviderList ...
 func ProviderList(ctx *gin.Context) {
 	providers := getProviders()
 
@@ -63,25 +71,25 @@ func ProviderList(ctx *gin.Context) {
 
 		item := &xbmc.ListItem{
 			Label:      fmt.Sprintf("%s - %s - %s %s", status, enabled, provider.Name, provider.Version),
-			Path:       UrlForXBMC("/provider/%s/settings", provider.ID),
+			Path:       URLForXBMC("/provider/%s/settings", provider.ID),
 			IsPlayable: false,
 		}
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30242]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/provider/%s/check", provider.ID))},
+			[]string{"LOCALIZE[30242]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/provider/%s/check", provider.ID))},
 		}
 		if provider.Enabled {
 			item.ContextMenu = append(item.ContextMenu,
-				[]string{"LOCALIZE[30241]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/provider/%s/disable", provider.ID))},
-				[]string{"LOCALIZE[30244]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/provider/%s/settings", provider.ID))},
+				[]string{"LOCALIZE[30241]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/provider/%s/disable", provider.ID))},
+				[]string{"LOCALIZE[30244]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/provider/%s/settings", provider.ID))},
 			)
 		} else {
 			item.ContextMenu = append(item.ContextMenu,
-				[]string{"LOCALIZE[30240]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/provider/%s/enable", provider.ID))},
+				[]string{"LOCALIZE[30240]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/provider/%s/enable", provider.ID))},
 			)
 		}
 		item.ContextMenu = append(item.ContextMenu,
-			[]string{"LOCALIZE[30274]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/providers/enable"))},
-			[]string{"LOCALIZE[30275]", fmt.Sprintf("XBMC.RunPlugin(%s)", UrlForXBMC("/providers/disable"))},
+			[]string{"LOCALIZE[30274]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/providers/enable"))},
+			[]string{"LOCALIZE[30275]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/providers/disable"))},
 		)
 		items = append(items, item)
 	}
@@ -89,46 +97,52 @@ func ProviderList(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("", items))
 }
 
+// ProviderSettings ...
 func ProviderSettings(ctx *gin.Context) {
-	addonId := ctx.Params.ByName("provider")
-	xbmc.AddonSettings(addonId)
+	addonID := ctx.Params.ByName("provider")
+	xbmc.AddonSettings(addonID)
 	ctx.String(200, "")
 }
 
+// ProviderCheck ...
 func ProviderCheck(ctx *gin.Context) {
-	addonId := ctx.Params.ByName("provider")
-	failures := xbmc.AddonCheck(addonId)
+	addonID := ctx.Params.ByName("provider")
+	failures := xbmc.AddonCheck(addonID)
 	translated := xbmc.GetLocalizedString(30243)
 	xbmc.Notify("Elementum", fmt.Sprintf("%s: %d", translated, failures), config.AddonIcon())
 	ctx.String(200, "")
 }
 
+// ProviderFailure ...
 func ProviderFailure(ctx *gin.Context) {
-	addonId := ctx.Params.ByName("provider")
-	xbmc.AddonFailure(addonId)
+	addonID := ctx.Params.ByName("provider")
+	xbmc.AddonFailure(addonID)
 	ctx.String(200, "")
 }
 
+// ProviderEnable ...
 func ProviderEnable(ctx *gin.Context) {
-	addonId := ctx.Params.ByName("provider")
-	xbmc.SetAddonEnabled(addonId, true)
+	addonID := ctx.Params.ByName("provider")
+	xbmc.SetAddonEnabled(addonID, true)
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.elementum/provider/" {
+	if path == providerPrefix {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
 }
 
+// ProviderDisable ...
 func ProviderDisable(ctx *gin.Context) {
-	addonId := ctx.Params.ByName("provider")
-	xbmc.SetAddonEnabled(addonId, false)
+	addonID := ctx.Params.ByName("provider")
+	xbmc.SetAddonEnabled(addonID, false)
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.elementum/provider/" {
+	if path == providerPrefix {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
 }
 
+// ProvidersEnableAll ...
 func ProvidersEnableAll(ctx *gin.Context) {
 	providers := getProviders()
 
@@ -136,12 +150,13 @@ func ProvidersEnableAll(ctx *gin.Context) {
 		xbmc.SetAddonEnabled(addon.ID, true)
 	}
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.elementum/provider/" {
+	if path == providerPrefix {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")
 }
 
+// ProvidersDisableAll ...
 func ProvidersDisableAll(ctx *gin.Context) {
 	providers := getProviders()
 
@@ -149,7 +164,7 @@ func ProvidersDisableAll(ctx *gin.Context) {
 		xbmc.SetAddonEnabled(addon.ID, false)
 	}
 	path := xbmc.InfoLabel("Container.FolderPath")
-	if path == "plugin://plugin.video.elementum/provider/" {
+	if path == providerPrefix {
 		xbmc.Refresh()
 	}
 	ctx.String(200, "")

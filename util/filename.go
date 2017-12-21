@@ -2,6 +2,7 @@ package util
 
 import "strings"
 
+// ToFileName ...
 func ToFileName(filename string) string {
 	reserved := []string{"<", ">", ":", "\"", "/", "\\", "|", "?", "*", "%", "+"}
 	for _, reservedchar := range reserved {

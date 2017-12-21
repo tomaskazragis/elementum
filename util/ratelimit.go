@@ -1,15 +1,16 @@
 package util
 
 import (
-	"time"
-	"strconv"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("ratelimiter")
 
+// RateLimiter ...
 type RateLimiter struct {
 	rateTicker   *time.Ticker
 	rateLimiter  chan bool
@@ -18,6 +19,7 @@ type RateLimiter struct {
 	coolDown     int
 }
 
+// NewRateLimiter ...
 func NewRateLimiter(burstRate int, burstTimeSpan time.Duration, parallelCount int) *RateLimiter {
 	limiter := &RateLimiter{
 		rateTicker:   time.NewTicker(burstTimeSpan),
@@ -41,15 +43,18 @@ func NewRateLimiter(burstRate int, burstTimeSpan time.Duration, parallelCount in
 	return limiter
 }
 
+// Enter ...
 func (rl *RateLimiter) Enter() {
 	rl.parallelChan <- true
 	rl.rateLimiter <- true
 }
 
+// Leave ...
 func (rl *RateLimiter) Leave() {
 	<-rl.parallelChan
 }
 
+// Call ...
 func (rl *RateLimiter) Call(f func()) {
 	rl.Enter()
 	defer rl.Leave()
@@ -60,6 +65,7 @@ func (rl *RateLimiter) Call(f func()) {
 	f()
 }
 
+// Reset ...
 func (rl *RateLimiter) Reset() {
 outer:
 	for i := 0; i < rl.burstRate; i++ {
@@ -71,6 +77,7 @@ outer:
 	}
 }
 
+// CoolDown ...
 func (rl *RateLimiter) CoolDown(headers http.Header) {
 	if len(headers) > 0 {
 		if retryAfter, exists := headers["Retry-After"]; exists {
@@ -90,6 +97,7 @@ func (rl *RateLimiter) CoolDown(headers http.Header) {
 	rl.coolDown = defaultCoolDown
 }
 
+// Close ...
 func (rl *RateLimiter) Close() {
 	rl.rateTicker.Stop()
 }

@@ -1,25 +1,37 @@
 package xbmc
 
+// View ...
 type View struct {
 	ContentType string    `json:"content_type"`
 	Items       ListItems `json:"items"`
 }
 
+// GUIIconOverlay ...
 type GUIIconOverlay int
 
 const (
+	// IconOverlayNone ...
 	IconOverlayNone GUIIconOverlay = iota
+	// IconOverlayRAR ...
 	IconOverlayRAR
+	// IconOverlayZip ...
 	IconOverlayZip
+	// IconOverlayLocked ...
 	IconOverlayLocked
+	// IconOverlayHasTrainer ...
 	IconOverlayHasTrainer
+	// IconOverlayTrained ...
 	IconOverlayTrained
+	// IconOverlayWatched ...
 	IconOverlayWatched
+	// IconOverlayHD ...
 	IconOverlayHD
 )
 
+// ListItems ...
 type ListItems []*ListItem
 
+// ListItem ...
 type ListItem struct {
 	Label       string            `json:"label"`
 	Label2      string            `json:"label2"`
@@ -34,6 +46,7 @@ type ListItem struct {
 	ContextMenu [][]string        `json:"context_menu,omitempty"`
 }
 
+// ListItemInfo ...
 type ListItemInfo struct {
 	// General Values that apply to all types
 	Count int    `json:"count,omitempty"`
@@ -88,6 +101,7 @@ type ListItemInfo struct {
 	Exif        string `json:"exif,omitempty"`
 }
 
+// ListItemArt ...
 type ListItemArt struct {
 	Thumbnail    string `json:"thumb,omitempty"`
 	Poster       string `json:"poster,omitempty"`
@@ -99,17 +113,20 @@ type ListItemArt struct {
 	Landscape    string `json:"landscape,omitempty"`
 }
 
+// ContextMenuItem ...
 type ContextMenuItem struct {
 	Label  string `json:"label"`
 	Action string `json:"action"`
 }
 
+// StreamInfo ...
 type StreamInfo struct {
 	Video    *StreamInfoEntry `json:"video,omitempty"`
 	Audio    *StreamInfoEntry `json:"audio,omitempty"`
 	Subtitle *StreamInfoEntry `json:"subtitle,omitempty"`
 }
 
+// StreamInfoEntry ...
 type StreamInfoEntry struct {
 	Codec    string  `json:"codec,omitempty"`
 	Aspect   float32 `json:"aspect,omitempty"`
@@ -120,10 +137,12 @@ type StreamInfoEntry struct {
 	Channels int     `json:"channels,omitempty"`
 }
 
+// VideoLibraryMovies ...
 type VideoLibraryMovies struct {
 	Movies []*VideoLibraryMovieItem `json:"movies"`
 }
 
+// VideoLibraryMovieItem ...
 type VideoLibraryMovieItem struct {
 	ID         int    `json:"movieid"`
 	Title      string `json:"label"`
@@ -133,56 +152,65 @@ type VideoLibraryMovieItem struct {
 	Resume     *Resume
 }
 
+// VideoLibraryShows ...
 type VideoLibraryShows struct {
 	Shows []*struct {
-		ID         int    `json:"tvshowid"`
-		Title      string `json:"label"`
-		ScraperID  string `json:"imdbnumber"`
-		Episodes   int    `json:"episode"`
+		ID        int    `json:"tvshowid"`
+		Title     string `json:"label"`
+		ScraperID string `json:"imdbnumber"`
+		Episodes  int    `json:"episode"`
 	} `json:"tvshows"`
 }
 
+// VideoLibraryEpisodes ...
 type VideoLibraryEpisodes struct {
 	Episodes []*VideoLibraryEpisodeItem `json:"episodes"`
 }
 
+// VideoLibraryEpisode ...
 type VideoLibraryEpisode struct {
 	Episode *VideoLibraryEpisodeItem `json:"episodedetails"`
 }
 
+// VideoLibraryEpisodeItem ...
 type VideoLibraryEpisodeItem struct {
-	ID         int       `json:"episodeid"`
-	Title      string    `json:"label"`
-	Season     int       `json:"season"`
-	Episode    int       `json:"episode"`
-	TVShowID   int       `json:"tvshowid"`
-	PlayCount  int       `json:"playcount"`
-	File       string    `json:"file"`
-	UniqueIDs  UniqueIDs `json:"uniqueid"`
-	Resume     *Resume
+	ID        int       `json:"episodeid"`
+	Title     string    `json:"label"`
+	Season    int       `json:"season"`
+	Episode   int       `json:"episode"`
+	TVShowID  int       `json:"tvshowid"`
+	PlayCount int       `json:"playcount"`
+	File      string    `json:"file"`
+	UniqueIDs UniqueIDs `json:"uniqueid"`
+	Resume    *Resume
 }
 
+// UniqueIDs ...
 type UniqueIDs struct {
 	ID string `json:"unknown"`
 }
 
+// Resume ...
 type Resume struct {
 	Position float64 `json:"position"`
 	Total    float64 `json:"total"`
 }
 
+// PlayerItemInfo ...
 type PlayerItemInfo struct {
 	Info struct {
-		Id   int    `json:"id"`
+		ID   int    `json:"id"`
 		Type string `json:"type"`
 	} `json:"item"`
 }
 
+// ActivePlayers ...
 type ActivePlayers []struct {
-	Id   int    `json:"playerid"`
+	ID   int    `json:"playerid"`
 	Type string `json:"type"`
 }
 
+// NewView ...
 func NewView(contentType string, items ListItems) *View {
 	return &View{
 		ContentType: contentType,

@@ -2,40 +2,50 @@ package providers
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
-	"github.com/op/go-logging"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/op/go-logging"
 )
 
 const (
+	// SortMovies ...
 	SortMovies = iota
+	// SortShows ...
 	SortShows
 )
 
 const (
+	// SortBySeeders ...
 	SortBySeeders = iota
+	// SortByResolution ...
 	SortByResolution
+	// SortBalanced ...
 	SortBalanced
 )
 
 const (
+	// Sort1080p720p480p ...
 	Sort1080p720p480p = iota
+	// Sort720p1080p480p ...
 	Sort720p1080p480p
+	// Sort720p480p1080p ...
 	Sort720p480p1080p
+	// Sort480p720p1080p ...
 	Sort480p720p1080p
 )
 
 var (
 	trackerTimeout = 3100 * time.Millisecond
-	log = logging.MustGetLogger("linkssearch")
+	log            = logging.MustGetLogger("linkssearch")
 )
 
+// Search ...
 func Search(searchers []Searcher, query string) []*bittorrent.TorrentFile {
 	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
@@ -56,6 +66,7 @@ func Search(searchers []Searcher, query string) []*bittorrent.TorrentFile {
 	return processLinks(torrentsChan, SortMovies)
 }
 
+// SearchMovie ...
 func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.TorrentFile {
 	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
@@ -76,6 +87,7 @@ func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.Tor
 	return processLinks(torrentsChan, SortMovies)
 }
 
+// SearchSeason ...
 func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Season) []*bittorrent.TorrentFile {
 	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
@@ -96,6 +108,7 @@ func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Seas
 	return processLinks(torrentsChan, SortShows)
 }
 
+// SearchEpisode ...
 func SearchEpisode(searchers []EpisodeSearcher, show *tmdb.Show, episode *tmdb.Episode) []*bittorrent.TorrentFile {
 	torrentsChan := make(chan *bittorrent.TorrentFile)
 	go func() {
@@ -131,7 +144,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	for torrent := range torrentsChan {
 		wg.Add(1)
 		if !strings.HasPrefix(torrent.URI, "magnet") {
-			progressTotal += 1
+			progressTotal++
 		}
 		torrents = append(torrents, torrent)
 		go func(torrent *bittorrent.TorrentFile) {
@@ -140,7 +153,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
 			}
 			if !strings.HasPrefix(torrent.URI, "magnet") {
-				progress += 1
+				progress++
 				progressUpdate <- "LOCALIZE[30117]"
 			} else {
 				progressUpdate <- "skip"
@@ -160,7 +173,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 				}
 				if dialogProgressBG != nil {
 					if msg != "skip" {
-						dialogProgressBG.Update(progress * 100 / progressTotal, "Elementum", msg)
+						dialogProgressBG.Update(progress*100/progressTotal, "Elementum", msg)
 					}
 				} else {
 					return
@@ -215,8 +228,8 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 		}
 
 		if torrent.IsPrivate == false {
-			for _, trackerUrl := range bittorrent.DefaultTrackers {
-				tracker, _ := bittorrent.NewTracker(trackerUrl)
+			for _, trackerURL := range bittorrent.DefaultTrackers {
+				tracker, _ := bittorrent.NewTracker(trackerURL)
 				trackers[tracker.URL.Host] = tracker
 			}
 		}
@@ -236,10 +249,10 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 
 	log.Infof("Scraping torrent metrics from %d trackers...\n", len(trackers))
 
-	progressTotal = len(trackers) * 2 + 1
+	progressTotal = len(trackers)*2 + 1
 	progress = 0
 	progressMsg := "LOCALIZE[30118]"
-	dialogProgressBG.Update(progress * 100 / progressTotal, "Elementum", progressMsg)
+	dialogProgressBG.Update(progress*100/progressTotal, "Elementum", progressMsg)
 
 	scrapeResults := make(chan []bittorrent.ScrapeResponseEntry, len(trackers))
 	failedConnect := 0
@@ -262,7 +275,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 				go func(tracker *bittorrent.Tracker) {
 					if err := tracker.Connect(); err != nil {
 						log.Warningf("Tracker %s failed: %s", tracker, err)
-						failedConnect += 1
+						failedConnect++
 						close(failed)
 						return
 					}
@@ -271,12 +284,12 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 
 				for {
 					select {
-					case <- failed:
+					case <-failed:
 						return
 					case <-time.After(trackerTimeout): // Connect timeout...
-						failedConnect += 1
+						failedConnect++
 						return
-					case <- connected:
+					case <-connected:
 						scraped := make(chan bool)
 						go func(tracker *bittorrent.Tracker) {
 							scrapeResult = tracker.Scrape(torrents)
@@ -286,7 +299,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 						for {
 							select {
 							case <-time.After(trackerTimeout): // Scrape timeout...
-								failedScrape += 1
+								failedScrape++
 								return
 							case <-scraped:
 								scrapeResults <- scrapeResult

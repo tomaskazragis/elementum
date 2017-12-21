@@ -1,24 +1,24 @@
 package tvdb
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/xml"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"path"
 	"sort"
-	"time"
-	"bytes"
 	"strconv"
-	"net/http"
-	"io/ioutil"
-	"archive/zip"
-	"encoding/xml"
+	"time"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 )
 
 const (
-	tvdbUrl                 = "http://thetvdb.com"
-	tvdbEndpoint            = tvdbUrl + "/api"
+	tvdbURL                 = "http://thetvdb.com"
+	tvdbEndpoint            = tvdbURL + "/api"
 	apiKey                  = "1D62F2F90030C444"
 	burstRate               = 30
 	burstTime               = 1 * time.Second
@@ -26,17 +26,21 @@ const (
 	cacheExpiration         = 2 * time.Hour
 )
 
+// SeasonList ...
 type SeasonList []*Season
+
+// EpisodeList ...
 type EpisodeList []*Episode
 
+// Episode ...
 type Episode struct {
-	Id            string `xml:"id"`
+	ID            string `xml:"id"`
 	Director      string `xml:"Director"`
 	EpisodeName   string `xml:"EpisodeName"`
 	EpisodeNumber int    `xml:"EpisodeNumber"`
 	FirstAired    string `xml:"FirstAired"`
 	GuestStars    string `xml:"GuestStars"`
-	ImdbId        string `xml:"IMDB_ID"`
+	ImdbID        string `xml:"IMDB_ID"`
 	Language      string `xml:"Language"`
 	Overview      string `xml:"Overview"`
 	Rating        string `xml:"Rating"`
@@ -45,8 +49,8 @@ type Episode struct {
 	Writer        string `xml:"Writer"`
 	FileName      string `xml:"filename"`
 	LastUpdated   string `xml:"lastupdated"`
-	SeasonId      string `xml:"seasonid"`
-	SeriesId      string `xml:"seriesid"`
+	SeasonID      string `xml:"seasonid"`
+	SeriesID      string `xml:"seriesid"`
 	ThumbHeight   string `xml:"thumb_height"`
 	ThumbWidth    string `xml:"thumb_width"`
 
@@ -54,18 +58,19 @@ type Episode struct {
 	AbsoluteNumberString string `xml:"absolute_number"`
 }
 
+// Show ...
 type Show struct {
-	Id            int    `xml:"id"`
+	ID            int    `xml:"id"`
 	ActorsSimple  string `xml:"Actors"`
 	AirsDayOfWeek string `xml:"Airs_DayOfWeek"`
 	AirsTime      string `xml:"Airs_Time"`
 	ContentRating string `xml:"ContentRating"`
 	FirstAired    string `xml:"FirstAired"`
 	Genre         string `xml:"Genre"`
-	ImdbId        string `xml:"IMDB_ID"`
+	ImdbID        string `xml:"IMDB_ID"`
 	Language      string `xml:"Language"`
 	Network       string `xml:"Network"`
-	NetworkId     string `xml:"NetworkID"`
+	NetworkID     string `xml:"NetworkID"`
 	Overview      string `xml:"Overview"`
 	Rating        string `xml:"Rating"`
 	RatingCount   string `xml:"RatingCount"`
@@ -85,13 +90,15 @@ type Show struct {
 	Actors  []*Actor   `xml:"-"`
 }
 
+// Season ...
 type Season struct {
 	Season   int
 	Episodes EpisodeList
 }
 
+// Banner ...
 type Banner struct {
-	Id            string `xml:"id"`
+	ID            string `xml:"id"`
 	BannerPath    string `xml:"BannerPath"`
 	BannerType    string `xml:"BannerType"`
 	BannerType2   string `xml:"BannerType2"`
@@ -105,15 +112,16 @@ type Banner struct {
 	Season        int    `xml:"Season,omitempty"`
 }
 
+// Actor ...
 type Actor struct {
-	Id        string `xml:"id"`
+	ID        string `xml:"id"`
 	Image     string `xml:"Image"`
 	Name      string `xml:"Name"`
 	Role      string `xml:"Role"`
 	SortOrder int    `xml:"SortOrder"`
 }
 
-func getShow(tvdbId int, language string) (*Show, error) {
+func getShow(tvdbID int, language string) (*Show, error) {
 	var serie struct {
 		Serie    *Show      `xml:"Series"`
 		Episodes []*Episode `xml:"Episode"`
@@ -125,7 +133,7 @@ func getShow(tvdbId int, language string) (*Show, error) {
 		Actors []*Actor `xml:"Actor"`
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbId, language))
+	resp, err := http.Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
 	if err != nil {
 		return nil, err
 	}
@@ -193,12 +201,13 @@ func getShow(tvdbId int, language string) (*Show, error) {
 	return show, nil
 }
 
-func GetShow(tvdbId int, language string) (*Show, error) {
+// GetShow ...
+func GetShow(tvdbID int, language string) (*Show, error) {
 	var show *Show
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tvdb.show.%d.%s", tvdbId, language)
+	key := fmt.Sprintf("com.tvdb.show.%d.%s", tvdbID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
-		newShow, err := getShow(tvdbId, language)
+		newShow, err := getShow(tvdbID, language)
 		if err != nil {
 			return nil, err
 		}
@@ -210,6 +219,7 @@ func GetShow(tvdbId int, language string) (*Show, error) {
 	return show, nil
 }
 
+// BySeasonAndEpisodeNumber ...
 type BySeasonAndEpisodeNumber []*Episode
 
 func (a BySeasonAndEpisodeNumber) Len() int      { return len(a) }
@@ -218,6 +228,7 @@ func (a BySeasonAndEpisodeNumber) Less(i, j int) bool {
 	return (a[i].SeasonNumber*1000)+a[i].EpisodeNumber < (a[j].SeasonNumber*1000)+a[j].EpisodeNumber
 }
 
+// BannersByRating ...
 type BannersByRating []*Banner
 
 func (a BannersByRating) Len() int      { return len(a) }

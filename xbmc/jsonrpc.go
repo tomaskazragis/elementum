@@ -8,15 +8,21 @@ import (
 	"github.com/elgatito/elementum/jsonrpc"
 )
 
+// Args ...
 type Args []interface{}
+
+// Object ...
 type Object map[string]interface{}
 
+// Results ...
 var Results map[string]chan interface{}
 
 var (
+	// XBMCJSONRPCHosts ...
 	XBMCJSONRPCHosts = []string{
 		net.JoinHostPort("127.0.0.1", "9090"),
 	}
+	// XBMCExJSONRPCHosts ...
 	XBMCExJSONRPCHosts = []string{
 		net.JoinHostPort("127.0.0.1", "65221"),
 	}
@@ -26,8 +32,7 @@ func getConnection(hosts ...string) (net.Conn, error) {
 	var err error
 
 	for _, host := range hosts {
-		c, err := net.DialTimeout("tcp", host, time.Second*5)
-		if err == nil {
+		if c, errCon := net.DialTimeout("tcp", host, time.Second*5); errCon == nil {
 			return c, nil
 		}
 	}

@@ -2,29 +2,30 @@ package tmdb
 
 import (
 	"fmt"
+	"math/rand"
 	"path"
 	"time"
-	"math/rand"
 
-	"github.com/jmcvetta/napping"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/jmcvetta/napping"
 )
 
-func GetSeason(showId int, seasonNumber int, language string) *Season {
+// GetSeason ...
+func GetSeason(showID int, seasonNumber int, language string) *Season {
 	var season *Season
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
-	key := fmt.Sprintf("com.tmdb.season.%d.%d.%s", showId, seasonNumber, language)
+	key := fmt.Sprintf("com.tmdb.season.%d.%d.%s", showID, seasonNumber, language)
 	if err := cacheStore.Get(key, &season); err != nil {
 		rateLimiter.Call(func() {
 			urlValues := napping.Params{
-				"api_key": apiKey,
+				"api_key":            apiKey,
 				"append_to_response": "credits,images,videos,external_ids",
-				"language": language,
+				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
-				fmt.Sprintf("%stv/%d/season/%d", tmdbEndpoint, showId, seasonNumber),
+				fmt.Sprintf("%stv/%d/season/%d", tmdbEndpoint, showID, seasonNumber),
 				&urlValues,
 				&season,
 				nil,
@@ -33,10 +34,10 @@ func GetSeason(showId int, seasonNumber int, language string) *Season {
 				log.Error(err.Error())
 				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showId)
+				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showID)
 				rateLimiter.CoolDown(resp.HttpResponse().Header)
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showId, resp.Status())
+				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
@@ -51,7 +52,7 @@ func GetSeason(showId int, seasonNumber int, language string) *Season {
 		if season.EpisodeCount > 0 {
 			for index := 0; index < season.EpisodeCount; index++ {
 				if season.Episodes[index].Name == "" {
-					season.Episodes[index] = GetEpisode(showId, seasonNumber, index + 1, "")
+					season.Episodes[index] = GetEpisode(showID, seasonNumber, index+1, "")
 				}
 			}
 		}
@@ -61,17 +62,18 @@ func GetSeason(showId int, seasonNumber int, language string) *Season {
 			traktFrequency := config.Get().TraktSyncFrequency * 60
 			if updateFrequency == 0 && traktFrequency == 0 {
 				updateFrequency = 1440
-			} else if updateFrequency > traktFrequency  && traktFrequency != 0 {
+			} else if updateFrequency > traktFrequency && traktFrequency != 0 {
 				updateFrequency = traktFrequency - 1
 			} else {
 				updateFrequency = updateFrequency - 1
 			}
-			cacheStore.Set(key, season, time.Duration(updateFrequency) * time.Minute)
+			cacheStore.Set(key, season, time.Duration(updateFrequency)*time.Minute)
 		}
 	}
 	return season
 }
 
+// ToListItems ...
 func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	items := make([]*xbmc.ListItem, 0, len(seasons))
 
@@ -103,6 +105,11 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	return items
 }
 
+func (seasons SeasonList) Len() int           { return len(seasons) }
+func (seasons SeasonList) Swap(i, j int)      { seasons[i], seasons[j] = seasons[j], seasons[i] }
+func (seasons SeasonList) Less(i, j int) bool { return seasons[i].Season < seasons[j].Season }
+
+// ToListItem ...
 func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	name := fmt.Sprintf("Season %d", season.Season)
 	if season.Season == 0 {
@@ -144,7 +151,3 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 
 	return item
 }
-
-func (s SeasonList) Len() int           { return len(s) }
-func (s SeasonList) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s SeasonList) Less(i, j int) bool { return s[i].Season < s[j].Season }

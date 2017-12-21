@@ -10,9 +10,10 @@ import (
 )
 
 func imageURL(path string) string {
-	return tvdbUrl + "/banners/" + path
+	return tvdbURL + "/banners/" + path
 }
 
+// ToListItems ...
 func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	items := make([]*xbmc.ListItem, 0, len(seasons))
 
@@ -41,6 +42,7 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	return items
 }
 
+// ToListItems ...
 func (episodes EpisodeList) ToListItems(show *Show) []*xbmc.ListItem {
 	items := make([]*xbmc.ListItem, 0, len(episodes))
 	if len(episodes) == 0 {
@@ -72,6 +74,7 @@ func (episodes EpisodeList) ToListItems(show *Show) []*xbmc.ListItem {
 	return items
 }
 
+// ToListItem ...
 func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	name := fmt.Sprintf("Season %d", season.Season)
 	if season.Season == 0 {
@@ -107,6 +110,7 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	return item
 }
 
+// ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.EpisodeName)
 

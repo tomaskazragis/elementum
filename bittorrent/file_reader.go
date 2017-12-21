@@ -12,6 +12,7 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
+// FileReader ...
 type FileReader struct {
 	*gotorrent.Reader
 	*gotorrent.File
@@ -21,6 +22,7 @@ type FileReader struct {
 	id int
 }
 
+// NewFileReader ...
 func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, error) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
@@ -48,6 +50,7 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 	return fr, nil
 }
 
+// Close ...
 func (fr *FileReader) Close() error {
 	log.Debugf("Closing reader: %#v", fr.id)
 

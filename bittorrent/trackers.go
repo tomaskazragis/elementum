@@ -14,39 +14,48 @@ import (
 )
 
 const (
-	connectionRequestInitialId int64 = 0x041727101980
+	connectionRequestInitialID int64 = 0x041727101980
 	defaultTimeout                   = 3 * time.Second
 	defaultBufferSize                = 2048 // must be bigger than MTU, which is 1500 most of the time
 	maxScrapedHashes                 = 70
 )
 
 const (
+	// ActionConnect ...
 	ActionConnect Action = iota
+	// ActionAnnounce ...
 	ActionAnnounce
+	// ActionScrape ...
 	ActionScrape
+	// ActionError ...
 	ActionError = 50331648 // it's LittleEndian(3), in BigEndian, don't ask
 )
 
+// Action ...
 type Action int32
 
+// TrackerRequest ...
 type TrackerRequest struct {
-	ConnectionId  int64
+	ConnectionID  int64
 	Action        Action
-	TransactionId int32
+	TransactionID int32
 }
 
+// TrackerResponse ...
 type TrackerResponse struct {
 	Action        Action
-	TransactionId int32
+	TransactionID int32
 }
 
+// ConnectionResponse ...
 type ConnectionResponse struct {
-	ConnectionId int64
+	ConnectionID int64
 }
 
+// AnnounceRequest ...
 type AnnounceRequest struct {
 	InfoHash   [20]byte
-	PeerId     [20]byte
+	PeerID     [20]byte
 	Downloaded int64
 	Left       int64
 	Uploaded   int64
@@ -57,42 +66,47 @@ type AnnounceRequest struct {
 	Port       int16
 }
 
+// Peer ...
 type Peer struct {
 	IPAddress int32
 	Port      int16
 }
 
+// AnnounceResponse ...
 type AnnounceResponse struct {
 	Interval int32
 	Leechers int32
 	Seeders  int32
 }
 
+// ScrapeResponseEntry ...
 type ScrapeResponseEntry struct {
 	Seeders   int32
 	Completed int32
 	Leechers  int32
 }
 
+// Tracker ...
 type Tracker struct {
 	connection   net.Conn
 	reader       *bufio.Reader
 	writer       *bufio.Writer
-	connectionId int64
+	connectionID int64
 	URL          *url.URL
 }
 
-func NewTracker(trackerUrl string) (tracker *Tracker, err error) {
-	tURL, err := url.Parse(trackerUrl)
+// NewTracker ...
+func NewTracker(trackerURL string) (tracker *Tracker, err error) {
+	tURL, err := url.Parse(trackerURL)
 	if err != nil {
 		return
 	}
 	if tURL.Scheme != "udp" {
-		err = errors.New("Only UDP trackers are supported.")
+		err = errors.New("Only UDP trackers are supported")
 		return
 	}
 	tracker = &Tracker{
-		connectionId: connectionRequestInitialId,
+		connectionID: connectionRequestInitialID,
 		URL:          tURL,
 	}
 	return
@@ -100,9 +114,9 @@ func NewTracker(trackerUrl string) (tracker *Tracker, err error) {
 
 func (tracker *Tracker) sendRequest(action Action, request interface{}) error {
 	trackerRequest := TrackerRequest{
-		ConnectionId:  tracker.connectionId,
+		ConnectionID:  tracker.connectionID,
 		Action:        action,
-		TransactionId: rand.Int31(),
+		TransactionID: rand.Int31(),
 	}
 	binary.Write(tracker.writer, binary.BigEndian, trackerRequest)
 	if request != nil {
@@ -118,15 +132,15 @@ func (tracker *Tracker) sendRequest(action Action, request interface{}) error {
 	}()
 	select {
 	case <-time.After(defaultTimeout):
-		return errors.New("Request timed out.")
+		return errors.New("Request timed out")
 	case err := <-result:
 		if err != nil {
 			return err
 		}
 	}
 
-	if trackerResponse.TransactionId != trackerRequest.TransactionId {
-		return errors.New("Request/Response transaction missmatch.")
+	if trackerResponse.TransactionID != trackerRequest.TransactionID {
+		return errors.New("Request/Response transaction missmatch")
 	}
 	if trackerResponse.Action == ActionError {
 		msg, err := tracker.reader.ReadString(0)
@@ -139,6 +153,7 @@ func (tracker *Tracker) sendRequest(action Action, request interface{}) error {
 	return nil
 }
 
+// Connect ...
 func (tracker *Tracker) Connect() error {
 	if strings.Index(tracker.URL.Host, ":") < 0 {
 		tracker.URL.Host += ":80"
@@ -153,7 +168,7 @@ func (tracker *Tracker) Connect() error {
 	if err := tracker.sendRequest(ActionConnect, nil); err != nil {
 		return err
 	}
-	return binary.Read(tracker.reader, binary.BigEndian, &tracker.connectionId)
+	return binary.Read(tracker.reader, binary.BigEndian, &tracker.connectionID)
 }
 
 func (tracker *Tracker) doScrape(infoHashes [][]byte) []ScrapeResponseEntry {
@@ -166,6 +181,7 @@ func (tracker *Tracker) doScrape(infoHashes [][]byte) []ScrapeResponseEntry {
 	return entries
 }
 
+// Scrape ...
 func (tracker *Tracker) Scrape(torrents []*TorrentFile) []ScrapeResponseEntry {
 	entries := make([]ScrapeResponseEntry, 0, len(torrents))
 
