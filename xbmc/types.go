@@ -210,6 +210,14 @@ type ActivePlayers []struct {
 	Type string `json:"type"`
 }
 
+// FileSources ...
+type FileSources struct {
+	Sources []struct {
+		FilePath string `json:"file"`
+		Label    string `json:"label"`
+	} `json:"sources"`
+}
+
 // NewView ...
 func NewView(contentType string, items ListItems) *View {
 	return &View{

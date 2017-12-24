@@ -178,6 +178,17 @@ func ConvertLanguage(language string, format int) string {
 	return retVal
 }
 
+// FilesGetSources ...
+func FilesGetSources() *FileSources {
+	params := map[string]interface{}{
+		"media": "video",
+	}
+	items := &FileSources{}
+	executeJSONRPCO("Files.GetSources", items, params)
+
+	return items
+}
+
 // GetLanguage ...
 func GetLanguage(format int) string {
 	retVal := ""
