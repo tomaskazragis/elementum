@@ -591,6 +591,11 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 }
 
 func (s *BTService) loadTorrentFiles() {
+	// Not loading previous torrents on start
+	if s.config.DownloadStorage == estorage.StorageMemory {
+		return
+	}
+
 	pattern := filepath.Join(s.config.TorrentsPath, "*.torrent")
 	files, _ := filepath.Glob(pattern)
 
