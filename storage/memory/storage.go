@@ -1,15 +1,6 @@
 package memory
 
 import (
-	// "errors"
-	// "fmt"
-	// "os"
-	// "path"
-	// "runtime"
-	// "strings"
-	// "math"
-	// "runtime/debug"
-	// "time"
 	"sync"
 
 	"github.com/anacrolix/torrent/metainfo"
@@ -21,19 +12,16 @@ import (
 )
 
 const (
-	// ChunkSize ...
-	ChunkSize = 1024 * 16
-	// ReadaheadRatio ...
-	ReadaheadRatio = 0.33
+	chunkSize      = 1024 * 16
+	readaheadRatio = 0.33
 )
 
 var log = logging.MustGetLogger("memory")
 
 // Storage main object
 type Storage struct {
-	Type int
-	mu   *sync.Mutex
-
+	Type     int
+	mu       *sync.Mutex
 	items    map[string]*Cache
 	capacity int64
 }
@@ -79,7 +67,6 @@ func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (stor
 		capacity: s.capacity,
 		id:       infoHash.HexString(),
 		mu:       &sync.Mutex{},
-		bmu:      &sync.Mutex{},
 	}
 	c.Init(info)
 	go c.Start()

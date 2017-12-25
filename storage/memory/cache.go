@@ -22,16 +22,16 @@ import (
 
 // Cache ...
 type Cache struct {
-	s   *Storage
-	mu  *sync.Mutex
-	bmu *sync.Mutex
+	s  *Storage
+	mu *sync.Mutex
 
 	id        string
 	running   bool
 	capacity  int64
 	filled    int64
 	readahead int64
-	policy    Policy
+
+	policy Policy
 
 	pieceCount    int
 	pieceLength   int64
@@ -42,15 +42,15 @@ type Cache struct {
 	closing chan struct{}
 
 	bufferSize int
-	buffers    []BufferItem
+	buffers    [][]byte
 	positions  []*BufferPosition
 }
 
 // BufferItem ...
-type BufferItem struct {
-	mu   *sync.Mutex
-	body []byte
-}
+// type BufferItem struct {
+// 	mu   *sync.Mutex
+// 	body []byte
+// }
 
 // BufferPosition ...
 type BufferPosition struct {
@@ -130,15 +130,16 @@ func (c *Cache) Init(info *metainfo.Info) {
 	if c.bufferSize > c.pieceCount {
 		c.bufferSize = c.pieceCount
 	}
-	c.readahead = int64(float64(c.capacity) * ReadaheadRatio)
+	c.readahead = int64(float64(c.capacity) * readaheadRatio)
 
-	c.buffers = make([]BufferItem, c.bufferSize)
+	c.buffers = make([][]byte, c.bufferSize)
 	c.positions = make([]*BufferPosition, c.bufferSize)
 	c.pieces = map[key]*Piece{}
 
 	for i := 0; i < c.pieceCount; i++ {
 		c.pieces[key(i)] = &Piece{
 			c:        c,
+			mu:       &sync.Mutex{},
 			Position: -1,
 			Index:    i,
 			Key:      key(i),
@@ -149,8 +150,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	}
 
 	for i := range c.buffers {
-		c.buffers[i].mu = &sync.Mutex{}
-		c.buffers[i].body = make([]byte, c.pieceLength)
+		c.buffers[i] = make([]byte, c.pieceLength)
 		c.positions[i] = &BufferPosition{}
 	}
 }
@@ -234,11 +234,11 @@ func (c *Cache) Start() {
 
 			if info.Filled == lastFilled {
 				log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
-				locks := ""
-				for i, b := range c.buffers {
-					locks += fmt.Sprintf("%#v:%#v | ", i, b.mu)
-				}
-				log.Debugf("Locks: %#v", locks)
+				// locks := ""
+				// for i, b := range c.buffers {
+				// 	locks += fmt.Sprintf("%#v:%#v | ", i, b.mu)
+				// }
+				// log.Debugf("Locks: %#v", locks)
 
 				positions := ""
 				for i, p := range c.positions {
