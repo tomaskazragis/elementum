@@ -62,7 +62,9 @@ func Migrate() (err error) {
 	// Step 1: Find Quasar
 	progressBase := 0
 	progressStep := 0
-	dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30338]")
+	if !config.Get().DisableBgProgress {
+		dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30338]")
+	}
 	pluginUserdata := filepath.Join(config.Get().Info.Profile, "..", "plugin.video.quasar")
 	if _, errOS := os.Stat(pluginUserdata); errOS != nil {
 		log.Debugf("Quasar directory not found (%#v): %#v", pluginUserdata, errOS)
@@ -81,10 +83,21 @@ func Migrate() (err error) {
 	log.Debugf("Using Quasar settings file: %#v", pluginSettings)
 	log.Debugf("Using Quasar database file: %#v", pluginDatabase)
 
+	// Disabling Quasar plugin if active, otherwise we can't edit it's database
+	for _, addon := range xbmc.GetAddons("xbmc.addon.video", "unknown", "all", []string{"name", "version", "enabled"}).Addons {
+		if addon.ID == "plugin.video.quasar" && addon.Enabled {
+			log.Debugf("Disabling Quasar plugin...")
+			xbmc.SetAddonEnabled("plugin.video.quasar", false)
+			time.Sleep(5 * time.Second)
+		}
+	}
+
 	// Step 2: Find strm files
 	progressBase = 25
 	progressStep = 0
-	dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	if !config.Get().DisableBgProgress {
+		dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	}
 
 	sourceDirectories := []string{}
 	sourceFiles := map[string]bool{}
@@ -124,14 +137,18 @@ func Migrate() (err error) {
 		}
 
 		progressStep = int(float64(i+1) / float64(len(sourceDirectories)) * 25)
-		dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+		if !config.Get().DisableBgProgress {
+			dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+		}
 	}
 	log.Debugf("Prepared strm files: %#v", len(sourceFiles))
 
 	// Step 3: Migrating strm files
 	progressBase = 50
 	progressStep = 0
-	dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	if !config.Get().DisableBgProgress {
+		dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	}
 
 	// Possible urls:
 	// /movie/:tmdbId/links
@@ -198,14 +215,18 @@ func Migrate() (err error) {
 		fileCounter++
 		if fileCounter%100 == 0 {
 			progressStep = int(float64(fileCounter) / float64(len(sourceFiles)) * 25)
-			dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+			if !config.Get().DisableBgProgress {
+				dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+			}
 		}
 	}
 
 	// Step 4: Migrating database
 	progressBase = 75
 	progressStep = 0
-	dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	if !config.Get().DisableBgProgress {
+		dialogProgress.Update(progressBase+progressStep, "Elementum", "LOCALIZE[30339]")
+	}
 
 	migratedCounter := 0
 	bucket := []byte("Library")
