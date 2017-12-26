@@ -308,6 +308,15 @@ type CalendarMovie struct {
 	Movie    *Movie `json:"movie"`
 }
 
+// UserSettings ...
+type UserSettings struct {
+	User struct {
+		Username string `json:"username"`
+		Name     string `json:"name"`
+	} `json:"user"`
+	Account struct{} `json:"account"`
+}
+
 func totalFromHeaders(headers http.Header) (total int, err error) {
 	if len(headers) > 0 {
 		if itemCount, exists := headers["X-Pagination-Item-Count"]; exists {
@@ -679,6 +688,23 @@ func Authorize(fromSettings bool) error {
 	xbmc.SetSetting("trakt_token_expiry", strconv.Itoa(int(expiry)))
 	xbmc.SetSetting("trakt_token", token.AccessToken)
 	xbmc.SetSetting("trakt_refresh_token", token.RefreshToken)
+
+	config.Get().TraktToken = token.AccessToken
+
+	// Getting username for currently authorized user
+	params := napping.Params{}.AsUrlValues()
+	resp, err := GetWithAuth("users/settings", params)
+	if resp.Status() == 200 {
+		user := &UserSettings{}
+		errJSON := resp.Unmarshal(user)
+		if errJSON != nil {
+			return errJSON
+		}
+
+		if user.User.Username != "" {
+			xbmc.SetSetting("trakt_username", user.User.Username)
+		}
+	}
 
 	xbmc.Notify("Elementum", success, config.AddonIcon())
 	return nil
