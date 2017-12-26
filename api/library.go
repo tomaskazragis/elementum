@@ -1591,29 +1591,36 @@ func Notification(btService *bittorrent.BTService) gin.HandlerFunc {
 				}
 
 			case "VideoLibrary.OnUpdate":
-				time.Sleep(200 * time.Millisecond) // Because Kodi...
-				if !bittorrent.WasPlaying {
-					return
-				}
-				var item struct {
-					ID   int    `json:"id"`
-					Type string `json:"type"`
+				time.Sleep(300 * time.Millisecond) // Because Kodi...
+				var request struct {
+					Item struct {
+						ID   int    `json:"id"`
+						Type string `json:"type"`
+					} `json:"item"`
+					Playcount int `json:"playcount"`
 				}
 				jsonData, _ := base64.StdEncoding.DecodeString(data)
-				if err := json.Unmarshal(jsonData, &item); err != nil {
+				if err := json.Unmarshal(jsonData, &request); err != nil {
 					libraryLog.Error(err)
 					return
 				}
-				if item.ID != 0 {
-					bittorrent.WasPlaying = false
-					if item.Type == movieType {
-						updateLibraryMovies()
-					} else {
-						updateLibraryShows()
-					}
-					xbmc.Refresh()
-				}
 
+				// TODO: Transform library id into Trakt id and sync watched status
+				// if config.Get().TraktToken != "" {
+				//
+				// }
+
+				if bittorrent.WasPlaying {
+					if request.Item.ID != 0 {
+						bittorrent.WasPlaying = false
+						if request.Item.Type == movieType {
+							updateLibraryMovies()
+						} else {
+							updateLibraryShows()
+						}
+						xbmc.Refresh()
+					}
+				}
 			case "VideoLibrary.OnRemove":
 				jsonData, err := base64.StdEncoding.DecodeString(data)
 				if err != nil {
