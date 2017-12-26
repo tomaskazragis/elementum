@@ -21,9 +21,9 @@ const (
 	// APIURL ...
 	APIURL = "https://api.trakt.tv"
 	// ClientID ...
-	ClientID = "4407ab20a3a971e7c92d4996b36b76d0312ea085cb139d7c38a1a4c9f8428f60"
+	ClientID = "2f911cee953f0af7833191d2b929e9a842bf8752e6b1afb458c8ff9ffc1d2c85"
 	// ClientSecret ...
-	ClientSecret = "83f5993015942fe1320772c9c9886dce08252fa95445afab81a1603f8671e490"
+	ClientSecret = "b290a36c1144c4baa937dcc9023b3cd44398cca46975928a3d833f7593f00980"
 	// APIVersion ...
 	APIVersion = "2"
 )
@@ -394,6 +394,7 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 
 	rateLimiter.Call(func() {
 		resp, err = napping.Send(&req)
+
 		if err != nil {
 			return
 		} else if resp.Status() == 429 {
@@ -662,6 +663,7 @@ func Authorize(fromSettings bool) error {
 	}
 
 	token, err := PollToken(code)
+	log.Debugf("Received token: %#v", token)
 
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
