@@ -42,6 +42,11 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 		})
+
+		if season == nil {
+			return nil
+		}
+
 		season.EpisodeCount = len(season.Episodes)
 
 		// Fix for shows that have translations but return empty strings

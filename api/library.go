@@ -269,6 +269,9 @@ func isDuplicateMovie(tmdbID string) (*tmdb.Movie, error) {
 
 func isDuplicateShow(tmdbID string) (*tmdb.Show, error) {
 	show := tmdb.GetShowByID(tmdbID, "en")
+	if show == nil {
+		return nil, errors.New("Can't resolve show")
+	}
 	showID := GetShowUniqueID(show)
 
 	if len(showID) == 0 || libraryShows == nil {
@@ -316,7 +319,7 @@ func isDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) (ep
 		showID = strconv.Itoa(tmdbShowID)
 	case TVDBScraper:
 		show := tmdb.GetShowByID(strconv.Itoa(tmdbShowID), "en")
-		if show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
+		if show == nil || show.ExternalIDs == nil || show.ExternalIDs.TVDBID == nil {
 			libraryLog.Warning(noExternalIDs + " for TVDB show")
 			return
 		}
@@ -448,6 +451,7 @@ func doUpdateLibrary() error {
 }
 
 func doSyncTrakt() error {
+	libraryLog.Debugf("Starting Trakt sync")
 	if err := checkMoviesPath(); err != nil {
 		return err
 	}
@@ -587,6 +591,9 @@ func removeMovie(ctx *gin.Context, tmdbID string) error {
 		return err
 	}
 	movie := tmdb.GetMovieByID(tmdbID, "en")
+	if movie == nil {
+		return errors.New("Can't resolve movie")
+	}
 	movieName := fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0])
 	movieStrm := util.ToFileName(movieName)
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
@@ -720,7 +727,11 @@ func writeShowStrm(showID string, adding bool) (*tmdb.Show, error) {
 			continue
 		}
 
-		episodes := tmdb.GetSeason(ID, season.Season, "en").Episodes
+		seasonTMDB := tmdb.GetSeason(ID, season.Season, "en")
+		if seasonTMDB == nil {
+			continue
+		}
+		episodes := seasonTMDB.Episodes
 
 		var reAddIDs []string
 		for _, episode := range episodes {
