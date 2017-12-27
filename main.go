@@ -1,8 +1,9 @@
 package main
 
 import (
-	"net/http"
 	// _ "net/http/pprof"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -105,7 +106,7 @@ func main() {
 	logging.SetFormatter(logging.MustStringFormatter(
 		`%{color}%{level:.4s}  %{module:-12s} ▶ %{shortfunc:-15s}  %{color:reset}%{message}`,
 	))
-	logging.SetBackend(logging.NewLogBackend(os.Stdout, "", 0))
+	logging.SetBackend(logging.NewLogBackend(ioutil.Discard, "", 0), logging.NewLogBackend(os.Stdout, "", 0))
 
 	log.Infof("Starting Elementum daemon")
 	log.Infof("Version: %s Go: %s", util.Version[1:len(util.Version)-1], runtime.Version())
