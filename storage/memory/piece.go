@@ -35,7 +35,7 @@ func (p *Piece) Completion() storage.Completion {
 	defer p.mu.Unlock()
 
 	return storage.Completion{
-		Complete: p.Active && p.Completed && p.Size == p.Length && p.Length != 0,
+		Complete: p.Completed,
 		Ok:       true,
 	}
 }
@@ -45,13 +45,13 @@ func (p *Piece) MarkComplete() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	log.Debugf("Complete: %#v", p.Index)
-	p.Completed = true
-
 	if !p.Active || p.Size != p.Length || p.Length == 0 {
-		panic("piece is not completed")
+		log.Debugf("Complete Error: %#v, !%#v, %#v != %#v", p.Index, p.Size, p.Length)
+		return errors.New("piece is not complete")
 	}
 
+	log.Debugf("Complete: %#v", p.Index)
+	p.Completed = true
 	return nil
 }
 
