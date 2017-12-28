@@ -242,7 +242,11 @@ func (c *Cache) Start() {
 
 				positions := ""
 				for i, p := range c.positions {
-					positions += fmt.Sprintf("%#v:%#v | ", i, p.Index)
+					pk := 0
+					if p.Index != 0 {
+						pk = c.pieces[p.Key].Position
+					}
+					positions += fmt.Sprintf("%#v:%#v-%#v | ", i, p.Index, pk)
 				}
 				log.Debugf("Positions: %#v", positions)
 			}
@@ -305,6 +309,7 @@ func (c *Cache) remove(pi key) {
 
 	if c.pieces[pi].Position != -1 {
 		c.positions[c.pieces[pi].Position].Used = false
+		c.positions[c.pieces[pi].Position].Index = 0
 	}
 
 	c.pieces[pi].Chunks.Clear()

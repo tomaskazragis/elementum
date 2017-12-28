@@ -47,6 +47,11 @@ func (p *Piece) MarkComplete() error {
 
 	log.Debugf("Complete: %#v", p.Index)
 	p.Completed = true
+
+	if !p.Active || p.Size != p.Length || p.Length == 0 {
+		panic("piece is not completed")
+	}
+
 	return nil
 }
 
@@ -167,8 +172,8 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 
 	for i := startIndex; i <= lastIndex; i++ {
 		if !p.Chunks.ContainsInt(i) {
-			log.Debugf("No contain read: %#v", p.Index)
-			return 0, io.EOF
+			log.Debugf("Not contains read: %#v, Stats: %#v-%#v, Completed: %#v, Chunk: %#v (%#v-%#v), Request: %#v, len(%#v)", p.Index, p.Size, p.Length, p.Completed, i, startIndex, lastIndex, off, len(b))
+			return 0, io.ErrUnexpectedEOF
 		}
 	}
 
