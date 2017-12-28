@@ -135,6 +135,7 @@ type BTService struct {
 	UploadLimiter   *rate.Limiter
 	Torrents        map[string]*Torrent
 	UserAgent       string
+	PeerID          string
 
 	config           *BTConfiguration
 	log              *logging.Logger
@@ -288,53 +289,60 @@ func (s *BTService) configure() {
 		s.log.Debug(err)
 	}
 
-	userAgent := util.UserAgent()
+	s.PeerID = util.PeerIDRandom(util.PeerID())
+	s.UserAgent = util.UserAgent()
 	if s.config.SpoofUserAgent > 0 {
 		switch s.config.SpoofUserAgent {
 		case 1:
-			userAgent = ""
+			s.UserAgent = "Transmission/1.93"
+			s.PeerID = util.PeerIDRandom("-TR1930-")
 			break
 		case 2:
-			userAgent = "libtorrent (Rasterbar) 1.1.0"
+			s.UserAgent = "libtorrent (Rasterbar) 1.1.0"
 			break
 		case 3:
-			userAgent = "BitTorrent 7.5.0"
+			s.UserAgent = "BitTorrent/7.5.0"
+			s.PeerID = util.PeerIDRandom("-BT7500-")
 			break
 		case 4:
-			userAgent = "BitTorrent 7.4.3"
+			s.UserAgent = "BitTorrent/7.4.3"
+			s.PeerID = util.PeerIDRandom("-BT7430-")
 			break
 		case 5:
-			userAgent = "µTorrent 3.4.9"
+			s.UserAgent = "uTorrent/3.4.9"
+			s.PeerID = util.PeerIDRandom("-UT3490-")
 			break
 		case 6:
-			userAgent = "µTorrent 3.2.0"
+			s.UserAgent = "uTorrent/3.2.0"
+			s.PeerID = util.PeerIDRandom("-UT3200-")
 			break
 		case 7:
-			userAgent = "µTorrent 2.2.1"
+			s.UserAgent = "uTorrent/2.2.1"
+			s.PeerID = util.PeerIDRandom("-UT2210-")
 			break
 		case 8:
-			userAgent = "Transmission 2.92"
+			s.UserAgent = "Transmission/2.92"
+			s.PeerID = util.PeerIDRandom("-TR2920-")
 			break
 		case 9:
-			userAgent = "Deluge 1.3.6.0"
+			s.UserAgent = "Deluge/1.3.6.0"
+			s.PeerID = util.PeerIDRandom("-DG1360-")
 			break
 		case 10:
-			userAgent = "Deluge 1.3.12.0"
+			s.UserAgent = "Deluge/1.3.12.0"
+			s.PeerID = util.PeerIDRandom("-DG1312-")
 			break
 		case 11:
-			userAgent = "Vuze 5.7.3.0"
+			s.UserAgent = "Vuze/5.7.3.0"
+			s.PeerID = util.PeerIDRandom("-VZ5730-")
+			break
+		default:
+			s.UserAgent = "uTorrent/3.4.9"
+			s.PeerID = util.PeerIDRandom("-UT3490-")
 			break
 		}
-		if userAgent != "" {
-			s.log.Infof("UserAgent: %s", userAgent)
-		}
-	} else {
-		s.log.Infof("UserAgent: %s", util.UserAgent())
 	}
-
-	if userAgent != "" {
-		s.UserAgent = userAgent
-	}
+	s.log.Infof("UserAgent: %s", s.UserAgent)
 
 	if s.config.ConnectionsLimit == 0 {
 		setPlatformSpecificSettings(s.config)
@@ -401,6 +409,9 @@ func (s *BTService) configure() {
 		UploadRateLimiter:   s.UploadLimiter,
 
 		DefaultStorage: s.DefaultStorage,
+
+		PeerID:        s.PeerID,
+		HTTPUserAgent: s.UserAgent,
 	}
 
 	if !s.config.LimitAfterBuffering {
