@@ -6,7 +6,7 @@ import (
 	// "path"
 	// "runtime"
 	// "strings"
-	"fmt"
+	// "fmt"
 	"math"
 	"runtime/debug"
 	"sync"
@@ -220,7 +220,7 @@ func (c *Cache) Start() {
 	defer progressTicker.Stop()
 	defer close(c.closing)
 
-	var lastFilled int64
+	// var lastFilled int64
 
 	for {
 		select {
@@ -232,26 +232,26 @@ func (c *Cache) Start() {
 			info := c.Info()
 			log.Debugf("Cap: %d | Size: %d | Items: %d | Capacity: %d \n", info.Capacity, info.Filled, info.Items, c.bufferSize)
 
-			if info.Filled == lastFilled {
-				log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
-				// locks := ""
-				// for i, b := range c.buffers {
-				// 	locks += fmt.Sprintf("%#v:%#v | ", i, b.mu)
-				// }
-				// log.Debugf("Locks: %#v", locks)
+			// if info.Filled == lastFilled {
+			// log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
+			// locks := ""
+			// for i, b := range c.buffers {
+			// 	locks += fmt.Sprintf("%#v:%#v | ", i, b.mu)
+			// }
+			// log.Debugf("Locks: %#v", locks)
 
-				positions := ""
-				for i, p := range c.positions {
-					pk := 0
-					if p.Index != 0 {
-						pk = c.pieces[p.Key].Position
-					}
-					positions += fmt.Sprintf("%#v:%#v-%#v | ", i, p.Index, pk)
-				}
-				log.Debugf("Positions: %#v", positions)
-			}
+			// positions := ""
+			// for i, p := range c.positions {
+			// 	pk := 0
+			// 	if p.Index != 0 {
+			// 		pk = c.pieces[p.Key].Position
+			// 	}
+			// 	positions += fmt.Sprintf("%#v:%#v-%#v | ", i, p.Index, pk)
+			// }
+			// log.Debugf("Positions: %#v", positions)
+			// }
 
-			lastFilled = info.Filled
+			// lastFilled = info.Filled
 
 			// str := ""
 			// for i := 0; i < 30; i++ {

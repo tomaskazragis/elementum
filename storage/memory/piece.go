@@ -45,11 +45,17 @@ func (p *Piece) MarkComplete() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if !p.Active || p.Size != p.Length || p.Length == 0 {
-		log.Debugf("Complete Error: %#v || !%#v || %#v != %#v", p.Index, p.Active, p.Size, p.Length)
+	if !p.Active || p.Length == 0 || p.Size == 0 || int64(len(p.Chunks.ToArray()))*chunkSize < p.Length {
+		log.Debugf("Complete Error: %#v || !%#v || %#v (%#v) != %#v", p.Index, p.Active, p.Size, int64(len(p.Chunks.ToArray()))*chunkSize, p.Length)
 		p.Reset()
 		return errors.New("piece is not complete")
 	}
+
+	// if !p.Active || p.Size != p.Length || p.Length == 0 {
+	// 	log.Debugf("Complete Error: %#v || !%#v || %#v != %#v", p.Index, p.Active, p.Size, p.Length)
+	// 	p.Reset()
+	// 	return errors.New("piece is not complete")
+	// }
 
 	log.Debugf("Complete: %#v", p.Index)
 	p.Completed = true
