@@ -46,7 +46,8 @@ func (p *Piece) MarkComplete() error {
 	defer p.mu.Unlock()
 
 	if !p.Active || p.Size != p.Length || p.Length == 0 {
-		log.Debugf("Complete Error: %#v, !%#v, %#v != %#v", p.Index, p.Size, p.Length)
+		log.Debugf("Complete Error: %#v || !%#v || %#v != %#v", p.Index, p.Active, p.Size, p.Length)
+		p.Reset()
 		return errors.New("piece is not complete")
 	}
 
@@ -110,6 +111,12 @@ func (p *Piece) GetBuffer(iswrite bool) bool {
 	}
 
 	return true
+}
+
+// Reset is cleaning stats to 0's
+func (p *Piece) Reset() {
+	p.Chunks.Clear()
+	p.Size = 0
 }
 
 // Seek File-like implementation

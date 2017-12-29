@@ -312,11 +312,12 @@ func (c *Cache) remove(pi key) {
 		c.positions[c.pieces[pi].Position].Index = 0
 	}
 
-	c.pieces[pi].Chunks.Clear()
 	c.pieces[pi].Position = -1
 	c.pieces[pi].Completed = false
 	c.pieces[pi].Active = false
-	c.pieces[pi].Size = 0
+	c.pieces[pi].mu.Lock()
+	c.pieces[pi].Reset()
+	c.pieces[pi].mu.Unlock()
 
 	c.updateItem(c.pieces[pi].Key, func(*ItemState, bool) bool {
 		return false
