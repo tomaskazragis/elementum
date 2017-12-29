@@ -9,13 +9,13 @@ import (
 // Version ...
 var Version string
 
-// UserAgent ...
-func UserAgent() string {
+// DefaultUserAgent ...
+func DefaultUserAgent() string {
 	return fmt.Sprintf("Elementum/%s", Version[1:len(Version)-1])
 }
 
-// PeerID return default PeerID
-func PeerID() string {
+// DefaultPeerID return default PeerID
+func DefaultPeerID() string {
 	return "-GT0001-"
 }
 

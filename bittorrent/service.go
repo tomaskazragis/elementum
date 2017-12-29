@@ -289,60 +289,61 @@ func (s *BTService) configure() {
 		s.log.Debug(err)
 	}
 
-	s.PeerID = util.PeerIDRandom(util.PeerID())
-	s.UserAgent = util.UserAgent()
+	s.PeerID = util.DefaultPeerID()
+	s.UserAgent = util.DefaultUserAgent()
 	if s.config.SpoofUserAgent > 0 {
 		switch s.config.SpoofUserAgent {
 		case 1:
 			s.UserAgent = "Transmission/1.93"
-			s.PeerID = util.PeerIDRandom("-TR1930-")
+			s.PeerID = "-TR1930-"
 			break
 		case 2:
 			s.UserAgent = "libtorrent (Rasterbar) 1.1.0"
+			s.PeerID = "-LT1100-"
 			break
 		case 3:
 			s.UserAgent = "BitTorrent/7.5.0"
-			s.PeerID = util.PeerIDRandom("-BT7500-")
+			s.PeerID = "-BT7500-"
 			break
 		case 4:
 			s.UserAgent = "BitTorrent/7.4.3"
-			s.PeerID = util.PeerIDRandom("-BT7430-")
+			s.PeerID = "-BT7430-"
 			break
 		case 5:
 			s.UserAgent = "uTorrent/3.4.9"
-			s.PeerID = util.PeerIDRandom("-UT3490-")
+			s.PeerID = "-UT3490-"
 			break
 		case 6:
 			s.UserAgent = "uTorrent/3.2.0"
-			s.PeerID = util.PeerIDRandom("-UT3200-")
+			s.PeerID = "-UT3200-"
 			break
 		case 7:
 			s.UserAgent = "uTorrent/2.2.1"
-			s.PeerID = util.PeerIDRandom("-UT2210-")
+			s.PeerID = "-UT2210-"
 			break
 		case 8:
 			s.UserAgent = "Transmission/2.92"
-			s.PeerID = util.PeerIDRandom("-TR2920-")
+			s.PeerID = "-TR2920-"
 			break
 		case 9:
 			s.UserAgent = "Deluge/1.3.6.0"
-			s.PeerID = util.PeerIDRandom("-DG1360-")
+			s.PeerID = "-DG1360-"
 			break
 		case 10:
 			s.UserAgent = "Deluge/1.3.12.0"
-			s.PeerID = util.PeerIDRandom("-DG1312-")
+			s.PeerID = "-DG1312-"
 			break
 		case 11:
 			s.UserAgent = "Vuze/5.7.3.0"
-			s.PeerID = util.PeerIDRandom("-VZ5730-")
+			s.PeerID = "-VZ5730-"
 			break
 		default:
 			s.UserAgent = "uTorrent/3.4.9"
-			s.PeerID = util.PeerIDRandom("-UT3490-")
+			s.PeerID = "-UT3490-"
 			break
 		}
 	}
-	s.log.Infof("UserAgent: %s", s.UserAgent)
+	s.log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
 
 	if s.config.ConnectionsLimit == 0 {
 		setPlatformSpecificSettings(s.config)
@@ -379,8 +380,6 @@ func (s *BTService) configure() {
 	}
 	s.DefaultStorage.SetReadaheadSize(s.GetBufferSize())
 
-	// TODO: Forcing no upload for the moment
-	s.config.SeedTimeLimit = 0
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
@@ -410,7 +409,8 @@ func (s *BTService) configure() {
 
 		DefaultStorage: s.DefaultStorage,
 
-		PeerID:        s.PeerID,
+		Bep20:         s.PeerID,
+		PeerID:        util.PeerIDRandom(s.PeerID),
 		HTTPUserAgent: s.UserAgent,
 	}
 
