@@ -5,22 +5,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
-	"net"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/dht"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/storage"
-	"github.com/dustin/go-humanize"
-	"github.com/op/go-logging"
-	"golang.org/x/time/rate"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -47,14 +44,6 @@ const (
 	// Active ...
 	Active
 )
-
-// const (
-// 	ipToSDefault     = iota
-// 	ipToSLowDelay    = 1 << iota
-// 	ipToSReliability = 1 << iota
-// 	ipToSThroughput  = 1 << iota
-// 	ipToSLowCost     = 1 << iota
-// )
 
 // DefaultTrackers ...
 var DefaultTrackers = []string{
@@ -90,62 +79,29 @@ var (
 // 	Password string
 // }
 
-// BTConfiguration ...
-type BTConfiguration struct {
-	SpoofUserAgent      int
-	DownloadStorage     int
-	MemorySize          int64
-	BufferSize          int64
-	MaxUploadRate       int
-	MaxDownloadRate     int
-	LimitAfterBuffering bool
-	ConnectionsLimit    int
-	SeedTimeLimit       int
-	DisableDHT          bool
-	DisableTCP          bool
-	DisableUTP          bool
-	EncryptionPolicy    int
-	LowerListenPort     int
-	UpperListenPort     int
-	ListenInterfaces    string
-	OutgoingInterfaces  string
-	DownloadPath        string
-	TorrentsPath        string
-	DisableBgProgress   bool
-	CompletedMove       bool
-	CompletedMoviesPath string
-	CompletedShowsPath  string
-
-	// SessionSave         int
-	// ShareRatioLimit     int
-	// SeedTimeRatioLimit  int
-	// DisableUPNP         bool
-	// TunedStorage        bool
-	// Proxy               *ProxySettings
-}
-
 // BTService ...
 type BTService struct {
-	Client          *gotorrent.Client
-	ClientConfig    *gotorrent.Config
+	config *config.Configuration
+
+	Client       *gotorrent.Client
+	ClientConfig *gotorrent.Config
+
 	PieceCompletion storage.PieceCompletion
 	DefaultStorage  estorage.ElementumStorage
-	// StorageEvents   *pubsub.PubSub
+
 	DownloadLimiter *rate.Limiter
 	UploadLimiter   *rate.Limiter
-	Torrents        map[string]*Torrent
-	UserAgent       string
-	PeerID          string
 
-	config           *BTConfiguration
-	log              *logging.Logger
+	Torrents map[string]*Torrent
+
+	UserAgent  string
+	PeerID     string
+	ListenAddr string
+
 	dialogProgressBG *xbmc.DialogProgressBG
-	SpaceChecked     map[string]bool
-	MarkedToMove     string
 
-	// closing      chan struct{}
-	// bufferEvents chan int
-	// pieceEvents  chan qstorage.PieceChange
+	SpaceChecked map[string]bool
+	MarkedToMove string
 }
 
 // DBItem ...
@@ -185,14 +141,12 @@ func InitDB() {
 }
 
 // NewBTService ...
-func NewBTService(conf BTConfiguration) *BTService {
+func NewBTService() *BTService {
 	s := &BTService{
-		log:    logging.MustGetLogger("btservice"),
-		config: &conf,
+		config: config.Get(),
 
 		SpaceChecked: make(map[string]bool, 0),
 		MarkedToMove: "",
-		// StorageEvents: pubsub.NewPubSub(),
 
 		Torrents: map[string]*Torrent{},
 
@@ -212,18 +166,6 @@ func NewBTService(conf BTConfiguration) *BTService {
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
 	}
 
-	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
-		if err := os.Mkdir(s.config.TorrentsPath, 0755); err != nil {
-			s.log.Error("Unable to create Torrents folder")
-		}
-	}
-
-	if completion, err := storage.NewBoltPieceCompletion(config.Get().ProfilePath); err == nil {
-		s.PieceCompletion = completion
-	} else {
-		s.PieceCompletion = storage.NewMapPieceCompletion()
-	}
-
 	s.configure()
 
 	tmdb.CheckAPIKey()
@@ -236,140 +178,83 @@ func NewBTService(conf BTConfiguration) *BTService {
 
 // Close ...
 func (s *BTService) Close(shutdown bool) {
-	s.log.Info("Stopping BT Services...")
+	log.Info("Stopping BT Services...")
 	if !shutdown {
 		s.stopServices()
 	}
 
-	s.log.Info("Closing Client")
+	log.Info("Closing Client")
 	if s.Client != nil {
 		s.Client.Close()
 		s.Client = nil
 	}
 }
 
-// Reconfigure ...
-func (s *BTService) Reconfigure(config BTConfiguration) {
+// Reconfigure fired every time addon configuration has changed
+// and Kodi sent a notification about that.
+// Should reassemble Service configuration and restart everything.
+// For non-memory storage it should also load old torrent files.
+func (s *BTService) Reconfigure() {
 	s.stopServices()
-	s.config = &config
+
+	config.Reload()
+
+	s.config = config.Get()
 	s.configure()
-	s.loadTorrentFiles()
+
+	go s.loadTorrentFiles()
 }
 
 func (s *BTService) configure() {
-	s.log.Info("Configuring client...")
+	log.Info("Configuring client...")
 
-	var listenPorts []string
-	for p := s.config.UpperListenPort; p >= s.config.LowerListenPort; p-- {
-		ln, err := net.Listen("tcp", ":"+strconv.Itoa(p))
-		if err != nil {
-			continue
+	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
+		if err := os.Mkdir(s.config.TorrentsPath, 0755); err != nil {
+			log.Error("Unable to create Torrents folder")
 		}
-
-		ln.Close()
-		listenPorts = append(listenPorts, strconv.Itoa(p))
-	}
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	listenInterfaces := []string{"0.0.0.0"}
-	if strings.TrimSpace(s.config.ListenInterfaces) != "" {
-		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
 	}
 
-	listenInterfacesStrings := make([]string, 0)
-	for _, listenInterface := range listenInterfaces {
-		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
-		if len(listenPorts) > 1 {
-			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
-		}
+	if completion, err := storage.NewBoltPieceCompletion(s.config.ProfilePath); err == nil {
+		s.PieceCompletion = completion
+	} else {
+		s.PieceCompletion = storage.NewMapPieceCompletion()
+	}
+
+	if s.config.ListenAutoDetect {
+		s.ListenAddr = "0.0.0.0:0"
+	} else {
+		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.BTListenPortMin, s.config.BTListenPortMax)
 	}
 
 	blocklist, err := iplist.MMapPacked("packed-blocklist")
 	if err != nil {
-		s.log.Debug(err)
+		log.Debug(err)
 	}
 
-	s.PeerID = util.DefaultPeerID()
-	s.UserAgent = util.DefaultUserAgent()
-	if s.config.SpoofUserAgent > 0 {
-		switch s.config.SpoofUserAgent {
-		case 1:
-			s.UserAgent = "Transmission/1.93"
-			s.PeerID = "-TR1930-"
-			break
-		case 2:
-			s.UserAgent = "libtorrent (Rasterbar) 1.1.0"
-			s.PeerID = "-LT1100-"
-			break
-		case 3:
-			s.UserAgent = "BitTorrent/7.5.0"
-			s.PeerID = "-BT7500-"
-			break
-		case 4:
-			s.UserAgent = "BitTorrent/7.4.3"
-			s.PeerID = "-BT7430-"
-			break
-		case 5:
-			s.UserAgent = "uTorrent/3.4.9"
-			s.PeerID = "-UT3490-"
-			break
-		case 6:
-			s.UserAgent = "uTorrent/3.2.0"
-			s.PeerID = "-UT3200-"
-			break
-		case 7:
-			s.UserAgent = "uTorrent/2.2.1"
-			s.PeerID = "-UT2210-"
-			break
-		case 8:
-			s.UserAgent = "Transmission/2.92"
-			s.PeerID = "-TR2920-"
-			break
-		case 9:
-			s.UserAgent = "Deluge/1.3.6.0"
-			s.PeerID = "-DG1360-"
-			break
-		case 10:
-			s.UserAgent = "Deluge/1.3.12.0"
-			s.PeerID = "-DG1312-"
-			break
-		case 11:
-			s.UserAgent = "Vuze/5.7.3.0"
-			s.PeerID = "-VZ5730-"
-			break
-		default:
-			s.UserAgent = "uTorrent/3.4.9"
-			s.PeerID = "-UT3490-"
-			break
-		}
-	}
-	s.log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
+	s.PeerID, s.UserAgent = util.GetUserAndPeer()
+	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
 
 	if s.config.ConnectionsLimit == 0 {
 		setPlatformSpecificSettings(s.config)
 	}
 
-	if s.config.MaxDownloadRate == 0 {
+	if s.config.DownloadRateLimit == 0 {
 		s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
 	}
-	if s.config.MaxUploadRate == 0 {
+	if s.config.UploadRateLimit == 0 {
 		s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
 	}
 
-	s.log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
+	log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
 	if s.config.DownloadStorage == estorage.StorageMemory {
-		// Forcing disable upload for memory storage
-		s.config.SeedTimeLimit = 0
-
 		memSize := int64(config.Get().MemorySize)
-		needSize := s.config.BufferSize + endBufferSize + 6*1024*1024
+		needSize := int64(s.config.BufferSize) + endBufferSize + 6*1024*1024
 
 		if memSize < needSize {
-			s.log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
+			log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
 			memSize = needSize
 		}
 
-		s.config.SeedTimeLimit = 0
 		s.DefaultStorage = memory.NewMemoryStorage(memSize)
 	} else if s.config.DownloadStorage == estorage.StorageFat32 {
 		s.DefaultStorage = estorage.NewFat32Storage(config.Get().DownloadPath)
@@ -383,7 +268,7 @@ func (s *BTService) configure() {
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
-		ListenAddr: listenInterfacesStrings[0],
+		ListenAddr: s.ListenAddr,
 		Debug:      true,
 
 		DisableTCP: s.config.DisableTCP,
@@ -418,11 +303,16 @@ func (s *BTService) configure() {
 		s.RestoreLimits()
 	}
 
-	s.log.Debugf("BitClient config: %#v", s.ClientConfig)
+	log.Debugf("BitClient config: %#v", s.ClientConfig)
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
-		s.log.Warningf("Error creating bit client: %#v", err)
+		// If client can't be created - we should panic
+		log.Errorf("Error creating bit client: %#v", err)
+
+		// Maybe we should use Dialog() to show a windows
+		xbmc.Notify("Elementum", "LOCALIZE[30354]", config.AddonIcon())
+		os.Exit(1)
 	} else {
-		s.log.Debugf("Created bit client: %#v", s.Client)
+		log.Debugf("Created bit client: %#v", s.Client)
 	}
 }
 
@@ -430,18 +320,18 @@ func (s *BTService) stopServices() {
 	// TODO: cleanup these messages after windows hang is fixed
 	// Don't need to execute RPC calls when Kodi is closing
 	if s.dialogProgressBG != nil {
-		s.log.Debugf("Closing existing Dialog")
+		log.Debugf("Closing existing Dialog")
 		s.dialogProgressBG.Close()
 	}
 	s.dialogProgressBG = nil
 
-	s.log.Debugf("Cleaning up all DialogBG")
+	log.Debugf("Cleaning up all DialogBG")
 	xbmc.DialogProgressBGCleanup()
 
-	s.log.Debugf("Resetting RPC")
+	log.Debugf("Resetting RPC")
 	xbmc.ResetRPC()
 
-	s.log.Debugf("Closing Client")
+	log.Debugf("Closing Client")
 	if s.Client != nil {
 		s.Client.Close()
 		s.Client = nil
@@ -470,12 +360,12 @@ func (s *BTService) stopServices() {
 func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 	diskStatus, err := diskusage.DiskUsage(config.Get().DownloadPath)
 	if err != nil {
-		s.log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
+		log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
 		return false
 	}
 
 	if torrent == nil || torrent.Info() == nil {
-		s.log.Warning("Missing torrent info to check available space.")
+		log.Warning("Missing torrent info to check available space.")
 		return false
 	}
 
@@ -489,19 +379,19 @@ func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 		sizeLeft = sizeLeft * 2
 	}
 
-	s.log.Infof("Checking for sufficient space on %s...", path)
-	s.log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
-	s.log.Infof("All time download: %s", humanize.Bytes(uint64(torrent.BytesCompleted())))
-	s.log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
+	log.Infof("Checking for sufficient space on %s...", path)
+	log.Infof("Total size of download: %s", humanize.Bytes(uint64(totalSize)))
+	log.Infof("All time download: %s", humanize.Bytes(uint64(torrent.BytesCompleted())))
+	log.Infof("Size total done: %s", humanize.Bytes(uint64(totalDone)))
 	if torrent.IsRarArchive {
-		s.log.Infof("Size left to download (x2 to extract): %s", humanize.Bytes(uint64(sizeLeft)))
+		log.Infof("Size left to download (x2 to extract): %s", humanize.Bytes(uint64(sizeLeft)))
 	} else {
-		s.log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
+		log.Infof("Size left to download: %s", humanize.Bytes(uint64(sizeLeft)))
 	}
-	s.log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
+	log.Infof("Available space: %s", humanize.Bytes(uint64(availableSpace)))
 
 	if availableSpace < sizeLeft {
-		s.log.Errorf("Unsufficient free space on %s. Has %d, needs %d.", path, diskStatus.Free, sizeLeft)
+		log.Errorf("Unsufficient free space on %s. Has %d, needs %d.", path, diskStatus.Free, sizeLeft)
 		xbmc.Notify("Elementum", "LOCALIZE[30207]", config.AddonIcon())
 
 		torrent.Pause()
@@ -513,7 +403,7 @@ func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 
 // AddTorrent ...
 func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
-	s.log.Infof("Adding torrent from %s", uri)
+	log.Infof("Adding torrent from %s", uri)
 
 	if s.config.DownloadPath == "." {
 		xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
@@ -534,24 +424,24 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 			torrent := NewTorrentFile(uri)
 
 			if err = torrent.Resolve(); err != nil {
-				s.log.Warningf("Could not resolve torrent %s: %#v", uri, err)
+				log.Warningf("Could not resolve torrent %s: %#v", uri, err)
 				return nil, err
 			}
 			uri = torrent.URI
 		}
 
-		s.log.Debugf("Adding torrent: %#v", uri)
-		s.log.Debugf("Service: %#v", s)
-		s.log.Debugf("Client: %#v", s.Client)
+		log.Debugf("Adding torrent: %#v", uri)
+		log.Debugf("Service: %#v", s)
+		log.Debugf("Client: %#v", s.Client)
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
-			s.log.Warningf("Could not add torrent %s: %#v", uri, err)
+			log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err
 		} else if torrentHandle == nil {
 			return nil, errors.New("Could not add torrent")
 		}
 	}
 
-	log.Debugf("Making new torrent item: %#v", uri)
+	log.Debugf("Making new torrent item: %#v, th: %#v", uri, torrentHandle)
 	torrent := NewTorrent(s, torrentHandle, uri)
 	if s.config.ConnectionsLimit > 0 {
 		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)
@@ -566,7 +456,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 
 // RemoveTorrent ...
 func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
-	s.log.Debugf("Removing torrent: %s", torrent.Name())
+	log.Debugf("Removing torrent: %s", torrent.Name())
 	if torrent == nil {
 		return false
 	}
@@ -576,27 +466,6 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 		t.Drop(removeFiles)
 		return true
 	}
-
-	// query := torrent.InfoHash()
-	// matched := -1
-	// for i := range s.Torrents {
-	// 	if s.Torrents[i] == query {
-	// 		matched = i
-	// 		break
-	// 	}
-	// }
-	//
-	// if matched > -1 {
-	// 	t := s.Torrents[matched]
-	//
-	// 	go func() {
-	// 		t.Drop(removeFiles)
-	// 		t = nil
-	// 	}()
-	//
-	// 	s.Torrents = append(s.Torrents[:matched], s.Torrents[matched+1:]...)
-	// 	return true
-	// }
 
 	return false
 }
@@ -611,15 +480,15 @@ func (s *BTService) loadTorrentFiles() {
 	files, _ := filepath.Glob(pattern)
 
 	for _, torrentFile := range files {
-		s.log.Infof("Loading torrent file %s", torrentFile)
+		log.Infof("Loading torrent file %s", torrentFile)
 
 		var err error
 		var torrentHandle *gotorrent.Torrent
 		if torrentHandle, err = s.Client.AddTorrentFromFile(torrentFile); err != nil || torrentHandle == nil {
-			s.log.Errorf("Error adding torrent file for %s", torrentFile)
+			log.Errorf("Error adding torrent file for %s", torrentFile)
 			if _, err := os.Stat(torrentFile); err == nil {
 				if err := os.Remove(torrentFile); err != nil {
-					s.log.Error(err)
+					log.Error(err)
 				}
 			}
 
@@ -707,10 +576,10 @@ func (s *BTService) downloadProgress() {
 
 					errMsg := fmt.Sprintf("Missing item type to move files to completed folder for %s", torrentName)
 					if item.Type == "" {
-						s.log.Error(errMsg)
+						log.Error(errMsg)
 						return errors.New(errMsg)
 					}
-					s.log.Warning(torrentName, "finished seeding, moving files...")
+					log.Warning(torrentName, "finished seeding, moving files...")
 
 					// Check paths are valid and writable, and only once
 					if _, exists := pathChecked[item.Type]; !exists {
@@ -718,7 +587,7 @@ func (s *BTService) downloadProgress() {
 							if err := config.IsWritablePath(s.config.CompletedMoviesPath); err != nil {
 								warnedMissing[infoHash] = true
 								pathChecked[item.Type] = true
-								s.log.Error(err)
+								log.Error(err)
 								return err
 							}
 							pathChecked[item.Type] = true
@@ -726,22 +595,22 @@ func (s *BTService) downloadProgress() {
 							if err := config.IsWritablePath(s.config.CompletedShowsPath); err != nil {
 								warnedMissing[infoHash] = true
 								pathChecked[item.Type] = true
-								s.log.Error(err)
+								log.Error(err)
 								return err
 							}
 							pathChecked[item.Type] = true
 						}
 					}
 
-					s.log.Info("Removing the torrent without deleting files...")
+					log.Info("Removing the torrent without deleting files...")
 					s.RemoveTorrent(torrentHandle, false)
 
 					// Delete torrent file
 					torrentFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
 					if _, err := os.Stat(torrentFile); err == nil {
-						s.log.Info("Deleting torrent file at ", torrentFile)
+						log.Info("Deleting torrent file at ", torrentFile)
 						if err := os.Remove(torrentFile); err != nil {
-							s.log.Error(err)
+							log.Error(err)
 							return err
 						}
 					}
@@ -796,10 +665,10 @@ func (s *BTService) downloadProgress() {
 					}
 
 					go func() {
-						s.log.Infof("Moving %s to %s", fileName, dstPath)
+						log.Infof("Moving %s to %s", fileName, dstPath)
 						srcPath := filepath.Join(s.config.DownloadPath, filePath)
 						if dst, err := util.Move(srcPath, dstPath); err != nil {
-							s.log.Error(err)
+							log.Error(err)
 						} else {
 							// Remove leftover folders
 							if dirPath := filepath.Dir(filePath); dirPath != "." {
@@ -811,9 +680,9 @@ func (s *BTService) downloadProgress() {
 									}
 								}
 							}
-							s.log.Warning(fileName, "moved to", dst)
+							log.Warning(fileName, "moved to", dst)
 
-							s.log.Infof("Marking %s for removal from library and database...", torrentName)
+							log.Infof("Marking %s for removal from library and database...", torrentName)
 							s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
 						}
 					}()
@@ -873,7 +742,7 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 	case RemoveFromLibrary:
 		item := &DBItem{}
 		if err := db.GetObject(Bucket, InfoHash, item); err != nil {
-			s.log.Error(err)
+			log.Error(err)
 			return err
 		}
 
@@ -916,16 +785,16 @@ func (s *BTService) SetUploadLimit(i int) {
 
 // RestoreLimits ...
 func (s *BTService) RestoreLimits() {
-	if s.config.MaxDownloadRate > 0 {
-		s.SetDownloadLimit(s.config.MaxDownloadRate)
-		s.log.Infof("Rate limiting download to %dkB/s", s.config.MaxDownloadRate/1024)
+	if s.config.DownloadRateLimit > 0 {
+		s.SetDownloadLimit(s.config.DownloadRateLimit)
+		log.Infof("Rate limiting download to %dkB/s", s.config.DownloadRateLimit/1024)
 	} else {
 		s.SetDownloadLimit(0)
 	}
 
-	if s.config.MaxUploadRate > 0 {
-		s.SetUploadLimit(s.config.MaxUploadRate)
-		s.log.Infof("Rate limiting upload to %dkB/s", s.config.MaxUploadRate/1024)
+	if s.config.UploadRateLimit > 0 {
+		s.SetUploadLimit(s.config.UploadRateLimit)
+		log.Infof("Rate limiting upload to %dkB/s", s.config.UploadRateLimit/1024)
 	} else {
 		s.SetUploadLimit(0)
 	}
@@ -935,7 +804,7 @@ func (s *BTService) RestoreLimits() {
 func (s *BTService) SetBufferingLimits() {
 	if s.config.LimitAfterBuffering {
 		s.SetDownloadLimit(0)
-		s.log.Info("Resetting rate limited download for buffering")
+		log.Info("Resetting rate limited download for buffering")
 	}
 }
 
@@ -946,15 +815,16 @@ func (s *BTService) GetSeedTime() int64 {
 
 // GetBufferSize ...
 func (s *BTService) GetBufferSize() int64 {
-	if s.config.BufferSize < endBufferSize {
+	b := int64(s.config.BufferSize)
+	if b < endBufferSize {
 		return endBufferSize
 	}
-	return s.config.BufferSize
+	return b
 }
 
 // GetMemorySize ...
 func (s *BTService) GetMemorySize() int64 {
-	return s.config.MemorySize
+	return int64(s.config.MemorySize)
 }
 
 // GetStorageType ...

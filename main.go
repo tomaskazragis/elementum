@@ -54,51 +54,6 @@ func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, 
 	return
 }
 
-func makeBTConfiguration(conf *config.Configuration) *bittorrent.BTConfiguration {
-	btConfig := &bittorrent.BTConfiguration{
-		DownloadStorage:     conf.DownloadStorage,
-		MemorySize:          int64(conf.MemorySize),
-		BufferSize:          int64(conf.BufferSize),
-		SpoofUserAgent:      conf.SpoofUserAgent,
-		MaxUploadRate:       conf.UploadRateLimit,
-		MaxDownloadRate:     conf.DownloadRateLimit,
-		LimitAfterBuffering: conf.LimitAfterBuffering,
-		ConnectionsLimit:    conf.ConnectionsLimit,
-		// SessionSave:         conf.SessionSave,
-		// ShareRatioLimit:     conf.ShareRatioLimit,
-		// SeedTimeRatioLimit:  conf.SeedTimeRatioLimit,
-		SeedTimeLimit: conf.SeedTimeLimit,
-		DisableDHT:    conf.DisableDHT,
-		DisableTCP:    conf.DisableTCP,
-		DisableUTP:    conf.DisableUTP,
-		// DisableUPNP:         conf.DisableUPNP,
-		EncryptionPolicy:   conf.EncryptionPolicy,
-		LowerListenPort:    conf.BTListenPortMin,
-		UpperListenPort:    conf.BTListenPortMax,
-		ListenInterfaces:   conf.ListenInterfaces,
-		OutgoingInterfaces: conf.OutgoingInterfaces,
-		// TunedStorage:        conf.TunedStorage,
-		DownloadPath:        conf.DownloadPath,
-		TorrentsPath:        conf.TorrentsPath,
-		DisableBgProgress:   conf.DisableBgProgress,
-		CompletedMove:       conf.CompletedMove,
-		CompletedMoviesPath: conf.CompletedMoviesPath,
-		CompletedShowsPath:  conf.CompletedShowsPath,
-	}
-
-	// if conf.SocksEnabled == true {
-	// 	btConfig.Proxy = &bittorrent.ProxySettings{
-	// 		Type:     conf.ProxyType,
-	// 		Hostname: conf.SocksHost,
-	// 		Port:     conf.SocksPort,
-	// 		Username: conf.SocksLogin,
-	// 		Password: conf.SocksPassword,
-	// 	}
-	// }
-
-	return btConfig
-}
-
 func main() {
 	// Make sure we are properly multithreaded.
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -133,7 +88,7 @@ func main() {
 	api.InitDB()
 	bittorrent.InitDB()
 
-	btService := bittorrent.NewBTService(*makeBTConfiguration(conf))
+	btService := bittorrent.NewBTService()
 
 	var shutdown = func() {
 		log.Info("Shutting down...")
@@ -162,7 +117,7 @@ func main() {
 	}))
 	http.Handle("/files/", bittorrent.ServeTorrent(btService, config.Get().DownloadPath))
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		btService.Reconfigure(*makeBTConfiguration(config.Reload()))
+		btService.Reconfigure()
 	}))
 	http.Handle("/shutdown", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		shutdown()
@@ -185,6 +140,7 @@ func main() {
 	go trakt.TokenRefreshHandler()
 
 	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
+
 	// s := &http.Server{
 	// 	Addr:         ":" + strconv.Itoa(config.ListenPort),
 	// 	Handler:      nil,

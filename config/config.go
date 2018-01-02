@@ -54,11 +54,12 @@ type Configuration struct {
 	DisableTCP    bool
 	DisableUTP    bool
 	// DisableUPNP         bool
-	EncryptionPolicy   int
-	BTListenPortMin    int
-	BTListenPortMax    int
-	ListenInterfaces   string
-	OutgoingInterfaces string
+	EncryptionPolicy int
+	ListenPortMin    int
+	ListenPortMax    int
+	ListenInterfaces string
+	ListenAutoDetect bool
+	// OutgoingInterfaces string
 	// TunedStorage        bool
 	Scrobble           bool
 	TraktUsername      string
@@ -172,7 +173,6 @@ func Reload() *Configuration {
 		// xbmc.Dialog("Elementum", "LOCALIZE[30113]")
 		settingsWarning = "LOCALIZE[30113]"
 		panic(settingsWarning)
-		// go waitSettingsSet()
 	} else if err := IsWritablePath(downloadPath); err != nil {
 		log.Errorf("Cannot write to location '%s': %#v", downloadPath, err)
 		// xbmc.AddonSettings("plugin.video.elementum")
@@ -263,11 +263,12 @@ func Reload() *Configuration {
 		DisableTCP:    settings["disable_tcp"].(bool),
 		DisableUTP:    settings["disable_utp"].(bool),
 		// DisableUPNP:         settings["disable_upnp"].(bool),
-		EncryptionPolicy:   settings["encryption_policy"].(int),
-		BTListenPortMin:    settings["listen_port_min"].(int),
-		BTListenPortMax:    settings["listen_port_max"].(int),
-		ListenInterfaces:   settings["listen_interfaces"].(string),
-		OutgoingInterfaces: settings["outgoing_interfaces"].(string),
+		EncryptionPolicy: settings["encryption_policy"].(int),
+		ListenPortMin:    settings["listen_port_min"].(int),
+		ListenPortMax:    settings["listen_port_max"].(int),
+		ListenInterfaces: settings["listen_interfaces"].(string),
+		ListenAutoDetect: settings["listen_autodetect"].(bool),
+		// OutgoingInterfaces: settings["outgoing_interfaces"].(string),
 		// TunedStorage:        settings["tuned_storage"].(bool),
 		ConnectionsLimit: settings["connections_limit"].(int),
 		// SessionSave:         settings["session_save"].(int),
@@ -342,12 +343,12 @@ func AddonResource(args ...string) string {
 // TranslatePath ...
 func TranslatePath(path string) string {
 	// Do not translate nfs/smb path
-	if strings.HasPrefix(path, "nfs:") || strings.HasPrefix(path, "smb:") {
-		if !strings.HasSuffix(path, "/") {
-			path += "/"
-		}
-		return path
-	}
+	// if strings.HasPrefix(path, "nfs:") || strings.HasPrefix(path, "smb:") {
+	// 	if !strings.HasSuffix(path, "/") {
+	// 		path += "/"
+	// 	}
+	// 	return path
+	// }
 	return filepath.Dir(xbmc.TranslatePath(path))
 }
 
@@ -357,9 +358,9 @@ func IsWritablePath(path string) error {
 		return errors.New("Path not set")
 	}
 	// TODO: Review this after test evidences come
-	// if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
-	// 	return errors.New(fmt.Sprintf("Network paths are not supported, change %s to a locally mounted path by the OS", path))
-	// }
+	if strings.HasPrefix(path, "nfs") || strings.HasPrefix(path, "smb") {
+		return fmt.Errorf("Network paths are not supported, change %s to a locally mounted path by the OS", path)
+	}
 	if p, err := os.Stat(path); err != nil || !p.IsDir() {
 		if err != nil {
 			return err

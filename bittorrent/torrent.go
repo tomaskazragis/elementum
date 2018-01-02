@@ -22,7 +22,6 @@ import (
 
 	// "github.com/anacrolix/missinggo/pubsub"
 	gotorrent "github.com/anacrolix/torrent"
-	"github.com/op/go-logging"
 	// "github.com/dustin/go-humanize"
 	// "github.com/elgatito/elementum/cloudhole"
 	// "github.com/elgatito/elementum/config"
@@ -31,8 +30,6 @@ import (
 	estorage "github.com/elgatito/elementum/storage"
 	"github.com/elgatito/elementum/xbmc"
 )
-
-var log = logging.MustGetLogger("torrent")
 
 const (
 	movieType = "movie"
@@ -161,7 +158,9 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		dbidTicker: &time.Ticker{},
 	}
 
+	log.Debugf("Waiting for information fetched for torrent: %#v", handle.InfoHash().HexString())
 	<-t.GotInfo()
+	log.Debugf("Information fetched for torrent: %#v", handle.InfoHash().HexString())
 
 	return t
 }
