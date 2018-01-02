@@ -153,12 +153,15 @@ func NewBTPlayer(bts *BTService, params BTPlayerParams) *BTPlayer {
 }
 
 func (btp *BTPlayer) addTorrent() error {
-	torrent, err := btp.bts.AddTorrent(btp.uri)
-	if err != nil {
-		return err
+	if btp.Torrent == nil {
+		torrent, err := btp.bts.AddTorrent(btp.uri)
+		if err != nil {
+			return err
+		}
+
+		btp.Torrent = torrent
 	}
 
-	btp.Torrent = torrent
 	if btp.Torrent == nil || btp.Torrent.Torrent == nil {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.uri)
 	}
@@ -188,10 +191,8 @@ func (btp *BTPlayer) PlayURL() string {
 func (btp *BTPlayer) Buffer() error {
 	if btp.resumeIndex >= 0 {
 		btp.Torrent.Resume()
-	} else {
-		if err := btp.addTorrent(); err != nil {
-			return err
-		}
+	} else if err := btp.addTorrent(); err != nil {
+		return err
 	}
 
 	buffered, done := btp.bufferEvents.Listen()

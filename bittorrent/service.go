@@ -223,7 +223,7 @@ func (s *BTService) configure() {
 	if s.config.ListenAutoDetect {
 		s.ListenAddr = "0.0.0.0:0"
 	} else {
-		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.BTListenPortMin, s.config.BTListenPortMax)
+		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
 	}
 
 	blocklist, err := iplist.MMapPacked("packed-blocklist")

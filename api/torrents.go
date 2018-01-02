@@ -114,8 +114,6 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		torrentsLog.Info("Currently downloading:")
-		cachedTorrents = map[int]string{}
-		counter := 0
 		for i, torrent := range btService.Torrents {
 			if torrent == nil {
 				continue
@@ -184,7 +182,6 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 				}
 			}
 
-			cachedTorrents[counter] = torrent.InfoHash()
 			playURL := URLQuery(URLForXBMC("/play"),
 				"resume", i,
 				"type", contentType,
@@ -228,8 +225,6 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		torrentsLog.Info("Currently downloading:")
-		cachedTorrents = map[int]string{}
-		counter := 0
 		for _, torrent := range btService.Torrents {
 			if torrent == nil {
 				continue
@@ -257,7 +252,6 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			peers := stats.ActivePeers
 			peersTotal := stats.TotalPeers
 
-			cachedTorrents[counter] = torrent.InfoHash()
 			t := TorrentsWeb{
 				ID:           torrent.InfoHash(),
 				Name:         torrentName,
@@ -270,7 +264,6 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 				PeersTotal:   peersTotal,
 			}
 			torrents = append(torrents, &t)
-			counter++
 		}
 
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -450,19 +443,6 @@ func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
 func GetTorrentFromParam(btService *bittorrent.BTService, param string) (*bittorrent.Torrent, error) {
 	if len(param) == 0 {
 		return nil, errors.New("Empty param")
-	}
-
-	if len(param) < 5 {
-		id, err := strconv.Atoi(param)
-		if err != nil {
-			return nil, errors.New("Wrong int param")
-		}
-
-		v, ok := cachedTorrents[id]
-		if !ok {
-			return nil, errors.New("Wrong int index")
-		}
-		param = v
 	}
 
 	t, ok := btService.Torrents[param]
