@@ -43,7 +43,7 @@ var (
 	userlistExpiration      = 1 * time.Minute
 )
 
-var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
+var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // Object ...
 type Object struct {
@@ -366,19 +366,22 @@ func Get(endPoint string, params url.Values) (resp *napping.Response, err error)
 		Header: &header,
 	}
 
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		resp, err = napping.Send(&req)
 		if err != nil {
-			return
+			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
 			err = newClearance()
 			if err == nil {
 				resp, err = Get(endPoint, params)
 			}
 		}
+
+		return nil
 	})
 	return
 }
@@ -401,20 +404,23 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		Header: &header,
 	}
 
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		resp, err = napping.Send(&req)
 
 		if err != nil {
-			return
+			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
 			err = newClearance()
 			if err == nil {
 				resp, err = GetWithAuth(endPoint, params)
 			}
 		}
+
+		return nil
 	})
 	return
 }
@@ -438,19 +444,22 @@ func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err e
 		Header:     &header,
 	}
 
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		resp, err = napping.Send(&req)
 		if err != nil {
-			return
+			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
 			err = newClearance()
 			if err == nil {
 				resp, err = Post(endPoint, payload)
 			}
 		}
+
+		return nil
 	})
 	return
 }
@@ -475,14 +484,15 @@ func GetCode() (code *Code, err error) {
 	}
 
 	var resp *napping.Response
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		resp, err = napping.Send(&req)
 		if err != nil {
 			err = resp.Unmarshal(&code)
-			return
+			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting Trakt code %s, cooling down...", code)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
 			err = newClearance()
 			if err == nil {
@@ -491,6 +501,8 @@ func GetCode() (code *Code, err error) {
 		} else {
 			resp.Unmarshal(&code)
 		}
+
+		return nil
 	})
 	if err == nil && resp.Status() != 200 {
 		err = fmt.Errorf("Unable to get Trakt code: %d", resp.Status())
@@ -519,19 +531,22 @@ func GetToken(code string) (resp *napping.Response, err error) {
 		Header: &header,
 	}
 
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		resp, err = napping.Send(&req)
 		if err != nil {
-			return
+			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting Trakt token with code %s, cooling down...", code)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
 			err = newClearance()
 			if err == nil {
 				resp, err = GetToken(code)
 			}
 		}
+
+		return nil
 	})
 	return
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
 )
@@ -18,7 +19,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.season.%d.%d.%s", showID, seasonNumber, language)
 	if err := cacheStore.Get(key, &season); err != nil {
-		rateLimiter.Call(func() {
+		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,videos,external_ids",
@@ -35,12 +36,15 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showID)
-				rateLimiter.CoolDown(resp.HttpResponse().Header)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
+
+			return nil
 		})
 
 		if season == nil {

@@ -281,8 +281,8 @@ type ReleaseDate struct {
 const (
 	tmdbEndpoint            = "https://api.themoviedb.org/3/"
 	imageEndpoint           = "http://image.tmdb.org/t/p/"
-	burstRate               = 35
-	burstTime               = 15 * time.Second
+	burstRate               = 40
+	burstTime               = 10 * time.Second
 	simultaneousConnections = 20
 	cacheExpiration         = 6 * 24 * time.Hour
 	recentExpiration        = 15 * time.Minute
@@ -300,7 +300,7 @@ var (
 	WarmingUp = true
 )
 
-var rateLimiter = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
+var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // CheckAPIKey ...
 func CheckAPIKey() {
@@ -387,7 +387,7 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 				tmpParams[k] = v
 			}
 			urlValues := tmpParams.AsUrlValues()
-			rateLimiter.Call(func() {
+			rl.Call(func() error {
 				resp, err := napping.Get(
 					tmdbEndpoint+endpoint,
 					&urlValues,
@@ -402,6 +402,8 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 					log.Error(message)
 					xbmc.Notify("Elementum", message, config.AddonIcon())
 				}
+
+				return nil
 			})
 			for i, entity := range tmp.Results {
 				entities[page*resultsPerPage+i] = entity
@@ -421,7 +423,7 @@ func Find(externalID string, externalSource string) *FindResult {
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.find.%s.%s", externalSource, externalID)
 	if err := cacheStore.Get(key, &result); err != nil {
-		rateLimiter.Call(func() {
+		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":         apiKey,
 				"external_source": externalSource,
@@ -441,6 +443,8 @@ func Find(externalID string, externalSource string) *FindResult {
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
 			cacheStore.Set(key, result, 15*time.Minute)
+
+			return nil
 		})
 	}
 

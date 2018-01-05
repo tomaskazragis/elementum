@@ -13,6 +13,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
 )
@@ -31,7 +32,7 @@ func GetShowImages(showID int) *Images {
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.show.%d.images", showID)
 	if err := cacheStore.Get(key, &images); err != nil {
-		rateLimiter.Call(func() {
+		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
@@ -47,13 +48,16 @@ func GetShowImages(showID int) *Images {
 				xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showID)
-				rateLimiter.CoolDown(resp.HttpResponse().Header)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				log.Warningf("Bad status getting images for %d: %d", showID, resp.Status())
 			}
 			if images != nil {
 				cacheStore.Set(key, images, imagesCacheExpiration)
 			}
+
+			return nil
 		})
 	}
 	return images
@@ -73,7 +77,7 @@ func GetShow(showID int, language string) (show *Show) {
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.show.%d.%s", showID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
-		rateLimiter.Call(func() {
+		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,alternative_titles,translations,external_ids",
@@ -98,7 +102,8 @@ func GetShow(showID int, language string) (show *Show) {
 				xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showID)
-				rateLimiter.CoolDown(resp.HttpResponse().Header)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
 				log.Warning(message)
@@ -108,6 +113,8 @@ func GetShow(showID int, language string) (show *Show) {
 			if show != nil {
 				cacheStore.Set(key, show, cacheExpiration)
 			}
+
+			return nil
 		})
 	}
 	if show == nil {
@@ -144,7 +151,7 @@ func GetShows(showIds []int, language string) Shows {
 // SearchShows ...
 func SearchShows(query string, language string, page int) (Shows, int) {
 	var results EntityList
-	rateLimiter.Call(func() {
+	rl.Call(func() error {
 		urlValues := napping.Params{
 			"api_key": apiKey,
 			"query":   query,
@@ -161,12 +168,15 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 			xbmc.Notify("Elementum", "Failed searching shows check your logs.", config.AddonIcon())
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded searching shows for %s, cooling down...", query)
-			rateLimiter.CoolDown(resp.HttpResponse().Header)
+			rl.CoolDown(resp.HttpResponse().Header)
+			return util.ErrExceeded
 		} else if resp.Status() != 200 {
 			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
 			log.Error(message)
 			xbmc.Notify("Elementum", message, config.AddonIcon())
 		}
+
+		return nil
 	})
 	tmdbIds := make([]int, 0, len(results.Results))
 	for _, entity := range results.Results {
@@ -205,7 +215,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					pageParams[k] = v
 				}
 				urlParams := pageParams.AsUrlValues()
-				rateLimiter.Call(func() {
+				rl.Call(func() error {
 					resp, err := napping.Get(
 						tmdbEndpoint+endpoint,
 						&urlParams,
@@ -217,24 +227,36 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 						xbmc.Notify("Elementum", "Failed while listing shows, check your logs.", config.AddonIcon())
 					} else if resp.Status() == 429 {
 						log.Warningf("Rate limit exceeded while listing shows from %s, cooling down...", endpoint)
-						rateLimiter.CoolDown(resp.HttpResponse().Header)
+						rl.CoolDown(resp.HttpResponse().Header)
+						return util.ErrExceeded
 					} else if resp.Status() != 200 {
 						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
 						log.Error(message)
 						xbmc.Notify("Elementum", message, config.AddonIcon())
 					}
+
+					return nil
 				})
 				if results != nil {
 					if totalResults == -1 {
 						totalResults = results.TotalResults
 						cacheStore.Set(totalKey, totalResults, recentExpiration)
 					}
+
+					var wgItems sync.WaitGroup
+					wgItems.Add(len(results.Results))
 					for s, show := range results.Results {
 						if show == nil {
+							wgItems.Done()
 							continue
 						}
-						shows[p*ResultsPerPage+s] = GetShow(show.ID, params["language"])
+
+						go func(i int, tmdbId int) {
+							defer wgItems.Done()
+							shows[i] = GetShow(tmdbId, params["language"])
+						}(p*ResultsPerPage+s, show.ID)
 					}
+					wgItems.Wait()
 				}
 			}(p)
 		}
@@ -331,7 +353,7 @@ func GetTVGenres(language string) []*Genre {
 	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
 	key := fmt.Sprintf("com.tmdb.genres.shows.%s", language)
 	if err := cacheStore.Get(key, &genres); err != nil {
-		rateLimiter.Call(func() {
+		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":  apiKey,
 				"language": language,
@@ -347,12 +369,15 @@ func GetTVGenres(language string) []*Genre {
 				xbmc.Notify("Elementum", "Failed getting TV genres, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warning("Rate limit exceeded getting TV genres, cooling down...")
-				rateLimiter.CoolDown(resp.HttpResponse().Header)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting TV genres: %d", resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
 			}
+
+			return nil
 		})
 		if genres.Genres != nil && len(genres.Genres) > 0 {
 			cacheStore.Set(key, genres, cacheExpiration)

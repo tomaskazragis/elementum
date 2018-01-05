@@ -1,103 +1,160 @@
 package util
 
 import (
+	"container/list"
+	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("ratelimiter")
+var log = logging.MustGetLogger("ratelimit")
 
-// RateLimiter ...
+// A RateLimiter limits the rate at which an action can be performed.  It
+// applies neither smoothing (like one could achieve in a token bucket system)
+// nor does it offer any conception of warmup, wherein the rate of actions
+// granted are steadily increased until a steady throughput equilibrium is
+// reached.
 type RateLimiter struct {
-	rateTicker   *time.Ticker
-	rateLimiter  chan bool
+	limit        int
+	interval     time.Duration
+	mtx          sync.Mutex
+	times        list.List
 	parallelChan chan bool
-	burstRate    int
-	coolDown     int
+	coolDown     bool
 }
 
-// NewRateLimiter ...
-func NewRateLimiter(burstRate int, burstTimeSpan time.Duration, parallelCount int) *RateLimiter {
-	limiter := &RateLimiter{
-		rateTicker:   time.NewTicker(burstTimeSpan),
-		rateLimiter:  make(chan bool, burstRate),
+// ErrExceeded should be returned if we need to rerun the function
+var ErrExceeded = errors.New("Rate-Limit Exceeded")
+
+// NewRateLimiter creates a new rate limiter for the limit and interval.
+func NewRateLimiter(limit int, interval time.Duration, parallelCount int) *RateLimiter {
+	lim := &RateLimiter{
+		limit:        limit,
+		interval:     interval,
 		parallelChan: make(chan bool, parallelCount),
-		burstRate:    burstRate,
 	}
-	go func() {
-		for _ = range limiter.rateTicker.C {
-			// log.Debugf("Rate limiter ticking (%d / %d)...", burstRate, parallelCount)
-			if limiter.coolDown == 0 {
-				limiter.Reset()
-				// log.Debugf("Resetting (%d / %d)...", burstRate, parallelCount)
-			} else {
-				time.Sleep(time.Duration(limiter.coolDown) * time.Second)
-				limiter.coolDown = 0
-				// log.Debugf("Cooldown tick after %ds (%d / %d)...", limiter.coolDown, burstRate, parallelCount)
-			}
+	lim.times.Init()
+	return lim
+}
+
+// Wait blocks if the rate limit has been reached.  Wait offers no guarantees
+// of fairness for multiple actors if the allowed rate has been temporarily
+// exhausted.
+func (r *RateLimiter) Wait() {
+	for {
+		ok, remaining := r.Try()
+		if ok {
+			break
 		}
-	}()
-	return limiter
+		time.Sleep(remaining)
+	}
 }
 
-// Enter ...
-func (rl *RateLimiter) Enter() {
-	rl.parallelChan <- true
-	rl.rateLimiter <- true
+// ForceWait is forcing rate limit if we have an external cause
+// (like Response from API).
+func (r *RateLimiter) ForceWait() {
+	r.mtx.Lock()
+	now := time.Now()
+	for r.times.Len() < r.limit {
+		r.times.PushBack(now)
+	}
+	r.mtx.Unlock()
+
+	r.Wait()
 }
 
-// Leave ...
-func (rl *RateLimiter) Leave() {
-	<-rl.parallelChan
+// ForceWaitWithTimeout is sleeping for N duration and then forcing wait reset
+func (r *RateLimiter) ForceWaitWithTimeout(timeout time.Duration) {
+	r.mtx.Lock()
+	time.Sleep(timeout)
+	r.mtx.Unlock()
+
+	r.ForceWait()
+}
+
+// Try returns true if under the rate limit, or false if over and the
+// remaining time before the rate limit expires.
+func (r *RateLimiter) Try() (ok bool, remaining time.Duration) {
+	r.mtx.Lock()
+	defer r.mtx.Unlock()
+	now := time.Now()
+	if l := r.times.Len(); l < r.limit {
+		r.times.PushBack(now)
+		return true, 0
+	}
+	frnt := r.times.Front()
+	if diff := now.Sub(frnt.Value.(time.Time)); diff < r.interval {
+		return false, r.interval - diff
+	}
+	frnt.Value = now
+	r.times.MoveToBack(frnt)
+	return true, 0
+}
+
+// CoolDown is checking HTTP headers if we need to wait
+func (r *RateLimiter) CoolDown(headers http.Header) {
+	if len(headers) == 0 {
+		return
+	}
+	if retryAfter, exists := headers["Retry-After"]; exists {
+		if retryAfter == nil {
+			return
+		}
+
+		coolDown, err := strconv.Atoi(retryAfter[0])
+		if err != nil || r.coolDown {
+			return
+		}
+
+		log.Debugf("Met a cooldown, sleeping for %#v seconds. Headers: %#v", coolDown, headers)
+
+		r.mtx.Lock()
+		defer r.mtx.Unlock()
+
+		// Marking we are going to sleep, so other can see and just return an error
+		// to avoid many sleeps
+		r.coolDown = true
+
+		// Sleeping for requested seconds, but if we get 0, sleeping for some time
+		timeout := time.Duration(coolDown) * time.Second
+		if coolDown == 0 {
+			timeout = time.Duration(300) * time.Millisecond
+		}
+		r.ForceWaitWithTimeout(timeout)
+		r.coolDown = false
+	}
 }
 
 // Call ...
-func (rl *RateLimiter) Call(f func()) {
-	rl.Enter()
-	defer rl.Leave()
-	if rl.coolDown > 0 {
-		// Already cooling down, wait up
-		time.Sleep(time.Duration(rl.coolDown) * time.Second)
-	}
-	f()
-}
+func (r *RateLimiter) Call(f func() error) {
+	// Count simultaneous calls
+	r.Enter()
+	defer r.Leave()
 
-// Reset ...
-func (rl *RateLimiter) Reset() {
-outer:
-	for i := 0; i < rl.burstRate; i++ {
-		select {
-		case <-rl.rateLimiter:
-		default:
-			break outer
+	// Checking for burst rate
+	r.Wait()
+
+	tries := 0
+	for {
+		err := f()
+		// If fail occur, we should rerun
+		if err == nil || err != ErrExceeded || tries >= 2 {
+			break
 		}
+		tries++
 	}
 }
 
-// CoolDown ...
-func (rl *RateLimiter) CoolDown(headers http.Header) {
-	if len(headers) > 0 {
-		if retryAfter, exists := headers["Retry-After"]; exists {
-			if retryAfter != nil {
-				coolDown, err := strconv.Atoi(retryAfter[0])
-				if err == nil && coolDown > 0 {
-					coolDown = rl.coolDown + coolDown + 1
-					log.Debugf("Cooling down for %d second(s)...", coolDown)
-					rl.coolDown = coolDown
-					return
-				}
-			}
-		}
-	}
-	defaultCoolDown := rl.coolDown + 3
-	log.Debugf("No Retry-After header found, cooling down for %d seconds...", defaultCoolDown)
-	rl.coolDown = defaultCoolDown
+// Enter blocks parallen channel for simultaneous connections limitation
+func (r *RateLimiter) Enter() {
+	r.parallelChan <- true
 }
 
-// Close ...
-func (rl *RateLimiter) Close() {
-	rl.rateTicker.Stop()
+// Leave removes channel usage
+func (r *RateLimiter) Leave() {
+	<-r.parallelChan
 }
