@@ -1017,31 +1017,6 @@ func LibraryUpdate() {
 		return
 	}
 
-	// Migrate old ElementumDB.json
-	if _, err := os.Stat(filepath.Join(libraryPath, "ElementumDB.json")); err == nil {
-		libraryLog.Warning("Found ElementumDB.json, upgrading to BoltDB...")
-		var oldDB struct {
-			Movies []string `json:"movies"`
-			Shows  []string `json:"shows"`
-		}
-		oldFile := filepath.Join(libraryPath, "ElementumDB.json")
-		file, err := ioutil.ReadFile(oldFile)
-		if err != nil {
-			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-		} else {
-			if err := json.Unmarshal(file, &oldDB); err != nil {
-				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			} else if err := updateDB(Batch, Movie, oldDB.Movies, 0); err != nil {
-				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			} else if err := updateDB(Batch, Show, oldDB.Shows, 0); err != nil {
-				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			} else {
-				os.Remove(oldFile)
-				libraryLog.Notice("Successfully imported and removed ElementumDB.json")
-			}
-		}
-	}
-
 	go func() {
 		// Give time to Kodi to start its JSON-RPC service
 		time.Sleep(5 * time.Second)
