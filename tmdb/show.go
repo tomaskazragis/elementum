@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ func LogError(err error) {
 // GetShowImages ...
 func GetShowImages(showID int) *Images {
 	var images *Images
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.images", showID)
 	if err := cacheStore.Get(key, &images); err != nil {
 		rl.Call(func() error {
@@ -74,7 +73,7 @@ func GetShow(showID int, language string) (show *Show) {
 	if showID == 0 {
 		return
 	}
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.%s", showID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
 		rl.Call(func() error {
@@ -197,7 +196,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 
 	shows := make(Shows, limit)
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.topshows.%s.%s.%d", cacheKey, genre, pageGroup)
 	totalKey := fmt.Sprintf("com.tmdb.topshows.%s.%s.total", cacheKey, genre)
 	if err := cacheStore.Get(key, &shows); err != nil {
@@ -350,7 +349,7 @@ func MostVotedShows(genre string, language string, page int) (Shows, int) {
 func GetTVGenres(language string) []*Genre {
 	genres := GenreList{}
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.genres.shows.%s", language)
 	if err := cacheStore.Get(key, &genres); err != nil {
 		rl.Call(func() error {

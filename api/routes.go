@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -36,7 +35,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	store := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	store := cache.NewDBStore()
 
 	r.GET("/", Index)
 	r.GET("/search", Search(btService))

@@ -11,6 +11,8 @@ import (
 	"github.com/op/go-logging"
 )
 
+//go:generate msgp -o msgp.go -io=false -tests=false
+
 const (
 	// DEFAULT ...
 	DEFAULT = time.Duration(0)
@@ -40,7 +42,8 @@ type CStore interface {
 	Flush() error
 }
 
-type responseCache struct {
+// ResponseCache ...
+type ResponseCache struct {
 	Status int
 	Header http.Header
 	Data   []byte
@@ -87,7 +90,7 @@ func (w *cachedWriter) Write(data []byte) (int, error) {
 	if err == nil {
 		//cache response
 		store := w.store
-		val := responseCache{
+		val := ResponseCache{
 			w.status,
 			w.Header(),
 			data,
@@ -103,7 +106,7 @@ func (w *cachedWriter) Write(data []byte) (int, error) {
 // Cache Middleware
 func Cache(store CStore, expire time.Duration) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var cache responseCache
+		var cache ResponseCache
 		key := cacheKey(pageCachePrefix, ctx.Request.URL.RequestURI())
 		if err := store.Get(key, &cache); err == nil {
 			for k, vals := range cache.Header {

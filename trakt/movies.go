@@ -3,7 +3,6 @@ package trakt
 import (
 	"fmt"
 	"math/rand"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -87,7 +86,7 @@ func GetMovie(ID string) (movie *Movie) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.movie.%s", ID)
 	if err := cacheStore.Get(key, &movie); err != nil {
 		resp, err := Get(endPoint, params)
@@ -160,7 +159,7 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.movies.%s.%s", topCategory, page)
 	totalKey := fmt.Sprintf("com.trakt.movies.%s.total", topCategory)
 	if err := cacheStore.Get(key, &movies); err != nil {
@@ -225,7 +224,7 @@ func WatchlistMovies() (movies []*Movies, err error) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := "com.trakt.movies.watchlist"
 	if err := cacheStore.Get(key, &movies); err != nil {
 		resp, err := GetWithAuth(endPoint, params)
@@ -270,7 +269,7 @@ func CollectionMovies() (movies []*Movies, err error) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := "com.trakt.movies.collection"
 	if errGet := cacheStore.Get(key, &movies); errGet != nil {
 		resp, errGet := GetWithAuth(endPoint, params)
@@ -348,7 +347,7 @@ func ListItemsMovies(listID string, withImages bool) (movies []*Movies, err erro
 
 	var resp *napping.Response
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	full := ""
 	if withImages {
 		full = ".full"
@@ -407,7 +406,7 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	endPointKey := strings.Replace(endPoint, "/", ".", -1)
 	key := fmt.Sprintf("com.trakt.mymovies.%s.%s", endPointKey, page)
 	totalKey := fmt.Sprintf("com.trakt.mymovies.%s.total", endPointKey)

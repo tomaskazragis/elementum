@@ -3,7 +3,6 @@ package trakt
 import (
 	"fmt"
 	"math/rand"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -87,7 +86,7 @@ func GetShow(ID string) (show *Show) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.show.%s", ID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
@@ -112,7 +111,7 @@ func GetShowByTMDB(tmdbID string) (show *Show) {
 
 	params := napping.Params{}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.show.tmdb.%s", tmdbID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
@@ -135,7 +134,7 @@ func GetShowByTVDB(tvdbID string) (show *Show) {
 
 	params := napping.Params{}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.show.tvdb.%s", tvdbID)
 	if err := cacheStore.Get(key, &show); err != nil {
 		resp, err := Get(endPoint, params)
@@ -158,7 +157,7 @@ func GetEpisode(id string) (episode *Episode) {
 
 	params := napping.Params{}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.episode.%s", id)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
@@ -181,7 +180,7 @@ func GetEpisodeByTMDB(tmdbID string) (episode *Episode) {
 
 	params := napping.Params{}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.episode.tmdb.%s", tmdbID)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
@@ -204,7 +203,7 @@ func GetEpisodeByTVDB(tvdbID string) (episode *Episode) {
 
 	params := napping.Params{}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.episode.tvdb.%s", tvdbID)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
@@ -267,7 +266,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.shows.%s.%s", topCategory, page)
 	totalKey := fmt.Sprintf("com.trakt.shows.%s.total", topCategory)
 	if err := cacheStore.Get(key, &shows); err != nil {
@@ -332,7 +331,7 @@ func WatchlistShows() (shows []*Shows, err error) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := "com.trakt.shows.watchlist"
 	if err := cacheStore.Get(key, &shows); err != nil {
 		resp, err := GetWithAuth(endPoint, params)
@@ -378,7 +377,7 @@ func CollectionShows() (shows []*Shows, err error) {
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := "com.trakt.shows.collection"
 	if err := cacheStore.Get(key, &shows); err != nil {
 		resp, err := GetWithAuth(endPoint, params)
@@ -419,7 +418,7 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 
 	var resp *napping.Response
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	full := ""
 	if withImages {
 		full = ".full"
@@ -475,7 +474,7 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 		"extended": "full,images",
 	}.AsUrlValues()
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	endPointKey := strings.Replace(endPoint, "/", ".", -1)
 	key := fmt.Sprintf("com.trakt.myshows.%s.%s", endPointKey, page)
 	totalKey := fmt.Sprintf("com.trakt.myshows.%s.total", endPointKey)

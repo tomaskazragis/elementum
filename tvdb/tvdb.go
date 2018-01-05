@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
-	"github.com/elgatito/elementum/config"
 )
+
+//go:generate msgp -o msgp.go -io=false -tests=false
 
 const (
 	tvdbURL                 = "http://thetvdb.com"
@@ -204,7 +204,7 @@ func getShow(tvdbID int, language string) (*Show, error) {
 // GetShow ...
 func GetShow(tvdbID int, language string) (*Show, error) {
 	var show *Show
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tvdb.show.%d.%s", tvdbID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
 		newShow, err := getShow(tvdbID, language)

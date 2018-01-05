@@ -3,7 +3,6 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
-	"path"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -16,7 +15,7 @@ import (
 // GetEpisode ...
 func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string) *Episode {
 	var episode *Episode
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.episode.%d.%d.%d.%s", showID, seasonNumber, episodeNumber, language)
 	if err := cacheStore.Get(key, &episode); err != nil {
 		rl.Call(func() error {

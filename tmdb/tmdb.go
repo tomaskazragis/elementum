@@ -3,7 +3,6 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +14,8 @@ import (
 	"github.com/jmcvetta/napping"
 	"github.com/op/go-logging"
 )
+
+//go:generate msgp -o msgp.go -io=false -tests=false
 
 const (
 	// PagesAtOnce ...
@@ -420,7 +421,7 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 func Find(externalID string, externalSource string) *FindResult {
 	var result *FindResult
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.find.%s.%s", externalSource, externalID)
 	if err := cacheStore.Get(key, &result); err != nil {
 		rl.Call(func() error {

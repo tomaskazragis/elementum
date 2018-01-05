@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -22,7 +21,7 @@ func inMoviesWatchlist(tmdbID int) bool {
 
 	var movies []*trakt.Movies
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.watchlist.movies")
 	if err := cacheStore.Get(key, &movies); err != nil {
 		movies, _ = trakt.WatchlistMovies()
@@ -44,7 +43,7 @@ func inShowsWatchlist(tmdbID int) bool {
 
 	var shows []*trakt.Shows
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.watchlist.shows")
 	if err := cacheStore.Get(key, &shows); err != nil {
 		shows, _ = trakt.WatchlistShows()
@@ -66,7 +65,7 @@ func inMoviesCollection(tmdbID int) bool {
 
 	var movies []*trakt.Movies
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.collection.movies")
 	if err := cacheStore.Get(key, &movies); err != nil {
 		movies, _ = trakt.CollectionMovies()
@@ -88,7 +87,7 @@ func inShowsCollection(tmdbID int) bool {
 
 	var shows []*trakt.Shows
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.collection.shows")
 	if err := cacheStore.Get(key, &shows); err != nil {
 		shows, _ = trakt.CollectionShows()

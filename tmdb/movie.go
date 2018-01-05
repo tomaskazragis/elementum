@@ -3,7 +3,6 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +26,7 @@ func (a ByPopularity) Less(i, j int) bool { return a[i].Popularity < a[j].Popula
 // GetImages ...
 func GetImages(movieID int) *Images {
 	var images *Images
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.movie.%d.images", movieID)
 	if err := cacheStore.Get(key, &images); err != nil {
 		rl.Call(func() error {
@@ -69,7 +68,7 @@ func GetMovie(tmdbID int, language string) *Movie {
 // GetMovieByID ...
 func GetMovieByID(movieID string, language string) *Movie {
 	var movie *Movie
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.movie.%s.%s", movieID, language)
 	if err := cacheStore.Get(key, &movie); err != nil {
 		rl.Call(func() error {
@@ -135,7 +134,7 @@ func GetMovies(tmdbIds []int, language string) Movies {
 func GetMovieGenres(language string) []*Genre {
 	genres := GenreList{}
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.genres.movies.%s", language)
 	if err := cacheStore.Get(key, &genres); err != nil {
 		rl.Call(func() error {
@@ -217,7 +216,7 @@ func GetIMDBList(listID string, language string, page int) (movies Movies, total
 	limit := resultsPerPage * PagesAtOnce
 	pageGroup := (page-1)*resultsPerPage/limit + 1
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.imdb.list.%s.%d", listID, pageGroup)
 	totalKey := fmt.Sprintf("com.imdb.list.%s.total", listID)
 	if err := cacheStore.Get(key, &movies); err != nil {
@@ -279,7 +278,7 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 
 	movies := make(Movies, limit)
 
-	cacheStore := cache.NewFileStore(path.Join(config.Get().ProfilePath, "cache"))
+	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%d", cacheKey, genre, pageGroup)
 	totalKey := fmt.Sprintf("com.tmdb.topmovies.%s.%s.total", cacheKey, genre)
 	if err := cacheStore.Get(key, &movies); err != nil {
