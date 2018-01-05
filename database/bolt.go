@@ -13,11 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
+	bolt "github.com/coreos/bbolt"
+	"github.com/op/go-logging"
+
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-	"github.com/op/go-logging"
 )
 
 type callBack func([]byte, []byte)
