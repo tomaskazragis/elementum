@@ -294,6 +294,22 @@ func (database *Database) CacheCleanup() {
 	}
 }
 
+// DeleteWithPrefix ...
+func (database *Database) DeleteWithPrefix(bucket []byte, prefix []byte) {
+	toRemove := []string{}
+	database.ForEach(bucket, func(key []byte, v []byte) error {
+		if bytes.HasPrefix(key, prefix) {
+			toRemove = append(toRemove, string(key))
+		}
+
+		return nil
+	})
+
+	if len(toRemove) > 0 {
+		database.BatchDelete(bucket, toRemove)
+	}
+}
+
 //
 //	Callback operations
 //
