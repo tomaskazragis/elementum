@@ -16,7 +16,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/xbmc"
 
-	"github.com/boltdb/bolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/op/go-logging"
 )
 
