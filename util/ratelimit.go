@@ -67,15 +67,6 @@ func (r *RateLimiter) ForceWait() {
 	r.Wait()
 }
 
-// ForceWaitWithTimeout is sleeping for N duration and then forcing wait reset
-func (r *RateLimiter) ForceWaitWithTimeout(timeout time.Duration) {
-	r.mtx.Lock()
-	time.Sleep(timeout)
-	r.mtx.Unlock()
-
-	r.ForceWait()
-}
-
 // Try returns true if under the rate limit, or false if over and the
 // remaining time before the rate limit expires.
 func (r *RateLimiter) Try() (ok bool, remaining time.Duration) {
@@ -110,10 +101,8 @@ func (r *RateLimiter) CoolDown(headers http.Header) {
 			return
 		}
 
-		log.Debugf("Met a cooldown, sleeping for %#v seconds. Headers: %#v", coolDown, headers)
-
 		r.mtx.Lock()
-		defer r.mtx.Unlock()
+		log.Debugf("Met a cooldown, sleeping for %#v seconds. Headers: %#v", coolDown, headers)
 
 		// Marking we are going to sleep, so other can see and just return an error
 		// to avoid many sleeps
@@ -124,7 +113,10 @@ func (r *RateLimiter) CoolDown(headers http.Header) {
 		if coolDown == 0 {
 			timeout = time.Duration(300) * time.Millisecond
 		}
-		r.ForceWaitWithTimeout(timeout)
+		time.Sleep(timeout)
+		r.mtx.Unlock()
+
+		r.ForceWait()
 		r.coolDown = false
 	}
 }
