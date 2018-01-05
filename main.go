@@ -2,6 +2,7 @@ package main
 
 import (
 	// _ "net/http/pprof"
+
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -85,6 +86,12 @@ func main() {
 		return
 	}
 
+	cacheDb, errCache := database.InitCacheDB(conf)
+	if errCache != nil {
+		log.Error(errCache)
+		return
+	}
+
 	api.InitDB()
 	bittorrent.InitDB()
 
@@ -94,7 +101,10 @@ func main() {
 		log.Info("Shutting down...")
 		api.CloseLibrary()
 		btService.Close(true)
+
 		db.Close()
+		cacheDb.Close()
+
 		log.Info("Goodbye")
 		os.Exit(0)
 	}
@@ -138,6 +148,7 @@ func main() {
 	go api.LibraryUpdate()
 	go api.LibraryListener()
 	go trakt.TokenRefreshHandler()
+	go db.MaintenanceRefreshHandler()
 
 	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
 

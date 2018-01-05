@@ -37,10 +37,10 @@ type Database struct {
 }
 
 var (
-	databaseFileName = "library.db"
-	backupFileName   = "library-backup.db"
-	databasePath     = ""
-	backupPath       = ""
+	databaseFileName    = "library.db"
+	backupFileName      = "library-backup.db"
+	cacheFileName       = "cache.db"
+	backupCacheFileName = "cache-backup.db"
 )
 
 var (
@@ -54,6 +54,9 @@ var (
 	TorrentHistoryBucket = []byte("TorrentHistory")
 	// SearchCacheBucket ...
 	SearchCacheBucket = []byte("SearchCache")
+
+	// CommonBucket ...
+	CommonBucket = []byte("Common")
 )
 
 // Buckets ...
@@ -65,32 +68,24 @@ var Buckets = [][]byte{
 	SearchCacheBucket,
 }
 
+// CacheBuckets represents buckets in Cache database
+var CacheBuckets = [][]byte{
+	CommonBucket,
+}
+
 var (
-	databaseLog = logging.MustGetLogger("database")
-	quit        chan struct{}
-	database    *Database
-	once        sync.Once
+	databaseLog   = logging.MustGetLogger("database")
+	quit          chan struct{}
+	database      *Database
+	cacheDatabase *Database
+	once          sync.Once
 )
 
 // InitDB ...
 func InitDB(conf *config.Configuration) (*Database, error) {
-	databasePath = filepath.Join(conf.Info.Profile, databaseFileName)
-	backupPath = filepath.Join(conf.Info.Profile, backupFileName)
-
-	defer func() {
-		if r := recover(); r != nil {
-			RestoreBackup()
-			os.Exit(1)
-		}
-	}()
-
-	db, err := bolt.Open(databasePath, 0600, &bolt.Options{
-		ReadOnly: false,
-		Timeout:  15 * time.Second,
-	})
-	if err != nil {
-		databaseLog.Warningf("Could not open database at %s: %s", databasePath, err.Error())
-		return nil, err
+	db, err := CreateDB(conf, databaseFileName, backupFileName)
+	if err != nil || db == nil {
+		return nil, errors.New("database not created")
 	}
 
 	database = &Database{db: db}
@@ -107,6 +102,51 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 	return database, nil
 }
 
+// InitCacheDB ...
+func InitCacheDB(conf *config.Configuration) (*Database, error) {
+	db, err := CreateDB(conf, cacheFileName, backupCacheFileName)
+	if err != nil || db == nil {
+		return nil, errors.New("database not created")
+	}
+
+	cacheDatabase = &Database{db: db}
+	quit = make(chan struct{}, 1)
+
+	for _, bucket := range CacheBuckets {
+		if err = cacheDatabase.CheckBucket(bucket); err != nil {
+			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+			databaseLog.Error(err)
+			return cacheDatabase, err
+		}
+	}
+
+	return cacheDatabase, nil
+}
+
+// CreateDB ...
+func CreateDB(conf *config.Configuration, fileName string, backupFileName string) (*bolt.DB, error) {
+	databasePath := filepath.Join(conf.Info.Profile, fileName)
+	backupPath := filepath.Join(conf.Info.Profile, backupFileName)
+
+	defer func() {
+		if r := recover(); r != nil {
+			RestoreBackup(databasePath, backupPath)
+			os.Exit(1)
+		}
+	}()
+
+	db, err := bolt.Open(databasePath, 0600, &bolt.Options{
+		ReadOnly: false,
+		Timeout:  15 * time.Second,
+	})
+	if err != nil {
+		databaseLog.Warningf("Could not open database at %s: %s", databasePath, err.Error())
+		return nil, err
+	}
+
+	return db, nil
+}
+
 // NewDB ...
 func NewDB() (*Database, error) {
 	if database == nil {
@@ -114,6 +154,16 @@ func NewDB() (*Database, error) {
 	}
 
 	return database, nil
+}
+
+// Get returns common database
+func Get() *Database {
+	return database
+}
+
+// GetCache returns Cache database
+func GetCache() *Database {
+	return cacheDatabase
 }
 
 // Close ...
@@ -133,32 +183,40 @@ func (database *Database) CheckBucket(bucket []byte) error {
 
 // MaintenanceRefreshHandler ...
 func (database *Database) MaintenanceRefreshHandler() {
-	database.CreateBackup()
-	database.CacheCleanup()
+	backupPath := filepath.Join(config.Get().Info.Profile, backupFileName)
+	cacheBackupPath := filepath.Join(config.Get().Info.Profile, backupCacheFileName)
+
+	database.CreateBackup(backupPath)
+	cacheDatabase.CreateBackup(cacheBackupPath)
+
+	// database.CacheCleanup()
 
 	tickerBackup := time.NewTicker(1 * time.Hour)
 	defer tickerBackup.Stop()
 
-	tickerCache := time.NewTicker(1 * time.Hour)
-	defer tickerCache.Stop()
+	// tickerCache := time.NewTicker(1 * time.Hour)
+	// defer tickerCache.Stop()
 	defer close(quit)
 
 	for {
 		select {
 		case <-tickerBackup.C:
-			go database.CreateBackup()
-		case <-tickerCache.C:
-			go database.CacheCleanup()
+			go func() {
+				database.CreateBackup(backupPath)
+				cacheDatabase.CreateBackup(cacheBackupPath)
+			}()
+		// case <-tickerCache.C:
+		// 	go database.CacheCleanup()
 		case <-quit:
 			tickerBackup.Stop()
-			tickerCache.Stop()
+			// tickerCache.Stop()
 			return
 		}
 	}
 }
 
 // RestoreBackup ...
-func RestoreBackup() {
+func RestoreBackup(databasePath string, backupPath string) {
 	databaseLog.Debug("Restoring backup")
 
 	// Remove existing library.db if needed
@@ -202,7 +260,7 @@ func RestoreBackup() {
 }
 
 // CreateBackup ...
-func (database *Database) CreateBackup() {
+func (database *Database) CreateBackup(backupPath string) {
 	if err := database.CheckBucket(LibraryBucket); err == nil {
 		database.db.View(func(tx *bolt.Tx) error {
 			tx.CopyFile(backupPath, 0600)
