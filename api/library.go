@@ -130,9 +130,9 @@ func clearPageCache(ctx *gin.Context) {
 	if ctx != nil {
 		ctx.Abort()
 	}
-	files, _ := filepath.Glob(filepath.Join(config.Get().Info.Profile, "cache", "page.*"))
-	for _, file := range files {
-		os.Remove(file)
+	cacheDB := database.GetCache()
+	if cacheDB != nil {
+		cacheDB.DeleteWithPrefix(database.CommonBucket, []byte("page."))
 	}
 	xbmc.Refresh()
 }

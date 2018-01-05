@@ -2,13 +2,12 @@ package api
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -203,8 +202,8 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Movie added to watchlist", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
 	}
 }
@@ -219,8 +218,8 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Movie removed from watchlist", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.movies"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.watchlist"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.watchlist"))
 		clearPageCache(ctx)
 	}
 }
@@ -235,8 +234,8 @@ func AddShowToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed %d", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Show added to watchlist", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
 	}
 }
@@ -251,8 +250,8 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Show removed from watchlist", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.watchlist.shows"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.watchlist"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.watchlist"))
 		clearPageCache(ctx)
 	}
 }
@@ -267,8 +266,8 @@ func AddMovieToCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Movie added to collection", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.collection"))
 		clearPageCache(ctx)
 	}
 }
@@ -283,8 +282,8 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Movie removed from collection", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.movies"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.movies.collection"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.collection"))
 		clearPageCache(ctx)
 	}
 }
@@ -299,8 +298,8 @@ func AddShowToCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Show added to collection", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.collection"))
 		clearPageCache(ctx)
 	}
 }
@@ -315,8 +314,8 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", fmt.Sprintf("Failed with %d status code", resp.Status()), config.AddonIcon())
 	} else {
 		xbmc.Notify("Elementum", "Show removed from collection", config.AddonIcon())
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.collection.shows"))
-		os.Remove(filepath.Join(config.Get().Info.Profile, "cache", "com.trakt.shows.collection"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))
+		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.collection"))
 		clearPageCache(ctx)
 	}
 }
