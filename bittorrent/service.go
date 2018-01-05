@@ -441,7 +441,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		}
 	}
 
-	log.Debugf("Making new torrent item: %#v, th: %#v", uri, torrentHandle)
+	log.Debugf("Making new torrent item with url = '%#v'", uri)
 	torrent := NewTorrent(s, torrentHandle, uri)
 	if s.config.ConnectionsLimit > 0 {
 		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)
