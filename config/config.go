@@ -317,8 +317,10 @@ func Reload() *Configuration {
 		newConfig.KeepDownloading = 2
 		newConfig.KeepFilesFinished = 2
 		newConfig.KeepFilesPlaying = 2
-		newConfig.LimitAfterBuffering = false
+
+		// TODO: Do we need this?
 		newConfig.SeedTimeLimit = 0
+		// newConfig.LimitAfterBuffering = false
 	}
 
 	lock.Lock()

@@ -151,8 +151,11 @@ func NewBTService() *BTService {
 		Torrents: map[string]*Torrent{},
 
 		// TODO: cleanup when limiting is finished
-		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
-		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<16),
+
+		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
+		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 0),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
 
@@ -769,7 +772,7 @@ func (s *BTService) SetDownloadLimit(i int) {
 		// s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
 		s.DownloadLimiter.SetLimit(rate.Inf)
 	} else {
-		// s.DownloadLimiter = rate.NewLimiter(rate.Limit(i), 2<<18)
+		// s.DownloadLimiter = rate.NewLimiter(rate.Limit(i), 2<<13)
 		s.DownloadLimiter.SetLimit(rate.Limit(i))
 	}
 }
