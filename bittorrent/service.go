@@ -709,7 +709,9 @@ func (s *BTService) downloadProgress() {
 					if s.dialogProgressBG == nil {
 						s.dialogProgressBG = xbmc.NewDialogProgressBG("Elementum", "")
 					}
-					s.dialogProgressBG.Update(showProgress, "Elementum", showTorrent)
+					if s.dialogProgressBG != nil {
+						s.dialogProgressBG.Update(showProgress, "Elementum", showTorrent)
+					}
 				}
 			} else if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
