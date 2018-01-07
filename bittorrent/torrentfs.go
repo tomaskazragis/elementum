@@ -39,7 +39,7 @@ func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 				Ctx: r.Context(),
 			},
 			Seeker: fr.Reader,
-		}, fr.File.Offset(), fr.File.Length())
+		}, 0, fr.File.Length())
 
 		defer fr.Close()
 		http.ServeContent(w, r, url, time.Time{}, rs)

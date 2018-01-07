@@ -463,7 +463,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.muBuffer.Unlock()
 
-	log.Debugf("Setting buffer for file: %s (%#v / %#v). Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v ", file.DisplayPath(), file.Length(), file.Torrent().Length(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset)
+	log.Debugf("Setting buffer for file: %s (%#v / %#v). Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v (%#v)", file.DisplayPath(), file.Length(), file.Torrent().Length(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset, file.Offset())
 
 	t.Service.SetBufferingLimits()
 
@@ -551,6 +551,10 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 		size = t.Torrent.Length() - offset
 	}
 
+	offset -= f.Offset()
+	if offset < 0 {
+		offset = 0
+	}
 	return
 }
 
@@ -660,7 +664,6 @@ func (t *Torrent) GetProgress() float64 {
 func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
-	log.Debugf("Offset: %#v", f.Offset())
 	if t.Storage() != nil && t.Service.config.DownloadStorage != estorage.StorageMemory {
 		f.Download()
 	}

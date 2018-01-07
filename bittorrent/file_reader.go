@@ -14,7 +14,7 @@ import (
 
 // FileReader ...
 type FileReader struct {
-	*gotorrent.Reader
+	gotorrent.Reader
 	*gotorrent.File
 	*Torrent
 
@@ -27,7 +27,7 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	fr := &FileReader{
-		Reader:  t.Torrent.NewReader(),
+		Reader:  f.NewReader(),
 		File:    f,
 		Torrent: t,
 
