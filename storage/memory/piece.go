@@ -192,7 +192,7 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 
 	n = copy(b, p.c.buffers[p.Position][off:][:])
 	if n != requested {
-		log.Debugf("No matched read: %#v", p.Index)
+		log.Debugf("Not matched requested size(%#v of %#v): %#v", n, requested, p.Index)
 		return 0, io.EOF
 	}
 
