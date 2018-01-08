@@ -89,7 +89,7 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 	}
 
 	database = &Database{db: db}
-	quit = make(chan struct{}, 1)
+	quit = make(chan struct{}, 2)
 
 	for _, bucket := range Buckets {
 		if err = database.CheckBucket(bucket); err != nil {
@@ -196,7 +196,7 @@ func (database *Database) MaintenanceRefreshHandler() {
 
 	// tickerCache := time.NewTicker(1 * time.Hour)
 	// defer tickerCache.Stop()
-	defer close(quit)
+	// defer close(quit)
 
 	for {
 		select {
