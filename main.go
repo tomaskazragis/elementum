@@ -6,9 +6,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
@@ -134,6 +136,19 @@ func main() {
 	}))
 
 	xbmc.Notify("Elementum", "LOCALIZE[30208]", config.AddonIcon())
+
+	sigc := make(chan os.Signal, 2)
+	signal.Notify(sigc,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+
+	go func() {
+		// s := <-sigc
+		<-sigc
+		shutdown()
+	}()
 
 	go func() {
 		if !wasFirstRun {
