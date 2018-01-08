@@ -217,11 +217,11 @@ func (s *BTService) configure() {
 		}
 	}
 
-	if completion, err := storage.NewBoltPieceCompletion(s.config.ProfilePath); err == nil {
-		s.PieceCompletion = completion
-	} else {
-		s.PieceCompletion = storage.NewMapPieceCompletion()
-	}
+	// if completion, err := storage.NewBoltPieceCompletion(s.config.ProfilePath); err == nil {
+	// 	s.PieceCompletion = completion
+	// } else {
+	s.PieceCompletion = storage.NewMapPieceCompletion()
+	// }
 
 	if s.config.ListenAutoDetect {
 		s.ListenAddr = "0.0.0.0:0"
@@ -316,6 +316,7 @@ func (s *BTService) configure() {
 		os.Exit(1)
 	} else {
 		log.Debugf("Created bit client: %#v", s.Client)
+		log.Debugf("Client listening on: %s", s.Client.ListenAddr().String())
 	}
 }
 
@@ -334,8 +335,14 @@ func (s *BTService) stopServices() {
 	log.Debugf("Resetting RPC")
 	xbmc.ResetRPC()
 
-	log.Debugf("Closing Client")
+	if s.PieceCompletion != nil {
+		if errClose := s.PieceCompletion.Close(); errClose != nil {
+			log.Debugf("Cannot close piece completion: %#v", errClose)
+		}
+	}
 	if s.Client != nil {
+
+		log.Debugf("Closing Client")
 		s.Client.Close()
 		s.Client = nil
 	}
