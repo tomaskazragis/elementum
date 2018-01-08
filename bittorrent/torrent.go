@@ -702,7 +702,17 @@ func (t *Torrent) Drop(removeFiles bool) {
 			path := filepath.Join(t.Service.ClientConfig.DataDir, f)
 			if _, err := os.Stat(path); err == nil {
 				log.Infof("Deleting torrent file at %s", path)
-				os.Remove(path)
+				go func() {
+					// Try to delete in N attemps
+					// this is because of opened handles on files which silently goes by
+					// so we try until rm fails
+					for i := 1; i <= 4; i++ {
+						if errRm := os.Remove(path); errRm != nil {
+							break
+						}
+						time.Sleep(time.Duration(i) * time.Second)
+					}
+				}()
 			}
 		}
 	}
