@@ -179,6 +179,13 @@ func DialogConfirm(title string, message string) bool {
 	return retVal != 0
 }
 
+// DialogText ...
+func DialogText(title string, text string) bool {
+	retVal := 0
+	executeJSONRPCEx("Dialog_Text", &retVal, Args{title, text})
+	return retVal != 0
+}
+
 // ListDialog ...
 func ListDialog(title string, items ...string) int {
 	retVal := -1
