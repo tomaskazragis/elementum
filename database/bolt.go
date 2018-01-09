@@ -148,6 +148,7 @@ func CreateDB(conf *config.Configuration, fileName string, backupFileName string
 	db, err := bolt.Open(databasePath, 0600, &bolt.Options{
 		ReadOnly: false,
 		Timeout:  15 * time.Second,
+		NoSync:   true,
 	})
 	if err != nil {
 		databaseLog.Warningf("Could not open database at %s: %s", databasePath, err.Error())

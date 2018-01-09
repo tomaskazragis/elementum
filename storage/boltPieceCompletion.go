@@ -59,6 +59,7 @@ func NewBoltBackedPieceCompletion(dir string) (ret CustomPieceCompletion, err er
 	if err != nil {
 		return
 	}
+	db.NoSync = true
 	ret = &boltBackedPieceCompletion{
 		db: db,
 		m:  map[metainfo.PieceKey]bool{},

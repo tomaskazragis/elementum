@@ -31,6 +31,11 @@ func NewDBStore() *DBStore {
 
 // Set ...
 func (c *DBStore) Set(key string, value interface{}, expires time.Duration) error {
+	// begin := time.Now()
+	// defer func() {
+	// 	log.Debugf("%s set at %s\n", key, time.Now().Sub(begin))
+	// }()
+
 	item := dbStoreItem{
 		Key:     key,
 		Value:   value,
@@ -47,9 +52,10 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) erro
 		return err
 	}
 
-	go c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
+	// go c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
+	return c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
 
-	return nil
+	// return nil
 }
 
 // Add ...
