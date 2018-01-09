@@ -33,7 +33,8 @@ type DWriter struct {
 
 // Database ...
 type Database struct {
-	db *bolt.DB
+	db   *bolt.DB
+	quit chan struct{}
 }
 
 var (
@@ -75,7 +76,6 @@ var CacheBuckets = [][]byte{
 
 var (
 	databaseLog   = logging.MustGetLogger("database")
-	quit          chan struct{}
 	database      *Database
 	cacheDatabase *Database
 	once          sync.Once
@@ -88,8 +88,7 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	database = &Database{db: db}
-	quit = make(chan struct{}, 2)
+	database = &Database{db: db, quit: make(chan struct{}, 1)}
 
 	for _, bucket := range Buckets {
 		if err = database.CheckBucket(bucket); err != nil {
@@ -109,8 +108,7 @@ func InitCacheDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	cacheDatabase = &Database{db: db}
-	quit = make(chan struct{}, 1)
+	cacheDatabase = &Database{db: db, quit: make(chan struct{}, 1)}
 
 	for _, bucket := range CacheBuckets {
 		if err = cacheDatabase.CheckBucket(bucket); err != nil {
@@ -169,7 +167,7 @@ func GetCache() *Database {
 // Close ...
 func (database *Database) Close() {
 	databaseLog.Debug("Closing Database")
-	quit <- struct{}{}
+	database.quit <- struct{}{}
 	database.db.Close()
 }
 
@@ -196,7 +194,8 @@ func (database *Database) MaintenanceRefreshHandler() {
 
 	// tickerCache := time.NewTicker(1 * time.Hour)
 	// defer tickerCache.Stop()
-	// defer close(quit)
+	defer close(database.quit)
+	defer close(cacheDatabase.quit)
 
 	for {
 		select {
@@ -205,11 +204,11 @@ func (database *Database) MaintenanceRefreshHandler() {
 				database.CreateBackup(backupPath)
 				cacheDatabase.CreateBackup(cacheBackupPath)
 			}()
-		// case <-tickerCache.C:
-		// 	go database.CacheCleanup()
-		case <-quit:
-			tickerBackup.Stop()
-			// tickerCache.Stop()
+			// case <-tickerCache.C:
+			// 	go database.CacheCleanup()
+		case <-database.quit:
+			return
+		case <-cacheDatabase.quit:
 			return
 		}
 	}
