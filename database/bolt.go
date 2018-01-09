@@ -88,7 +88,7 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	database = &Database{db: db, quit: make(chan struct{}, 1)}
+	database = &Database{db: db, quit: make(chan struct{}, 2)}
 
 	for _, bucket := range Buckets {
 		if err = database.CheckBucket(bucket); err != nil {
@@ -108,7 +108,7 @@ func InitCacheDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	cacheDatabase = &Database{db: db, quit: make(chan struct{}, 1)}
+	cacheDatabase = &Database{db: db, quit: make(chan struct{}, 2)}
 
 	for _, bucket := range CacheBuckets {
 		if err = cacheDatabase.CheckBucket(bucket); err != nil {
