@@ -164,6 +164,7 @@ func main() {
 	go api.LibraryListener()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()
+	go cacheDb.MaintenanceRefreshHandler()
 
 	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
 

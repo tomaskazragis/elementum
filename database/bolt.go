@@ -33,8 +33,10 @@ type DWriter struct {
 
 // Database ...
 type Database struct {
-	db   *bolt.DB
-	quit chan struct{}
+	db             *bolt.DB
+	quit           chan struct{}
+	fileName       string
+	backupFileName string
 }
 
 var (
@@ -88,7 +90,12 @@ func InitDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	database = &Database{db: db, quit: make(chan struct{}, 2)}
+	database = &Database{
+		db:             db,
+		quit:           make(chan struct{}, 2),
+		fileName:       databaseFileName,
+		backupFileName: backupFileName,
+	}
 
 	for _, bucket := range Buckets {
 		if err = database.CheckBucket(bucket); err != nil {
@@ -108,7 +115,12 @@ func InitCacheDB(conf *config.Configuration) (*Database, error) {
 		return nil, errors.New("database not created")
 	}
 
-	cacheDatabase = &Database{db: db, quit: make(chan struct{}, 2)}
+	cacheDatabase = &Database{
+		db:             db,
+		quit:           make(chan struct{}, 2),
+		fileName:       cacheFileName,
+		backupFileName: backupCacheFileName,
+	}
 
 	for _, bucket := range CacheBuckets {
 		if err = cacheDatabase.CheckBucket(bucket); err != nil {
@@ -181,34 +193,26 @@ func (database *Database) CheckBucket(bucket []byte) error {
 
 // MaintenanceRefreshHandler ...
 func (database *Database) MaintenanceRefreshHandler() {
-	backupPath := filepath.Join(config.Get().Info.Profile, backupFileName)
-	cacheBackupPath := filepath.Join(config.Get().Info.Profile, backupCacheFileName)
+	backupPath := filepath.Join(config.Get().Info.Profile, database.backupFileName)
 
 	database.CreateBackup(backupPath)
-	cacheDatabase.CreateBackup(cacheBackupPath)
 
 	// database.CacheCleanup()
 
 	tickerBackup := time.NewTicker(1 * time.Hour)
 	defer tickerBackup.Stop()
 
-	// tickerCache := time.NewTicker(1 * time.Hour)
-	// defer tickerCache.Stop()
 	defer close(database.quit)
-	defer close(cacheDatabase.quit)
 
 	for {
 		select {
 		case <-tickerBackup.C:
 			go func() {
 				database.CreateBackup(backupPath)
-				cacheDatabase.CreateBackup(cacheBackupPath)
 			}()
 			// case <-tickerCache.C:
 			// 	go database.CacheCleanup()
 		case <-database.quit:
-			return
-		case <-cacheDatabase.quit:
 			return
 		}
 	}
