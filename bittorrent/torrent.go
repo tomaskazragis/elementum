@@ -698,23 +698,30 @@ func (t *Torrent) Drop(removeFiles bool) {
 	t.Torrent.Drop()
 
 	if removeFiles {
-		for _, f := range files {
-			path := filepath.Join(t.Service.ClientConfig.DataDir, f)
-			if _, err := os.Stat(path); err == nil {
-				log.Infof("Deleting torrent file at %s", path)
-				go func() {
-					// Try to delete in N attemps
-					// this is because of opened handles on files which silently goes by
-					// so we try until rm fails
-					for i := 1; i <= 4; i++ {
+		go func() {
+			// Try to delete in N attemps
+			// this is because of opened handles on files which silently goes by
+			// so we try until rm fails
+			for i := 1; i <= 4; i++ {
+				left := 0
+				for _, f := range files {
+					path := filepath.Join(t.Service.ClientConfig.DataDir, f)
+					if _, err := os.Stat(path); err == nil {
+						log.Infof("Deleting torrent file at %s", path)
 						if errRm := os.Remove(path); errRm != nil {
-							break
+							continue
 						}
-						time.Sleep(time.Duration(i) * time.Second)
+						left++
 					}
-				}()
+				}
+
+				if left > 0 {
+					time.Sleep(time.Duration(i) * time.Second)
+				} else {
+					return
+				}
 			}
-		}
+		}()
 	}
 
 	if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
