@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
 
 	fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
@@ -40,6 +41,13 @@ type DummyStorage struct {
 	storage.ClientImpl
 	Type      int
 	readahead int64
+}
+
+// CustomPieceCompletion own override of PieceCompletion
+type CustomPieceCompletion interface {
+	storage.PieceCompletion
+	Attach(metainfo.Hash, *metainfo.Info) error
+	Detach(metainfo.Hash) error
 }
 
 // NewFat32Storage ...

@@ -17,7 +17,6 @@ import (
 	"github.com/anacrolix/dht"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/iplist"
-	"github.com/anacrolix/torrent/storage"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -86,7 +85,7 @@ type BTService struct {
 	Client       *gotorrent.Client
 	ClientConfig *gotorrent.Config
 
-	PieceCompletion storage.PieceCompletion
+	PieceCompletion estorage.CustomPieceCompletion
 	DefaultStorage  estorage.ElementumStorage
 
 	DownloadLimiter *rate.Limiter
@@ -217,11 +216,12 @@ func (s *BTService) configure() {
 		}
 	}
 
-	// if completion, err := storage.NewBoltPieceCompletion(s.config.ProfilePath); err == nil {
-	// 	s.PieceCompletion = completion
-	// } else {
-	s.PieceCompletion = storage.NewMapPieceCompletion()
-	// }
+	if completion, errPC := estorage.NewBoltBackedPieceCompletion(s.config.ProfilePath); errPC == nil {
+		s.PieceCompletion = completion
+	} else {
+		log.Errorf("Cannot initialize PieceCompletion: %#v", errPC)
+		s.PieceCompletion = estorage.NewMapPieceCompletion()
+	}
 
 	if s.config.ListenAutoDetect {
 		s.ListenAddr = "0.0.0.0:0"
