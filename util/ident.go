@@ -11,9 +11,19 @@ import (
 // Version ...
 var Version string
 
+// GetVersion returns version, provided to compiler
+func GetVersion() string {
+	if len(Version) > 0 {
+		return Version[1 : len(Version)-1]
+	}
+
+	// Return Dummy version if none provided by compiler
+	return "v0.0.1"
+}
+
 // DefaultUserAgent ...
 func DefaultUserAgent() string {
-	return fmt.Sprintf("Elementum/%s", Version[1:len(Version)-1])
+	return fmt.Sprintf("Elementum/%s", GetVersion())
 }
 
 // DefaultPeerID return default PeerID

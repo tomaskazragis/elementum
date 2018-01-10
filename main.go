@@ -67,7 +67,7 @@ func main() {
 	logging.SetBackend(logging.NewLogBackend(ioutil.Discard, "", 0), logging.NewLogBackend(os.Stdout, "", 0))
 
 	log.Infof("Starting Elementum daemon")
-	log.Infof("Version: %s Go: %s", util.Version[1:len(util.Version)-1], runtime.Version())
+	log.Infof("Version: %s Go: %s", util.GetVersion(), runtime.Version())
 
 	conf := config.Reload()
 
