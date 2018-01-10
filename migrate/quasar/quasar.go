@@ -234,6 +234,7 @@ func Migrate() (err error) {
 	oldDB, errDB := bolt.Open(pluginDatabase, 0600, &bolt.Options{
 		ReadOnly: false,
 		Timeout:  15 * time.Second,
+		NoSync:   true,
 	})
 	if errDB != nil {
 		log.Debugf("Could not open database at %s: %s", pluginDatabase, errDB.Error())
