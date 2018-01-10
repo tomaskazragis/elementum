@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"errors"
+	"runtime"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -30,7 +31,7 @@ func NewDBStore() *DBStore {
 }
 
 // Set ...
-func (c *DBStore) Set(key string, value interface{}, expires time.Duration) error {
+func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err error) {
 	// begin := time.Now()
 	// defer func() {
 	// 	log.Debugf("%s set at %s\n", key, time.Now().Sub(begin))
@@ -45,6 +46,16 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) erro
 	buf := bytes.NewBuffer(nil)
 	gzWriter, _ := gzip.NewWriterLevel(buf, 1)
 
+	// Recover from marshal errors
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
+
 	if err := msgpack.NewEncoder(gzWriter).Encode(item); err != nil {
 		return err
 	}
@@ -52,10 +63,7 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) erro
 		return err
 	}
 
-	// go c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
 	return c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
-
-	// return nil
 }
 
 // Add ...
@@ -69,13 +77,23 @@ func (c *DBStore) Replace(key string, value interface{}, expires time.Duration) 
 }
 
 // Get ...
-func (c *DBStore) Get(key string, value interface{}) error {
+func (c *DBStore) Get(key string, value interface{}) (err error) {
 	data, errGet := c.db.GetBytes(database.CommonBucket, key)
 	if errGet != nil {
 		return errGet
 	} else if len(data) == 0 {
 		return errors.New("data is empty")
 	}
+
+	// Recover from unmarshal errors
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
 
 	gzReader, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
