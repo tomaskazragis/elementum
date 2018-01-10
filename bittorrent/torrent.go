@@ -161,7 +161,6 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 	log.Debugf("Waiting for information fetched for torrent: %#v", handle.InfoHash().HexString())
 	<-t.GotInfo()
 	log.Debugf("Information fetched for torrent: %#v", handle.InfoHash().HexString())
-	t.Service.PieceCompletion.Attach(handle.InfoHash(), handle.Info())
 
 	return t
 }
@@ -695,10 +694,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 			r.Close()
 		}
 	}
-	ih := t.Torrent.InfoHash()
 	t.Torrent.Drop()
-
-	t.Service.PieceCompletion.Detach(ih)
 
 	if removeFiles {
 		go func() {
