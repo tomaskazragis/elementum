@@ -32,7 +32,7 @@ const (
 	endBufferSize     int64 = 5400276 // ~5.5mb
 	playbackMaxWait         = 30 * time.Second
 	minCandidateSize        = 100 * 1024 * 1024
-	episodeMatchRegex       = "(?i)(^|\\W)(S0*?%[1]dE0*?%[2]d|%[1]dx0*?%[2]d)\\W"
+	episodeMatchRegex       = "(?i)(^|\\W)(S0*?%[1]d\\W?E0*?%[2]d|%[1]dx0*?%[2]d)\\W"
 )
 
 var (
