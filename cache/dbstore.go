@@ -3,7 +3,6 @@ package cache
 import (
 	"bytes"
 	"errors"
-	"runtime"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -49,10 +48,7 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 	// Recover from marshal errors
 	defer func() {
 		if r := recover(); r != nil {
-			if _, ok := r.(runtime.Error); ok {
-				panic(r)
-			}
-			err = r.(error)
+			err = errors.New("Can't encode the value")
 		}
 	}()
 
@@ -88,10 +84,7 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 	// Recover from unmarshal errors
 	defer func() {
 		if r := recover(); r != nil {
-			if _, ok := r.(runtime.Error); ok {
-				panic(r)
-			}
-			err = r.(error)
+			err = errors.New("Can't decode into value")
 		}
 	}()
 
