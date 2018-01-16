@@ -144,22 +144,47 @@ type VideoLibraryMovies struct {
 
 // VideoLibraryMovieItem ...
 type VideoLibraryMovieItem struct {
-	ID         int    `json:"movieid"`
-	Title      string `json:"label"`
-	IMDBNumber string `json:"imdbnumber"`
-	PlayCount  int    `json:"playcount"`
-	File       string `json:"file"`
+	ID         int       `json:"movieid"`
+	Title      string    `json:"label"`
+	IMDBNumber string    `json:"imdbnumber"`
+	PlayCount  int       `json:"playcount"`
+	File       string    `json:"file"`
+	UniqueIDs  UniqueIDs `json:"uniqueid"`
 	Resume     *Resume
 }
 
 // VideoLibraryShows ...
 type VideoLibraryShows struct {
-	Shows []*struct {
-		ID        int    `json:"tvshowid"`
-		Title     string `json:"label"`
-		ScraperID string `json:"imdbnumber"`
-		Episodes  int    `json:"episode"`
-	} `json:"tvshows"`
+	Shows []*VideoLibraryShowItem `json:"tvshows"`
+}
+
+// VideoLibraryShowItem ...
+type VideoLibraryShowItem struct {
+	ID        int       `json:"tvshowid"`
+	Title     string    `json:"label"`
+	ScraperID string    `json:"imdbnumber"`
+	Episodes  int       `json:"episode"`
+	UniqueIDs UniqueIDs `json:"uniqueid"`
+}
+
+// VideoLibrarySeasons ...
+type VideoLibrarySeasons struct {
+	Seasons []*VideoLibrarySeasonItem `json:"seasons"`
+}
+
+// VideoLibrarySeason ...
+type VideoLibrarySeason struct {
+	Episode *VideoLibrarySeasonItem `json:"seasondetails"`
+}
+
+// VideoLibrarySeasonItem ...
+type VideoLibrarySeasonItem struct {
+	ID        int    `json:"seasonid"`
+	Title     string `json:"label"`
+	Season    int    `json:"season"`
+	Episodes  int    `json:"episode"`
+	TVShowID  int    `json:"tvshowid"`
+	PlayCount int    `json:"playcount"`
 }
 
 // VideoLibraryEpisodes ...
@@ -187,7 +212,13 @@ type VideoLibraryEpisodeItem struct {
 
 // UniqueIDs ...
 type UniqueIDs struct {
-	ID string `json:"unknown"`
+	Unknown    string `json:"unknown"`
+	TMDB       string `json:"tmdb"`
+	TVDB       string `json:"tvdb"`
+	IMDB       string `json:"imdb"`
+	TheMovieDB string `json:"themoviedb"`
+	Trakt      string `json:"trakt"`
+	Kodi       int
 }
 
 // Resume ...

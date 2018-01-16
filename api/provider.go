@@ -3,9 +3,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
@@ -21,9 +21,9 @@ type providerDebugResponse struct {
 func ProviderGetMovie(ctx *gin.Context) {
 	tmdbID := ctx.Params.ByName("tmdbId")
 	provider := ctx.Params.ByName("provider")
-	log.Println("Searching links for:", tmdbID)
-	movie := tmdb.GetMovieByID(tmdbID, "en")
-	log.Printf("Resolved %s to %s", tmdbID, movie.Title)
+	log.Infof("Searching links for:", tmdbID)
+	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+	log.Infof("Resolved %s to %s", tmdbID, movie.Title)
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchMovieLinks(movie)
@@ -50,17 +50,17 @@ func ProviderGetEpisode(ctx *gin.Context) {
 	seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 	episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-	log.Println("Searching links for TMDB Id:", showID)
+	log.Infof("Searching links for TMDB Id:", showID)
 
-	show := tmdb.GetShow(showID, "en")
-	season := tmdb.GetSeason(showID, seasonNumber, "en")
+	show := tmdb.GetShow(showID, config.Get().Language)
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
 	if season == nil {
 		ctx.Error(fmt.Errorf("Unable to get season %d", seasonNumber))
 		return
 	}
 	episode := season.Episodes[episodeNumber-1]
 
-	log.Printf("Resolved %d to %s", showID, show.Name)
+	log.Infof("Resolved %d to %s", showID, show.Name)
 
 	searcher := providers.NewAddonSearcher(provider)
 	torrents := searcher.SearchEpisodeLinks(show, episode)

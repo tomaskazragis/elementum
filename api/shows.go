@@ -3,12 +3,12 @@ package api
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
@@ -157,7 +157,7 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 
 		tmdbID := strconv.Itoa(show.ID)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", show.ID))}
-		if _, err := isDuplicateShow(tmdbID); err != nil || isAddedToLibrary(tmdbID, Show) {
+		if _, err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", show.ID))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?merge=true", show.ID))}
@@ -366,7 +366,7 @@ func ShowEpisodes(ctx *gin.Context) {
 }
 
 func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, error) {
-	log.Println("Searching links for TMDB Id:", showID)
+	log.Info("Searching links for TMDB Id:", showID)
 
 	show := tmdb.GetShow(showID, config.Get().Language)
 	if show == nil {
@@ -378,7 +378,7 @@ func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, e
 		return nil, errors.New("Unable to find season")
 	}
 
-	log.Printf("Resolved %d to %s", showID, show.Name)
+	log.Info("Resolved %d to %s", showID, show.Name)
 
 	searchers := providers.GetSeasonSearchers()
 	if len(searchers) == 0 {
@@ -430,9 +430,9 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 			return
 		}
 
-		if torrents := InTorrentsMap(strconv.Itoa(season.ID)); len(torrents) > 0 {
+		if torrent := InTorrentsMap(strconv.Itoa(season.ID)); torrent != nil {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[0].URI,
+				URLForXBMC("/play"), "uri", torrent.URI,
 				"tmdb", strconv.Itoa(season.ID),
 				"library", library,
 				"type", "episode")
@@ -512,7 +512,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 }
 
 func showEpisodeLinks(showID int, seasonNumber int, episodeNumber int) ([]*bittorrent.TorrentFile, error) {
-	log.Println("Searching links for TMDB Id:", showID)
+	log.Info("Searching links for TMDB Id:", showID)
 
 	show := tmdb.GetShow(showID, config.Get().Language)
 	if show == nil {
@@ -526,7 +526,7 @@ func showEpisodeLinks(showID int, seasonNumber int, episodeNumber int) ([]*bitto
 
 	episode := season.Episodes[episodeNumber-1]
 
-	log.Printf("Resolved %d to %s", showID, show.Name)
+	log.Infof("Resolved %d to %s", showID, show.Name)
 
 	searchers := providers.GetEpisodeSearchers()
 	if len(searchers) == 0 {
@@ -601,9 +601,9 @@ func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Han
 			return
 		}
 
-		if torrents := InTorrentsMap(strconv.Itoa(episode.ID)); len(torrents) > 0 {
+		if torrent := InTorrentsMap(strconv.Itoa(episode.ID)); torrent != nil {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[0].URI,
+				URLForXBMC("/play"), "uri", torrent.URI,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),
@@ -737,9 +737,9 @@ func ShowEpisodePlay(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 			return
 		}
 
-		if torrents := InTorrentsMap(strconv.Itoa(episode.ID)); len(torrents) > 0 {
+		if torrent := InTorrentsMap(strconv.Itoa(episode.ID)); torrent != nil {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[0].URI,
+				URLForXBMC("/play"), "uri", torrent.URI,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),

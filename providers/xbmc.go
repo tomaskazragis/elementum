@@ -127,6 +127,7 @@ func NewAddonSearcher(addonID string) *AddonSearcher {
 	}
 }
 
+// TODO: Review search objects and pass real localized titles
 // GetMovieSearchObject ...
 func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObject {
 	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])

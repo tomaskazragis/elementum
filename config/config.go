@@ -320,7 +320,6 @@ func Reload() *Configuration {
 
 		// TODO: Do we need this?
 		newConfig.SeedTimeLimit = 0
-		// newConfig.LimitAfterBuffering = false
 	}
 
 	lock.Lock()

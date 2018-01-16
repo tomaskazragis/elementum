@@ -106,14 +106,14 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 
 func searchHistoryEmpty(historyType string) bool {
 	historyList := SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list"+historyType, &historyList)
+	database.Get().GetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
 	return historyList == nil || len(historyList) == 0
 }
 
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 	historyList := SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list"+historyType, &historyList)
+	database.Get().GetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
 	found := -1
 	for i, v := range historyList {
@@ -134,7 +134,7 @@ func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 		historyList = append(SearchHistory{query}, historyList[:historyMaxSize-1]...)
 	}
 
-	db.SetObject(database.HistoryBucket, "list"+historyType, &historyList)
+	database.Get().SetObject(database.HistoryBucket, "list"+historyType, &historyList)
 
 	xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
 	ctx.String(200, "")
@@ -143,7 +143,7 @@ func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 
 func searchHistoryList(ctx *gin.Context, historyType string) {
 	historyList := &SearchHistory{}
-	db.GetObject(database.HistoryBucket, "list"+historyType, historyList)
+	database.Get().GetObject(database.HistoryBucket, "list"+historyType, historyList)
 
 	urlPrefix := ""
 	if len(historyType) > 0 {

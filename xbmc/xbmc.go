@@ -33,18 +33,19 @@ func VideoLibraryClean() (retVal string) {
 }
 
 // VideoLibraryGetMovies ...
-func VideoLibraryGetMovies() (movies *VideoLibraryMovies) {
+func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 	params := map[string]interface{}{"properties": []interface{}{
 		"imdbnumber",
 		"playcount",
 		"file",
 		"resume",
+		"uniqueid",
 	}}
-	ret := executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
-	if ret != nil {
-		log.Error(ret)
+	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
+	if err != nil {
+		log.Error(err)
 	}
-	return movies
+	return
 }
 
 // PlayerGetActive ...
@@ -71,9 +72,26 @@ func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 }
 
 // VideoLibraryGetShows ...
-func VideoLibraryGetShows() (shows *VideoLibraryShows) {
-	params := map[string]interface{}{"properties": []interface{}{"imdbnumber", "episode"}}
-	err := executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
+	params := map[string]interface{}{
+		"properties": []interface{}{"imdbnumber", "episode", "uniqueid"},
+	}
+	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+	if err != nil {
+		log.Error(err)
+	}
+	return
+}
+
+// VideoLibraryGetSeasons ...
+func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err error) {
+	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
+		"tvshowid",
+		"season",
+		"episode",
+		"playcount",
+	}}
+	err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
 	if err != nil {
 		log.Error(err)
 	}
@@ -81,7 +99,7 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows) {
 }
 
 // VideoLibraryGetEpisodes ...
-func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes) {
+func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err error) {
 	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
 		"tvshowid",
 		"uniqueid",
@@ -91,7 +109,7 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes) {
 		"file",
 		"resume",
 	}}
-	err := executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
 	if err != nil {
 		log.Error(err)
 	}

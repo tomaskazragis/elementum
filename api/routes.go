@@ -13,7 +13,9 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/util"
+
 	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -26,6 +28,8 @@ const (
 	// IndexCacheExpiration ...
 	IndexCacheExpiration = 15 * 24 * time.Hour // 15 days caching for index
 )
+
+var log = logging.MustGetLogger("api")
 
 // Routes ...
 func Routes(btService *bittorrent.BTService) *gin.Engine {
@@ -247,7 +251,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
 
-	r.GET("/notification", Notification(btService))
+	// r.GET("/notification", Notification(btService))
 
 	r.GET("/versions", Versions(btService))
 

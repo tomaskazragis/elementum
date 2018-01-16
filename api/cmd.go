@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
@@ -12,13 +13,19 @@ var cmdLog = logging.MustGetLogger("cmd")
 
 // ClearCache ...
 func ClearCache(ctx *gin.Context) {
-	clearPageCache(ctx)
+	if ctx != nil {
+		ctx.Abort()
+	}
+	library.ClearPageCache()
 	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
 }
 
 // ClearPageCache ...
 func ClearPageCache(ctx *gin.Context) {
-	clearPageCache(ctx)
+	if ctx != nil {
+		ctx.Abort()
+	}
+	library.ClearPageCache()
 }
 
 // ResetClearances ...

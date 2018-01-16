@@ -288,6 +288,7 @@ const (
 	cacheExpiration         = 6 * 24 * time.Hour
 	recentExpiration        = 15 * time.Minute
 	imagesCacheExpiration   = 14 * 24 * time.Hour
+	resolveCacheExpiration  = 14 * 24 * time.Hour
 )
 
 var (
@@ -374,7 +375,7 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 	resultsPerPage := config.Get().ResultsPerPage
 	entities := make([]*Entity, PagesAtOnce*resultsPerPage)
 	params["api_key"] = apiKey
-	params["language"] = "en"
+	params["language"] = config.Get().Language
 
 	wg.Add(PagesAtOnce)
 	for i := 0; i < PagesAtOnce; i++ {
@@ -417,7 +418,6 @@ func ListEntities(endpoint string, params napping.Params) []*Entity {
 }
 
 // Find ...
-// TODO Actually use this somewhere?
 func Find(externalID string, externalSource string) *FindResult {
 	var result *FindResult
 
@@ -436,14 +436,19 @@ func Find(externalID string, externalSource string) *FindResult {
 				nil,
 			)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err)
 				xbmc.Notify("Elementum", "Failed Find call, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warning("Rate limit exceeded finding tmdb item, cooling down...")
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
 			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Find call bad status: %d", resp.Status())
-				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
+				log.Warningf("Bad status finding tmdb item: %d", resp.Status())
 			}
-			cacheStore.Set(key, result, 15*time.Minute)
+
+			if result != nil {
+				cacheStore.Set(key, result, resolveCacheExpiration)
+			}
 
 			return nil
 		})

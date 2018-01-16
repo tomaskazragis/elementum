@@ -2,13 +2,13 @@ package api
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
@@ -200,7 +200,7 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 
 		tmdbID := strconv.Itoa(movie.ID)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movie.ID))}
-		if _, err := isDuplicateMovie(tmdbID); err != nil || isAddedToLibrary(tmdbID, Movie) {
+		if _, err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movie.ID))}
 		}
 
@@ -326,11 +326,11 @@ func SearchMovies(ctx *gin.Context) {
 }
 
 func movieLinks(tmdbID string) []*bittorrent.TorrentFile {
-	log.Println("Searching links for:", tmdbID)
+	log.Info("Searching links for:", tmdbID)
 
 	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 
-	log.Printf("Resolved %s to %s", tmdbID, movie.Title)
+	log.Infof("Resolved %s to %s", tmdbID, movie.Title)
 
 	searchers := providers.GetMovieSearchers()
 	if len(searchers) == 0 {
@@ -390,9 +390,9 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 			return
 		}
 
-		if torrents := InTorrentsMap(tmdbID); len(torrents) > 0 {
+		if torrent := InTorrentsMap(tmdbID); torrent != nil {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[0].URI,
+				URLForXBMC("/play"), "uri", torrent.URI,
 				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")
@@ -502,9 +502,9 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 			return
 		}
 
-		if torrents := InTorrentsMap(tmdbID); len(torrents) > 0 {
+		if torrent := InTorrentsMap(tmdbID); torrent != nil {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[0].URI,
+				URLForXBMC("/play"), "uri", torrent.URI,
 				"tmdb", tmdbID,
 				"library", library,
 				"type", "movie")

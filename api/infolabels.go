@@ -8,6 +8,7 @@ import (
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -109,7 +110,7 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		item := episode.ToListItem(show)
-		if libraryItem := FindEpisodeInLibrary(show, episode); libraryItem != nil {
+		if libraryItem := library.FindEpisodeInLibrary(show, episode); libraryItem != nil {
 			item.Info.DBID = libraryItem.ID
 		}
 
@@ -131,7 +132,7 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		item := movie.ToListItem()
-		if libraryItem := FindMovieInLibrary(movie); libraryItem != nil {
+		if libraryItem := library.FindMovieInLibrary(movie); libraryItem != nil {
 			item.Info.DBID = libraryItem.ID
 		}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -204,7 +205,10 @@ func AddMovieToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Movie added to watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.watchlist"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -220,7 +224,10 @@ func RemoveMovieFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Movie removed from watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.movies"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.watchlist"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -236,7 +243,10 @@ func AddShowToWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Show added to watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.watchlist"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -252,7 +262,10 @@ func RemoveShowFromWatchlist(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Show removed from watchlist", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.watchlist.shows"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.watchlist"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -268,7 +281,10 @@ func AddMovieToCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Movie added to collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.collection"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -284,7 +300,10 @@ func RemoveMovieFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Movie removed from collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.movies"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.movies.collection"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -300,7 +319,10 @@ func AddShowToCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Show added to collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.collection"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -316,7 +338,10 @@ func RemoveShowFromCollection(ctx *gin.Context) {
 		xbmc.Notify("Elementum", "Show removed from collection", config.AddonIcon())
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.collection.shows"))
 		database.GetCache().DeleteWithPrefix(database.CommonBucket, []byte("com.trakt.shows.collection"))
-		clearPageCache(ctx)
+		if ctx != nil {
+			ctx.Abort()
+		}
+		library.ClearPageCache()
 	}
 }
 
@@ -380,7 +405,7 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 
 		tmdbID := strconv.Itoa(movie.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
-		if _, err := isDuplicateMovie(tmdbID); err != nil || isAddedToLibrary(tmdbID, Movie) {
+		if _, err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movie.IDs.TMDB))}
 		}
 
@@ -538,7 +563,7 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 
 		tmdbID := strconv.Itoa(show.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", show.IDs.TMDB))}
-		if _, err := isDuplicateShow(tmdbID); err != nil || isAddedToLibrary(tmdbID, Show) {
+		if _, err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?merge=true", show.IDs.TMDB))}
@@ -808,7 +833,7 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 
 		tmdbID := strconv.Itoa(movie.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movie.IDs.TMDB))}
-		if _, err := isDuplicateMovie(tmdbID); err != nil || isAddedToLibrary(tmdbID, Movie) {
+		if _, err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movie.IDs.TMDB))}
 		}
 
@@ -900,7 +925,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 
 		tmdbID := strconv.Itoa(show.IDs.TMDB)
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", show.IDs.TMDB))}
-		if _, err := isDuplicateShow(tmdbID); err != nil || isAddedToLibrary(tmdbID, Show) {
+		if _, err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", show.IDs.TMDB))}
 		}
 		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?merge=true", show.IDs.TMDB))}
