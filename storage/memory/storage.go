@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/anacrolix/torrent/metainfo"
@@ -8,7 +9,9 @@ import (
 
 	"github.com/op/go-logging"
 
+	"github.com/elgatito/elementum/config"
 	estorage "github.com/elgatito/elementum/storage"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -62,6 +65,11 @@ func (s *Storage) SetReadaheadSize(size int64) {}
 
 // OpenTorrent ...
 func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
+	if !s.haveAvailableMemory() {
+		xbmc.Notify("Elementum", "LOCALIZE[30356]", config.AddonIcon())
+		return nil, errors.New("Not enough free memory")
+	}
+
 	c := &Cache{
 		s:        s,
 		capacity: s.capacity,
@@ -76,4 +84,10 @@ func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (stor
 	s.items[c.id] = c
 
 	return c, nil
+}
+
+// TODO: add checker for memory usage.
+// Use physical free memory or try to detect free to allocate?
+func (s *Storage) haveAvailableMemory() bool {
+	return true
 }
