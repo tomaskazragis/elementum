@@ -120,8 +120,13 @@ func GetShowByTMDB(tmdbID string) (show *Show) {
 			xbmc.Notify("Elementum", "Failed getting Trakt show using TMDB ID, check your logs.", config.AddonIcon())
 			return
 		}
-		if err := resp.Unmarshal(&show); err != nil {
+
+		var results ShowSearchResults
+		if err := resp.Unmarshal(&results); err != nil {
 			log.Warning(err)
+		}
+		if results != nil && len(results) > 0 && results[0].Show != nil {
+			show = results[0].Show
 		}
 		cacheStore.Set(key, show, cacheExpiration)
 	}
@@ -189,8 +194,13 @@ func GetEpisodeByTMDB(tmdbID string) (episode *Episode) {
 			xbmc.Notify("Elementum", "Failed getting Trakt episode using TMDB ID, check your logs.", config.AddonIcon())
 			return
 		}
-		if err := resp.Unmarshal(&episode); err != nil {
+
+		var results EpisodeSearchResults
+		if err := resp.Unmarshal(&results); err != nil {
 			log.Warning(err)
+		}
+		if results != nil && len(results) > 0 && results[0].Episode != nil {
+			episode = results[0].Episode
 		}
 		cacheStore.Set(key, episode, cacheExpiration)
 	}
@@ -541,6 +551,37 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			Thumbnail: show.Images.Thumbnail.Full,
 		},
 	}
+}
+
+// WatchedShows ...
+func WatchedShows() (shows []*WatchedShow, err error) {
+	if err := Authorized(); err != nil {
+		return shows, nil
+	}
+
+	endPoint := "sync/watched/shows"
+
+	params := napping.Params{}.AsUrlValues()
+
+	cacheStore := cache.NewDBStore()
+	key := "com.trakt.episodes.watched"
+	if err := cacheStore.Get(key, &shows); err != nil {
+		resp, err := GetWithAuth(endPoint, params)
+
+		if err != nil {
+			return shows, err
+		} else if resp.Status() != 200 {
+			return shows, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
+		}
+
+		if err := resp.Unmarshal(&shows); err != nil {
+			log.Warning(err)
+		}
+
+		cacheStore.Set(key, shows, watchedExpiration)
+	}
+
+	return
 }
 
 // ToListItem ...

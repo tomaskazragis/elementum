@@ -108,6 +108,34 @@ func GetMovie(ID string) (movie *Movie) {
 	return
 }
 
+// GetMovieByTMDB ...
+func GetMovieByTMDB(tmdbID string) (movie *Movie) {
+	endPoint := fmt.Sprintf("search/tmdb/%s?type=movie", tmdbID)
+
+	params := napping.Params{}.AsUrlValues()
+
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.trakt.movie.tmdb.%s", tmdbID)
+	if err := cacheStore.Get(key, &movie); err != nil {
+		resp, err := Get(endPoint, params)
+		if err != nil {
+			log.Error(err)
+			xbmc.Notify("Elementum", "Failed getting Trakt movie using TMDB ID, check your logs.", config.AddonIcon())
+			return
+		}
+
+		var results MovieSearchResults
+		if err := resp.Unmarshal(&results); err != nil {
+			log.Warning(err)
+		}
+		if results != nil && len(results) > 0 && results[0].Movie != nil {
+			movie = results[0].Movie
+		}
+		cacheStore.Set(key, movie, cacheExpiration)
+	}
+	return
+}
+
 // SearchMovies ...
 func SearchMovies(query string, page string) (movies []*Movies, err error) {
 	endPoint := "search"
@@ -441,6 +469,37 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 		if err := cacheStore.Get(totalKey, &total); err != nil {
 			total = -1
 		}
+	}
+
+	return
+}
+
+// WatchedMovies ...
+func WatchedMovies() (movies []*WatchedMovie, err error) {
+	if err := Authorized(); err != nil {
+		return movies, nil
+	}
+
+	endPoint := "sync/watched/movies"
+
+	params := napping.Params{}.AsUrlValues()
+
+	cacheStore := cache.NewDBStore()
+	key := "com.trakt.movies.watched"
+	if err := cacheStore.Get(key, &movies); err != nil {
+		resp, err := GetWithAuth(endPoint, params)
+
+		if err != nil {
+			return movies, err
+		} else if resp.Status() != 200 {
+			return movies, fmt.Errorf("Bad status getting Trakt watched for movies: %d", resp.Status())
+		}
+
+		if err := resp.Unmarshal(&movies); err != nil {
+			log.Warning(err)
+		}
+
+		cacheStore.Set(key, movies, watchedExpiration)
 	}
 
 	return

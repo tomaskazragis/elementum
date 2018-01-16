@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
@@ -43,6 +45,7 @@ var (
 	cacheExpiration         = 6 * 24 * time.Hour
 	recentExpiration        = 15 * time.Minute
 	userlistExpiration      = 1 * time.Minute
+	watchedExpiration       = 30 * time.Minute
 )
 
 var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
@@ -52,6 +55,28 @@ type Object struct {
 	Title string `json:"title"`
 	Year  int    `json:"year"`
 	IDs   *IDs   `json:"ids"`
+}
+
+// MovieSearchResults ...
+type MovieSearchResults []struct {
+	Type  string      `json:"type"`
+	Score interface{} `json:"score"`
+	Movie *Movie
+}
+
+// ShowSearchResults ...
+type ShowSearchResults []struct {
+	Type  string      `json:"type"`
+	Score interface{} `json:"score"`
+	Show  *Show
+}
+
+// EpisodeSearchResults ...
+type EpisodeSearchResults []struct {
+	Type    string      `json:"type"`
+	Score   interface{} `json:"score"`
+	Episode *Episode
+	Show    *Show
 }
 
 // Movie ...
@@ -317,6 +342,59 @@ type UserSettings struct {
 		Name     string `json:"name"`
 	} `json:"user"`
 	Account struct{} `json:"account"`
+}
+
+// WatchedItem represents possible watched add/delete item
+type WatchedItem struct {
+	MediaType string
+	Movie     int
+	Show      int
+	Season    int
+	Episode   int
+	Watched   bool
+}
+
+// WatchedMovie ...
+type WatchedMovie struct {
+	Plays         int       `json:"plays"`
+	LastWatchedAt time.Time `json:"last_watched_at"`
+	Movie         struct {
+		Title string `json:"title"`
+		Year  int    `json:"year"`
+		Ids   struct {
+			Trakt int    `json:"trakt"`
+			Slug  string `json:"slug"`
+			Imdb  string `json:"imdb"`
+			Tmdb  int    `json:"tmdb"`
+		} `json:"ids"`
+	} `json:"movie"`
+}
+
+// WatchedShow ...
+type WatchedShow struct {
+	Plays         int       `json:"plays"`
+	LastWatchedAt time.Time `json:"last_watched_at"`
+	Show          struct {
+		Title string `json:"title"`
+		Year  int    `json:"year"`
+		Ids   struct {
+			Trakt  int    `json:"trakt"`
+			Slug   string `json:"slug"`
+			Tvdb   int    `json:"tvdb"`
+			Imdb   string `json:"imdb"`
+			Tmdb   int    `json:"tmdb"`
+			Tvrage int    `json:"tvrage"`
+		} `json:"ids"`
+	} `json:"show"`
+	Seasons []struct {
+		Plays    int `json:"plays"`
+		Number   int `json:"number"`
+		Episodes []struct {
+			Number        int       `json:"number"`
+			Plays         int       `json:"plays"`
+			LastWatchedAt time.Time `json:"last_watched_at"`
+		} `json:"episodes"`
+	} `json:"seasons"`
 }
 
 func totalFromHeaders(headers http.Header) (total int, err error) {
@@ -777,6 +855,96 @@ func RemoveFromCollection(itemType string, tmdbID string) (resp *napping.Respons
 	endPoint := "sync/collection/remove"
 	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
 }
+
+// SetWatched addes and removes from watched history
+func SetWatched(item *WatchedItem) (resp *napping.Response, err error) {
+	if err := Authorized(); err != nil {
+		return nil, err
+	}
+
+	pre := `{"movies": [`
+	post := `]}`
+	if item.Movie == 0 {
+		pre = `{"shows": [`
+	}
+
+	query := item.String()
+	endPoint := "sync/history"
+	if !item.Watched {
+		endPoint = "sync/history/remove"
+	}
+
+	return Post(endPoint, bytes.NewBufferString(pre+query+post))
+}
+
+// SetMultipleWatched adds and removes from watched history
+func SetMultipleWatched(items []*WatchedItem) (resp *napping.Response, err error) {
+	if err := Authorized(); err != nil || len(items) == 0 {
+		return nil, err
+	}
+
+	pre := `{"movies": [`
+	post := `]}`
+	if items[0].Movie == 0 {
+		pre = `{"shows": [`
+	}
+
+	queries := []string{}
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		queries = append(queries, item.String())
+	}
+	query := strings.Join(queries, ", ")
+
+	endPoint := "sync/history"
+	if !items[0].Watched {
+		endPoint = "sync/history/remove"
+	}
+
+	cache.NewDBStore().Delete(fmt.Sprintf("com.trakt.%ss.watched", items[0].MediaType))
+
+	log.Debugf("Setting watch state for %d %s items", len(items), items[0].MediaType)
+	return Post(endPoint, bytes.NewBufferString(pre+query+post))
+}
+
+func (item *WatchedItem) String() (query string) {
+	watchedAt := fmt.Sprintf(`"watched_at": "%s",`, time.Now().Format("20060102-15:04:05.000"))
+
+	if item.Movie != 0 {
+		query = fmt.Sprintf(`{ %s "ids": {"tmdb": %d }}`, watchedAt, item.Movie)
+	} else if item.Episode != 0 && item.Season != 0 && item.Show != 0 {
+		query = fmt.Sprintf(`{ "ids": {"tmdb": %d}, "seasons": [{ "number": %d, "episodes": [{%s "number": %d }]}]}`, item.Show, item.Season, watchedAt, item.Episode)
+	} else if item.Season != 0 && item.Show != 0 {
+		query = fmt.Sprintf(`{ "ids": {"tmdb": %d}, "seasons": [{ %s "number": %d }]}`, item.Show, watchedAt, item.Season)
+	} else {
+		query = fmt.Sprintf(`{ "ids": {"tmdb": %d}}`, item.Show)
+	}
+
+	return
+}
+
+// This is commented for future use (if needed)
+// // SetMultipleWatched addes and removes list from watched history
+// func SetMultipleWatched(watched bool, itemType string, tmdbID []string) (resp *napping.Response, err error) {
+// 	if err := Authorized(); err != nil {
+// 		return nil, err
+// 	}
+//
+// 	endPoint := "sync/history"
+// 	if !watched {
+// 		endPoint = "sync/history/remove"
+// 	}
+//
+// 	buf := bytes.NewBuffer([]byte(""))
+// 	buf.WriteString(fmt.Sprintf(`{"%ss": [`, itemType))
+// 	for _, i := range tmdbID {
+// 		buf.WriteString(fmt.Sprintf(`{"ids": {"tmdb": %s}}`, i))
+// 	}
+// 	buf.WriteString(`]}`)
+// 	return Post(endPoint, buf)
+// }
 
 // Scrobble ...
 func Scrobble(action string, contentType string, tmdbID int, watched float64, runtime float64) {
