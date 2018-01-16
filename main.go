@@ -19,6 +19,7 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/lockfile"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
@@ -94,28 +95,33 @@ func main() {
 		return
 	}
 
-	api.InitDB()
-	bittorrent.InitDB()
-
 	btService := bittorrent.NewBTService()
 
-	var shutdown = func() {
+	var shutdown = func(fromSignal bool) {
 		log.Info("Shutting down...")
-		api.CloseLibrary()
+		library.CloseLibrary()
 		btService.Close(true)
 
 		db.Close()
 		cacheDb.Close()
 
 		log.Info("Goodbye")
-		os.Exit(0)
+
+		// If we don't give an exit code - python treat as well done and not
+		// restarting the daemon. So when we come here from Signal -
+		// we should properly exit with non-0 exitcode.
+		if !fromSignal {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
 	}
 
 	var watchParentProcess = func() {
 		for {
 			if os.Getppid() == 1 {
 				log.Warning("Parent shut down, shutting down too...")
-				go shutdown()
+				go shutdown(false)
 				break
 			}
 			time.Sleep(1 * time.Second)
@@ -131,8 +137,11 @@ func main() {
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.Reconfigure()
 	}))
+	http.Handle("/notification", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Notification(w, r, btService)
+	}))
 	http.Handle("/shutdown", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		shutdown()
+		shutdown(false)
 	}))
 
 	xbmc.Notify("Elementum", "LOCALIZE[30208]", config.AddonIcon())
@@ -145,9 +154,8 @@ func main() {
 		syscall.SIGQUIT)
 
 	go func() {
-		// s := <-sigc
 		<-sigc
-		shutdown()
+		shutdown(true)
 	}()
 
 	go func() {
@@ -160,8 +168,7 @@ func main() {
 		xbmc.ResetRPC()
 	}()
 
-	go api.LibraryUpdate()
-	go api.LibraryListener()
+	go library.Init()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
