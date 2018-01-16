@@ -40,9 +40,7 @@ const (
 )
 
 // LocalBroadcasters ...
-var LocalBroadcasters = map[int]*Broadcaster{
-	WATCHED: NewLocalBroadcaster(),
-}
+var LocalBroadcasters = map[int]*Broadcaster{}
 
 // NewBroadcaster creates a new broadcaster with the necessary internal
 // structure. The uninitialized broadcaster is unsuitable to be listened or

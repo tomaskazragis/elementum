@@ -1,77 +1,17 @@
 package bittorrent
 
 import (
-	// "fmt"
-	"bytes"
 	"io"
-	// "math"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
-	// "runtime/debug"
-	// "bytes"
-	// "regexp"
-	// "strings"
-	// "net/url"
-	// "net/http"
-	// "crypto/sha1"
-	// "encoding/hex"
-	// "encoding/json"
-	// "encoding/base32"
-	"path/filepath"
 
-	// "github.com/anacrolix/missinggo/pubsub"
 	gotorrent "github.com/anacrolix/torrent"
-	// "github.com/dustin/go-humanize"
-	// "github.com/elgatito/elementum/cloudhole"
-	// "github.com/elgatito/elementum/config"
-	// "github.com/zeebo/bencode"
 
+	"github.com/elgatito/elementum/database"
 	estorage "github.com/elgatito/elementum/storage"
-	"github.com/elgatito/elementum/xbmc"
 )
-
-const (
-	movieType = "movie"
-	showType  = "show"
-)
-
-const (
-	// StatusQueued ...
-	StatusQueued = iota
-	// StatusChecking ...
-	StatusChecking
-	// StatusFinding ...
-	StatusFinding
-	// StatusPaused ...
-	StatusPaused
-	// StatusBuffering ...
-	StatusBuffering
-	// StatusDownloading ...
-	StatusDownloading
-	// StatusFinished ...
-	StatusFinished
-	// StatusSeeding ...
-	StatusSeeding
-	// StatusAllocating ...
-	StatusAllocating
-	// StatusStalled ...
-	StatusStalled
-)
-
-// StatusStrings ...
-var StatusStrings = []string{
-	"Queued",
-	"Checking",
-	"Finding",
-	"Paused",
-	"Buffering",
-	"Downloading",
-	"Finished",
-	"Seeding",
-	"Allocating",
-	"Stalled",
-}
 
 // Torrent ...
 type Torrent struct {
@@ -97,27 +37,25 @@ type Torrent struct {
 	IsPaused    bool
 	IsBuffering bool
 	IsSeeding   bool
+	// IsDownloadStarted used to mark started downloads to avoid getting
+	// "Checked" status when one piece is in checking state
+	IsDownloadStarted bool
 
 	IsRarArchive bool
 
 	needSeeding bool
-	needDBID    bool
 
-	DBID   int
-	DBTYPE string
-	DBItem *DBItem
+	DBItem *database.BTItem
 
 	mu        *sync.Mutex
 	muBuffer  *sync.RWMutex
 	muSeeding *sync.RWMutex
 
-	lastDownRate   int64
 	downRates      []int64
 	upRates        []int64
 	rateCounter    int
 	downloadedSize int64
 	uploadedSize   int64
-	dbidTries      int
 
 	pieceLength float64
 
@@ -127,7 +65,6 @@ type Torrent struct {
 	progressTicker *time.Ticker
 	bufferTicker   *time.Ticker
 	seedTicker     *time.Ticker
-	dbidTicker     *time.Ticker
 }
 
 // NewTorrent ...
@@ -146,7 +83,6 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		BufferEndPieces:      []int{},
 
 		needSeeding: true,
-		needDBID:    true,
 
 		mu:        &sync.Mutex{},
 		muBuffer:  &sync.RWMutex{},
@@ -155,7 +91,6 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		closing: make(chan struct{}),
 
 		seedTicker: &time.Ticker{},
-		dbidTicker: &time.Ticker{},
 	}
 
 	log.Debugf("Waiting for information fetched for torrent: %#v", handle.InfoHash().HexString())
@@ -175,7 +110,6 @@ func (t *Torrent) Watch() {
 	// log.Debugf("Starting watch timers")
 	// debug.PrintStack()
 
-	detailsTicker := time.NewTicker(5 * time.Second)
 	t.progressTicker = time.NewTicker(1 * time.Second)
 	t.bufferTicker = time.NewTicker(1 * time.Second)
 	t.bufferFinished = make(chan struct{}, 5)
@@ -186,15 +120,11 @@ func (t *Torrent) Watch() {
 	t.downloadedSize = 0
 	t.uploadedSize = 0
 
-	t.dbidTries = 0
-
 	t.pieceLength = float64(t.Torrent.Info().PieceLength)
 
-	defer detailsTicker.Stop()
 	defer t.progressTicker.Stop()
 	defer t.bufferTicker.Stop()
 	defer t.seedTicker.Stop()
-	defer t.dbidTicker.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -205,17 +135,11 @@ func (t *Torrent) Watch() {
 		case <-t.bufferFinished:
 			go t.bufferFinishedEvent()
 
-		case <-detailsTicker.C:
-			go t.detailsEvent()
-
 		case <-t.progressTicker.C:
 			go t.progressEvent()
 
 		case <-t.seedTicker.C:
 			go t.seedTickerEvent()
-
-		case <-t.dbidTicker.C:
-			go t.dbidEvent()
 
 		case <-t.closing:
 			return
@@ -262,11 +186,6 @@ func (t *Torrent) bufferTickerEvent() {
 			progressCount += float64(t.PieceBytesMissing(i))
 		}
 
-		// progressCount := 0.0
-		// for _, v := range t.BufferPiecesProgress {
-		// 	progressCount += v
-		// }
-
 		total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
 		t.BufferProgress = (total - progressCount) / total * 100
 
@@ -276,27 +195,6 @@ func (t *Torrent) bufferTickerEvent() {
 	}
 
 	t.muBuffer.Unlock()
-}
-
-// CleanupBuffer ...
-func (t *Torrent) CleanupBuffer() {
-	// for _, v := range t.BufferEndPieces {
-	// 	t.Storage.RemovePiece(v)
-	// }
-
-	t.BufferEndPieces = []int{}
-}
-
-func (t *Torrent) detailsEvent() {
-	// str := ""
-	// for i := 0; i < t.Torrent.NumPieces(); i++ {
-	// 	st := t.Torrent.PieceState(i)
-	// 	if st.Priority > 0 {
-	// 		str += fmt.Sprintf("%d:%d  ", i, st.Priority)
-	// 	}
-	// }
-	// log.Debugf("Priorities: %s  \n", str)
-	// t.Service.ClientInfo(logWriter{log})
 }
 
 func (t *Torrent) progressEvent() {
@@ -324,37 +222,13 @@ func (t *Torrent) progressEvent() {
 		t.rateCounter = 0
 	}
 
-	if t.lastDownRate == t.downloadedSize {
-		buf := bytes.NewBuffer([]byte{})
-		t.Service.ClientInfo(buf)
-		log.Debug("Download stale. Client state:\n", buf.String())
-	}
-	t.lastDownRate = t.downloadedSize
-
-	// str := ""
-	// for i := 0; i < t.Torrent.NumPieces(); i++ {
-	// 	// for i := 0; i < 50; i++ {
-	// 	st := t.Torrent.PieceState(i)
-	// 	if st.Priority > 0 {
-	// 		str += fmt.Sprintf("%d:%d  ", i, st.Priority)
-	// 	}
+	// if t.lastDownRate == t.downloadedSize {
+	// 	buf := bytes.NewBuffer([]byte{})
+	// 	t.Service.ClientInfo(buf)
+	// 	log.Debug("Download stale. Client state:\n", buf.String())
 	// }
-	// str += "\n"
-	// for i := 0; i < 40; i++ {
-	// 	st := t.Torrent.PieceState(i)
-	// 	// if st.Priority > 0 {
-	// 	str += fmt.Sprintf("%d:%d  ", i, st.Priority)
-	// 	// }
-	// }
-	// log.Debugf("Priorities: %s  \n", str)
-	// log.Debugf("Active readers: %#v", t.readers)
-	// for i, r := range t.readers {
-	// 	log.Debugf("Active reader: %#v = %#v === %#v", i, *r, *r.Reader)
-	// }
+	// t.lastDownRate = t.downloadedSize
 
-	// t.Service.Client.WriteStatus(logWriter{log})
-
-	// log.Debugf("ProgressTicker: %s; %#v/%#v; %#v = %.2f ", t.Name(), t.DownloadRate, t.UploadRate, t.GetStateString(), t.GetProgress())
 	log.Debugf("PR: %#v/%#v; %#v = %.2f ", t.DownloadRate, t.UploadRate, t.GetStateString(), t.GetProgress())
 	if t.needSeeding && t.Service.GetSeedTime() > 0 && t.GetProgress() >= 100 {
 		t.muSeeding.Lock()
@@ -371,20 +245,6 @@ func (t *Torrent) progressEvent() {
 	if t.DBItem == nil {
 		t.GetDBItem()
 	}
-
-	// for i := 0; i < t.Torrent.NumPieces(); i++ {
-	// 	state := t.Torrent.PieceState(i)
-	// 	if state.Priority == 1 {
-	// 		continue
-	// 	} else if state.Priority == 0 {
-	// 		continue
-	// 	}
-	// 	// } else if state.Priority == 0 && state.Complete == false {
-	// 	// 	continue
-	// 	// }
-	//
-	// 	log.Debugf("Piece with priority: %#v, %#v", i, state)
-	// }
 }
 
 func (t *Torrent) bufferFinishedEvent() {
@@ -404,29 +264,6 @@ func (t *Torrent) bufferFinishedEvent() {
 		}
 	}
 	t.bufferReaders = map[string]*FileReader{}
-}
-
-func (t *Torrent) dbidEvent() {
-	t.dbidTries++
-
-	if t.DBID != 0 {
-		t.dbidTicker.Stop()
-		return
-	}
-
-	playerID := xbmc.PlayerGetActive()
-	if playerID == -1 {
-		return
-	}
-
-	if item := xbmc.PlayerGetItem(playerID); item != nil {
-		t.DBID = item.Info.ID
-		t.DBTYPE = item.Info.Type
-
-		t.dbidTicker.Stop()
-	} else if t.dbidTries == 10 {
-		t.dbidTicker.Stop()
-	}
 }
 
 func (t *Torrent) seedTickerEvent() {
@@ -474,52 +311,6 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	t.bufferReaders["post"], _ = NewFileReader(t, file, "")
 	t.bufferReaders["post"].Seek(postBufferOffset, io.SeekStart)
 	t.bufferReaders["post"].SetReadahead(postBufferSize)
-
-	// pieceLength := file.Torrent().Info().PieceLength
-	// bufferPieces := int64(math.Ceil(float64(t.Service.GetBufferSize()) / float64(pieceLength)))
-	//
-	// startPiece, endPiece, _ := t.getFilePiecesAndOffset(file)
-	//
-	// endBufferPiece := startPiece + bufferPieces - 1
-	// endBufferLength := bufferPieces * int64(pieceLength)
-	//
-	// // postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - 5*1024*1024)
-	// postBufferPiece, _ := t.pieceFromOffset(file.Offset() + file.Length() - endBufferSize)
-	// // postBufferOffset := postBufferPiece * int64(pieceLength)
-	// postBufferLength := (endPiece - postBufferPiece + 1) * int64(pieceLength)
-	//
-	// t.muBuffer.Lock()
-	// t.IsBuffering = true
-	// t.BufferProgress = 0
-	// t.BufferLength = endBufferLength + postBufferLength
-	//
-	// for i := startPiece; i <= endBufferPiece; i++ {
-	// 	t.BufferPiecesProgress[int(i)] = 0
-	// }
-	// for i := postBufferPiece; i <= endPiece; i++ {
-	// 	t.BufferPiecesProgress[int(i)] = 0
-	// }
-	//
-	// // if t.Service.GetStorageType() == StorageMemory {
-	// // 	log.Debug("Sending event for initializing memory storage")
-	// // 	t.Service.bufferEvents <- len(t.BufferPiecesProgress)
-	// // }
-	//
-	// t.muBuffer.Unlock()
-	//
-	// log.Debugf("Setting buffer for file: %s. Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v ", file.DisplayPath(), t.Service.GetBufferSize(), startPiece, endBufferPiece, postBufferPiece, endPiece, pieceLength, endBufferLength, postBufferLength, file.Offset())
-	//
-	// t.Service.SetBufferingLimits()
-	//
-	// t.bufferReader = t.NewReader(file, false)
-	// t.bufferReader.Seek(file.Offset(), io.SeekStart)
-	// t.bufferReader.SetReadahead(endBufferLength)
-	// // t.bufferReader.Seek(file.Offset(), os.SEEK_SET)
-	//
-	// t.postReader = t.NewReader(file, false)
-	// t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, io.SeekStart)
-	// t.postReader.SetReadahead(postBufferLength)
-	// // t.postReader.Seek(file.Offset()+file.Length()-postBufferLength, os.SEEK_SET)
 }
 
 func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiece, endPiece int, offset, size int64) {
@@ -573,7 +364,7 @@ func (t *Torrent) GetState() int {
 			continue
 		}
 
-		if state.Checking == true {
+		if !t.IsDownloadStarted && state.Checking == true {
 			return StatusChecking
 		} else if state.Partial == true {
 			havePartial = true
@@ -585,6 +376,7 @@ func (t *Torrent) GetState() int {
 		return StatusQueued
 	} else if progress < 100 {
 		if havePartial {
+			t.IsDownloadStarted = true
 			return StatusDownloading
 		} else if t.BytesCompleted() == 0 {
 			return StatusQueued
@@ -664,6 +456,7 @@ func (t *Torrent) GetProgress() float64 {
 func (t *Torrent) DownloadFile(f *gotorrent.File) {
 	t.ChosenFiles = append(t.ChosenFiles, f)
 	log.Debugf("Choosing file for download: %s", f.DisplayPath())
+	// TODO: Change this in general to be able to use per-torrent storage
 	if t.Storage() != nil && t.Service.config.DownloadStorage != estorage.StorageMemory {
 		f.Download()
 	}
@@ -744,42 +537,9 @@ func (t *Torrent) Resume() {
 	t.IsPaused = false
 }
 
-// GetDBID ...
-func (t *Torrent) GetDBID() {
-	if t.DBID == 0 && t.needDBID == true {
-		log.Debugf("Getting DBID for torrent: %s", t.Name())
-		t.needDBID = false
-		t.dbidTicker = time.NewTicker(10 * time.Second)
-	}
-}
-
 // GetDBItem ...
 func (t *Torrent) GetDBItem() {
 	t.DBItem = t.Service.GetDBItem(t.InfoHash())
-}
-
-// GetPlayingItem ...
-func (t *Torrent) GetPlayingItem() *PlayingItem {
-	if t.DBItem == nil {
-		return nil
-	}
-
-	TMDBID := t.DBItem.ID
-	if t.DBItem.Type != movieType {
-		TMDBID = t.DBItem.ShowID
-	}
-
-	return &PlayingItem{
-		DBID:   t.DBID,
-		DBTYPE: t.DBTYPE,
-
-		TMDBID:  TMDBID,
-		Season:  t.DBItem.Season,
-		Episode: t.DBItem.Episode,
-
-		WatchedTime: WatchedTime,
-		Duration:    VideoDuration,
-	}
 }
 
 func average(xs []int64) float64 {

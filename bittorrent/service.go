@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -27,38 +28,6 @@ import (
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-)
-
-const (
-	// Delete ...
-	Delete = iota
-	// Update ...
-	Update
-	// RemoveFromLibrary ...
-	RemoveFromLibrary
-)
-
-const (
-	// Remove ...
-	Remove = iota
-	// Active ...
-	Active
-)
-
-// DefaultTrackers ...
-var DefaultTrackers = []string{
-	"udp://tracker.opentrackr.org:1337/announce",
-	"udp://tracker.coppersurfer.tk:6969/announce",
-	"udp://tracker.leechers-paradise.org:6969/announce",
-	"udp://tracker.openbittorrent.com:80/announce",
-	"udp://public.popcorn-tracker.org:6969/announce",
-	"udp://explodie.org:6969",
-}
-
-var (
-	db *database.Database
-	// Bucket that represents bittorrent database
-	Bucket = database.BitTorrentBucket
 )
 
 // const (
@@ -82,6 +51,7 @@ var (
 // BTService ...
 type BTService struct {
 	config *config.Configuration
+	mu     sync.Mutex
 
 	Client       *gotorrent.Client
 	ClientConfig *gotorrent.Config
@@ -92,6 +62,7 @@ type BTService struct {
 	DownloadLimiter *rate.Limiter
 	UploadLimiter   *rate.Limiter
 
+	Players  map[string]*BTPlayer
 	Torrents map[string]*Torrent
 
 	UserAgent  string
@@ -104,40 +75,11 @@ type BTService struct {
 	MarkedToMove string
 }
 
-// DBItem ...
-type DBItem struct {
-	ID      int    `json:"id"`
-	State   int    `json:"state"`
-	Type    string `json:"type"`
-	File    int    `json:"file"`
-	ShowID  int    `json:"showid"`
-	Season  int    `json:"season"`
-	Episode int    `json:"episode"`
-}
-
-// PlayingItem ...
-type PlayingItem struct {
-	DBID   int
-	DBTYPE string
-
-	TMDBID  int
-	Season  int
-	Episode int
-
-	WatchedTime float64
-	Duration    float64
-}
-
 type activeTorrent struct {
 	torrentName  string
 	downloadRate float64
 	uploadRate   float64
 	progress     int
-}
-
-// InitDB ...
-func InitDB() {
-	db, _ = database.NewDB()
 }
 
 // NewBTService ...
@@ -149,6 +91,7 @@ func NewBTService() *BTService {
 		MarkedToMove: "",
 
 		Torrents: map[string]*Torrent{},
+		Players:  map[string]*BTPlayer{},
 
 		// TODO: cleanup when limiting is finished
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
@@ -273,7 +216,7 @@ func (s *BTService) configure() {
 		DataDir: config.Get().DownloadPath,
 
 		ListenAddr: s.ListenAddr,
-		Debug:      true,
+		Debug:      false,
 
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
@@ -349,26 +292,13 @@ func (s *BTService) stopServices() {
 	}
 }
 
-// func (s *BTService) Watch() {
-// 	defer close(s.closing)
-// 	// defer s.StorageChanges.Close()
-//
-// 	for {
-// 		select {
-// 		// case change := <- s.pieceEvents:
-// 		// 	//change := _i.(qstorage.PieceChange)
-// 		// 	log.Debugf("Sending piece change event: %#v", change)
-// 		// 	if change.State == "complete" {
-// 		// 		s.Torrents[0].Torrent.UpdatePieceCompletion(change.Index)
-// 		// 	}
-// 		case <- s.closing:
-// 			return
-// 		}
-// 	}
-// }
-
 // CheckAvailableSpace ...
 func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
+	// For memory storage we don't need to check available space
+	if s.config.DownloadStorage != estorage.StorageMemory {
+		return true
+	}
+
 	diskStatus, err := diskusage.DiskUsage(config.Get().DownloadPath)
 	if err != nil {
 		log.Warningf("Unable to retrieve the free space for %s, continuing anyway...", config.Get().DownloadPath)
@@ -483,6 +413,7 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 
 func (s *BTService) loadTorrentFiles() {
 	// Not loading previous torrents on start
+	// Otherwise we can dig out all the memory and halt the device
 	if s.config.DownloadStorage == estorage.StorageMemory {
 		return
 	}
@@ -566,7 +497,7 @@ func (s *BTService) downloadProgress() {
 				//
 				// Handle moving completed downloads
 				//
-				if !s.config.CompletedMove || status != StatusSeeding || Playing {
+				if !s.config.CompletedMove || status != StatusSeeding || s.anyPlayerIsPlaying() {
 					continue
 				}
 				if xbmc.PlayerIsPlaying() {
@@ -578,9 +509,9 @@ func (s *BTService) downloadProgress() {
 					continue
 				}
 
-				item := &DBItem{}
+				item := &database.BTItem{}
 				func() error {
-					if err := db.GetObject(Bucket, infoHash, item); err != nil {
+					if err := database.Get().GetObject(Bucket, infoHash, item); err != nil {
 						warnedMissing[infoHash] = true
 						return err
 					}
@@ -662,7 +593,7 @@ func (s *BTService) downloadProgress() {
 					} else {
 						dstPath = filepath.Dir(s.config.CompletedShowsPath)
 						if item.ShowID > 0 {
-							show := tmdb.GetShow(item.ShowID, "en")
+							show := tmdb.GetShow(item.ShowID, config.Get().Language)
 							if show != nil {
 								showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
 								seasonPath := filepath.Join(showPath, fmt.Sprintf("Season %d", item.Season))
@@ -740,9 +671,9 @@ func (s *BTService) downloadProgress() {
 func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) error {
 	switch Operation {
 	case Delete:
-		return db.Delete(Bucket, InfoHash)
+		return database.Get().Delete(Bucket, InfoHash)
 	case Update:
-		item := DBItem{
+		item := database.BTItem{
 			State:   Active,
 			ID:      ID,
 			Type:    Type,
@@ -751,24 +682,24 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 			Season:  infos[2],
 			Episode: infos[3],
 		}
-		return db.SetObject(Bucket, InfoHash, item)
+		return database.Get().SetObject(Bucket, InfoHash, item)
 	case RemoveFromLibrary:
-		item := &DBItem{}
-		if err := db.GetObject(Bucket, InfoHash, item); err != nil {
+		item := &database.BTItem{}
+		if err := database.Get().GetObject(Bucket, InfoHash, item); err != nil {
 			log.Error(err)
 			return err
 		}
 
 		item.State = Remove
-		return db.SetObject(Bucket, InfoHash, item)
+		return database.Get().SetObject(Bucket, InfoHash, item)
 	}
 
 	return nil
 }
 
 // GetDBItem ...
-func (s *BTService) GetDBItem(infoHash string) (dbItem *DBItem) {
-	if err := db.GetObject(Bucket, infoHash, dbItem); err != nil {
+func (s *BTService) GetDBItem(infoHash string) (dbItem *database.BTItem) {
+	if err := database.Get().GetObject(Bucket, infoHash, dbItem); err != nil {
 		return nil
 	}
 	return dbItem
@@ -866,4 +797,103 @@ func (s *BTService) PlayerSeek() {
 // ClientInfo ...
 func (s *BTService) ClientInfo(w io.Writer) {
 	s.Client.WriteStatus(w)
+}
+
+// AttachPlayer adds Player instance to service
+func (s *BTService) AttachPlayer(p *BTPlayer) {
+	if p == nil || p.Torrent == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.Players[p.Torrent.InfoHash()]; ok {
+		return
+	}
+
+	s.Players[p.Torrent.InfoHash()] = p
+}
+
+// DetachPlayer removes Player instance
+func (s *BTService) DetachPlayer(p *BTPlayer) {
+	if p == nil || p.Torrent == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.Players, p.Torrent.InfoHash())
+}
+
+// GetPlayer searches for player with desired TMDB id
+func (s *BTService) GetPlayer(kodiID int, tmdbID int) *BTPlayer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, p := range s.Players {
+		if p == nil || p.Torrent == nil {
+			continue
+		}
+
+		if (tmdbID != 0 && p.p.TMDBId == tmdbID) || (kodiID != 0 && p.p.KodiID == kodiID) {
+			return p
+		}
+	}
+
+	return nil
+}
+
+func (s *BTService) anyPlayerIsPlaying() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, p := range s.Players {
+		if p == nil || p.Torrent == nil {
+			continue
+		}
+
+		if p.p.Playing {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetActivePlayer searches for player that is Playing anything
+func (s *BTService) GetActivePlayer() *BTPlayer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, p := range s.Players {
+		if p == nil || p.Torrent == nil {
+			continue
+		}
+
+		if p.p.Playing {
+			return p
+		}
+	}
+
+	return nil
+}
+
+// HasTorrent checks whether there is active torrent for queried tmdb id
+func (s *BTService) HasTorrent(tmdbID int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil || t.DBItem == nil {
+			continue
+		}
+
+		if t.DBItem.ID == tmdbID {
+			return true
+		}
+	}
+
+	return false
 }

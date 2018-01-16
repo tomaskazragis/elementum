@@ -75,7 +75,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 		}
 
-		params := bittorrent.BTPlayerParams{
+		params := bittorrent.PlayerParams{
 			URI:         uri,
 			FromLibrary: fromLibrary,
 			FileIndex:   fileIndex,
@@ -88,7 +88,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)
-		libraryLog.Debugf("Playing item: %#v", resume)
+		log.Debugf("Playing item: %#v", resume)
 		if t, ok := btService.Torrents[resume]; resume != "" && ok {
 			player.Torrent = t
 		}

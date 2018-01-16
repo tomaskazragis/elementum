@@ -7,7 +7,6 @@ import (
 
 	gotorrent "github.com/anacrolix/torrent"
 
-	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -18,7 +17,6 @@ type FileReader struct {
 	*gotorrent.File
 	*Torrent
 
-	lb *broadcast.Broadcaster
 	id int
 }
 
@@ -31,7 +29,6 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 		File:    f,
 		Torrent: t,
 
-		lb: broadcast.LocalBroadcasters[broadcast.WATCHED],
 		id: int(rand.Int31()),
 	}
 	fr.Reader.SetReadahead(1)
@@ -53,10 +50,6 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 // Close ...
 func (fr *FileReader) Close() error {
 	log.Debugf("Closing reader: %#v", fr.id)
-
-	if item := fr.Torrent.GetPlayingItem(); item != nil {
-		go fr.lb.Broadcast(item)
-	}
 
 	fr.Torrent.mu.Lock()
 	defer fr.Torrent.mu.Unlock()
