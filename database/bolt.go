@@ -21,24 +21,6 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
-type callBack func([]byte, []byte)
-type callBackWithError func([]byte, []byte) error
-
-// DWriter ...
-type DWriter struct {
-	bucket   []byte
-	key      []byte
-	database *Database
-}
-
-// Database ...
-type Database struct {
-	db             *bolt.DB
-	quit           chan struct{}
-	fileName       string
-	backupFileName string
-}
-
 var (
 	databaseFileName    = "library.db"
 	backupFileName      = "library-backup.db"
@@ -419,7 +401,7 @@ func (database *Database) GetObject(bucket []byte, key string, item interface{})
 	}
 
 	if len(v) == 0 {
-		return
+		return errors.New("Bytes empty")
 	}
 
 	if err = json.Unmarshal(v, &item); err != nil {
