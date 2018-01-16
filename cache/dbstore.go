@@ -111,7 +111,7 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 
 // Delete ...
 func (c *DBStore) Delete(key string) error {
-	return nil
+	return c.db.Delete(database.CommonBucket, key)
 }
 
 // Increment ...
