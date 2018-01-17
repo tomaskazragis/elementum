@@ -52,6 +52,7 @@ func GetShowImages(showID int) *Images {
 				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				log.Warningf("Bad status getting images for %d: %d", showID, resp.Status())
+				return util.ErrHTTP
 			}
 			if images != nil {
 				cacheStore.Set(key, images, imagesCacheExpiration)
@@ -108,6 +109,7 @@ func GetShow(showID int, language string) (show *Show) {
 				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
 				log.Warning(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 
 			if show != nil {
@@ -174,6 +176,7 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
 			log.Error(message)
 			xbmc.Notify("Elementum", message, config.AddonIcon())
+			return util.ErrHTTP
 		}
 
 		return nil
@@ -233,6 +236,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
 						log.Error(message)
 						xbmc.Notify("Elementum", message, config.AddonIcon())
+						return util.ErrHTTP
 					}
 
 					return nil
@@ -375,6 +379,7 @@ func GetTVGenres(language string) []*Genre {
 				message := fmt.Sprintf("Bad status getting TV genres: %d", resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 
 			return nil

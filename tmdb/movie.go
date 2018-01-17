@@ -50,6 +50,7 @@ func GetImages(movieID int) *Images {
 				return util.ErrExceeded
 			} else if resp.Status() != 200 {
 				log.Warningf("Bad status getting images for %d: %d", movieID, resp.Status())
+				return util.ErrHTTP
 			}
 			if images != nil {
 				cacheStore.Set(key, images, imagesCacheExpiration)
@@ -95,6 +96,7 @@ func GetMovieByID(movieID string, language string) *Movie {
 				message := fmt.Sprintf("Bad status getting movie %s: %d", movieID, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 			if movie != nil {
 				cacheStore.Set(key, movie, cacheExpiration)
@@ -160,6 +162,7 @@ func GetMovieGenres(language string) []*Genre {
 				message := fmt.Sprintf("Bad status getting movie genres: %d", resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 
 			return nil
@@ -198,6 +201,7 @@ func SearchMovies(query string, language string, page int) (Movies, int) {
 			message := fmt.Sprintf("Bad status searching movies: %d", resp.Status())
 			log.Error(message)
 			xbmc.Notify("Elementum", message, config.AddonIcon())
+			return util.ErrHTTP
 		}
 
 		return nil
@@ -242,6 +246,7 @@ func GetIMDBList(listID string, language string, page int) (movies Movies, total
 				message := fmt.Sprintf("Bad status getting IMDb list: %d", resp.Status())
 				log.Error(message + fmt.Sprintf(" (%s)", listID))
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 
 			return nil
@@ -315,6 +320,7 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
 						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
 						xbmc.Notify("Elementum", message, config.AddonIcon())
+						return util.ErrHTTP
 					}
 
 					return nil

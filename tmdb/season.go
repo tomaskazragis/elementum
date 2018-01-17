@@ -42,6 +42,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
 				log.Error(message)
 				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
 			}
 
 			return nil
