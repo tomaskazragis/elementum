@@ -127,13 +127,12 @@ func NewAddonSearcher(addonID string) *AddonSearcher {
 	}
 }
 
-// TODO: Review search objects and pass real localized titles
 // GetMovieSearchObject ...
 func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObject {
 	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])
-	title := movie.OriginalTitle
-	if title == "" {
-		title = movie.Title
+	title := movie.Title
+	if config.Get().UseOriginalTitle && movie.OriginalTitle != "" {
+		title = movie.OriginalTitle
 	}
 	sObject := &MovieSearchObject{
 		IMDBId: movie.IMDBId,
@@ -151,9 +150,9 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 // GetSeasonSearchObject ...
 func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Season) *SeasonSearchObject {
 	year, _ := strconv.Atoi(strings.Split(season.AirDate, "-")[0])
-	title := show.OriginalName
-	if title == "" {
-		title = show.Name
+	title := show.Name
+	if config.Get().UseOriginalTitle && show.OriginalName != "" {
+		title = show.OriginalName
 	}
 
 	return &SeasonSearchObject{
@@ -169,16 +168,16 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 // GetEpisodeSearchObject ...
 func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.Episode) *EpisodeSearchObject {
 	year, _ := strconv.Atoi(strings.Split(episode.AirDate, "-")[0])
-	title := show.OriginalName
-	if title == "" {
-		title = show.Name
+	title := show.Name
+	if config.Get().UseOriginalTitle && show.OriginalName != "" {
+		title = show.OriginalName
 	}
 
 	tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
 
 	// Is this an Anime?
 	absoluteNumber := 0
-	if util.StrInterfaceToInt(show.ExternalIDs.TVDBID) > 0 {
+	if tvdbID > 0 {
 		countryIsJP := false
 		for _, country := range show.OriginCountry {
 			if country == "JP" {
