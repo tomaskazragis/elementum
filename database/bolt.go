@@ -376,6 +376,17 @@ func (database *Database) GetCachedObject(bucket []byte, key string, item interf
 // Get/Set operations
 //
 
+// Has checks for existence of a key
+func (database *Database) Has(bucket []byte, key string) (ret bool) {
+	database.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucket)
+		ret = len(b.Get([]byte(key))) > 0
+		return nil
+	})
+
+	return
+}
+
 // GetBytes ...
 func (database *Database) GetBytes(bucket []byte, key string) (value []byte, err error) {
 	err = database.db.View(func(tx *bolt.Tx) error {
