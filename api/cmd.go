@@ -28,6 +28,22 @@ func ClearPageCache(ctx *gin.Context) {
 	library.ClearPageCache()
 }
 
+// ClearTraktCache ...
+func ClearTraktCache(ctx *gin.Context) {
+	if ctx != nil {
+		ctx.Abort()
+	}
+	library.ClearTraktCache()
+}
+
+// ClearTmdbCache ...
+func ClearTmdbCache(ctx *gin.Context) {
+	if ctx != nil {
+		ctx.Abort()
+	}
+	library.ClearTmdbCache()
+}
+
 // ResetClearances ...
 func ResetClearances(ctx *gin.Context) {
 	cloudhole.ResetClearances()

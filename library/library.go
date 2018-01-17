@@ -1277,6 +1277,24 @@ func ClearPageCache() {
 	xbmc.Refresh()
 }
 
+// ClearTraktCache deletes cached trakt data
+func ClearTraktCache() {
+	cacheDB := database.GetCache()
+	if cacheDB != nil {
+		cacheDB.DeleteWithPrefix(database.CommonBucket, []byte("com.trakt."))
+	}
+	xbmc.Refresh()
+}
+
+// ClearTmdbCache deletes cached tmdb data
+func ClearTmdbCache() {
+	cacheDB := database.GetCache()
+	if cacheDB != nil {
+		cacheDB.DeleteWithPrefix(database.CommonBucket, []byte("com.tmdb."))
+	}
+	xbmc.Refresh()
+}
+
 //
 // Utilities
 // 		mainly copied from api/routes to skip cycle imports
