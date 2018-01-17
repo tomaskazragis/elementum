@@ -12,6 +12,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
@@ -410,6 +411,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			Rating:        show.VoteAverage,
 			TVShowTitle:   show.OriginalName,
 			Premiered:     show.FirstAirDate,
+			PlayCount:     playcount.GetWatchedShowByTMDB(show.ID).Int(),
 			DBTYPE:        "tvshow",
 			Mediatype:     "tvshow",
 		},

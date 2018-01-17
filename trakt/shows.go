@@ -9,6 +9,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
@@ -541,6 +542,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			Code:          show.IDs.IMDB,
 			IMDBNumber:    show.IDs.IMDB,
 			Trailer:       show.Trailer,
+			PlayCount:     playcount.GetWatchedShowByTMDB(show.IDs.TMDB).Int(),
 			DBTYPE:        "tvshow",
 			Mediatype:     "tvshow",
 		},
@@ -598,6 +600,7 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 			Votes:         strconv.Itoa(season.Votes),
 			Code:          show.IDs.IMDB,
 			IMDBNumber:    show.IDs.IMDB,
+			PlayCount:     playcount.GetWatchedSeasonByTMDB(show.IDs.TMDB, season.Number).Int(),
 			DBTYPE:        "season",
 			Mediatype:     "season",
 		},
@@ -627,6 +630,7 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 			Season:        episode.Season,
 			Code:          show.IDs.IMDB,
 			IMDBNumber:    show.IDs.IMDB,
+			PlayCount:     playcount.GetWatchedEpisodeByTMDB(show.IDs.TMDB, episode.Season, episode.Number).Int(),
 			DBTYPE:        "episode",
 			Mediatype:     "episode",
 		},

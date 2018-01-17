@@ -14,11 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cespare/xxhash"
 	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
@@ -106,6 +108,8 @@ var l = &Library{
 	UIDs:   map[int]*UniqueIDs{},
 	Movies: map[int]*Movie{},
 	Shows:  map[int]*Show{},
+
+	WatchedTrakt: map[uint64]bool{},
 }
 
 // InitDB ...
@@ -357,9 +361,6 @@ func Refresh() error {
 	if err := RefreshShows(); err != nil {
 		return err
 	}
-	if err := RefreshUIDs(); err != nil {
-		return err
-	}
 	if changes, err := SyncTraktWatched(); err != nil {
 		return err
 	} else if changes {
@@ -380,6 +381,7 @@ func RefreshMovies() error {
 	Scanning = true
 	defer func() {
 		Scanning = false
+		RefreshUIDs()
 	}()
 
 	var movies *xbmc.VideoLibraryMovies
@@ -397,13 +399,11 @@ func RefreshMovies() error {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
 
-	l.mu.Movies.Lock()
-	defer l.mu.Movies.Unlock()
-
 	l.Movies = map[int]*Movie{}
 	for _, m := range movies.Movies {
 		m.UniqueIDs.Kodi = m.ID
 
+		l.mu.Movies.Lock()
 		l.Movies[m.ID] = &Movie{
 			ID:      m.ID,
 			Title:   m.Title,
@@ -413,6 +413,7 @@ func RefreshMovies() error {
 			UIDs:    parseUniqueID(MovieType, &m.UniqueIDs, m.File),
 			Xbmc:    m,
 		}
+		l.mu.Movies.Unlock()
 	}
 
 	return nil
@@ -427,10 +428,8 @@ func RefreshShows() error {
 	Scanning = true
 	defer func() {
 		Scanning = false
+		RefreshUIDs()
 	}()
-
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
 
 	var shows *xbmc.VideoLibraryShows
 	for tries := 1; tries <= 3; tries++ {
@@ -446,6 +445,9 @@ func RefreshShows() error {
 		return errors.New("Could not fetch Shows from Kodi")
 	}
 
+	l.mu.Shows.Lock()
+	defer l.mu.Shows.Unlock()
+
 	l.Shows = map[int]*Show{}
 	for _, s := range shows.Shows {
 		s.UniqueIDs.Kodi = s.ID
@@ -455,7 +457,7 @@ func RefreshShows() error {
 			Title:    s.Title,
 			Seasons:  map[int]*Season{},
 			Episodes: map[int]*Episode{},
-			UIDs:     parseUniqueID(EpisodeType, &s.UniqueIDs, ""),
+			UIDs:     parseUniqueID(ShowType, &s.UniqueIDs, ""),
 			Xbmc:     s,
 		}
 
@@ -481,7 +483,7 @@ func RefreshSeasons(showID int) error {
 			Season:   s.Season,
 			Episodes: s.Episodes,
 			Watched:  s.PlayCount > 0,
-			UIDs:     &UniqueIDs{Kodi: s.ID},
+			UIDs:     &UniqueIDs{MediaType: SeasonType, Kodi: s.ID},
 			Xbmc:     s,
 		}
 	}
@@ -496,9 +498,11 @@ func RefreshEpisodes(showID int) error {
 		return errors.New("Could not fetch Episodes from Kodi")
 	}
 
+	show := strconv.Itoa(showID)
 	l.Shows[showID].Episodes = map[int]*Episode{}
 	for _, e := range episodes.Episodes {
 		e.UniqueIDs.Kodi = e.ID
+		e.UniqueIDs.TMDB = show
 
 		l.Shows[showID].Episodes[e.ID] = &Episode{
 			ID:      e.ID,
@@ -507,7 +511,7 @@ func RefreshEpisodes(showID int) error {
 			Episode: e.Episode,
 			Watched: e.PlayCount > 0,
 			Resume:  &Resume{},
-			UIDs:    parseUniqueID(ShowType, &e.UniqueIDs, e.File),
+			UIDs:    parseUniqueID(EpisodeType, &e.UniqueIDs, e.File),
 			Xbmc:    e,
 		}
 	}
@@ -521,21 +525,53 @@ func RefreshUIDs() error {
 	l.mu.UIDs.Lock()
 	defer l.mu.UIDs.Unlock()
 
+	playcount.Mu.Lock()
+	defer playcount.Mu.Unlock()
+	playcount.Watched = map[uint64]bool{}
 	l.UIDs = map[int]*UniqueIDs{}
+	for k, v := range l.WatchedTrakt {
+		playcount.Watched[k] = v
+	}
+
 	for _, m := range l.Movies {
 		m.UIDs.MediaType = MovieType
 		l.UIDs[m.ID] = m.UIDs
+
+		if m.Watched {
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.UIDs.TMDB))] = true
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.UIDs.Trakt))] = true
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.UIDs.IMDB))] = true
+		}
 	}
 	for _, s := range l.Shows {
 		s.UIDs.MediaType = ShowType
 		l.UIDs[s.ID] = s.UIDs
+
+		if s.Watched {
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.UIDs.TMDB))] = true
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.UIDs.Trakt))] = true
+			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TVDBScraper, s.UIDs.TVDB))] = true
+		}
+
 		for _, e := range l.Shows[s.ID].Seasons {
 			e.UIDs.MediaType = SeasonType
 			l.UIDs[e.ID] = e.UIDs
+
+			if e.Watched {
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.UIDs.TMDB, e.Season))] = true
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.UIDs.Trakt, e.Season))] = true
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TVDBScraper, s.UIDs.TVDB, e.Season))] = true
+			}
 		}
 		for _, e := range l.Shows[s.ID].Episodes {
 			e.UIDs.MediaType = EpisodeType
 			l.UIDs[e.ID] = e.UIDs
+
+			if e.Watched {
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.UIDs.TMDB, e.Season, e.Episode))] = true
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.UIDs.Trakt, e.Season, e.Episode))] = true
+				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TVDBScraper, s.UIDs.TVDB, e.Season, e.Episode))] = true
+			}
 		}
 	}
 
@@ -554,7 +590,7 @@ func parseUniqueID(entityType int, xbmcIDs *xbmc.UniqueIDs, fileName string) (i 
 	i.TVDB, _ = strconv.Atoi(xbmcIDs.TVDB)
 	i.Trakt, _ = strconv.Atoi(xbmcIDs.Trakt)
 
-	cacheKey := fmt.Sprintf("Resolved_%d_%d", entityType, xbmcIDs.Kodi)
+	cacheKey := fmt.Sprintf("Resolve_%d_%d", entityType, xbmcIDs.Kodi)
 
 	if err := cacheStore.Get(cacheKey, i); err == nil {
 		return i
@@ -829,7 +865,7 @@ func writeShowStrm(showID string, adding bool) (*tmdb.Show, error) {
 	if show == nil {
 		return nil, fmt.Errorf("Unable to get show (%s)", showID)
 	}
-	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.Name, strings.Split(show.FirstAirDate, "-")[0]))
+	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.OriginalName, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
@@ -1331,14 +1367,23 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 	TraktScanning = true
 	defer func() {
 		TraktScanning = false
+		RefreshUIDs()
 	}()
 
 	movies, errMovies := trakt.WatchedMovies()
 	if errMovies != nil {
 		return false, errMovies
 	}
+
+	l.mu.Trakt.Lock()
+
+	l.WatchedTrakt = map[uint64]bool{}
 	watchedMovies := map[int]bool{}
 	for _, m := range movies {
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.Movie.Ids.Trakt))] = true
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.Movie.Ids.Tmdb))] = true
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.Movie.Ids.Imdb))] = true
+
 		var r *Movie
 		if r == nil && m.Movie.Ids.Tmdb != 0 {
 			r, _ = GetMovieByTMDB(m.Movie.Ids.Tmdb)
@@ -1358,13 +1403,24 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 			}
 		}
 	}
+	l.mu.Trakt.Unlock()
 
 	shows, errShows := trakt.WatchedShows()
 	if errShows != nil {
 		return false, errShows
 	}
+
+	l.mu.Trakt.Lock()
+
 	watchedShows := map[int]bool{}
 	for _, s := range shows {
+		for _, season := range s.Seasons {
+			for _, episode := range season.Episodes {
+				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.Ids.Tmdb, season.Number, episode.Number))] = true
+				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.Ids.Trakt, season.Number, episode.Number))] = true
+			}
+		}
+
 		var r *Show
 		if r == nil && s.Show.Ids.Tmdb != 0 {
 			r, _ = GetShowByTMDB(s.Show.Ids.Tmdb)
@@ -1391,6 +1447,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 			}
 		}
 	}
+	l.mu.Trakt.Unlock()
 
 	// Now, when we know what is marked Watched on Trakt - we are
 	// looking at Kodi library and sync back to Trakt items,
@@ -1403,9 +1460,11 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		if m.UIDs.TMDB == 0 {
 			continue
 		}
-		if _, ok := watchedMovies[m.UIDs.TMDB]; ok || !m.Watched {
+		cacheKey := fmt.Sprintf("Synced_%d_%d", MovieType, m.UIDs.TMDB)
+		if _, ok := watchedMovies[m.UIDs.TMDB]; ok || !m.Watched || db.Has(dbBucket, cacheKey) {
 			continue
 		}
+		db.Set(dbBucket, cacheKey, "1")
 
 		syncMovies = append(syncMovies, &trakt.WatchedItem{
 			MediaType: "movie",
@@ -1420,11 +1479,16 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		if s.UIDs.TMDB == 0 {
 			continue
 		}
+		cacheKey := fmt.Sprintf("Synced_%d_%d", ShowType, s.UIDs.TMDB)
+		if db.Has(dbBucket, cacheKey) {
+			continue
+		}
+		db.Set(dbBucket, cacheKey, "1")
+
 		for _, e := range s.Episodes {
 			if _, ok := watchedShows[e.UIDs.Kodi]; ok || !e.Watched {
 				continue
 			}
-
 			syncShows = append(syncShows, &trakt.WatchedItem{
 				MediaType: "episode",
 				Show:      s.UIDs.TMDB,

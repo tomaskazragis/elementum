@@ -10,6 +10,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 
@@ -444,6 +445,7 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 			Date:          movie.ReleaseDate,
 			Votes:         strconv.Itoa(movie.VoteCount),
 			Rating:        movie.VoteAverage,
+			PlayCount:     playcount.GetWatchedMovieByTMDB(movie.ID).Int(),
 			DBTYPE:        "movie",
 			Mediatype:     "movie",
 		},

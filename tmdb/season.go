@@ -7,6 +7,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
@@ -136,6 +137,7 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 			Mediatype:     "season",
 			Code:          show.ExternalIDs.IMDBId,
 			IMDBNumber:    show.ExternalIDs.IMDBId,
+			PlayCount:     playcount.GetWatchedSeasonByTMDB(show.ID, season.Season).Int(),
 		},
 		Art: &xbmc.ListItemArt{},
 	}

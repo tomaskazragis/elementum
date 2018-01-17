@@ -18,12 +18,15 @@ type Library struct {
 
 	// Stored Library Shows
 	Shows map[int]*Show
+
+	WatchedTrakt map[uint64]bool
 }
 
 type lMutex struct {
 	UIDs   sync.RWMutex
 	Movies sync.RWMutex
 	Shows  sync.RWMutex
+	Trakt  sync.RWMutex
 }
 
 // UniqueIDs represents all IDs for a library item
@@ -34,6 +37,7 @@ type UniqueIDs struct {
 	TVDB      int    `json:"tvdb"`
 	IMDB      string `json:"imdb"`
 	Trakt     int    `json:"trakt"`
+	Watched   bool   `json:"watched"`
 }
 
 // Movie represents Movie content type
