@@ -1360,7 +1360,7 @@ func RefreshTrakt() error {
 
 // SyncTraktWatched gets watched list and updates watched status in the library
 func SyncTraktWatched() (haveChanges bool, err error) {
-	if errAuth := trakt.Authorized(); errAuth != nil {
+	if config.Get().TraktToken == "" {
 		return
 	}
 
