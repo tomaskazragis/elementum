@@ -87,12 +87,12 @@ var (
 		regexp.MustCompile(`\W+1440p\W*`): Resolution1440p,
 		regexp.MustCompile(`\W+2160p\W*`): Resolution4k,
 
-		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):   Resolution240p,
-		regexp.MustCompile(`\W+(xvid|dvd|hdtv)\W*`):         Resolution480p,
-		regexp.MustCompile(`\W+(hdrip|bluray|b[rd]rip)\W*`): Resolution720p,
-		regexp.MustCompile(`\W+(fullhd|fhd)\W*`):            Resolution1080p,
-		regexp.MustCompile(`\W+2K\W*`):                      Resolution1440p,
-		regexp.MustCompile(`\W+4K\W*`):                      Resolution4k,
+		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):         Resolution240p,
+		regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p,
+		regexp.MustCompile(`\W+(hdrip|bluray|b[rd]rip)\W*`):       Resolution720p,
+		regexp.MustCompile(`\W+(fullhd|fhd)\W*`):                  Resolution1080p,
+		regexp.MustCompile(`\W+2K\W*`):                            Resolution1440p,
+		regexp.MustCompile(`\W+4K\W*`):                            Resolution4k,
 	}
 	// Resolutions ...
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "1440p", "4K"}
@@ -300,8 +300,8 @@ func (t *TorrentFile) initialize() {
 
 	if t.Resolution == ResolutionUnknown {
 		t.Resolution = matchTags(t, resolutionTags)
-		if t.Resolution == 0 {
-			t.Resolution = 1
+		if t.Resolution == ResolutionUnknown {
+			t.Resolution = Resolution480p
 		}
 	}
 	if t.VideoCodec == CodecUnknown {
