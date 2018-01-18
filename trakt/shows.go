@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -66,16 +67,40 @@ func setShowFanart(show *Show) *Show {
 }
 
 func setShowsFanart(shows []*Shows) []*Shows {
-	for i, show := range shows {
-		shows[i].Show = setShowFanart(show.Show)
+	// TODO: Remove when finish with debugging
+	if len(shows) > 30 {
+		return shows
 	}
+
+	wg := sync.WaitGroup{}
+	for i, show := range shows {
+		wg.Add(1)
+		go func(idx int, s *Shows) {
+			defer wg.Done()
+			shows[idx].Show = setShowFanart(s.Show)
+		}(i, show)
+	}
+	wg.Wait()
+
 	return shows
 }
 
 func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
-	for i, show := range shows {
-		shows[i].Show = setShowFanart(show.Show)
+	// TODO: Remove when finish with debugging
+	if len(shows) > 30 {
+		return shows
 	}
+
+	wg := sync.WaitGroup{}
+	for i, show := range shows {
+		wg.Add(1)
+		go func(idx int, s *CalendarShow) {
+			defer wg.Done()
+			shows[idx].Show = setShowFanart(s.Show)
+		}(i, show)
+	}
+	wg.Wait()
+
 	return shows
 }
 

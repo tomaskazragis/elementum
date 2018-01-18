@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -66,16 +67,40 @@ func setFanart(movie *Movie) *Movie {
 }
 
 func setFanarts(movies []*Movies) []*Movies {
-	for i, movie := range movies {
-		movies[i].Movie = setFanart(movie.Movie)
+	// TODO: Remove when finish with debugging
+	if len(movies) > 30 {
+		return movies
 	}
+
+	wg := sync.WaitGroup{}
+	for i, movie := range movies {
+		wg.Add(1)
+		go func(idx int, m *Movies) {
+			defer wg.Done()
+			movies[idx].Movie = setFanart(m.Movie)
+		}(i, movie)
+	}
+	wg.Wait()
+
 	return movies
 }
 
 func setCalendarFanarts(movies []*CalendarMovie) []*CalendarMovie {
-	for i, movie := range movies {
-		movies[i].Movie = setFanart(movie.Movie)
+	// TODO: Remove when finish with debugging
+	if len(movies) > 30 {
+		return movies
 	}
+
+	wg := sync.WaitGroup{}
+	for i, movie := range movies {
+		wg.Add(1)
+		go func(idx int, m *CalendarMovie) {
+			defer wg.Done()
+			movies[idx].Movie = setFanart(m.Movie)
+		}(i, movie)
+	}
+	wg.Wait()
+
 	return movies
 }
 
@@ -219,6 +244,14 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 				log.Warning(errUnm)
 			}
 		}
+
+		// moviesForPage := []*Movies{}
+		// pageFrom := (pageInt-1)*resultsPerPage - (pageGroup * limit)
+		// pageTo := (pageInt * resultsPerPage) - 1 - (pageGroup * limit)
+		// for p := pageFrom; p <= pageTo && p <= len(movies); p++ {
+		// 	moviesForPage = append(moviesForPage, movies[p])
+		// }
+		// movies = moviesForPage
 
 		if page != "0" {
 			movies = setFanarts(movies)

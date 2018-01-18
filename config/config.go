@@ -30,6 +30,7 @@ type Configuration struct {
 	KeepFilesPlaying    int
 	KeepFilesFinished   int
 	DisableBgProgress   bool
+	ForceUseTrakt       bool
 	ResultsPerPage      int
 	EnableOverlayStatus bool
 	ChooseStreamAuto    bool
@@ -247,6 +248,7 @@ func Reload() *Configuration {
 		KeepFilesPlaying:    settings["keep_files_playing"].(int),
 		KeepFilesFinished:   settings["keep_files_finished"].(int),
 		DisableBgProgress:   settings["disable_bg_progress"].(bool),
+		ForceUseTrakt:       settings["force_use_trakt"].(bool),
 		ResultsPerPage:      settings["results_per_page"].(int),
 		EnableOverlayStatus: settings["enable_overlay_status"].(bool),
 		ChooseStreamAuto:    settings["choose_stream_auto"].(bool),
