@@ -347,6 +347,7 @@ type UserSettings struct {
 // WatchedItem represents possible watched add/delete item
 type WatchedItem struct {
 	MediaType string
+	KodiID    int
 	Movie     int
 	Show      int
 	Season    int

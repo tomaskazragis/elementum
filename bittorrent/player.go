@@ -707,19 +707,42 @@ func (btp *BTPlayer) Params() *PlayerParams {
 func (btp *BTPlayer) UpdateWatched() {
 	btp.log.Debugf("Updating Watched state: %#v", btp.p)
 
-	if btp.p.KodiID == 0 || btp.p.VideoDuration == 0 || btp.p.WatchedTime == 0 {
+	if btp.p.VideoDuration == 0 || btp.p.WatchedTime == 0 {
 		return
 	}
 
 	progress := btp.p.WatchedTime / btp.p.VideoDuration * 100
 
-	log.Infof("Currently at %f%%, DBID: %d", progress, btp.p.KodiID)
+	log.Infof("Currently at %f%%, KodiID: %d", progress, btp.p.KodiID)
 
 	if progress > 90 {
+		var watched *trakt.WatchedItem
+
 		if btp.p.ContentType == movieType {
-			xbmc.SetMovieWatched(btp.p.KodiID, 1, 0, 0)
+			watched = &trakt.WatchedItem{
+				MediaType: btp.p.ContentType,
+				Movie:     btp.p.TMDBId,
+				Watched:   true,
+			}
+			if btp.p.KodiID != 0 {
+				xbmc.SetMovieWatched(btp.p.KodiID, 1, 0, 0)
+			}
 		} else if btp.p.ContentType == episodeType {
-			xbmc.SetEpisodeWatched(btp.p.KodiID, 1, 0, 0)
+			watched = &trakt.WatchedItem{
+				MediaType: btp.p.ContentType,
+				Show:      btp.p.ShowID,
+				Season:    btp.p.Season,
+				Episode:   btp.p.Episode,
+				Watched:   true,
+			}
+			if btp.p.KodiID != 0 {
+				xbmc.SetEpisodeWatched(btp.p.KodiID, 1, 0, 0)
+			}
+		}
+
+		if config.Get().TraktToken != "" && watched != nil {
+			log.Debugf("Setting Trakt watched for: %#v", watched)
+			go trakt.SetWatched(watched)
 		}
 	} else if btp.p.WatchedTime > 180 {
 		if btp.p.ContentType == movieType {

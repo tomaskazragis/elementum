@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/bittorrent"
@@ -27,7 +28,16 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 	method := r.URL.Query().Get("method")
 	data := r.URL.Query().Get("data")
 
-	jsonData, _ := base64.StdEncoding.DecodeString(data)
+	jsonData, jsonErr := base64.StdEncoding.DecodeString(data)
+	if jsonErr != nil {
+		// Base64 is not URL safe and, probably, Kodi is not well encoding it,
+		// so we just take it from URL and decode.
+		// Hoping "data=" is always in the end of url.
+		if strings.Contains(r.URL.RawQuery, "&data=") {
+			data = r.URL.RawQuery[strings.Index(r.URL.RawQuery, "&data=")+6:]
+		}
+		jsonData, _ = base64.StdEncoding.DecodeString(data)
+	}
 	log.Debugf("Got notification from %s/%s: %s", sender, method, string(jsonData))
 
 	if sender != "xbmc" {
@@ -127,10 +137,28 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 		log.Infof("Stopped at %f%%", progress)
 
 		if stopped.Ended && progress > 90 {
+			var watched *trakt.WatchedItem
 			if stopped.Item.Type == movieType {
 				xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+				watched = &trakt.WatchedItem{
+					MediaType: stopped.Item.Type,
+					Movie:     p.Params().TMDBId,
+					Watched:   true,
+				}
 			} else {
 				xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
+				watched = &trakt.WatchedItem{
+					MediaType: stopped.Item.Type,
+					Show:      p.Params().ShowID,
+					Season:    p.Params().Season,
+					Episode:   p.Params().Episode,
+					Watched:   true,
+				}
+			}
+
+			if config.Get().TraktToken != "" && watched != nil {
+				log.Debugf("Settings Trakt watched: %#v", watched)
+				go trakt.SetWatched(watched)
 			}
 		} else if p.Params().WatchedTime > 180 {
 			if stopped.Item.Type == movieType {
