@@ -612,21 +612,7 @@ playbackWaitLoop:
 	playing := true
 
 	btp.updateWatchTimes()
-
-	if btp.p.TMDBId != 0 && btp.p.KodiID == 0 {
-		query := strconv.Itoa(btp.p.TMDBId)
-		if btp.p.ContentType == movieType {
-			i := library.FindByIDMovieInLibrary(query)
-			if i != nil {
-				btp.p.KodiID = i.ID
-			}
-		} else if btp.p.ContentType == episodeType {
-			i := library.FindByIDEpisodeInLibrary(btp.p.ShowID, btp.p.Season, btp.p.Episode)
-			if i != nil {
-				btp.p.KodiID = i.ID
-			}
-		}
-	}
+	btp.GetIdent()
 
 	btp.log.Infof("Got playback: %fs / %fs", btp.p.WatchedTime, btp.p.VideoDuration)
 	if btp.scrobble {
@@ -683,8 +669,9 @@ playbackLoop:
 	}
 
 	btp.log.Info("Stopped playback")
+	btp.GetIdent()
+	btp.UpdateWatched()
 	if btp.scrobble {
-		btp.UpdateWatched()
 		trakt.Scrobble("stop", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 	}
 	btp.p.Playing = false
@@ -815,6 +802,28 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 					log.Debugf("Saving torrent entry for TMDB: %#v", episode.ID)
 					database.Get().SetBytes(HistoryBucket, strconv.Itoa(episode.ID), b)
 				}
+			}
+		}
+	}
+}
+
+// GetIdent tries to find playing item in Kodi library
+func (btp *BTPlayer) GetIdent() {
+	if btp.p.TMDBId == 0 || btp.p.KodiID != 0 {
+		return
+	}
+
+	if btp.p.ContentType == movieType {
+		movie, _ := library.GetMovieByTMDB(btp.p.TMDBId)
+		if movie != nil {
+			btp.p.KodiID = movie.UIDs.Kodi
+		}
+	} else if btp.p.ContentType == episodeType {
+		show, _ := library.GetShowByTMDB(btp.p.ShowID)
+		if show != nil {
+			episode := show.GetEpisode(btp.p.Season, btp.p.Episode)
+			if episode != nil {
+				btp.p.KodiID = episode.UIDs.Kodi
 			}
 		}
 	}
