@@ -3372,9 +3372,9 @@ func (z SeasonList) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 22
+	// map header, size 23
 	// string "Entity"
-	o = append(o, 0xde, 0x0, 0x16, 0xa6, 0x45, 0x6e, 0x74, 0x69, 0x74, 0x79)
+	o = append(o, 0xde, 0x0, 0x17, 0xa6, 0x45, 0x6e, 0x74, 0x69, 0x74, 0x79)
 	o, err = z.Entity.MarshalMsg(o)
 	if err != nil {
 		return
@@ -3511,6 +3511,29 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 			}
 		}
 	}
+	// string "AlternativeTitles"
+	o = append(o, 0xb1, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x76, 0x65, 0x54, 0x69, 0x74, 0x6c, 0x65, 0x73)
+	if z.AlternativeTitles == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		// map header, size 1
+		// string "Titles"
+		o = append(o, 0x81, 0xa6, 0x54, 0x69, 0x74, 0x6c, 0x65, 0x73)
+		o = msgp.AppendArrayHeader(o, uint32(len(z.AlternativeTitles.Titles)))
+		for za0007 := range z.AlternativeTitles.Titles {
+			if z.AlternativeTitles.Titles[za0007] == nil {
+				o = msgp.AppendNil(o)
+			} else {
+				// map header, size 2
+				// string "Iso3166_1"
+				o = append(o, 0x82, 0xa9, 0x49, 0x73, 0x6f, 0x33, 0x31, 0x36, 0x36, 0x5f, 0x31)
+				o = msgp.AppendString(o, z.AlternativeTitles.Titles[za0007].Iso3166_1)
+				// string "Title"
+				o = append(o, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
+				o = msgp.AppendString(o, z.AlternativeTitles.Titles[za0007].Title)
+			}
+		}
+	}
 	// string "Credits"
 	o = append(o, 0xa7, 0x43, 0x72, 0x65, 0x64, 0x69, 0x74, 0x73)
 	if z.Credits == nil {
@@ -3534,11 +3557,11 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Seasons"
 	o = append(o, 0xa7, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Seasons)))
-	for za0007 := range z.Seasons {
-		if z.Seasons[za0007] == nil {
+	for za0008 := range z.Seasons {
+		if z.Seasons[za0008] == nil {
 			o = msgp.AppendNil(o)
 		} else {
-			o, err = z.Seasons[za0007].MarshalMsg(o)
+			o, err = z.Seasons[za0008].MarshalMsg(o)
 			if err != nil {
 				return
 			}
@@ -3923,6 +3946,92 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					}
 				}
 			}
+		case "AlternativeTitles":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.AlternativeTitles = nil
+			} else {
+				if z.AlternativeTitles == nil {
+					z.AlternativeTitles = new(struct {
+						Titles []*AlternativeTitle `json:"results"`
+					})
+				}
+				var zb0013 uint32
+				zb0013, bts, err = msgp.ReadMapHeaderBytes(bts)
+				if err != nil {
+					return
+				}
+				for zb0013 > 0 {
+					zb0013--
+					field, bts, err = msgp.ReadMapKeyZC(bts)
+					if err != nil {
+						return
+					}
+					switch msgp.UnsafeString(field) {
+					case "Titles":
+						var zb0014 uint32
+						zb0014, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						if err != nil {
+							return
+						}
+						if cap(z.AlternativeTitles.Titles) >= int(zb0014) {
+							z.AlternativeTitles.Titles = (z.AlternativeTitles.Titles)[:zb0014]
+						} else {
+							z.AlternativeTitles.Titles = make([]*AlternativeTitle, zb0014)
+						}
+						for za0007 := range z.AlternativeTitles.Titles {
+							if msgp.IsNil(bts) {
+								bts, err = msgp.ReadNilBytes(bts)
+								if err != nil {
+									return
+								}
+								z.AlternativeTitles.Titles[za0007] = nil
+							} else {
+								if z.AlternativeTitles.Titles[za0007] == nil {
+									z.AlternativeTitles.Titles[za0007] = new(AlternativeTitle)
+								}
+								var zb0015 uint32
+								zb0015, bts, err = msgp.ReadMapHeaderBytes(bts)
+								if err != nil {
+									return
+								}
+								for zb0015 > 0 {
+									zb0015--
+									field, bts, err = msgp.ReadMapKeyZC(bts)
+									if err != nil {
+										return
+									}
+									switch msgp.UnsafeString(field) {
+									case "Iso3166_1":
+										z.AlternativeTitles.Titles[za0007].Iso3166_1, bts, err = msgp.ReadStringBytes(bts)
+										if err != nil {
+											return
+										}
+									case "Title":
+										z.AlternativeTitles.Titles[za0007].Title, bts, err = msgp.ReadStringBytes(bts)
+										if err != nil {
+											return
+										}
+									default:
+										bts, err = msgp.Skip(bts)
+										if err != nil {
+											return
+										}
+									}
+								}
+							}
+						}
+					default:
+						bts, err = msgp.Skip(bts)
+						if err != nil {
+							return
+						}
+					}
+				}
+			}
 		case "Credits":
 			if msgp.IsNil(bts) {
 				bts, err = msgp.ReadNilBytes(bts)
@@ -3956,28 +4065,28 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				}
 			}
 		case "Seasons":
-			var zb0013 uint32
-			zb0013, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0016 uint32
+			zb0016, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Seasons) >= int(zb0013) {
-				z.Seasons = (z.Seasons)[:zb0013]
+			if cap(z.Seasons) >= int(zb0016) {
+				z.Seasons = (z.Seasons)[:zb0016]
 			} else {
-				z.Seasons = make(SeasonList, zb0013)
+				z.Seasons = make(SeasonList, zb0016)
 			}
-			for za0007 := range z.Seasons {
+			for za0008 := range z.Seasons {
 				if msgp.IsNil(bts) {
 					bts, err = msgp.ReadNilBytes(bts)
 					if err != nil {
 						return
 					}
-					z.Seasons[za0007] = nil
+					z.Seasons[za0008] = nil
 				} else {
-					if z.Seasons[za0007] == nil {
-						z.Seasons[za0007] = new(Season)
+					if z.Seasons[za0008] == nil {
+						z.Seasons[za0008] = new(Season)
 					}
-					bts, err = z.Seasons[za0007].UnmarshalMsg(bts)
+					bts, err = z.Seasons[za0008].UnmarshalMsg(bts)
 					if err != nil {
 						return
 					}
@@ -4043,6 +4152,19 @@ func (z *Show) Msgsize() (s int) {
 			}
 		}
 	}
+	s += 18
+	if z.AlternativeTitles == nil {
+		s += msgp.NilSize
+	} else {
+		s += 1 + 7 + msgp.ArrayHeaderSize
+		for za0007 := range z.AlternativeTitles.Titles {
+			if z.AlternativeTitles.Titles[za0007] == nil {
+				s += msgp.NilSize
+			} else {
+				s += 1 + 10 + msgp.StringPrefixSize + len(z.AlternativeTitles.Titles[za0007].Iso3166_1) + 6 + msgp.StringPrefixSize + len(z.AlternativeTitles.Titles[za0007].Title)
+			}
+		}
+	}
 	s += 8
 	if z.Credits == nil {
 		s += msgp.NilSize
@@ -4056,11 +4178,11 @@ func (z *Show) Msgsize() (s int) {
 		s += z.Images.Msgsize()
 	}
 	s += 8 + msgp.ArrayHeaderSize
-	for za0007 := range z.Seasons {
-		if z.Seasons[za0007] == nil {
+	for za0008 := range z.Seasons {
+		if z.Seasons[za0008] == nil {
 			s += msgp.NilSize
 		} else {
-			s += z.Seasons[za0007].Msgsize()
+			s += z.Seasons[za0008].Msgsize()
 		}
 	}
 	return

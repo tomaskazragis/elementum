@@ -96,6 +96,9 @@ type Show struct {
 	Translations        *struct {
 		Translations []*Language `json:"translations"`
 	} `json:"translations"`
+	AlternativeTitles *struct {
+		Titles []*AlternativeTitle `json:"results"`
+	} `json:"alternative_titles"`
 
 	Credits *Credits `json:"credits,omitempty"`
 	Images  *Images  `json:"images,omitempty"`

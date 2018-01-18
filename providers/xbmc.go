@@ -138,12 +138,16 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 		IMDBId: movie.IMDBId,
 		Title:  NormalizeTitle(title),
 		Year:   year,
-		Titles: make(map[string]string),
+		Titles: map[string]string{
+			"Original": movie.OriginalTitle,
+		},
 	}
-	for _, title := range movie.AlternativeTitles.Titles {
-		sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
+	if movie.AlternativeTitles != nil && movie.AlternativeTitles.Titles != nil {
+		for _, title := range movie.AlternativeTitles.Titles {
+			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
+		}
 	}
-	sObject.Titles["Original"] = title
+
 	return sObject
 }
 
@@ -155,14 +159,21 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 		title = show.OriginalName
 	}
 
-	return &SeasonSearchObject{
+	sObject := &SeasonSearchObject{
 		IMDBId: show.ExternalIDs.IMDBId,
 		TVDBId: util.StrInterfaceToInt(show.ExternalIDs.TVDBID),
 		Title:  NormalizeTitle(title),
-		Titles: map[string]string{"Original": title},
+		Titles: map[string]string{"Original": show.OriginalName},
 		Year:   year,
 		Season: season.Season,
 	}
+	if show.AlternativeTitles != nil && show.AlternativeTitles.Titles != nil {
+		for _, title := range show.AlternativeTitles.Titles {
+			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
+		}
+	}
+
+	return sObject
 }
 
 // GetEpisodeSearchObject ...
@@ -207,16 +218,23 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 		}
 	}
 
-	return &EpisodeSearchObject{
+	sObject := &EpisodeSearchObject{
 		IMDBId:         show.ExternalIDs.IMDBId,
 		TVDBId:         tvdbID,
 		Title:          NormalizeTitle(title),
-		Titles:         map[string]string{"Original": title},
+		Titles:         map[string]string{"Original": show.OriginalName},
 		Season:         episode.SeasonNumber,
 		Episode:        episode.EpisodeNumber,
 		Year:           year,
 		AbsoluteNumber: absoluteNumber,
 	}
+	if show.AlternativeTitles != nil && show.AlternativeTitles.Titles != nil {
+		for _, title := range show.AlternativeTitles.Titles {
+			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
+		}
+	}
+
+	return sObject
 }
 
 func (as *AddonSearcher) call(method string, searchObject interface{}) []*bittorrent.TorrentFile {
