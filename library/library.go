@@ -361,9 +361,7 @@ func Refresh() error {
 	if err := RefreshShows(); err != nil {
 		return err
 	}
-	if changes, err := SyncTraktWatched(); err != nil {
-		return err
-	} else if changes {
+	if changes, err := SyncTraktWatched(); err == nil && changes {
 		Refresh()
 		xbmc.Refresh()
 	}

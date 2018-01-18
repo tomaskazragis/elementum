@@ -56,6 +56,7 @@ type Torrent struct {
 	rateCounter    int
 	downloadedSize int64
 	uploadedSize   int64
+	lastProgress   float64
 
 	pieceLength float64
 
@@ -208,14 +209,26 @@ func (t *Torrent) progressEvent() {
 	// }
 	// log.Noticef(strings.Repeat("=", 20))
 
-	t.downRates[t.rateCounter] = t.Torrent.BytesCompleted() - t.downloadedSize
-	t.upRates[t.rateCounter] = t.Torrent.Stats().DataBytesWritten - t.uploadedSize
+	curDownloaded := t.Torrent.BytesCompleted()
+	curUploaded := t.Torrent.Stats().DataBytesWritten
+	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
+	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize
 
-	t.downloadedSize = t.Torrent.BytesCompleted()
-	t.uploadedSize = t.Torrent.Stats().DataBytesWritten
+	if curDownloaded > t.downloadedSize {
+		t.downloadedSize = curDownloaded
+	}
+	if curUploaded > t.uploadedSize {
+		t.uploadedSize = curUploaded
+	}
 
 	t.DownloadRate = int64(average(t.downRates))
+	if t.DownloadRate < 0 {
+		t.DownloadRate = 0
+	}
 	t.UploadRate = int64(average(t.upRates))
+	if t.UploadRate < 0 {
+		t.UploadRate = 0
+	}
 
 	t.rateCounter++
 	if t.rateCounter == len(t.downRates)-1 {
@@ -447,8 +460,13 @@ func (t *Torrent) GetProgress() float64 {
 	progress := float64(t.BytesCompleted()) / float64(total) * 100.0
 	if progress > 100 {
 		progress = 100
+	} else if progress < t.lastProgress {
+		progress = t.lastProgress
 	}
 
+	// TODO: replace with proper Rate calculator
+	// when it's available in the library
+	t.lastProgress = progress
 	return progress
 }
 
