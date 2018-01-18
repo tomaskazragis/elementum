@@ -98,9 +98,42 @@ func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err err
 	return
 }
 
+// VideoLibraryGetAllSeasons ...
+func VideoLibraryGetAllSeasons() (seasons *VideoLibrarySeasons, err error) {
+	params := map[string]interface{}{"properties": []interface{}{
+		"tvshowid",
+		"season",
+		"episode",
+		"playcount",
+	}}
+	err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
+	if err != nil {
+		log.Error(err)
+	}
+	return
+}
+
 // VideoLibraryGetEpisodes ...
 func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err error) {
 	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
+		"tvshowid",
+		"uniqueid",
+		"season",
+		"episode",
+		"playcount",
+		"file",
+		"resume",
+	}}
+	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+	if err != nil {
+		log.Error(err)
+	}
+	return
+}
+
+// VideoLibraryGetAllEpisodes ...
+func VideoLibraryGetAllEpisodes() (episodes *VideoLibraryEpisodes, err error) {
+	params := map[string]interface{}{"properties": []interface{}{
 		"tvshowid",
 		"uniqueid",
 		"season",

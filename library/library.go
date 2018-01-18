@@ -361,6 +361,12 @@ func Refresh() error {
 	if err := RefreshShows(); err != nil {
 		return err
 	}
+	if err := RefreshSeasons(); err != nil {
+		return err
+	}
+	if err := RefreshEpisodes(); err != nil {
+		return err
+	}
 	if changes, err := SyncTraktWatched(); err == nil && changes {
 		Refresh()
 		xbmc.Refresh()
@@ -458,24 +464,29 @@ func RefreshShows() error {
 			UIDs:     parseUniqueID(ShowType, &s.UniqueIDs, ""),
 			Xbmc:     s,
 		}
-
-		RefreshSeasons(s.ID)
-		RefreshEpisodes(s.ID)
 	}
 
 	return nil
 }
 
 // RefreshSeasons updates seasons list for selected show in the library
-func RefreshSeasons(showID int) error {
-	seasons, err := xbmc.VideoLibraryGetSeasons(showID)
+func RefreshSeasons() error {
+	seasons, err := xbmc.VideoLibraryGetAllSeasons()
 	if seasons == nil || seasons.Seasons == nil || err != nil {
 		return errors.New("Could not fetch Seasons from Kodi")
 	}
 
-	l.Shows[showID].Seasons = map[int]*Season{}
+	l.mu.Shows.Lock()
+	defer l.mu.Shows.Unlock()
+
+	cleanupCheck := map[int]bool{}
 	for _, s := range seasons.Seasons {
-		l.Shows[showID].Seasons[s.ID] = &Season{
+		if _, ok := cleanupCheck[s.TVShowID]; !ok {
+			l.Shows[s.TVShowID].Seasons = map[int]*Season{}
+			cleanupCheck[s.TVShowID] = true
+		}
+
+		l.Shows[s.TVShowID].Seasons[s.ID] = &Season{
 			ID:       s.ID,
 			Title:    s.Title,
 			Season:   s.Season,
@@ -490,19 +501,27 @@ func RefreshSeasons(showID int) error {
 }
 
 // RefreshEpisodes updates episodes list for selected show in the library
-func RefreshEpisodes(showID int) error {
-	episodes, err := xbmc.VideoLibraryGetEpisodes(showID)
+func RefreshEpisodes() error {
+	episodes, err := xbmc.VideoLibraryGetAllEpisodes()
 	if episodes == nil || episodes.Episodes == nil || err != nil {
 		return errors.New("Could not fetch Episodes from Kodi")
 	}
 
-	show := strconv.Itoa(showID)
-	l.Shows[showID].Episodes = map[int]*Episode{}
-	for _, e := range episodes.Episodes {
-		e.UniqueIDs.Kodi = e.ID
-		e.UniqueIDs.TMDB = show
+	l.mu.Shows.Lock()
+	defer l.mu.Shows.Unlock()
 
-		l.Shows[showID].Episodes[e.ID] = &Episode{
+	cleanupCheck := map[int]bool{}
+
+	for _, e := range episodes.Episodes {
+		if _, ok := cleanupCheck[e.TVShowID]; !ok {
+			l.Shows[e.TVShowID].Episodes = map[int]*Episode{}
+			cleanupCheck[e.TVShowID] = true
+		}
+
+		e.UniqueIDs.Kodi = e.ID
+		e.UniqueIDs.TMDB = strconv.Itoa(e.TVShowID)
+
+		l.Shows[e.TVShowID].Episodes[e.ID] = &Episode{
 			ID:      e.ID,
 			Title:   e.Title,
 			Season:  e.Season,
