@@ -351,6 +351,8 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		return nil, fmt.Errorf("Download path empty")
 	}
 
+	// TODO: Make proper ExistingTorrent check, for using existing torrents,
+	// without creating new ones for each Player creation.
 	var err error
 	var torrentHandle *gotorrent.Torrent
 	if strings.HasPrefix(uri, "magnet:") {
@@ -454,11 +456,12 @@ func (s *BTService) downloadProgress() {
 	for {
 		select {
 		case <-rotateTicker.C:
-			if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
-				s.dialogProgressBG.Close()
-				s.dialogProgressBG = nil
-				continue
-			}
+			// TODO: there should be a check whether service is in Pause state
+			// if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
+			// 	s.dialogProgressBG.Close()
+			// 	s.dialogProgressBG = nil
+			// 	continue
+			// }
 
 			var totalDownloadRate int64
 			var totalUploadRate int64

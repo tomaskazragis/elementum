@@ -112,7 +112,8 @@ func (t *Torrent) Watch() {
 	// debug.PrintStack()
 
 	t.progressTicker = time.NewTicker(1 * time.Second)
-	t.bufferTicker = time.NewTicker(1 * time.Second)
+
+	t.startBufferTicker()
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.downRates = []int64{0, 0, 0, 0, 0}
@@ -143,9 +144,14 @@ func (t *Torrent) Watch() {
 			go t.seedTickerEvent()
 
 		case <-t.closing:
+			log.Debug("Stopping watch events")
 			return
 		}
 	}
+}
+
+func (t *Torrent) startBufferTicker() {
+	t.bufferTicker = time.NewTicker(1 * time.Second)
 }
 
 func (t *Torrent) bufferTickerEvent() {
@@ -294,6 +300,8 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	if file == nil {
 		return
 	}
+
+	t.startBufferTicker()
 
 	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file, 0, t.Service.GetBufferSize())
 	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file, file.Length()-endBufferSize, endBufferSize)
