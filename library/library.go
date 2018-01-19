@@ -481,6 +481,10 @@ func RefreshSeasons() error {
 
 	cleanupCheck := map[int]bool{}
 	for _, s := range seasons.Seasons {
+		if c, ok := l.Shows[s.TVShowID]; !ok || c == nil || c.Seasons == nil {
+			continue
+		}
+
 		if _, ok := cleanupCheck[s.TVShowID]; !ok {
 			l.Shows[s.TVShowID].Seasons = map[int]*Season{}
 			cleanupCheck[s.TVShowID] = true
@@ -513,6 +517,10 @@ func RefreshEpisodes() error {
 	cleanupCheck := map[int]bool{}
 
 	for _, e := range episodes.Episodes {
+		if c, ok := l.Shows[e.TVShowID]; !ok || c == nil || c.Episodes == nil {
+			continue
+		}
+
 		if _, ok := cleanupCheck[e.TVShowID]; !ok {
 			l.Shows[e.TVShowID].Episodes = map[int]*Episode{}
 			cleanupCheck[e.TVShowID] = true
