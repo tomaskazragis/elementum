@@ -17,6 +17,7 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 
 	bolt "github.com/coreos/bbolt"
+	"github.com/karrick/godirwalk"
 	"github.com/op/go-logging"
 )
 
@@ -105,7 +106,7 @@ func Migrate() (err error) {
 	kodiSources := xbmc.FilesGetSources()
 	log.Debugf("Kodi FilesGetSources: %#v", kodiSources)
 	for _, source := range kodiSources.Sources {
-		sourceDirectories = append(sourceDirectories, source.FilePath)
+		sourceDirectories = append(sourceDirectories, xbmc.TranslatePath(source.FilePath))
 	}
 
 	pluginLibrary := ""
@@ -125,15 +126,16 @@ func Migrate() (err error) {
 	log.Debugf("Using Quasar library directory: %#v", pluginLibrary)
 
 	if len(pluginLibrary) > 0 {
-		sourceDirectories = append(sourceDirectories, pluginLibrary)
+		sourceDirectories = append(sourceDirectories, xbmc.TranslatePath(pluginLibrary))
 	}
 
 	for i, source := range sourceDirectories {
-		pattern := filepath.Join(source, "**", "*.strm")
-		log.Debugf("Processing the source: %#v with pattern: %#v", source, pattern)
-		files, _ := filepath.Glob(pattern)
-		for _, f := range files {
-			sourceFiles[f] = true
+		log.Debugf("Processing the source: %s", source)
+		files := searchStrm(source)
+		if len(files) != 0 {
+			for _, f := range files {
+				sourceFiles[f] = true
+			}
 		}
 
 		progressStep = int(float64(i+1) / float64(len(sourceDirectories)) * 25)
@@ -295,4 +297,20 @@ func Migrate() (err error) {
 	log.Debugf("Ended Quasar migration")
 
 	return
+}
+
+func searchStrm(dir string) []string {
+	ret := []string{}
+
+	godirwalk.Walk(dir, &godirwalk.Options{
+		FollowSymbolicLinks: true,
+		Callback: func(osPathname string, de *godirwalk.Dirent) error {
+			if strings.HasSuffix(osPathname, ".strm") {
+				ret = append(ret, osPathname)
+			}
+			return nil
+		},
+	})
+
+	return ret
 }
