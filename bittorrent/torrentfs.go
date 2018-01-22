@@ -62,7 +62,7 @@ func GetTorrentForPath(s *BTService, path string, url string, r *http.Request) (
 		for _, f := range torrent.Files() {
 			if url[1:] == f.Path() {
 				tfsLog.Noticef("%s belongs to torrent %s", url, torrent.Name())
-				return NewFileReader(torrent, &f, r.Method)
+				return NewFileReader(torrent, f, r.Method)
 			}
 		}
 	}

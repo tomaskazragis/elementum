@@ -305,16 +305,16 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 			btp.Torrent.IsRarArchive = true
 			if !xbmc.DialogConfirm("Elementum", "LOCALIZE[30303]") {
 				btp.notEnoughSpace = true
-				return &f, errors.New("RAR archive detected and download was cancelled")
+				return f, errors.New("RAR archive detected and download was cancelled")
 			}
-			return &f, nil
+			return f, nil
 		}
 	}
 
 	if len(candidateFiles) > 1 {
 		btp.log.Info(fmt.Sprintf("There are %d candidate files", len(candidateFiles)))
 		if btp.p.FileIndex >= 0 && btp.p.FileIndex < len(candidateFiles) {
-			return &files[candidateFiles[btp.p.FileIndex]], nil
+			return files[candidateFiles[btp.p.FileIndex]], nil
 		}
 
 		choices := make(byFilename, 0, len(candidateFiles))
@@ -345,7 +345,7 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 			}
 
 			if foundMatches == 1 {
-				return &files[choices[lastMatched].Index], nil
+				return files[choices[lastMatched].Index], nil
 			}
 		}
 
@@ -358,12 +358,12 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 
 		choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
 		if choice >= 0 {
-			return &files[choices[choice].Index], nil
+			return files[choices[choice].Index], nil
 		}
 		return nil, fmt.Errorf("User cancelled")
 	}
 
-	return &files[biggestFile], nil
+	return files[biggestFile], nil
 }
 
 func (btp *BTPlayer) findSubtitlesFile() *gotorrent.File {
@@ -379,9 +379,9 @@ func (btp *BTPlayer) findSubtitlesFile() *gotorrent.File {
 	for _, file := range files {
 		fileName := file.Path()
 		if strings.HasSuffix(fileName, srtFileName) {
-			return &file
+			return file
 		} else if strings.HasSuffix(fileName, ".srt") {
-			lastMatched = &file
+			lastMatched = file
 			countMatched++
 		}
 	}
