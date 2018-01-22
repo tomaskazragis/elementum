@@ -1460,11 +1460,29 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 	watchedShows := map[int]bool{}
 	for _, s := range shows {
+		tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.Ids.Tmdb), config.Get().Language)
+		completedSeasons := 0
 		for _, season := range s.Seasons {
+			if tmdbShow != nil {
+				tmdbSeason := tmdb.GetSeason(s.Show.Ids.Tmdb, season.Number, config.Get().Language)
+				if tmdbSeason != nil && tmdbSeason.EpisodeCount == len(season.Episodes) {
+					completedSeasons++
+
+					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.Show.Ids.Tmdb, season.Number))] = true
+					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.Show.Ids.Trakt, season.Number))] = true
+				}
+			}
+
 			for _, episode := range season.Episodes {
 				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.Ids.Tmdb, season.Number, episode.Number))] = true
 				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.Ids.Trakt, season.Number, episode.Number))] = true
 			}
+		}
+
+		if tmdbShow != nil && completedSeasons == len(tmdbShow.Seasons) {
+			s.Watched = true
+			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.Show.Ids.Tmdb))] = true
+			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.Show.Ids.Trakt))] = true
 		}
 
 		var r *Show
@@ -1478,6 +1496,10 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		if r == nil {
 			continue
 		} else if r != nil {
+			if s.Watched {
+				xbmc.SetShowWatched(r.UIDs.Kodi, 1)
+			}
+
 			for _, season := range s.Seasons {
 				for _, episode := range season.Episodes {
 					e := r.GetEpisode(season.Number, episode.Number)

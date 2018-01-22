@@ -373,7 +373,8 @@ type WatchedMovie struct {
 
 // WatchedShow ...
 type WatchedShow struct {
-	Plays         int       `json:"plays"`
+	Plays         int `json:"plays"`
+	Watched       bool
 	LastWatchedAt time.Time `json:"last_watched_at"`
 	Show          struct {
 		Title string `json:"title"`

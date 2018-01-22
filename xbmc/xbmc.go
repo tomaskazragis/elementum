@@ -164,6 +164,16 @@ func SetMovieWatched(movieID int, playcount int, position int, total int) (ret s
 	return
 }
 
+// SetShowWatched ...
+func SetShowWatched(showID int, playcount int) (ret string) {
+	params := map[string]interface{}{
+		"tvshowid":  showID,
+		"playcount": playcount,
+	}
+	executeJSONRPCO("VideoLibrary.SetTVShowDetails", &ret, params)
+	return
+}
+
 // SetEpisodeWatched ...
 func SetEpisodeWatched(episodeID int, playcount int, position int, total int) (ret string) {
 	params := map[string]interface{}{
