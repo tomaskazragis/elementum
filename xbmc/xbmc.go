@@ -43,7 +43,7 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Error getting movies: %#v", err)
 	}
 	return
 }
@@ -78,7 +78,7 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 	}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Error getting tvshows: %#v", err)
 	}
 	return
 }
@@ -93,7 +93,7 @@ func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err err
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Error getting seasons: %#v", err)
 	}
 	return
 }
@@ -108,7 +108,7 @@ func VideoLibraryGetAllSeasons() (seasons *VideoLibrarySeasons, err error) {
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Error getting seasons: %#v", err)
 	}
 	return
 }
@@ -126,7 +126,7 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Error getting episodes: %#v", err)
 	}
 	return
 }

@@ -405,6 +405,7 @@ func RefreshMovies() error {
 	if movies == nil || movies.Movies == nil {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
+	log.Debugf("Fetched %d movies from Kodi Library", len(movies.Movies))
 
 	l.Movies = map[int]*Movie{}
 	for _, m := range movies.Movies {
@@ -448,9 +449,11 @@ func RefreshShows() error {
 		}
 		break
 	}
+
 	if shows == nil || shows.Shows == nil {
 		return errors.New("Could not fetch Shows from Kodi")
 	}
+	log.Debugf("Fetched %d shows from Kodi Library", len(shows.Shows))
 
 	l.mu.Shows.Lock()
 	defer l.mu.Shows.Unlock()
@@ -474,10 +477,21 @@ func RefreshShows() error {
 
 // RefreshSeasons updates seasons list for selected show in the library
 func RefreshSeasons() error {
-	seasons, err := xbmc.VideoLibraryGetAllSeasons()
-	if seasons == nil || seasons.Seasons == nil || err != nil {
+	var seasons *xbmc.VideoLibrarySeasons
+	for tries := 1; tries <= 3; tries++ {
+		var err error
+		seasons, err = xbmc.VideoLibraryGetAllSeasons()
+		if seasons == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+		break
+	}
+
+	if seasons == nil || seasons.Seasons == nil {
 		return errors.New("Could not fetch Seasons from Kodi")
 	}
+	log.Debugf("Fetched %d seasons from Kodi Library", len(seasons.Seasons))
 
 	l.mu.Shows.Lock()
 	defer l.mu.Shows.Unlock()
@@ -509,10 +523,21 @@ func RefreshSeasons() error {
 
 // RefreshEpisodes updates episodes list for selected show in the library
 func RefreshEpisodes() error {
-	episodes, err := xbmc.VideoLibraryGetAllEpisodes()
-	if episodes == nil || episodes.Episodes == nil || err != nil {
+	var episodes *xbmc.VideoLibraryEpisodes
+	for tries := 1; tries <= 3; tries++ {
+		var err error
+		episodes, err = xbmc.VideoLibraryGetAllEpisodes()
+		if episodes == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+		break
+	}
+
+	if episodes == nil || episodes.Episodes == nil {
 		return errors.New("Could not fetch Episodes from Kodi")
 	}
+	log.Debugf("Fetched %d episodes from Kodi Library", len(episodes.Episodes))
 
 	l.mu.Shows.Lock()
 	defer l.mu.Shows.Unlock()
