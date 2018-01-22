@@ -321,7 +321,7 @@ func Reload() *Configuration {
 		newConfig.KeepFilesPlaying = 2
 
 		// TODO: Do we need this?
-		newConfig.SeedTimeLimit = 0
+		// newConfig.SeedTimeLimit = 0
 	}
 
 	lock.Lock()
