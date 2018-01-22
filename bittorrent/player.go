@@ -2,6 +2,7 @@ package bittorrent
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -753,47 +754,24 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 		return
 	}
 
-	b, err := ioutil.ReadFile(btp.Torrent.TorrentPath)
-	if err != nil {
-		return
-	}
+	var buf bytes.Buffer
+	btp.Torrent.Torrent.Metainfo().Write(&buf)
+	b := buf.Bytes()
 
 	show := tmdb.GetShow(btp.p.ShowID, config.Get().Language)
 	if show == nil {
 		return
 	}
 
-	now := time.Now().UTC()
-	addSpecials := config.Get().AddSpecials
-
 	for _, season := range show.Seasons {
 		if season.EpisodeCount == 0 {
 			continue
 		}
-		if config.Get().ShowUnairedSeasons == false {
-			firstAired, _ := time.Parse("2006-01-02", show.FirstAirDate)
-			if firstAired.After(now) {
-				continue
-			}
-		}
-		if addSpecials == false && season.Season == 0 {
-			continue
-		}
-
 		episodes := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language).Episodes
 
 		for _, episode := range episodes {
 			if episode == nil {
 				continue
-			}
-			if config.Get().ShowUnairedEpisodes == false {
-				if episode.AirDate == "" {
-					continue
-				}
-				firstAired, _ := time.Parse("2006-01-02", episode.AirDate)
-				if firstAired.After(now) {
-					continue
-				}
 			}
 
 			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season.Season, episode.EpisodeNumber))
