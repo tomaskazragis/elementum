@@ -241,6 +241,7 @@ func Init() {
 				if config.Get().UpdateAutoScan && Scanning == false {
 					Scanning = true
 					xbmc.VideoLibraryScan()
+					Scanning = false
 				}
 			}
 		}()
@@ -300,6 +301,7 @@ func Init() {
 				if config.Get().UpdateAutoScan && Scanning == false && updateFrequency != traktFrequency {
 					Scanning = true
 					xbmc.VideoLibraryScan()
+					Scanning = false
 				}
 			}
 		case <-traktSyncTicker.C:
@@ -310,6 +312,7 @@ func Init() {
 				if config.Get().UpdateAutoScan && Scanning == false {
 					Scanning = true
 					xbmc.VideoLibraryScan()
+					Scanning = false
 				}
 			}
 		case <-markedForRemovalTicker.C:
