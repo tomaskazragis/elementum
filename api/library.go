@@ -168,6 +168,7 @@ func UpdateLibrary(ctx *gin.Context) {
 
 // UpdateTrakt ...
 func UpdateTrakt(ctx *gin.Context) {
+	xbmc.Notify("Elementum", "LOCALIZE[30358]", config.AddonIcon())
 	if err := library.RefreshTrakt(); err != nil {
 		ctx.String(200, err.Error())
 	}
