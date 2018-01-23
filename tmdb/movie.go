@@ -43,7 +43,7 @@ func GetImages(movieID int) *Images {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieID), config.AddonIcon())
+				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieID), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", movieID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -87,7 +87,7 @@ func GetMovieByID(movieID string, language string) *Movie {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting movie %s, check your logs.", movieID), config.AddonIcon())
+				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting movie %s, check your logs.", movieID), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting movie %s, cooling down...", movieID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -95,7 +95,7 @@ func GetMovieByID(movieID string, language string) *Movie {
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting movie %s: %d", movieID, resp.Status())
 				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
+				// xbmc.Notify("Elementum", message, config.AddonIcon())
 				return util.ErrHTTP
 			}
 			if movie != nil {

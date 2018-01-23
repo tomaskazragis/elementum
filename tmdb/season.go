@@ -33,7 +33,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+				// xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -41,7 +41,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
 				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
+				// xbmc.Notify("Elementum", message, config.AddonIcon())
 				return util.ErrHTTP
 			}
 

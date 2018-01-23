@@ -45,7 +45,7 @@ func GetShowImages(showID int) *Images {
 			)
 			if err != nil {
 				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
+				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -100,7 +100,7 @@ func GetShow(showID int, language string) (show *Show) {
 					log.Error(err)
 				}
 				LogError(err)
-				xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
+				// xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -108,7 +108,7 @@ func GetShow(showID int, language string) (show *Show) {
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
 				log.Warning(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
+				// xbmc.Notify("Elementum", message, config.AddonIcon())
 				return util.ErrHTTP
 			}
 
