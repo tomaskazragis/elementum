@@ -194,7 +194,11 @@ func (t *Torrent) bufferTickerEvent() {
 		}
 
 		total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
-		t.BufferProgress = (total - progressCount) / total * 100
+		// Making sure current progress is not less then previous
+		thisProgress := (total - progressCount) / total * 100
+		if thisProgress > t.BufferProgress {
+			t.BufferProgress = thisProgress
+		}
 
 		if t.BufferProgress >= 100 {
 			t.bufferFinished <- struct{}{}
