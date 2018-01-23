@@ -141,6 +141,26 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	progressUpdate := make(chan string)
 
 	wg := sync.WaitGroup{}
+	for torrent := range torrentsChan {
+		wg.Add(1)
+		if !strings.HasPrefix(torrent.URI, "magnet") {
+			progressTotal++
+		}
+		torrents = append(torrents, torrent)
+		go func(torrent *bittorrent.TorrentFile) {
+			defer wg.Done()
+			if err := torrent.Resolve(); err != nil {
+				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
+			}
+			if !strings.HasPrefix(torrent.URI, "magnet") {
+				progress++
+				progressUpdate <- "LOCALIZE[30117]"
+			} else {
+				progressUpdate <- "skip"
+			}
+		}(torrent)
+	}
+
 	dialogProgressBG := xbmc.NewDialogProgressBG("Elementum", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
 	go func() {
 		for {
@@ -161,26 +181,6 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 			}
 		}
 	}()
-
-	for torrent := range torrentsChan {
-		wg.Add(1)
-		if !strings.HasPrefix(torrent.URI, "magnet") {
-			progressTotal++
-		}
-		torrents = append(torrents, torrent)
-		go func(torrent *bittorrent.TorrentFile) {
-			defer wg.Done()
-			if err := torrent.Resolve(); err != nil {
-				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
-			}
-			if !strings.HasPrefix(torrent.URI, "magnet") {
-				progress++
-				progressUpdate <- "LOCALIZE[30117]"
-			} else {
-				progressUpdate <- "skip"
-			}
-		}(torrent)
-	}
 
 	wg.Wait()
 
