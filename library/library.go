@@ -690,18 +690,19 @@ func parseUniqueID(entityType int, xbmcIDs *xbmc.UniqueIDs, fileName string) (i 
 		}
 	}
 
+	// TODO: Remove if not wanted anymore
 	// Try to match from selected Scraper setting
-	if len(xbmcIDs.Unknown) > 0 {
-		switch config.Get().TvScraper {
-		case TMDBScraper:
-			break
-		case TVDBScraper:
-			i.TMDB = findTMDBIDs(entityType, "tvdb_id", xbmcIDs.Unknown)
-		case TraktScraper:
-			ids := findTraktIDs(entityType, TMDBScraper, strconv.Itoa(i.TMDB))
-			i.TMDB = ids.TMDB
-		}
-	}
+	// if len(xbmcIDs.Unknown) > 0 {
+	// 	switch config.Get().TvScraper {
+	// 	case TMDBScraper:
+	// 		break
+	// 	case TVDBScraper:
+	// 		i.TMDB = findTMDBIDs(entityType, "tvdb_id", xbmcIDs.Unknown)
+	// 	case TraktScraper:
+	// 		ids := findTraktIDs(entityType, TMDBScraper, strconv.Itoa(i.TMDB))
+	// 		i.TMDB = ids.TMDB
+	// 	}
+	// }
 
 	// At last, try to read TMDB id from file
 	if i.TMDB != 0 || len(fileName) == 0 || !strings.HasSuffix(fileName, ".strm") {
