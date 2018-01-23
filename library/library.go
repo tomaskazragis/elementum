@@ -353,7 +353,7 @@ func Init() {
 	}
 }
 
-// Refresh is updateing library from Kodi
+// Refresh is updating library from Kodi
 func Refresh() error {
 	if TraktScanning {
 		return nil
@@ -369,10 +369,6 @@ func Refresh() error {
 	}
 	if err := RefreshEpisodes(); err != nil {
 		return err
-	}
-	if changes, err := SyncTraktWatched(); err == nil && changes {
-		Refresh()
-		xbmc.Refresh()
 	}
 
 	log.Debug("Library refresh finished")

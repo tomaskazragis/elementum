@@ -728,7 +728,10 @@ func (btp *BTPlayer) UpdateWatched() {
 			}
 		}
 
-		if config.Get().TraktToken != "" && watched != nil {
+		// We set Trakt watched only if it's not in Kodi library
+		// to track items that are started from Elementum lists
+		// otherwise we will get Watched items set twice in Trakt
+		if config.Get().TraktToken != "" && watched != nil && btp.p.KodiID == 0 {
 			log.Debugf("Setting Trakt watched for: %#v", watched)
 			go trakt.SetWatched(watched)
 		}
@@ -738,10 +741,9 @@ func (btp *BTPlayer) UpdateWatched() {
 		} else if btp.p.ContentType == episodeType {
 			xbmc.SetEpisodeWatched(btp.p.KodiID, 0, int(btp.p.WatchedTime), int(btp.p.VideoDuration))
 		}
-	} else {
-		time.Sleep(200 * time.Millisecond)
-		xbmc.Refresh()
 	}
+	time.Sleep(200 * time.Millisecond)
+	xbmc.Refresh()
 }
 
 // IsWatched ...

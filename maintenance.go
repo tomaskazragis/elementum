@@ -136,40 +136,43 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 
 		log.Infof("Stopped at %f%%", progress)
 
-		if stopped.Ended && progress > 90 {
-			var watched *trakt.WatchedItem
-			if stopped.Item.Type == movieType {
-				xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
-				watched = &trakt.WatchedItem{
-					MediaType: stopped.Item.Type,
-					Movie:     p.Params().TMDBId,
-					Watched:   true,
-				}
-			} else {
-				xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
-				watched = &trakt.WatchedItem{
-					MediaType: stopped.Item.Type,
-					Show:      p.Params().ShowID,
-					Season:    p.Params().Season,
-					Episode:   p.Params().Episode,
-					Watched:   true,
-				}
-			}
-
-			if config.Get().TraktToken != "" && watched != nil {
-				log.Debugf("Settings Trakt watched: %#v", watched)
-				go trakt.SetWatched(watched)
-			}
-		} else if p.Params().WatchedTime > 180 {
-			if stopped.Item.Type == movieType {
-				xbmc.SetMovieWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
-			} else {
-				xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
-			}
-		} else {
-			time.Sleep(200 * time.Millisecond)
-			xbmc.Refresh()
-		}
+		// General Watched state management moved to Player
+		// because we always play with it, non-plugin plays should be on Kodi's
+		// side
+		// if stopped.Ended && progress > 90 {
+		// 	var watched *trakt.WatchedItem
+		// 	if stopped.Item.Type == movieType {
+		// 		xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
+		// 		watched = &trakt.WatchedItem{
+		// 			MediaType: stopped.Item.Type,
+		// 			Movie:     p.Params().TMDBId,
+		// 			Watched:   true,
+		// 		}
+		// 	} else {
+		// 		xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
+		// 		watched = &trakt.WatchedItem{
+		// 			MediaType: stopped.Item.Type,
+		// 			Show:      p.Params().ShowID,
+		// 			Season:    p.Params().Season,
+		// 			Episode:   p.Params().Episode,
+		// 			Watched:   true,
+		// 		}
+		// 	}
+		//
+		// 	if config.Get().TraktToken != "" && watched != nil {
+		// 		log.Debugf("Settings Trakt watched: %#v", watched)
+		// 		go trakt.SetWatched(watched)
+		// 	}
+		// } else if p.Params().WatchedTime > 180 {
+		// 	if stopped.Item.Type == movieType {
+		// 		xbmc.SetMovieWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
+		// 	} else {
+		// 		xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
+		// 	}
+		// } else {
+		// 	time.Sleep(200 * time.Millisecond)
+		// 	xbmc.Refresh()
+		// }
 
 	case "VideoLibrary.OnUpdate":
 		if library.Scanning {
@@ -184,8 +187,11 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			} `json:"item"`
 			Playcount int `json:"playcount"`
 		}
+		request.Playcount = -1
 		if err := json.Unmarshal(jsonData, &request); err != nil {
 			log.Error(err)
+			return
+		} else if request.Playcount == -1 {
 			return
 		}
 
@@ -230,6 +236,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 
 			if watched != nil {
 				watched.Watched = request.Playcount > 0
+				log.Debugf("Updating Trakt after onUpdate: %#v", watched)
 				go trakt.SetWatched(watched)
 			}
 		}
@@ -238,11 +245,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			return
 		}
 
-		if request.Item.Type == movieType {
-			library.RefreshMovies()
-		} else {
-			library.RefreshShows()
-		}
+		library.Refresh()
 		xbmc.Refresh()
 
 	case "VideoLibrary.OnRemove":
@@ -273,6 +276,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 				log.Warning("Nothing left to remove from Elementum")
 			}
 		}
+
+		library.Refresh()
 
 	case "VideoLibrary.OnScanFinished":
 		// library.Scanning = false

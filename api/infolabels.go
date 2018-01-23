@@ -111,6 +111,7 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := episode.ToListItem(show)
 		if libraryItem := library.FindEpisodeInLibrary(show, episode); libraryItem != nil {
+			log.Debugf("Found episode in library: %+v", libraryItem)
 			item.Info.DBID = libraryItem.ID
 		}
 
@@ -133,6 +134,7 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := movie.ToListItem()
 		if libraryItem := library.FindMovieInLibrary(movie); libraryItem != nil {
+			log.Debugf("Found movie in library: %+v", libraryItem)
 			item.Info.DBID = libraryItem.ID
 		}
 

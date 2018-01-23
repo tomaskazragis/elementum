@@ -39,17 +39,6 @@ func FindByIDMovieInLibrary(id string) *xbmc.VideoLibraryMovieItem {
 
 // FindMovieInLibrary ...
 func FindMovieInLibrary(movie *tmdb.Movie) *xbmc.VideoLibraryMovieItem {
-	// query := strconv.Itoa(movie.ID)
-	// id := 0
-	//
-	// l.mu.UIDs.RLock()
-	// for _, u := range l.UIDs {
-	// 	if u.TMDB == query {
-	// 		id, _ = u.Kodi
-	// 	}
-	// }
-	// l.mu.UIDs.RUnlock()
-
 	if movie.ID == 0 || len(l.Movies) == 0 {
 		return nil
 	}
@@ -63,14 +52,6 @@ func FindMovieInLibrary(movie *tmdb.Movie) *xbmc.VideoLibraryMovieItem {
 		}
 	}
 
-	// for _, existingMovie := range l.Movies {
-	// 	if existingMovie.IMDBNumber != "" {
-	// 		if existingMovie.IMDBNumber == movie.IMDBId {
-	// 			return existingMovie
-	// 		}
-	// 	}
-	// }
-
 	return nil
 }
 
@@ -80,27 +61,16 @@ func FindEpisodeInLibrary(show *tmdb.Show, episode *tmdb.Episode) *xbmc.VideoLib
 		return nil
 	}
 
-	// query := strconv.Itoa(episode.ID)
-	// id := 0
-	//
-	// l.mu.UIDs.RLock()
-	// for _, u := range l.UIDs {
-	// 	if u.TMDB == query {
-	// 		id, _ = strconv.Atoi(u.Kodi)
-	// 	}
-	// }
-	// l.mu.UIDs.RUnlock()
-
-	// if id == 0 {
-	// 	return nil
-	// }
-
 	l.mu.Shows.RLock()
 	defer l.mu.Shows.RUnlock()
 
 	for _, existingShow := range l.Shows {
+		if existingShow.UIDs.TMDB != show.ID {
+			continue
+		}
+
 		for _, existingEpisode := range existingShow.Episodes {
-			if existingEpisode.UIDs.TMDB == episode.ID {
+			if existingEpisode.Season == episode.SeasonNumber && existingEpisode.Episode == episode.EpisodeNumber {
 				return existingEpisode.Xbmc
 			}
 		}
@@ -114,7 +84,6 @@ func GetLibraryMovie(kodiID int) *Movie {
 	l.mu.Movies.Lock()
 	defer l.mu.Movies.Unlock()
 
-	// query := strconv.Itoa(kodiID)
 	for _, m := range l.Movies {
 		if m.UIDs.Kodi == kodiID {
 			return m
