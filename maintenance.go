@@ -45,6 +45,28 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 	}
 
 	switch method {
+	// TODO: Investigave whether we can use "Position: 0"
+	// to detect we don't need to resume
+	// case "Playlist.OnAdd":
+	// 	p := s.GetActivePlayer()
+	// 	if p == nil || p.Params().VideoDuration == 0 {
+	// 		return
+	// 	}
+	// 	var request struct {
+	// 		Item struct {
+	// 			ID   int    `json:"id"`
+	// 			Type string `json:"type"`
+	// 		} `json:"item"`
+	// 		Position int `json:"position"`
+	// 	}
+	// 	request.Position = -1
+	//
+	// 	if err := json.Unmarshal(jsonData, &request); err != nil {
+	// 		log.Error(err)
+	// 		return
+	// 	}
+	// 	log.Debugf("Processing request: %#v", request)
+
 	case "Player.OnSeek":
 		p := s.GetActivePlayer()
 		if p == nil || p.Params().VideoDuration == 0 {
@@ -73,11 +95,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			p.Params().Paused = false
 			return
 		}
-		if !p.Params().FromLibrary {
-			return
-		}
-		libraryResume := config.Get().LibraryResume
-		if libraryResume == 0 {
+		if !p.Params().FromLibrary || !config.Get().PlayResume {
 			return
 		}
 		var started struct {
@@ -99,13 +117,13 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 
 		if started.Item.Type == movieType {
 			movie := library.GetMovie(started.Item.ID)
-			if movie == nil || (libraryResume == 2 && s.HasTorrent(uids.TMDB)) {
+			if movie == nil {
 				return
 			}
 			position = movie.Resume.Position
 		} else {
 			episode := library.GetEpisode(started.Item.ID)
-			if episode == nil || (libraryResume == 2 && s.HasTorrent(uids.TMDB)) {
+			if episode == nil {
 				return
 			}
 			position = episode.Resume.Position
