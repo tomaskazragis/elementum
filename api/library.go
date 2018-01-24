@@ -7,6 +7,7 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/library"
+	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,9 @@ func AddMovie(ctx *gin.Context) {
 		ctx.String(200, err.Error())
 		return
 	}
+	if config.Get().TraktToken != "" {
+		go trakt.AddToCollection("movies", tmdbID)
+	}
 
 	if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", movie.Title)) {
 		xbmc.VideoLibraryScan()
@@ -78,9 +82,13 @@ func AddMoviesList(ctx *gin.Context) {
 // RemoveMovie ...
 func RemoveMovie(ctx *gin.Context) {
 	tmdbID, _ := strconv.Atoi(ctx.Params.ByName("tmdbId"))
+	tmdbStr := ctx.Params.ByName("tmdbId")
 	movie, err := library.RemoveMovie(tmdbID)
 	if err != nil {
 		ctx.String(200, err.Error())
+	}
+	if config.Get().TraktToken != "" {
+		go trakt.RemoveFromCollection("movies", tmdbStr)
 	}
 
 	if ctx != nil {
@@ -107,6 +115,9 @@ func AddShow(ctx *gin.Context) {
 	if err != nil {
 		ctx.String(200, err.Error())
 		return
+	}
+	if config.Get().TraktToken != "" {
+		go trakt.AddToCollection("shows", tmdbID)
 	}
 
 	label := "LOCALIZE[30277]"
@@ -143,6 +154,9 @@ func RemoveShow(ctx *gin.Context) {
 	show, err := library.RemoveShow(tmdbID)
 	if err != nil {
 		ctx.String(200, err.Error())
+	}
+	if config.Get().TraktToken != "" {
+		go trakt.RemoveFromCollection("shows", tmdbID)
 	}
 
 	if ctx != nil {
