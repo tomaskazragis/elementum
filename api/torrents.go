@@ -7,10 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
-	"unicode"
 
-	"github.com/cloudflare/ahocorasick"
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
@@ -65,42 +62,13 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
-		if len(torrent.URI) > 0 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name)) {
+		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name))) {
 			return torrent
 		}
 		database.Get().Delete(HistoryBucket, tmdbID)
 	}
 
 	return nil
-}
-
-func nameMatch(torrentName string, itemName string) bool {
-	patterns := strings.FieldsFunc(strings.ToLower(itemName), func(r rune) bool {
-		if unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsMark(r) {
-			return true
-		}
-		return false
-	})
-
-	m := ahocorasick.NewStringMatcher(patterns)
-
-	found := m.Match([]byte(strings.ToLower(torrentName)))
-
-	return len(found) >= len(patterns)
-}
-
-// ExistingTorrent ...
-func ExistingTorrent(btService *bittorrent.BTService, longName string) (existingTorrent string) {
-	for _, torrent := range btService.Torrents {
-		if nameMatch(torrent.Name(), longName) {
-			infoHash := torrent.InfoHash()
-			torrentFile := filepath.Join(config.Get().TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-			torrentsLog.Debugf("Existing: %#v", torrentFile)
-			return torrentFile
-		}
-	}
-
-	return ""
 }
 
 // ListTorrents ...

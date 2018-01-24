@@ -40,7 +40,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		existingTorrent := ExistingTorrent(btService, query)
+		existingTorrent := btService.HasTorrentByName(query)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", existingTorrent))
 			return

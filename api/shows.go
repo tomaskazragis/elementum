@@ -415,10 +415,11 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 
 		longName := fmt.Sprintf("%s Season %02d", show.Name, seasonNumber)
 
-		existingTorrent := ExistingTorrent(btService, longName)
-		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
+		existingTorrent := btService.HasTorrentBySeason(showID, seasonNumber)
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]")) {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", existingTorrent,
+				URLForXBMC("/play"),
+				"resume", existingTorrent,
 				"tmdb", strconv.Itoa(season.ID),
 				"library", library,
 				"type", "episode")
@@ -583,10 +584,11 @@ func ShowEpisodeLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Han
 
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 
-		existingTorrent := ExistingTorrent(btService, longName)
-		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
+		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]")) {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", existingTorrent,
+				URLForXBMC("/play"),
+				"resume", existingTorrent,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),
@@ -718,11 +720,11 @@ func ShowEpisodePlay(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 			return
 		}
 
-		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
-		existingTorrent := ExistingTorrent(btService, longName)
+		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
 		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
 			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", existingTorrent,
+				URLForXBMC("/play"),
+				"resume", existingTorrent,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),

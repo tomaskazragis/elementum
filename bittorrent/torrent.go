@@ -568,8 +568,8 @@ func (t *Torrent) Resume() {
 }
 
 // GetDBItem ...
-func (t *Torrent) GetDBItem() {
-	t.DBItem = t.Service.GetDBItem(t.InfoHash())
+func (t *Torrent) GetDBItem() *database.BTItem {
+	return t.DBItem
 }
 
 func average(xs []int64) float64 {

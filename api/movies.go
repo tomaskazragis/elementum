@@ -375,8 +375,8 @@ func MovieLinks(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFu
 			return
 		}
 
-		existingTorrent := ExistingTorrent(btService, movie.Title)
-		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
+		existingTorrent := btService.HasTorrentByID(movie.ID)
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]")) {
 			rURL := URLQuery(
 				URLForXBMC("/play"), "uri", existingTorrent,
 				"tmdb", tmdbID,
@@ -487,8 +487,8 @@ func MoviePlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFun
 			return
 		}
 
-		existingTorrent := ExistingTorrent(btService, movie.Title)
-		if existingTorrent != "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]") {
+		existingTorrent := btService.HasTorrentByID(movie.ID)
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]")) {
 			rURL := URLQuery(
 				URLForXBMC("/play"), "uri", existingTorrent,
 				"tmdb", tmdbID,

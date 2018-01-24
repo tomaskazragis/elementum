@@ -33,6 +33,7 @@ type Configuration struct {
 	ForceUseTrakt       bool
 	ResultsPerPage      int
 	EnableOverlayStatus bool
+	SilentStreamStart   bool
 	ChooseStreamAuto    bool
 	ForceLinkType       bool
 	UseOriginalTitle    bool
@@ -71,7 +72,7 @@ type Configuration struct {
 	UpdateFrequency    int
 	UpdateDelay        int
 	UpdateAutoScan     bool
-	LibraryResume      int
+	PlayResume         bool
 	UseCloudHole       bool
 	CloudHoleKey       string
 	TMDBApiKey         string
@@ -250,6 +251,7 @@ func Reload() *Configuration {
 		ForceUseTrakt:       settings["force_use_trakt"].(bool),
 		ResultsPerPage:      settings["results_per_page"].(int),
 		EnableOverlayStatus: settings["enable_overlay_status"].(bool),
+		SilentStreamStart:   settings["silent_stream_start"].(bool),
 		ChooseStreamAuto:    settings["choose_stream_auto"].(bool),
 		ForceLinkType:       settings["force_link_type"].(bool),
 		UseOriginalTitle:    settings["use_original_title"].(bool),
@@ -282,7 +284,7 @@ func Reload() *Configuration {
 		UpdateFrequency:    settings["library_update_frequency"].(int),
 		UpdateDelay:        settings["library_update_delay"].(int),
 		UpdateAutoScan:     settings["library_auto_scan"].(bool),
-		LibraryResume:      settings["library_resume"].(int),
+		PlayResume:         settings["play_resume"].(bool),
 		UseCloudHole:       settings["use_cloudhole"].(bool),
 		CloudHoleKey:       settings["cloudhole_key"].(string),
 		TMDBApiKey:         settings["tmdb_api_key"].(string),

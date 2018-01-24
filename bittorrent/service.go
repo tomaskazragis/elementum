@@ -676,7 +676,7 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 	case Delete:
 		return database.Get().Delete(Bucket, InfoHash)
 	case Update:
-		item := database.BTItem{
+		item := &database.BTItem{
 			State:   Active,
 			ID:      ID,
 			Type:    Type,
@@ -701,11 +701,13 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 }
 
 // GetDBItem ...
-func (s *BTService) GetDBItem(infoHash string) (dbItem *database.BTItem) {
-	if err := database.Get().GetObject(Bucket, infoHash, dbItem); err != nil {
+func (s *BTService) GetDBItem(infoHash string) *database.BTItem {
+	item := &database.BTItem{}
+	if err := database.Get().GetObject(Bucket, infoHash, item); err != nil {
 		return nil
 	}
-	return dbItem
+
+	return item
 }
 
 // SetDownloadLimit ...
@@ -883,8 +885,8 @@ func (s *BTService) GetActivePlayer() *BTPlayer {
 	return nil
 }
 
-// HasTorrent checks whether there is active torrent for queried tmdb id
-func (s *BTService) HasTorrent(tmdbID int) bool {
+// HasTorrentByID checks whether there is active torrent for queried tmdb id
+func (s *BTService) HasTorrentByID(tmdbID int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -894,9 +896,63 @@ func (s *BTService) HasTorrent(tmdbID int) bool {
 		}
 
 		if t.DBItem.ID == tmdbID {
-			return true
+			return t.InfoHash()
 		}
 	}
 
-	return false
+	return ""
+}
+
+// HasTorrentBySeason checks whether there is active torrent for queried season
+func (s *BTService) HasTorrentBySeason(tmdbID int, season int) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil || t.DBItem == nil {
+			continue
+		}
+
+		if t.DBItem.ShowID == tmdbID && t.DBItem.Season == season {
+			return t.InfoHash()
+		}
+	}
+
+	return ""
+}
+
+// HasTorrentByEpisode checks whether there is active torrent for queried episode
+func (s *BTService) HasTorrentByEpisode(tmdbID int, season, episode int) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil || t.DBItem == nil {
+			continue
+		}
+
+		if t.DBItem.ShowID == tmdbID && t.DBItem.Season == season && t.DBItem.Episode == episode {
+			return t.InfoHash()
+		}
+	}
+
+	return ""
+}
+
+// HasTorrentByName checks whether there is active torrent for queried name
+func (s *BTService) HasTorrentByName(query string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil {
+			continue
+		}
+
+		if strings.Contains(t.Name(), query) {
+			return t.InfoHash()
+		}
+	}
+
+	return ""
 }
