@@ -1327,6 +1327,14 @@ func ClearPageCache() {
 	xbmc.Refresh()
 }
 
+// ClearCacheKey deletes specific key
+func ClearCacheKey(key string) {
+	cacheDB := database.GetCache()
+	if cacheDB != nil {
+		cacheDB.Delete(database.CommonBucket, key)
+	}
+}
+
 // ClearTraktCache deletes cached trakt data
 func ClearTraktCache() {
 	cacheDB := database.GetCache()

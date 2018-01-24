@@ -13,10 +13,15 @@ var cmdLog = logging.MustGetLogger("cmd")
 
 // ClearCache ...
 func ClearCache(ctx *gin.Context) {
+	key := ctx.Params.ByName("key")
 	if ctx != nil {
 		ctx.Abort()
 	}
-	library.ClearPageCache()
+	if key != "" {
+		library.ClearCacheKey(key)
+	} else {
+		library.ClearPageCache()
+	}
 	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
 }
 
