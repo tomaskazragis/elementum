@@ -2589,6 +2589,109 @@ func (z *Object) Msgsize() (s int) {
 }
 
 // MarshalMsg implements msgp.Marshaler
+func (z *ProgressShow) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 2
+	// string "Episode"
+	o = append(o, 0x82, 0xa7, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65)
+	if z.Episode == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.Episode.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	// string "Show"
+	o = append(o, 0xa4, 0x53, 0x68, 0x6f, 0x77)
+	if z.Show == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.Show.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *ProgressShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Episode":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.Episode = nil
+			} else {
+				if z.Episode == nil {
+					z.Episode = new(Episode)
+				}
+				bts, err = z.Episode.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+			}
+		case "Show":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.Show = nil
+			} else {
+				if z.Show == nil {
+					z.Show = new(Show)
+				}
+				bts, err = z.Show.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *ProgressShow) Msgsize() (s int) {
+	s = 1 + 8
+	if z.Episode == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.Episode.Msgsize()
+	}
+	s += 5
+	if z.Show == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.Show.Msgsize()
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
 func (z *Season) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 8
@@ -3562,10 +3665,13 @@ func (z *UserSettings) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *WatchedItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 6
+	// map header, size 7
 	// string "MediaType"
-	o = append(o, 0x86, 0xa9, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x54, 0x79, 0x70, 0x65)
+	o = append(o, 0x87, 0xa9, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x54, 0x79, 0x70, 0x65)
 	o = msgp.AppendString(o, z.MediaType)
+	// string "KodiID"
+	o = append(o, 0xa6, 0x4b, 0x6f, 0x64, 0x69, 0x49, 0x44)
+	o = msgp.AppendInt(o, z.KodiID)
 	// string "Movie"
 	o = append(o, 0xa5, 0x4d, 0x6f, 0x76, 0x69, 0x65)
 	o = msgp.AppendInt(o, z.Movie)
@@ -3602,6 +3708,11 @@ func (z *WatchedItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		switch msgp.UnsafeString(field) {
 		case "MediaType":
 			z.MediaType, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "KodiID":
+			z.KodiID, bts, err = msgp.ReadIntBytes(bts)
 			if err != nil {
 				return
 			}
@@ -3643,7 +3754,7 @@ func (z *WatchedItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *WatchedItem) Msgsize() (s int) {
-	s = 1 + 10 + msgp.StringPrefixSize + len(z.MediaType) + 6 + msgp.IntSize + 5 + msgp.IntSize + 7 + msgp.IntSize + 8 + msgp.IntSize + 8 + msgp.BoolSize
+	s = 1 + 10 + msgp.StringPrefixSize + len(z.MediaType) + 7 + msgp.IntSize + 6 + msgp.IntSize + 5 + msgp.IntSize + 7 + msgp.IntSize + 8 + msgp.IntSize + 8 + msgp.BoolSize
 	return
 }
 
@@ -3658,27 +3769,15 @@ func (z *WatchedMovie) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0xad, 0x4c, 0x61, 0x73, 0x74, 0x57, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64, 0x41, 0x74)
 	o = msgp.AppendTime(o, z.LastWatchedAt)
 	// string "Movie"
-	// map header, size 3
-	// string "Title"
-	o = append(o, 0xa5, 0x4d, 0x6f, 0x76, 0x69, 0x65, 0x83, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
-	o = msgp.AppendString(o, z.Movie.Title)
-	// string "Year"
-	o = append(o, 0xa4, 0x59, 0x65, 0x61, 0x72)
-	o = msgp.AppendInt(o, z.Movie.Year)
-	// string "Ids"
-	// map header, size 4
-	// string "Trakt"
-	o = append(o, 0xa3, 0x49, 0x64, 0x73, 0x84, 0xa5, 0x54, 0x72, 0x61, 0x6b, 0x74)
-	o = msgp.AppendInt(o, z.Movie.Ids.Trakt)
-	// string "Slug"
-	o = append(o, 0xa4, 0x53, 0x6c, 0x75, 0x67)
-	o = msgp.AppendString(o, z.Movie.Ids.Slug)
-	// string "Imdb"
-	o = append(o, 0xa4, 0x49, 0x6d, 0x64, 0x62)
-	o = msgp.AppendString(o, z.Movie.Ids.Imdb)
-	// string "Tmdb"
-	o = append(o, 0xa4, 0x54, 0x6d, 0x64, 0x62)
-	o = msgp.AppendInt(o, z.Movie.Ids.Tmdb)
+	o = append(o, 0xa5, 0x4d, 0x6f, 0x76, 0x69, 0x65)
+	if z.Movie == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.Movie.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
@@ -3709,73 +3808,19 @@ func (z *WatchedMovie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Movie":
-			var zb0002 uint32
-			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
-			if err != nil {
-				return
-			}
-			for zb0002 > 0 {
-				zb0002--
-				field, bts, err = msgp.ReadMapKeyZC(bts)
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
 				if err != nil {
 					return
 				}
-				switch msgp.UnsafeString(field) {
-				case "Title":
-					z.Movie.Title, bts, err = msgp.ReadStringBytes(bts)
-					if err != nil {
-						return
-					}
-				case "Year":
-					z.Movie.Year, bts, err = msgp.ReadIntBytes(bts)
-					if err != nil {
-						return
-					}
-				case "Ids":
-					var zb0003 uint32
-					zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
-					if err != nil {
-						return
-					}
-					for zb0003 > 0 {
-						zb0003--
-						field, bts, err = msgp.ReadMapKeyZC(bts)
-						if err != nil {
-							return
-						}
-						switch msgp.UnsafeString(field) {
-						case "Trakt":
-							z.Movie.Ids.Trakt, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Slug":
-							z.Movie.Ids.Slug, bts, err = msgp.ReadStringBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Imdb":
-							z.Movie.Ids.Imdb, bts, err = msgp.ReadStringBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Tmdb":
-							z.Movie.Ids.Tmdb, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						default:
-							bts, err = msgp.Skip(bts)
-							if err != nil {
-								return
-							}
-						}
-					}
-				default:
-					bts, err = msgp.Skip(bts)
-					if err != nil {
-						return
-					}
+				z.Movie = nil
+			} else {
+				if z.Movie == nil {
+					z.Movie = new(Movie)
+				}
+				bts, err = z.Movie.UnmarshalMsg(bts)
+				if err != nil {
+					return
 				}
 			}
 		default:
@@ -3791,48 +3836,263 @@ func (z *WatchedMovie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *WatchedMovie) Msgsize() (s int) {
-	s = 1 + 6 + msgp.IntSize + 14 + msgp.TimeSize + 6 + 1 + 6 + msgp.StringPrefixSize + len(z.Movie.Title) + 5 + msgp.IntSize + 4 + 1 + 6 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Movie.Ids.Slug) + 5 + msgp.StringPrefixSize + len(z.Movie.Ids.Imdb) + 5 + msgp.IntSize
+	s = 1 + 6 + msgp.IntSize + 14 + msgp.TimeSize + 6
+	if z.Movie == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.Movie.Msgsize()
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *WatchedProgressShow) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 7
+	// string "Aired"
+	o = append(o, 0x87, 0xa5, 0x41, 0x69, 0x72, 0x65, 0x64)
+	o = msgp.AppendInt(o, z.Aired)
+	// string "Completed"
+	o = append(o, 0xa9, 0x43, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x64)
+	o = msgp.AppendInt(o, z.Completed)
+	// string "LastWatchedAt"
+	o = append(o, 0xad, 0x4c, 0x61, 0x73, 0x74, 0x57, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64, 0x41, 0x74)
+	o = msgp.AppendTime(o, z.LastWatchedAt)
+	// string "Seasons"
+	o = append(o, 0xa7, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Seasons)))
+	for za0001 := range z.Seasons {
+		if z.Seasons[za0001] == nil {
+			o = msgp.AppendNil(o)
+		} else {
+			o, err = z.Seasons[za0001].MarshalMsg(o)
+			if err != nil {
+				return
+			}
+		}
+	}
+	// string "HiddenSeasons"
+	o = append(o, 0xad, 0x48, 0x69, 0x64, 0x64, 0x65, 0x6e, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.HiddenSeasons)))
+	for za0002 := range z.HiddenSeasons {
+		if z.HiddenSeasons[za0002] == nil {
+			o = msgp.AppendNil(o)
+		} else {
+			o, err = z.HiddenSeasons[za0002].MarshalMsg(o)
+			if err != nil {
+				return
+			}
+		}
+	}
+	// string "NextEpisode"
+	o = append(o, 0xab, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65)
+	if z.NextEpisode == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.NextEpisode.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	// string "LastEpisode"
+	o = append(o, 0xab, 0x4c, 0x61, 0x73, 0x74, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65)
+	if z.LastEpisode == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.LastEpisode.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *WatchedProgressShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Aired":
+			z.Aired, bts, err = msgp.ReadIntBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Completed":
+			z.Completed, bts, err = msgp.ReadIntBytes(bts)
+			if err != nil {
+				return
+			}
+		case "LastWatchedAt":
+			z.LastWatchedAt, bts, err = msgp.ReadTimeBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Seasons":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if cap(z.Seasons) >= int(zb0002) {
+				z.Seasons = (z.Seasons)[:zb0002]
+			} else {
+				z.Seasons = make([]*Season, zb0002)
+			}
+			for za0001 := range z.Seasons {
+				if msgp.IsNil(bts) {
+					bts, err = msgp.ReadNilBytes(bts)
+					if err != nil {
+						return
+					}
+					z.Seasons[za0001] = nil
+				} else {
+					if z.Seasons[za0001] == nil {
+						z.Seasons[za0001] = new(Season)
+					}
+					bts, err = z.Seasons[za0001].UnmarshalMsg(bts)
+					if err != nil {
+						return
+					}
+				}
+			}
+		case "HiddenSeasons":
+			var zb0003 uint32
+			zb0003, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if cap(z.HiddenSeasons) >= int(zb0003) {
+				z.HiddenSeasons = (z.HiddenSeasons)[:zb0003]
+			} else {
+				z.HiddenSeasons = make([]*Season, zb0003)
+			}
+			for za0002 := range z.HiddenSeasons {
+				if msgp.IsNil(bts) {
+					bts, err = msgp.ReadNilBytes(bts)
+					if err != nil {
+						return
+					}
+					z.HiddenSeasons[za0002] = nil
+				} else {
+					if z.HiddenSeasons[za0002] == nil {
+						z.HiddenSeasons[za0002] = new(Season)
+					}
+					bts, err = z.HiddenSeasons[za0002].UnmarshalMsg(bts)
+					if err != nil {
+						return
+					}
+				}
+			}
+		case "NextEpisode":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.NextEpisode = nil
+			} else {
+				if z.NextEpisode == nil {
+					z.NextEpisode = new(Episode)
+				}
+				bts, err = z.NextEpisode.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+			}
+		case "LastEpisode":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.LastEpisode = nil
+			} else {
+				if z.LastEpisode == nil {
+					z.LastEpisode = new(Episode)
+				}
+				bts, err = z.LastEpisode.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *WatchedProgressShow) Msgsize() (s int) {
+	s = 1 + 6 + msgp.IntSize + 10 + msgp.IntSize + 14 + msgp.TimeSize + 8 + msgp.ArrayHeaderSize
+	for za0001 := range z.Seasons {
+		if z.Seasons[za0001] == nil {
+			s += msgp.NilSize
+		} else {
+			s += z.Seasons[za0001].Msgsize()
+		}
+	}
+	s += 14 + msgp.ArrayHeaderSize
+	for za0002 := range z.HiddenSeasons {
+		if z.HiddenSeasons[za0002] == nil {
+			s += msgp.NilSize
+		} else {
+			s += z.HiddenSeasons[za0002].Msgsize()
+		}
+	}
+	s += 12
+	if z.NextEpisode == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.NextEpisode.Msgsize()
+	}
+	s += 12
+	if z.LastEpisode == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.LastEpisode.Msgsize()
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *WatchedShow) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 4
+	// map header, size 5
 	// string "Plays"
-	o = append(o, 0x84, 0xa5, 0x50, 0x6c, 0x61, 0x79, 0x73)
+	o = append(o, 0x85, 0xa5, 0x50, 0x6c, 0x61, 0x79, 0x73)
 	o = msgp.AppendInt(o, z.Plays)
+	// string "Watched"
+	o = append(o, 0xa7, 0x57, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64)
+	o = msgp.AppendBool(o, z.Watched)
 	// string "LastWatchedAt"
 	o = append(o, 0xad, 0x4c, 0x61, 0x73, 0x74, 0x57, 0x61, 0x74, 0x63, 0x68, 0x65, 0x64, 0x41, 0x74)
 	o = msgp.AppendTime(o, z.LastWatchedAt)
 	// string "Show"
-	// map header, size 3
-	// string "Title"
-	o = append(o, 0xa4, 0x53, 0x68, 0x6f, 0x77, 0x83, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
-	o = msgp.AppendString(o, z.Show.Title)
-	// string "Year"
-	o = append(o, 0xa4, 0x59, 0x65, 0x61, 0x72)
-	o = msgp.AppendInt(o, z.Show.Year)
-	// string "Ids"
-	// map header, size 6
-	// string "Trakt"
-	o = append(o, 0xa3, 0x49, 0x64, 0x73, 0x86, 0xa5, 0x54, 0x72, 0x61, 0x6b, 0x74)
-	o = msgp.AppendInt(o, z.Show.Ids.Trakt)
-	// string "Slug"
-	o = append(o, 0xa4, 0x53, 0x6c, 0x75, 0x67)
-	o = msgp.AppendString(o, z.Show.Ids.Slug)
-	// string "Tvdb"
-	o = append(o, 0xa4, 0x54, 0x76, 0x64, 0x62)
-	o = msgp.AppendInt(o, z.Show.Ids.Tvdb)
-	// string "Imdb"
-	o = append(o, 0xa4, 0x49, 0x6d, 0x64, 0x62)
-	o = msgp.AppendString(o, z.Show.Ids.Imdb)
-	// string "Tmdb"
-	o = append(o, 0xa4, 0x54, 0x6d, 0x64, 0x62)
-	o = msgp.AppendInt(o, z.Show.Ids.Tmdb)
-	// string "Tvrage"
-	o = append(o, 0xa6, 0x54, 0x76, 0x72, 0x61, 0x67, 0x65)
-	o = msgp.AppendInt(o, z.Show.Ids.Tvrage)
+	o = append(o, 0xa4, 0x53, 0x68, 0x6f, 0x77)
+	if z.Show == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.Show.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
 	// string "Seasons"
 	o = append(o, 0xa7, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Seasons)))
@@ -3884,99 +4144,40 @@ func (z *WatchedShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "Watched":
+			z.Watched, bts, err = msgp.ReadBoolBytes(bts)
+			if err != nil {
+				return
+			}
 		case "LastWatchedAt":
 			z.LastWatchedAt, bts, err = msgp.ReadTimeBytes(bts)
 			if err != nil {
 				return
 			}
 		case "Show":
-			var zb0002 uint32
-			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
-			if err != nil {
-				return
-			}
-			for zb0002 > 0 {
-				zb0002--
-				field, bts, err = msgp.ReadMapKeyZC(bts)
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
 				if err != nil {
 					return
 				}
-				switch msgp.UnsafeString(field) {
-				case "Title":
-					z.Show.Title, bts, err = msgp.ReadStringBytes(bts)
-					if err != nil {
-						return
-					}
-				case "Year":
-					z.Show.Year, bts, err = msgp.ReadIntBytes(bts)
-					if err != nil {
-						return
-					}
-				case "Ids":
-					var zb0003 uint32
-					zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
-					if err != nil {
-						return
-					}
-					for zb0003 > 0 {
-						zb0003--
-						field, bts, err = msgp.ReadMapKeyZC(bts)
-						if err != nil {
-							return
-						}
-						switch msgp.UnsafeString(field) {
-						case "Trakt":
-							z.Show.Ids.Trakt, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Slug":
-							z.Show.Ids.Slug, bts, err = msgp.ReadStringBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Tvdb":
-							z.Show.Ids.Tvdb, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Imdb":
-							z.Show.Ids.Imdb, bts, err = msgp.ReadStringBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Tmdb":
-							z.Show.Ids.Tmdb, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Tvrage":
-							z.Show.Ids.Tvrage, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						default:
-							bts, err = msgp.Skip(bts)
-							if err != nil {
-								return
-							}
-						}
-					}
-				default:
-					bts, err = msgp.Skip(bts)
-					if err != nil {
-						return
-					}
+				z.Show = nil
+			} else {
+				if z.Show == nil {
+					z.Show = new(Show)
+				}
+				bts, err = z.Show.UnmarshalMsg(bts)
+				if err != nil {
+					return
 				}
 			}
 		case "Seasons":
-			var zb0004 uint32
-			zb0004, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Seasons) >= int(zb0004) {
-				z.Seasons = (z.Seasons)[:zb0004]
+			if cap(z.Seasons) >= int(zb0002) {
+				z.Seasons = (z.Seasons)[:zb0002]
 			} else {
 				z.Seasons = make([]struct {
 					Plays    int `json:"plays"`
@@ -3986,16 +4187,16 @@ func (z *WatchedShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						Plays         int       `json:"plays"`
 						LastWatchedAt time.Time `json:"last_watched_at"`
 					} `json:"episodes"`
-				}, zb0004)
+				}, zb0002)
 			}
 			for za0001 := range z.Seasons {
-				var zb0005 uint32
-				zb0005, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0003 uint32
+				zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0005 > 0 {
-					zb0005--
+				for zb0003 > 0 {
+					zb0003--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
@@ -4012,28 +4213,28 @@ func (z *WatchedShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
 							return
 						}
 					case "Episodes":
-						var zb0006 uint32
-						zb0006, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0004 uint32
+						zb0004, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.Seasons[za0001].Episodes) >= int(zb0006) {
-							z.Seasons[za0001].Episodes = (z.Seasons[za0001].Episodes)[:zb0006]
+						if cap(z.Seasons[za0001].Episodes) >= int(zb0004) {
+							z.Seasons[za0001].Episodes = (z.Seasons[za0001].Episodes)[:zb0004]
 						} else {
 							z.Seasons[za0001].Episodes = make([]struct {
 								Number        int       `json:"number"`
 								Plays         int       `json:"plays"`
 								LastWatchedAt time.Time `json:"last_watched_at"`
-							}, zb0006)
+							}, zb0004)
 						}
 						for za0002 := range z.Seasons[za0001].Episodes {
-							var zb0007 uint32
-							zb0007, bts, err = msgp.ReadMapHeaderBytes(bts)
+							var zb0005 uint32
+							zb0005, bts, err = msgp.ReadMapHeaderBytes(bts)
 							if err != nil {
 								return
 							}
-							for zb0007 > 0 {
-								zb0007--
+							for zb0005 > 0 {
+								zb0005--
 								field, bts, err = msgp.ReadMapKeyZC(bts)
 								if err != nil {
 									return
@@ -4083,7 +4284,13 @@ func (z *WatchedShow) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *WatchedShow) Msgsize() (s int) {
-	s = 1 + 6 + msgp.IntSize + 14 + msgp.TimeSize + 5 + 1 + 6 + msgp.StringPrefixSize + len(z.Show.Title) + 5 + msgp.IntSize + 4 + 1 + 6 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Show.Ids.Slug) + 5 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Show.Ids.Imdb) + 5 + msgp.IntSize + 7 + msgp.IntSize + 8 + msgp.ArrayHeaderSize
+	s = 1 + 6 + msgp.IntSize + 8 + msgp.BoolSize + 14 + msgp.TimeSize + 5
+	if z.Show == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.Show.Msgsize()
+	}
+	s += 8 + msgp.ArrayHeaderSize
 	for za0001 := range z.Seasons {
 		s += 1 + 6 + msgp.IntSize + 7 + msgp.IntSize + 9 + msgp.ArrayHeaderSize + (len(z.Seasons[za0001].Episodes) * (28 + msgp.IntSize + msgp.IntSize + msgp.TimeSize))
 	}
