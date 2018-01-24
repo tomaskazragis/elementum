@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -385,6 +386,14 @@ func GetTVGenres(language string) []*Genre {
 			return nil
 		})
 		if genres.Genres != nil && len(genres.Genres) > 0 {
+			for _, i := range genres.Genres {
+				i.Name = strings.Title(i.Name)
+			}
+
+			sort.Slice(genres.Genres, func(i, j int) bool {
+				return genres.Genres[i].Name < genres.Genres[j].Name
+			})
+
 			cacheStore.Set(key, genres, cacheExpiration)
 		}
 	}

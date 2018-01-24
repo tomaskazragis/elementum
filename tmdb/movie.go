@@ -3,6 +3,7 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -151,6 +152,7 @@ func GetMovieGenres(language string) []*Genre {
 				&genres,
 				nil,
 			)
+
 			if err != nil {
 				log.Error(err)
 				xbmc.Notify("Elementum", "Failed getting movie genres, check your logs.", config.AddonIcon())
@@ -168,6 +170,14 @@ func GetMovieGenres(language string) []*Genre {
 			return nil
 		})
 		if genres.Genres != nil && len(genres.Genres) > 0 {
+			for _, i := range genres.Genres {
+				i.Name = strings.Title(i.Name)
+			}
+
+			sort.Slice(genres.Genres, func(i, j int) bool {
+				return genres.Genres[i].Name < genres.Genres[j].Name
+			})
+
 			cacheStore.Set(key, genres, cacheExpiration)
 		}
 	}
