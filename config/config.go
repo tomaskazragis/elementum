@@ -51,11 +51,11 @@ type Configuration struct {
 	// SessionSave         int
 	// ShareRatioLimit     int
 	// SeedTimeRatioLimit  int
-	SeedTimeLimit int
-	DisableDHT    bool
-	DisableTCP    bool
-	DisableUTP    bool
-	// DisableUPNP         bool
+	SeedTimeLimit    int
+	DisableDHT       bool
+	DisableTCP       bool
+	DisableUTP       bool
+	DisableUPNP      bool
 	EncryptionPolicy int
 	ListenPortMin    int
 	ListenPortMax    int
@@ -261,11 +261,11 @@ func Reload() *Configuration {
 		SmartEpisodeMatch:   settings["smart_episode_match"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
-		SeedTimeLimit: settings["seed_time_limit"].(int),
-		DisableDHT:    settings["disable_dht"].(bool),
-		DisableTCP:    settings["disable_tcp"].(bool),
-		DisableUTP:    settings["disable_utp"].(bool),
-		// DisableUPNP:         settings["disable_upnp"].(bool),
+		SeedTimeLimit:    settings["seed_time_limit"].(int),
+		DisableDHT:       settings["disable_dht"].(bool),
+		DisableTCP:       settings["disable_tcp"].(bool),
+		DisableUTP:       settings["disable_utp"].(bool),
+		DisableUPNP:      settings["disable_upnp"].(bool),
 		EncryptionPolicy: settings["encryption_policy"].(int),
 		ListenPortMin:    settings["listen_port_min"].(int),
 		ListenPortMax:    settings["listen_port_max"].(int),

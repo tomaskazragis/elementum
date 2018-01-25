@@ -494,11 +494,19 @@ func (t *Torrent) DownloadFile(f *gotorrent.File) {
 
 // InfoHash ...
 func (t *Torrent) InfoHash() string {
+	if t.Torrent == nil {
+		return ""
+	}
+
 	return t.Torrent.InfoHash().HexString()
 }
 
 // Name ...
 func (t *Torrent) Name() string {
+	if t.Torrent == nil {
+		return ""
+	}
+
 	return t.Torrent.Name()
 }
 

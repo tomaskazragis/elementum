@@ -141,9 +141,6 @@ func (btp *BTPlayer) addTorrent() error {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.p.URI)
 	}
 
-	btp.onMetadataReceived()
-	go btp.s.AttachPlayer(btp)
-
 	return nil
 }
 
@@ -163,6 +160,9 @@ func (btp *BTPlayer) Buffer() error {
 	} else if err := btp.addTorrent(); err != nil {
 		return err
 	}
+
+	btp.onMetadataReceived()
+	go btp.s.AttachPlayer(btp)
 
 	buffered, done := btp.bufferEvents.Listen()
 	defer close(done)
@@ -404,7 +404,15 @@ func (btp *BTPlayer) Close() {
 	btp.closed = true
 	close(btp.closing)
 
-	go btp.s.DetachPlayer(btp)
+	// Torrent was not initialized so just close and return
+	if btp.Torrent == nil {
+		return
+	}
+
+	defer func() {
+		go btp.s.DetachPlayer(btp)
+		go btp.s.PlayerStop()
+	}()
 
 	isWatched := btp.IsWatched()
 	keepDownloading := false
@@ -450,8 +458,6 @@ func (btp *BTPlayer) Close() {
 			btp.s.RemoveTorrent(btp.Torrent, false)
 		}
 	}
-
-	go btp.s.PlayerStop()
 }
 
 func (btp *BTPlayer) bufferDialog() {
