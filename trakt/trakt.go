@@ -45,7 +45,7 @@ var (
 	cacheExpiration         = 6 * 24 * time.Hour
 	recentExpiration        = 15 * time.Minute
 	userlistExpiration      = 1 * time.Minute
-	watchedExpiration       = 30 * time.Minute
+	watchedExpiration       = 10 * time.Minute
 )
 
 var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
@@ -61,14 +61,14 @@ type Object struct {
 type MovieSearchResults []struct {
 	Type  string      `json:"type"`
 	Score interface{} `json:"score"`
-	Movie *Movie
+	Movie *Movie      `json:"movie"`
 }
 
 // ShowSearchResults ...
 type ShowSearchResults []struct {
 	Type  string      `json:"type"`
 	Score interface{} `json:"score"`
-	Show  *Show
+	Show  *Show       `json:"show"`
 }
 
 // EpisodeSearchResults ...
@@ -359,16 +359,7 @@ type WatchedItem struct {
 type WatchedMovie struct {
 	Plays         int       `json:"plays"`
 	LastWatchedAt time.Time `json:"last_watched_at"`
-	Movie         struct {
-		Title string `json:"title"`
-		Year  int    `json:"year"`
-		Ids   struct {
-			Trakt int    `json:"trakt"`
-			Slug  string `json:"slug"`
-			Imdb  string `json:"imdb"`
-			Tmdb  int    `json:"tmdb"`
-		} `json:"ids"`
-	} `json:"movie"`
+	Movie         *Movie    `json:"movie"`
 }
 
 // WatchedShow ...
@@ -376,19 +367,8 @@ type WatchedShow struct {
 	Plays         int `json:"plays"`
 	Watched       bool
 	LastWatchedAt time.Time `json:"last_watched_at"`
-	Show          struct {
-		Title string `json:"title"`
-		Year  int    `json:"year"`
-		Ids   struct {
-			Trakt  int    `json:"trakt"`
-			Slug   string `json:"slug"`
-			Tvdb   int    `json:"tvdb"`
-			Imdb   string `json:"imdb"`
-			Tmdb   int    `json:"tmdb"`
-			Tvrage int    `json:"tvrage"`
-		} `json:"ids"`
-	} `json:"show"`
-	Seasons []struct {
+	Show          *Show     `json:"show"`
+	Seasons       []struct {
 		Plays    int `json:"plays"`
 		Number   int `json:"number"`
 		Episodes []struct {
@@ -397,6 +377,23 @@ type WatchedShow struct {
 			LastWatchedAt time.Time `json:"last_watched_at"`
 		} `json:"episodes"`
 	} `json:"seasons"`
+}
+
+// WatchedProgressShow ...
+type WatchedProgressShow struct {
+	Aired         int       `json:"aired"`
+	Completed     int       `json:"completed"`
+	LastWatchedAt time.Time `json:"last_watched_at"`
+	Seasons       []*Season `json:"seasons"`
+	HiddenSeasons []*Season `json:"hidden_seasons"`
+	NextEpisode   *Episode  `json:"next_episode"`
+	LastEpisode   *Episode  `json:"last_episode"`
+}
+
+// ProgressShow ...
+type ProgressShow struct {
+	Episode *Episode `json:"episode"`
+	Show    *Show    `json:"show"`
 }
 
 func totalFromHeaders(headers http.Header) (total int, err error) {

@@ -87,7 +87,6 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 		trakt := movies.Group("/trakt")
 		{
-			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), MoviesTrakt)
 			trakt.GET("/watchlist", WatchlistMovies)
 			trakt.GET("/collection", CollectionMovies)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularMovies)
@@ -97,6 +96,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			trakt.GET("/collected", cache.Cache(store, DefaultCacheExpiration), TraktMostCollectedMovies)
 			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheExpiration), TraktMostAnticipatedMovies)
 			trakt.GET("/boxoffice", cache.Cache(store, DefaultCacheExpiration), TraktBoxOffice)
+			trakt.GET("/history", cache.Cache(store, RecentCacheExpiration), TraktHistoryMovies)
 
 			lists := trakt.Group("/lists")
 			{
@@ -141,7 +141,6 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 		trakt := shows.Group("/trakt")
 		{
-			trakt.GET("/", cache.Cache(store, IndexCacheExpiration), TVTrakt)
 			trakt.GET("/watchlist", WatchlistShows)
 			trakt.GET("/collection", CollectionShows)
 			trakt.GET("/popular", cache.Cache(store, DefaultCacheExpiration), TraktPopularShows)
@@ -150,6 +149,8 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			trakt.GET("/watched", cache.Cache(store, DefaultCacheExpiration), TraktMostWatchedShows)
 			trakt.GET("/collected", cache.Cache(store, DefaultCacheExpiration), TraktMostCollectedShows)
 			trakt.GET("/anticipated", cache.Cache(store, DefaultCacheExpiration), TraktMostAnticipatedShows)
+			trakt.GET("/progress", TraktProgressShows)
+			trakt.GET("/history", cache.Cache(store, RecentCacheExpiration), TraktHistoryShows)
 
 			lists := trakt.Group("/lists")
 			{
@@ -258,6 +259,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	cmd := r.Group("/cmd")
 	{
 		cmd.GET("/clear_cache", ClearCache)
+		cmd.GET("/clear_cache_key/:key", ClearCache)
 		cmd.GET("/clear_page_cache", ClearPageCache)
 		cmd.GET("/clear_trakt_cache", ClearTraktCache)
 		cmd.GET("/clear_tmdb_cache", ClearTmdbCache)

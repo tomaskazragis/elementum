@@ -44,6 +44,8 @@ type ListItem struct {
 	Art         *ListItemArt      `json:"art,omitempty"`
 	StreamInfo  *StreamInfo       `json:"stream_info,omitempty"`
 	ContextMenu [][]string        `json:"context_menu,omitempty"`
+
+	TraktAuth bool `json:"-"`
 }
 
 // ListItemInfo ...

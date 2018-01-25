@@ -19,25 +19,36 @@ import (
 // TVIndex ...
 func TVIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30056]", Path: URLForXBMC("/shows/trakt/"), Thumbnail: config.AddonResource("img", "trakt.png")},
 		{Label: "LOCALIZE[30209]", Path: URLForXBMC("/shows/search"), Thumbnail: config.AddonResource("img", "search.png")},
+
+		{Label: "LOCALIZE[30360]", Path: URLForXBMC("/shows/trakt/progress"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
+		{Label: "LOCALIZE[30263]", Path: URLForXBMC("/shows/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
+		{Label: "LOCALIZE[30254]", Path: URLForXBMC("/shows/trakt/watchlist"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/watchlist"))}}, TraktAuth: true},
+		{Label: "LOCALIZE[30257]", Path: URLForXBMC("/shows/trakt/collection"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/collection"))}}, TraktAuth: true},
+		{Label: "LOCALIZE[30290]", Path: URLForXBMC("/shows/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png"), TraktAuth: true},
 		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/shows/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
+		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/shows/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
+		{Label: "LOCALIZE[30247]", Path: URLForXBMC("/shows/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
+		{Label: "LOCALIZE[30248]", Path: URLForXBMC("/shows/trakt/watched"), Thumbnail: config.AddonResource("img", "most_watched.png")},
+		{Label: "LOCALIZE[30249]", Path: URLForXBMC("/shows/trakt/collected"), Thumbnail: config.AddonResource("img", "most_collected.png")},
+		{Label: "LOCALIZE[30250]", Path: URLForXBMC("/shows/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
+
 		{Label: "LOCALIZE[30238]", Path: URLForXBMC("/shows/recent/episodes"), Thumbnail: config.AddonResource("img", "fresh.png")},
 		{Label: "LOCALIZE[30237]", Path: URLForXBMC("/shows/recent/shows"), Thumbnail: config.AddonResource("img", "clock.png")},
 		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/shows/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30211]", Path: URLForXBMC("/shows/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
 		{Label: "LOCALIZE[30212]", Path: URLForXBMC("/shows/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
 		{Label: "LOCALIZE[30289]", Path: URLForXBMC("/shows/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
+
+		{Label: "LOCALIZE[30361]", Path: URLForXBMC("/shows/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
 	}
-	itemsWithContext := make(xbmc.ListItems, 0)
 	for _, item := range items {
 		item.ContextMenu = [][]string{
 			[]string{"LOCALIZE[30143]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_tvshows"))},
 		}
-		itemsWithContext = append(itemsWithContext, item)
 	}
 
-	ctx.JSON(200, xbmc.NewView("menus_tvshows", itemsWithContext))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", filterListItems(items)))
 }
 
 // TVGenres ...
@@ -56,38 +67,7 @@ func TVGenres(ctx *gin.Context) {
 			},
 		})
 	}
-	ctx.JSON(200, xbmc.NewView("menus_tvshows_genres", items))
-}
-
-// TVTrakt ...
-func TVTrakt(ctx *gin.Context) {
-	items := xbmc.ListItems{
-		{Label: "LOCALIZE[30263]", Path: URLForXBMC("/shows/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png")},
-		{
-			Label:     "LOCALIZE[30254]",
-			Path:      URLForXBMC("/shows/trakt/watchlist"),
-			Thumbnail: config.AddonResource("img", "trakt.png"),
-			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/watchlist"))},
-			},
-		},
-		{
-			Label:     "LOCALIZE[30257]",
-			Path:      URLForXBMC("/shows/trakt/collection"),
-			Thumbnail: config.AddonResource("img", "trakt.png"),
-			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/collection"))},
-			},
-		},
-		{Label: "LOCALIZE[30290]", Path: URLForXBMC("/shows/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
-		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/shows/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
-		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/shows/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
-		{Label: "LOCALIZE[30247]", Path: URLForXBMC("/shows/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
-		{Label: "LOCALIZE[30248]", Path: URLForXBMC("/shows/trakt/watched"), Thumbnail: config.AddonResource("img", "most_watched.png")},
-		{Label: "LOCALIZE[30249]", Path: URLForXBMC("/shows/trakt/collected"), Thumbnail: config.AddonResource("img", "most_collected.png")},
-		{Label: "LOCALIZE[30250]", Path: URLForXBMC("/shows/trakt/anticipated"), Thumbnail: config.AddonResource("img", "most_anticipated.png")},
-	}
-	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows_genres", filterListItems(items)))
 }
 
 // TVTraktLists ...
@@ -106,7 +86,7 @@ func TVTraktLists(ctx *gin.Context) {
 		items = append(items, item)
 	}
 
-	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", filterListItems(items)))
 }
 
 // CalendarShows ...
@@ -119,7 +99,7 @@ func CalendarShows(ctx *gin.Context) {
 		{Label: "LOCALIZE[30299]", Path: URLForXBMC("/shows/trakt/calendars/allnewshows"), Thumbnail: config.AddonResource("img", "fresh.png")},
 		{Label: "LOCALIZE[30300]", Path: URLForXBMC("/shows/trakt/calendars/allpremieres"), Thumbnail: config.AddonResource("img", "box_office.png")},
 	}
-	ctx.JSON(200, xbmc.NewView("menus_tvshows", items))
+	ctx.JSON(200, xbmc.NewView("menus_tvshows", filterListItems(items)))
 }
 
 func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query string) {
@@ -197,7 +177,7 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 		}
 		items = append(items, next)
 	}
-	ctx.JSON(200, xbmc.NewView("tvshows", items))
+	ctx.JSON(200, xbmc.NewView("tvshows", filterListItems(items)))
 }
 
 // PopularShows ...
@@ -297,7 +277,7 @@ func ShowSeasons(ctx *gin.Context) {
 	}
 	// xbmc.ListItems always returns false to Less() so that order is unchanged
 
-	ctx.JSON(200, xbmc.NewView("seasons", reversedItems))
+	ctx.JSON(200, xbmc.NewView("seasons", filterListItems(reversedItems)))
 }
 
 // ShowEpisodes ...
@@ -362,7 +342,7 @@ func ShowEpisodes(ctx *gin.Context) {
 		item.IsPlayable = true
 	}
 
-	ctx.JSON(200, xbmc.NewView("episodes", items))
+	ctx.JSON(200, xbmc.NewView("episodes", filterListItems(items)))
 }
 
 func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, error) {

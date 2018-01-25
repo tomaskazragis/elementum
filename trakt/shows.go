@@ -85,6 +85,21 @@ func setShowsFanart(shows []*Shows) []*Shows {
 	return shows
 }
 
+func setProgressShowsFanart(shows []*ProgressShow) []*ProgressShow {
+	wg := sync.WaitGroup{}
+	for i, show := range shows {
+		wg.Add(1)
+		go func(idx int, s *ProgressShow) {
+			defer wg.Done()
+			if s != nil && s.Show != nil {
+				shows[idx].Show = setShowFanart(s.Show)
+			}
+		}(i, show)
+	}
+	wg.Wait()
+	return shows
+}
+
 func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
 	// TODO: Remove when finish with debugging
 	if len(shows) > 30 {
@@ -588,7 +603,9 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 
 	endPoint := "sync/watched/shows"
 
-	params := napping.Params{}.AsUrlValues()
+	params := napping.Params{
+		"extended": "full,images",
+	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
 	key := "com.trakt.episodes.watched"
@@ -607,6 +624,70 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 
 		cacheStore.Set(key, shows, watchedExpiration)
 	}
+
+	return
+}
+
+// WatchedShowsProgress ...
+func WatchedShowsProgress() (shows []*ProgressShow, err error) {
+	if errAuth := Authorized(); errAuth != nil {
+		return nil, errAuth
+	}
+
+	watchedShows, errWatched := WatchedShows()
+	if errWatched != nil {
+		log.Errorf("Error getting the watched shows: %v", errWatched)
+		return nil, errWatched
+	}
+
+	params := napping.Params{
+		"hidden":         "false",
+		"specials":       "false",
+		"count_specials": "false",
+	}.AsUrlValues()
+
+	showsList := make([]*ProgressShow, len(watchedShows))
+	watchedProgressShows := make([]*WatchedProgressShow, len(watchedShows))
+
+	var wg sync.WaitGroup
+	wg.Add(len(watchedShows))
+	for i, show := range watchedShows {
+		go func(i int, show *WatchedShow) {
+			defer wg.Done()
+			endPoint := fmt.Sprintf("shows/%d/progress/watched", show.Show.IDs.Trakt)
+
+			resp, err := GetWithAuth(endPoint, params)
+			if err != nil {
+				log.Errorf("Error getting endpoint %s for show '%d': %#v", endPoint, show.Show.IDs.Trakt, err)
+				return
+			} else if resp.Status() != 200 {
+				log.Errorf("Got %d response status getting endpoint %s for show '%d'", resp.Status(), endPoint, show.Show.IDs.Trakt)
+				return
+			}
+			var watchedProgressShow *WatchedProgressShow
+			if err := resp.Unmarshal(&watchedProgressShow); err != nil {
+				log.Warningf("Can't unmarshal response: %#v", err)
+			}
+
+			watchedProgressShows[i] = watchedProgressShow
+
+			if watchedProgressShow.NextEpisode != nil && watchedProgressShow.NextEpisode.Number != 0 && watchedProgressShow.NextEpisode.Season != 0 {
+				showsList[i] = &ProgressShow{
+					Show:    show.Show,
+					Episode: watchedProgressShow.NextEpisode,
+				}
+			}
+		}(i, show)
+	}
+	wg.Wait()
+
+	for _, s := range showsList {
+		if s != nil {
+			shows = append(shows, s)
+		}
+	}
+
+	shows = setProgressShowsFanart(shows)
 
 	return
 }
