@@ -168,7 +168,7 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 		)
 		if err != nil {
 			log.Error(err)
-			xbmc.Notify("Elementum", "Failed searching shows check your logs.", config.AddonIcon())
+			// xbmc.Notify("Elementum", "Failed searching shows check your logs.", config.AddonIcon())
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded searching shows for %s, cooling down...", query)
 			rl.CoolDown(resp.HttpResponse().Header)
@@ -176,7 +176,7 @@ func SearchShows(query string, language string, page int) (Shows, int) {
 		} else if resp.Status() != 200 {
 			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
 			log.Error(message)
-			xbmc.Notify("Elementum", message, config.AddonIcon())
+			// xbmc.Notify("Elementum", message, config.AddonIcon())
 			return util.ErrHTTP
 		}
 
@@ -228,7 +228,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					)
 					if err != nil {
 						log.Error(err)
-						xbmc.Notify("Elementum", "Failed while listing shows, check your logs.", config.AddonIcon())
+						// xbmc.Notify("Elementum", "Failed while listing shows, check your logs.", config.AddonIcon())
 					} else if resp.Status() == 429 {
 						log.Warningf("Rate limit exceeded while listing shows from %s, cooling down...", endpoint)
 						rl.CoolDown(resp.HttpResponse().Header)
@@ -236,7 +236,7 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					} else if resp.Status() != 200 {
 						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
 						log.Error(message)
-						xbmc.Notify("Elementum", message, config.AddonIcon())
+						// xbmc.Notify("Elementum", message, config.AddonIcon())
 						return util.ErrHTTP
 					}
 

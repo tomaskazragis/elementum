@@ -33,7 +33,7 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 			)
 			if err != nil {
 				log.Error(err.Error())
-				xbmc.Notify("Elementum", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showID), config.AddonIcon())
+				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showID), config.AddonIcon())
 			} else if resp.Status() == 429 {
 				log.Warningf("Rate limit exceeded getting S%02dE%02d of %d, cooling down...", seasonNumber, episodeNumber, showID)
 				rl.CoolDown(resp.HttpResponse().Header)
@@ -41,7 +41,7 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
 				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
+				// xbmc.Notify("Elementum", message, config.AddonIcon())
 				return util.ErrHTTP
 			}
 

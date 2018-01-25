@@ -3,6 +3,7 @@ package trakt
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -398,6 +399,10 @@ func Userlists() (lists []*List) {
 		log.Warning(err)
 	}
 
+	sort.Slice(lists, func(i int, j int) bool {
+		return lists[i].Name < lists[j].Name
+	})
+
 	return lists
 }
 
@@ -533,6 +538,9 @@ func WatchedMovies() (movies []*WatchedMovie, err error) {
 			log.Warning(err)
 		}
 
+		sort.Slice(movies, func(i int, j int) bool {
+			return movies[i].LastWatchedAt.Unix() > movies[j].LastWatchedAt.Unix()
+		})
 		cacheStore.Set(key, movies, watchedExpiration)
 	}
 

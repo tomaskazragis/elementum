@@ -1331,7 +1331,10 @@ func ClearPageCache() {
 func ClearCacheKey(key string) {
 	cacheDB := database.GetCache()
 	if cacheDB != nil {
-		cacheDB.Delete(database.CommonBucket, key)
+		log.Debugf("Removing cache key: %s", key)
+		if err := cacheDB.Delete(database.CommonBucket, key); err != nil {
+			log.Debugf("Error removing key from cache: %#v", err)
+		}
 	}
 }
 
@@ -1456,16 +1459,16 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 	l.WatchedTrakt = map[uint64]bool{}
 	watchedMovies := map[int]bool{}
 	for _, m := range movies {
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.Movie.Ids.Trakt))] = true
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.Movie.Ids.Tmdb))] = true
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.Movie.Ids.Imdb))] = true
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.Movie.IDs.Trakt))] = true
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.Movie.IDs.TMDB))] = true
+		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.Movie.IDs.IMDB))] = true
 
 		var r *Movie
-		if r == nil && m.Movie.Ids.Tmdb != 0 {
-			r, _ = GetMovieByTMDB(m.Movie.Ids.Tmdb)
+		if r == nil && m.Movie.IDs.TMDB != 0 {
+			r, _ = GetMovieByTMDB(m.Movie.IDs.TMDB)
 		}
-		if r == nil && m.Movie.Ids.Imdb != "" {
-			r, _ = GetMovieByIMDB(m.Movie.Ids.Imdb)
+		if r == nil && m.Movie.IDs.IMDB != "" {
+			r, _ = GetMovieByIMDB(m.Movie.IDs.IMDB)
 		}
 
 		if r == nil {
@@ -1490,37 +1493,37 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 	watchedShows := map[int]bool{}
 	for _, s := range shows {
-		tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.Ids.Tmdb), config.Get().Language)
+		tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.IDs.TMDB), config.Get().Language)
 		completedSeasons := 0
 		for _, season := range s.Seasons {
 			if tmdbShow != nil {
-				tmdbSeason := tmdb.GetSeason(s.Show.Ids.Tmdb, season.Number, config.Get().Language)
+				tmdbSeason := tmdb.GetSeason(s.Show.IDs.TMDB, season.Number, config.Get().Language)
 				if tmdbSeason != nil && tmdbSeason.EpisodeCount == len(season.Episodes) {
 					completedSeasons++
 
-					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.Show.Ids.Tmdb, season.Number))] = true
-					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.Show.Ids.Trakt, season.Number))] = true
+					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.Show.IDs.TMDB, season.Number))] = true
+					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.Show.IDs.Trakt, season.Number))] = true
 				}
 			}
 
 			for _, episode := range season.Episodes {
-				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.Ids.Tmdb, season.Number, episode.Number))] = true
-				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.Ids.Trakt, season.Number, episode.Number))] = true
+				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.IDs.TMDB, season.Number, episode.Number))] = true
+				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.IDs.Trakt, season.Number, episode.Number))] = true
 			}
 		}
 
 		if tmdbShow != nil && completedSeasons == len(tmdbShow.Seasons) {
 			s.Watched = true
-			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.Show.Ids.Tmdb))] = true
-			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.Show.Ids.Trakt))] = true
+			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.Show.IDs.TMDB))] = true
+			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.Show.IDs.Trakt))] = true
 		}
 
 		var r *Show
-		if r == nil && s.Show.Ids.Tmdb != 0 {
-			r, _ = GetShowByTMDB(s.Show.Ids.Tmdb)
+		if r == nil && s.Show.IDs.TMDB != 0 {
+			r, _ = GetShowByTMDB(s.Show.IDs.TMDB)
 		}
-		if r == nil && s.Show.Ids.Imdb != "" {
-			r, _ = GetShowByIMDB(s.Show.Ids.Imdb)
+		if r == nil && s.Show.IDs.IMDB != "" {
+			r, _ = GetShowByIMDB(s.Show.IDs.IMDB)
 		}
 
 		if r == nil {
@@ -1812,12 +1815,10 @@ func AddShow(tmdbID string, merge string) (*tmdb.Show, error) {
 
 	ID, _ := strconv.Atoi(tmdbID)
 	show, errGet := IsDuplicateShow(tmdbID)
-	if merge == falseType {
-		if errGet != nil {
-			log.Warning(errGet)
-			xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
-			return show, errGet
-		}
+	if merge == falseType && errGet != nil {
+		log.Warning(errGet)
+		xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
+		return show, errGet
 	}
 
 	if _, err := writeShowStrm(tmdbID, true); err != nil {

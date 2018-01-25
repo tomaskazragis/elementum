@@ -488,7 +488,7 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 
 	if item.Info.Trailer == "" && config.Get().Language != "en" {
 		enMovie := GetMovie(movie.ID, "en")
-		if enMovie.Trailers != nil {
+		if enMovie != nil && enMovie.Trailers != nil {
 			for _, trailer := range enMovie.Trailers.Youtube {
 				item.Info.Trailer = trailer.Source
 				break
