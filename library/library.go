@@ -1327,6 +1327,14 @@ func ClearPageCache() {
 	xbmc.Refresh()
 }
 
+// ClearResolveCache deletes cached IDs resolve
+func ClearResolveCache() {
+	cacheDB := database.GetCache()
+	if cacheDB != nil {
+		cacheDB.DeleteWithPrefix(database.CommonBucket, []byte("Resolve_"))
+	}
+}
+
 // ClearCacheKey deletes specific key
 func ClearCacheKey(key string) {
 	cacheDB := database.GetCache()
@@ -1410,26 +1418,32 @@ func RefreshTrakt() error {
 		Refresh()
 		xbmc.Refresh()
 	}
-	if err := SyncMoviesList("watchlist", true); err != nil {
-		return err
+	if config.Get().TraktSyncWatchlist {
+		if err := SyncMoviesList("watchlist", true); err != nil {
+			return err
+		}
+		if err := SyncShowsList("watchlist", true); err != nil {
+			return err
+		}
 	}
-	if err := SyncMoviesList("collection", true); err != nil {
-		return err
-	}
-	if err := SyncShowsList("watchlist", true); err != nil {
-		return err
-	}
-	if err := SyncShowsList("collection", true); err != nil {
-		return err
+	if config.Get().TraktSyncCollections {
+		if err := SyncMoviesList("collection", true); err != nil {
+			return err
+		}
+		if err := SyncShowsList("collection", true); err != nil {
+			return err
+		}
 	}
 
-	lists := trakt.Userlists()
-	for _, list := range lists {
-		if err := SyncMoviesList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
-			continue
-		}
-		if err := SyncShowsList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
-			continue
+	if config.Get().TraktSyncUserlists {
+		lists := trakt.Userlists()
+		for _, list := range lists {
+			if err := SyncMoviesList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
+				continue
+			}
+			if err := SyncShowsList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
+				continue
+			}
 		}
 	}
 
@@ -1439,7 +1453,7 @@ func RefreshTrakt() error {
 
 // SyncTraktWatched gets watched list and updates watched status in the library
 func SyncTraktWatched() (haveChanges bool, err error) {
-	if config.Get().TraktToken == "" {
+	if config.Get().TraktToken == "" || !config.Get().TraktSyncWatched {
 		return
 	}
 
@@ -1549,6 +1563,10 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		}
 	}
 	l.mu.Trakt.Unlock()
+
+	if !config.Get().TraktSyncWatchedBack {
+		return
+	}
 
 	// Now, when we know what is marked Watched on Trakt - we are
 	// looking at Kodi library and sync back to Trakt items,

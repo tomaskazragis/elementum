@@ -303,6 +303,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 
 	case "VideoLibrary.OnCleanFinished":
 		go func() {
+			library.ClearResolveCache()
 			library.Refresh()
 			library.ClearPageCache()
 		}()

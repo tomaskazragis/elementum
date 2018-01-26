@@ -63,21 +63,28 @@ type Configuration struct {
 	ListenAutoDetect bool
 	// OutgoingInterfaces string
 	// TunedStorage        bool
-	Scrobble           bool
-	TraktUsername      string
-	TraktToken         string
-	TraktRefreshToken  string
-	TraktTokenExpiry   int
-	TraktSyncFrequency int
-	UpdateFrequency    int
-	UpdateDelay        int
-	UpdateAutoScan     bool
-	PlayResume         bool
-	UseCloudHole       bool
-	CloudHoleKey       string
-	TMDBApiKey         string
-	OSDBUser           string
-	OSDBPass           string
+	Scrobble bool
+
+	TraktUsername        string
+	TraktToken           string
+	TraktRefreshToken    string
+	TraktTokenExpiry     int
+	TraktSyncFrequency   int
+	TraktSyncCollections bool
+	TraktSyncWatchlist   bool
+	TraktSyncUserlists   bool
+	TraktSyncWatched     bool
+	TraktSyncWatchedBack bool
+
+	UpdateFrequency int
+	UpdateDelay     int
+	UpdateAutoScan  bool
+	PlayResume      bool
+	UseCloudHole    bool
+	CloudHoleKey    string
+	TMDBApiKey      string
+	OSDBUser        string
+	OSDBPass        string
 
 	SortingModeMovies           int
 	SortingModeShows            int
@@ -275,21 +282,28 @@ func Reload() *Configuration {
 		// TunedStorage:        settings["tuned_storage"].(bool),
 		ConnectionsLimit: settings["connections_limit"].(int),
 		// SessionSave:         settings["session_save"].(int),
-		Scrobble:           settings["trakt_scrobble"].(bool),
-		TraktUsername:      settings["trakt_username"].(string),
-		TraktToken:         settings["trakt_token"].(string),
-		TraktRefreshToken:  settings["trakt_refresh_token"].(string),
-		TraktTokenExpiry:   settings["trakt_token_expiry"].(int),
-		TraktSyncFrequency: settings["trakt_sync"].(int),
-		UpdateFrequency:    settings["library_update_frequency"].(int),
-		UpdateDelay:        settings["library_update_delay"].(int),
-		UpdateAutoScan:     settings["library_auto_scan"].(bool),
-		PlayResume:         settings["play_resume"].(bool),
-		UseCloudHole:       settings["use_cloudhole"].(bool),
-		CloudHoleKey:       settings["cloudhole_key"].(string),
-		TMDBApiKey:         settings["tmdb_api_key"].(string),
-		OSDBUser:           settings["osdb_user"].(string),
-		OSDBPass:           settings["osdb_pass"].(string),
+		Scrobble: settings["trakt_scrobble"].(bool),
+
+		TraktUsername:        settings["trakt_username"].(string),
+		TraktToken:           settings["trakt_token"].(string),
+		TraktRefreshToken:    settings["trakt_refresh_token"].(string),
+		TraktTokenExpiry:     settings["trakt_token_expiry"].(int),
+		TraktSyncFrequency:   settings["trakt_sync"].(int),
+		TraktSyncCollections: settings["trakt_sync_collections"].(bool),
+		TraktSyncWatchlist:   settings["trakt_sync_watchlist"].(bool),
+		TraktSyncUserlists:   settings["trakt_sync_userlists"].(bool),
+		TraktSyncWatched:     settings["trakt_sync_watched"].(bool),
+		TraktSyncWatchedBack: settings["trakt_sync_watchedback"].(bool),
+
+		UpdateFrequency: settings["library_update_frequency"].(int),
+		UpdateDelay:     settings["library_update_delay"].(int),
+		UpdateAutoScan:  settings["library_auto_scan"].(bool),
+		PlayResume:      settings["play_resume"].(bool),
+		UseCloudHole:    settings["use_cloudhole"].(bool),
+		CloudHoleKey:    settings["cloudhole_key"].(string),
+		TMDBApiKey:      settings["tmdb_api_key"].(string),
+		OSDBUser:        settings["osdb_user"].(string),
+		OSDBPass:        settings["osdb_pass"].(string),
 
 		SortingModeMovies:           settings["sorting_mode_movies"].(int),
 		SortingModeShows:            settings["sorting_mode_shows"].(int),
