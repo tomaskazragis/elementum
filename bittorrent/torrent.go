@@ -1,7 +1,10 @@
 package bittorrent
 
 import (
+	"bytes"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -578,6 +581,31 @@ func (t *Torrent) Resume() {
 // GetDBItem ...
 func (t *Torrent) GetDBItem() *database.BTItem {
 	return t.DBItem
+}
+
+// SaveMetainfo ...
+func (t *Torrent) SaveMetainfo(path string) error {
+	// Not saving torrent for memory storage
+	if t.Service.config.DownloadStorage == estorage.StorageMemory {
+		return nil
+	}
+	if t.Torrent == nil {
+		return fmt.Errorf("Torrent is not available")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("Directory %s does not exist", path)
+	}
+
+	var buf bytes.Buffer
+	t.Torrent.Metainfo().Write(&buf)
+
+	filePath := filepath.Join(path, fmt.Sprintf("%s.torrent", t.InfoHash()))
+	log.Debugf("Saving torrent to %s", filePath)
+	if err := ioutil.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func average(xs []int64) float64 {

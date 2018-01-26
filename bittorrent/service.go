@@ -218,7 +218,8 @@ func (s *BTService) configure() {
 		DataDir: config.Get().DownloadPath,
 
 		ListenAddr: s.ListenAddr,
-		Debug:      false,
+		// Debug:      false,
+		Debug: true,
 
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
@@ -386,9 +387,10 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		} else if torrentHandle == nil {
 			return nil, errors.New("Could not add torrent")
 		}
+
 	}
 
-	log.Debugf("Making new torrent item with url = '%#v'", uri)
+	log.Debugf("Making new torrent item with url = '%s'", uri)
 	torrent := NewTorrent(s, torrentHandle, uri)
 	if s.config.ConnectionsLimit > 0 {
 		torrentHandle.SetMaxEstablishedConns(s.config.ConnectionsLimit)
@@ -396,6 +398,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 
 	s.Torrents[torrent.infoHash] = torrent
 
+	go torrent.SaveMetainfo(s.config.TorrentsPath)
 	go torrent.Watch()
 
 	return torrent, nil

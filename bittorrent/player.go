@@ -446,6 +446,11 @@ func (btp *BTPlayer) Close() {
 		}
 
 		infoHash := btp.Torrent.InfoHash()
+		savedFilePath := filepath.Join(btp.s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+		if _, err := os.Stat(savedFilePath); err == nil {
+			btp.log.Infof("Deleting saved torrent file at %s", savedFilePath)
+			defer os.Remove(savedFilePath)
+		}
 
 		btp.s.UpdateDB(Delete, infoHash, 0, "")
 		btp.log.Infof("Removed %s from database", btp.Torrent.Name())
