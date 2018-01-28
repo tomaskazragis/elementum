@@ -35,7 +35,8 @@ const (
 	trueType  = "true"
 	falseType = "false"
 
-	resolveExpiration = 7 * 24 * time.Hour
+	resolveExpiration     = 7 * 24 * time.Hour
+	resolveFileExpiration = 14 * 24 * time.Hour
 )
 
 const (
@@ -364,12 +365,6 @@ func Refresh() error {
 	if err := RefreshShows(); err != nil {
 		return err
 	}
-	if err := RefreshSeasons(); err != nil {
-		return err
-	}
-	if err := RefreshEpisodes(); err != nil {
-		return err
-	}
 
 	log.Debug("Library refresh finished")
 	return nil
@@ -403,21 +398,27 @@ func RefreshMovies() error {
 	}
 	log.Debugf("Fetched %d movies from Kodi Library", len(movies.Movies))
 
+	l.mu.Movies.Lock()
+	defer l.mu.Movies.Unlock()
+
 	l.Movies = map[int]*Movie{}
 	for _, m := range movies.Movies {
 		m.UniqueIDs.Kodi = m.ID
 
-		l.mu.Movies.Lock()
 		l.Movies[m.ID] = &Movie{
 			ID:      m.ID,
 			Title:   m.Title,
 			Watched: m.PlayCount > 0,
 			File:    m.File,
 			Resume:  &Resume{},
-			UIDs:    parseUniqueID(MovieType, &m.UniqueIDs, m.File),
-			Xbmc:    m,
+			UIDs:    &UniqueIDs{Kodi: m.ID},
+			// UIDs:    parseUniqueID(MovieType, &m.UniqueIDs, m.File),
+			Xbmc: m,
 		}
-		l.mu.Movies.Unlock()
+	}
+
+	for _, m := range l.Movies {
+		parseUniqueID(MovieType, m.UIDs, &m.Xbmc.UniqueIDs, m.Xbmc.File)
 	}
 
 	return nil
@@ -463,8 +464,52 @@ func RefreshShows() error {
 			Title:    s.Title,
 			Seasons:  map[int]*Season{},
 			Episodes: map[int]*Episode{},
-			UIDs:     parseUniqueID(ShowType, &s.UniqueIDs, ""),
-			Xbmc:     s,
+			UIDs:     &UniqueIDs{Kodi: s.ID},
+			// UIDs:     parseUniqueID(ShowType, &s.UniqueIDs, ""),
+			Xbmc: s,
+		}
+	}
+
+	if err := RefreshSeasons(); err != nil {
+		return err
+	}
+	if err := RefreshEpisodes(); err != nil {
+		return err
+	}
+
+	for _, show := range l.Shows {
+		// Step 1: try to get information from what we get from Kodi
+		parseUniqueID(ShowType, show.UIDs, &show.Xbmc.UniqueIDs, "")
+
+		// Step 2: if TMDB not found - try to find it from episodes
+		if show.UIDs.TMDB == 0 {
+			for _, e := range show.Episodes {
+				if !strings.HasSuffix(e.Xbmc.File, ".strm") {
+					continue
+				}
+
+				u := &UniqueIDs{}
+				parseUniqueID(EpisodeType, u, &e.Xbmc.UniqueIDs, e.Xbmc.File)
+				if u.TMDB != 0 {
+					show.UIDs.TMDB = u.TMDB
+					break
+				}
+			}
+		}
+
+		if show.UIDs.TMDB == 0 {
+			continue
+		}
+
+		for _, s := range show.Seasons {
+			s.UIDs.TMDB = show.UIDs.TMDB
+			s.UIDs.TVDB = show.UIDs.TVDB
+			s.UIDs.IMDB = show.UIDs.IMDB
+		}
+		for _, e := range show.Episodes {
+			e.UIDs.TMDB = show.UIDs.TMDB
+			e.UIDs.TVDB = show.UIDs.TVDB
+			e.UIDs.IMDB = show.UIDs.IMDB
 		}
 	}
 
@@ -489,9 +534,6 @@ func RefreshSeasons() error {
 	}
 	log.Debugf("Fetched %d seasons from Kodi Library", len(seasons.Seasons))
 
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
-
 	cleanupCheck := map[int]bool{}
 	for _, s := range seasons.Seasons {
 		if c, ok := l.Shows[s.TVShowID]; !ok || c == nil || c.Seasons == nil {
@@ -503,14 +545,17 @@ func RefreshSeasons() error {
 			cleanupCheck[s.TVShowID] = true
 		}
 
+		s.UniqueIDs.Kodi = s.ID
+
 		l.Shows[s.TVShowID].Seasons[s.ID] = &Season{
 			ID:       s.ID,
 			Title:    s.Title,
 			Season:   s.Season,
 			Episodes: s.Episodes,
 			Watched:  s.PlayCount > 0,
-			UIDs:     &UniqueIDs{MediaType: SeasonType, Kodi: s.ID},
-			Xbmc:     s,
+			UIDs:     &UniqueIDs{Kodi: s.ID},
+			// UIDs:     &UniqueIDs{MediaType: SeasonType, Kodi: s.ID, TMDB: l.Shows[s.TVShowID].UIDs.TMDB},
+			Xbmc: s,
 		}
 	}
 
@@ -535,11 +580,7 @@ func RefreshEpisodes() error {
 	}
 	log.Debugf("Fetched %d episodes from Kodi Library", len(episodes.Episodes))
 
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
-
 	cleanupCheck := map[int]bool{}
-
 	for _, e := range episodes.Episodes {
 		if c, ok := l.Shows[e.TVShowID]; !ok || c == nil || c.Episodes == nil {
 			continue
@@ -551,7 +592,11 @@ func RefreshEpisodes() error {
 		}
 
 		e.UniqueIDs.Kodi = e.ID
-		e.UniqueIDs.TMDB = strconv.Itoa(e.TVShowID)
+		e.UniqueIDs.TMDB = ""
+		e.UniqueIDs.TVDB = ""
+		e.UniqueIDs.Trakt = ""
+		e.UniqueIDs.Unknown = ""
+		// e.UniqueIDs.TMDB = l.Shows[e.TVShowID].UIDs.TMDB
 
 		l.Shows[e.TVShowID].Episodes[e.ID] = &Episode{
 			ID:      e.ID,
@@ -560,8 +605,9 @@ func RefreshEpisodes() error {
 			Episode: e.Episode,
 			Watched: e.PlayCount > 0,
 			Resume:  &Resume{},
-			UIDs:    parseUniqueID(EpisodeType, &e.UniqueIDs, e.File),
-			Xbmc:    e,
+			UIDs:    &UniqueIDs{Kodi: e.ID},
+			// UIDs:    parseUniqueID(EpisodeType, &e.UniqueIDs, e.File),
+			Xbmc: e,
 		}
 	}
 
@@ -628,52 +674,48 @@ func RefreshUIDs() error {
 	return nil
 }
 
-func parseUniqueID(entityType int, xbmcIDs *xbmc.UniqueIDs, fileName string) (i *UniqueIDs) {
-	i = &UniqueIDs{
-		MediaType: entityType,
-		Kodi:      xbmcIDs.Kodi,
-		IMDB:      xbmcIDs.IMDB,
-	}
-
+func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string) {
+	i.MediaType = entityType
+	i.Kodi = xbmcIDs.Kodi
+	i.IMDB = xbmcIDs.IMDB
 	i.TMDB, _ = strconv.Atoi(xbmcIDs.TMDB)
 	i.TVDB, _ = strconv.Atoi(xbmcIDs.TVDB)
 	i.Trakt, _ = strconv.Atoi(xbmcIDs.Trakt)
 
-	cacheKey := fmt.Sprintf("Resolve_%d_%d", entityType, xbmcIDs.Kodi)
-
-	if err := cacheStore.Get(cacheKey, i); err == nil {
-		return i
-	}
-	defer func() {
-		// If we use Trakt - we should resolve it
-		// This can be done later if needed
-		// if config.Get().TraktToken != "" && len(i.Trakt) == 0 && len(i.TMDB) != 0 {
-		// 	ids := findTraktIDs(entityType, TMDBScraper, i.TMDB)
-		// 	if ids != nil {
-		// 		i.Trakt = strconv.Itoa(ids.Trakt)
-		//
-		// 		if len(i.IMDB) == 0 && i.IMDB != "0" {
-		// 			i.IMDB = ids.IMDB
-		// 		}
-		// 		if len(i.TVDB) == 0 && i.TVDB != "0" {
-		// 			i.TVDB = strconv.Itoa(ids.TVDB)
-		// 		}
-		// 	}
-		// }
-
-		cacheStore.Set(cacheKey, i, resolveExpiration)
-	}()
+	// cacheKey := fmt.Sprintf("Resolve_%d_%d", entityType, xbmcIDs.Kodi)
+	// if err := cacheStore.Get(cacheKey, i); err == nil {
+	// 	return i
+	// }
+	// defer func() {
+	// 	cacheStore.Set(cacheKey, i, resolveExpiration)
+	// }()
 
 	// Checking alternative fields
+	// 		TheMovieDB
 	if i.TMDB == 0 && len(xbmcIDs.TheMovieDB) > 0 {
 		i.TMDB, _ = strconv.Atoi(xbmcIDs.TheMovieDB)
 	}
 
+	// 		IMDB
 	if len(xbmcIDs.Unknown) > 0 && strings.HasPrefix(xbmcIDs.Unknown, "tt") {
 		i.IMDB = xbmcIDs.Unknown
 		if i.TMDB != 0 {
 			return
 		}
+	}
+
+	if len(fileName) > 0 {
+		id := findTMDBInFile(fileName, xbmcIDs.Unknown)
+		if id != 0 {
+			i.TMDB = id
+			return
+		}
+	}
+
+	// We should not query for each episode, has no sense,
+	// since we need only TVShow ID to be resolved
+	if entityType == EpisodeType {
+		return
 	}
 
 	// If we get here - we have no TMDB, so try to resolve it
@@ -690,59 +732,47 @@ func parseUniqueID(entityType int, xbmcIDs *xbmc.UniqueIDs, fileName string) (i 
 		}
 	}
 
-	// TODO: Remove if not wanted anymore
-	// Try to match from selected Scraper setting
-	// if len(xbmcIDs.Unknown) > 0 {
-	// 	switch config.Get().TvScraper {
-	// 	case TMDBScraper:
-	// 		break
-	// 	case TVDBScraper:
-	// 		i.TMDB = findTMDBIDs(entityType, "tvdb_id", xbmcIDs.Unknown)
-	// 	case TraktScraper:
-	// 		ids := findTraktIDs(entityType, TMDBScraper, strconv.Itoa(i.TMDB))
-	// 		i.TMDB = ids.TMDB
-	// 	}
-	// }
+	return
+}
 
-	// At last, try to read TMDB id from file
-	if i.TMDB != 0 || len(fileName) == 0 || !strings.HasSuffix(fileName, ".strm") {
+func findTMDBInFile(fileName string, pattern string) (id int) {
+	if len(fileName) == 0 || !strings.HasSuffix(fileName, ".strm") {
 		return
 	}
+
+	// cacheKey := fmt.Sprintf("Resolve_File_%s", fileName)
+	// if err := cacheStore.Get(cacheKey, id); err == nil {
+	// 	return id
+	// }
+	defer func() {
+		if id == 0 {
+			log.Debugf("Parsed id: %d === %s === %s", id, pattern, fileName)
+		}
+		// cacheStore.Set(cacheKey, id, resolveFileExpiration)
+	}()
 
 	if _, err := os.Stat(fileName); err != nil {
 		return
 	}
 
 	fileContent, err := ioutil.ReadFile(fileName)
+	// log.Debugf("C: %s === %s === %#v", fileName, fileContent, err)
 	if err != nil {
 		return
 	}
 
 	// Dummy check. If Unknown is found in the strm file - we treat it as tmdb id
-	if bytes.Contains(fileContent, []byte("/"+xbmcIDs.Unknown)) {
-		i.TMDB, _ = strconv.Atoi(xbmcIDs.Unknown)
+	if len(pattern) > 1 && bytes.Contains(fileContent, []byte("/"+pattern)) {
+		id, _ = strconv.Atoi(pattern)
+		return
 	}
 
 	// Reading the strm file and passing to a regexp to get TMDB ID
 	// This can't be done with episodes, since it has Show ID and not Episode ID
-	// if matches := resolveRegexp.FindSubmatch(fileContent); len(matches) > 1 {
-	// 	id, errConv := strconv.Atoi(string(matches[1]))
-	// 	if id == 0 || errConv != nil {
-	// 		return
-	// 	}
-
-	// Skip detection of item for now
-	// switch entityType {
-	// case MovieType:
-	// 	if m := tmdb.GetMovie(id, config.Get().Language); m != nil {
-	// 		i.TMDB = strconv.Itoa(m.ID)
-	// 	}
-	// case ShowType:
-	// 	if m := tmdb.GetShow(id, config.Get().Language); m != nil {
-	// 		i.TMDB = strconv.Itoa(m.ID)
-	// 	}
-	// }
-	// }
+	if matches := resolveRegexp.FindSubmatch(fileContent); len(matches) > 1 {
+		id, _ = strconv.Atoi(string(matches[1]))
+		return
+	}
 
 	return
 }

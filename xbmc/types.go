@@ -181,12 +181,13 @@ type VideoLibrarySeason struct {
 
 // VideoLibrarySeasonItem ...
 type VideoLibrarySeasonItem struct {
-	ID        int    `json:"seasonid"`
-	Title     string `json:"label"`
-	Season    int    `json:"season"`
-	Episodes  int    `json:"episode"`
-	TVShowID  int    `json:"tvshowid"`
-	PlayCount int    `json:"playcount"`
+	ID        int       `json:"seasonid"`
+	Title     string    `json:"label"`
+	Season    int       `json:"season"`
+	Episodes  int       `json:"episode"`
+	TVShowID  int       `json:"tvshowid"`
+	PlayCount int       `json:"playcount"`
+	UniqueIDs UniqueIDs `json:"uniqueid"`
 }
 
 // VideoLibraryEpisodes ...

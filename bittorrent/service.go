@@ -94,8 +94,8 @@ func NewBTService() *BTService {
 		Players:  map[string]*BTPlayer{},
 
 		// TODO: cleanup when limiting is finished
-		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
-		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
+		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
+		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<16),
 		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
 		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<16),
 
