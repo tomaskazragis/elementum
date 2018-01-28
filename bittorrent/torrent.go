@@ -57,6 +57,7 @@ type Torrent struct {
 	downRates      []int64
 	upRates        []int64
 	rateCounter    int
+	transferSize   int64
 	downloadedSize int64
 	uploadedSize   int64
 	lastProgress   float64
@@ -222,11 +223,15 @@ func (t *Torrent) progressEvent() {
 	// }
 	// log.Noticef(strings.Repeat("=", 20))
 
-	curDownloaded := t.Torrent.BytesCompleted()
-	curUploaded := t.Torrent.Stats().DataBytesWritten
+	stats := t.Torrent.Stats()
+	curDownloaded := stats.DataBytesRead
+	curUploaded := stats.DataBytesWritten
+
 	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
 	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize
 
+	oldSize := t.transferSize
+	t.transferSize = t.Torrent.BytesCompleted()
 	if curDownloaded > t.downloadedSize {
 		t.downloadedSize = curDownloaded
 	}
@@ -255,7 +260,7 @@ func (t *Torrent) progressEvent() {
 	// }
 	// t.lastDownRate = t.downloadedSize
 
-	log.Debugf("PR: %#v/%#v; %#v = %.2f ", t.DownloadRate, t.UploadRate, t.GetStateString(), t.GetProgress())
+	log.Debugf("PR: %#v (%d)/%#v; %#v = %.2f ", t.DownloadRate, t.transferSize-oldSize, t.UploadRate, t.GetStateString(), t.GetProgress())
 	if t.needSeeding && t.Service.GetSeedTime() > 0 && t.GetProgress() >= 100 {
 		t.muSeeding.Lock()
 		seedingTime := time.Duration(t.Service.GetSeedTime()) * time.Hour
