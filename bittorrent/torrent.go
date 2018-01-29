@@ -33,6 +33,7 @@ type Torrent struct {
 
 	BufferLength         int64
 	BufferProgress       float64
+	BufferPiecesLength   int64
 	BufferPiecesProgress map[int]float64
 	BufferEndPieces      []int
 
@@ -192,14 +193,13 @@ func (t *Torrent) bufferTickerEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 
 	if t.IsBuffering {
-		progressCount := 0.0
+		var progressCount int64
 		for i := range t.BufferPiecesProgress {
-			progressCount += float64(t.PieceBytesMissing(i))
+			progressCount += t.PieceBytesMissing(i)
 		}
 
-		total := float64(len(t.BufferPiecesProgress)) * t.pieceLength
 		// Making sure current progress is not less then previous
-		thisProgress := (total - progressCount) / total * 100
+		thisProgress := float64(t.BufferPiecesLength-progressCount) / float64(t.BufferPiecesLength) * 100
 		if thisProgress > t.BufferProgress {
 			t.BufferProgress = thisProgress
 		}
@@ -329,6 +329,11 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 	for i := postBufferStart; i <= postBufferEnd; i++ {
 		t.BufferPiecesProgress[int(i)] = 0
 		t.BufferEndPieces = append(t.BufferEndPieces, int(i))
+	}
+
+	t.BufferPiecesLength = 0
+	for i := range t.BufferPiecesProgress {
+		t.BufferPiecesLength += t.Torrent.Piece(i).Info().Length()
 	}
 
 	t.muBuffer.Unlock()
