@@ -819,4 +819,8 @@ func (btp *BTPlayer) GetIdent() {
 			}
 		}
 	}
+
+	if btp.p.KodiID == 0 {
+		log.Debugf("Can't find %s for these parameters: %+v", btp.p.ContentType, btp.p)
+	}
 }

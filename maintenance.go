@@ -11,7 +11,7 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/library"
-	"github.com/elgatito/elementum/trakt"
+	// "github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -213,58 +213,66 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			return
 		}
 
-		if config.Get().TraktToken != "" && !library.TraktScanning {
-			var watched *trakt.WatchedItem
-			if request.Item.Type == movieType {
-				movie := library.GetLibraryMovie(request.Item.ID)
-				if movie != nil {
-					watched = &trakt.WatchedItem{
-						MediaType: request.Item.Type,
-						Movie:     movie.UIDs.TMDB,
-					}
-				}
-			} else if request.Item.Type == showType {
-				show := library.GetLibraryShow(request.Item.ID)
-				if show != nil {
-					watched = &trakt.WatchedItem{
-						MediaType: request.Item.Type,
-						Show:      show.UIDs.TMDB,
-					}
-				}
-			} else if request.Item.Type == seasonType {
-				show, season := library.GetLibrarySeason(request.Item.ID)
-				if show != nil && season != nil {
-					watched = &trakt.WatchedItem{
-						MediaType: request.Item.Type,
-						Show:      show.UIDs.TMDB,
-						Season:    season.Season,
-					}
-				}
-			} else if request.Item.Type == episodeType {
-				show, episode := library.GetLibraryEpisode(request.Item.ID)
-				if show != nil && episode != nil {
-					watched = &trakt.WatchedItem{
-						MediaType: request.Item.Type,
-						Show:      show.UIDs.TMDB,
-						Season:    episode.Season,
-						Episode:   episode.Episode,
-					}
-				}
-			}
-
-			if watched != nil {
-				watched.Watched = request.Playcount > 0
-				log.Debugf("Updating Trakt after onUpdate: %#v", watched)
-				go trakt.SetWatched(watched)
-			}
+		if request.Item.Type == movieType {
+			library.RefreshMovies()
+			xbmc.Refresh()
+		} else {
+			library.RefreshShows()
+			xbmc.Refresh()
 		}
+		// TODO: don't know do we need this to set since we can sync it later?
+		// if config.Get().TraktToken != "" && !library.TraktScanning {
+		// 	var watched *trakt.WatchedItem
+		// 	if request.Item.Type == movieType {
+		// 		movie := library.GetLibraryMovie(request.Item.ID)
+		// 		if movie != nil {
+		// 			watched = &trakt.WatchedItem{
+		// 				MediaType: request.Item.Type,
+		// 				Movie:     movie.UIDs.TMDB,
+		// 			}
+		// 		}
+		// 	} else if request.Item.Type == showType {
+		// 		show := library.GetLibraryShow(request.Item.ID)
+		// 		if show != nil {
+		// 			watched = &trakt.WatchedItem{
+		// 				MediaType: request.Item.Type,
+		// 				Show:      show.UIDs.TMDB,
+		// 			}
+		// 		}
+		// 	} else if request.Item.Type == seasonType {
+		// 		show, season := library.GetLibrarySeason(request.Item.ID)
+		// 		if show != nil && season != nil {
+		// 			watched = &trakt.WatchedItem{
+		// 				MediaType: request.Item.Type,
+		// 				Show:      show.UIDs.TMDB,
+		// 				Season:    season.Season,
+		// 			}
+		// 		}
+		// 	} else if request.Item.Type == episodeType {
+		// 		show, episode := library.GetLibraryEpisode(request.Item.ID)
+		// 		if show != nil && episode != nil {
+		// 			watched = &trakt.WatchedItem{
+		// 				MediaType: request.Item.Type,
+		// 				Show:      show.UIDs.TMDB,
+		// 				Season:    episode.Season,
+		// 				Episode:   episode.Episode,
+		// 			}
+		// 		}
+		// 	}
+		//
+		// 	if watched != nil {
+		// 		watched.Watched = request.Playcount > 0
+		// 		log.Debugf("Updating Trakt after onUpdate: %#v", watched)
+		// 		go trakt.SetWatched(watched)
+		// 	}
+		// }
 
-		if request.Item.ID == 0 || library.TraktScanning || library.Scanning {
-			return
-		}
-
-		library.Refresh()
-		xbmc.Refresh()
+		// if request.Item.ID == 0 || library.TraktScanning || library.Scanning {
+		// 	return
+		// }
+		//
+		// library.Refresh()
+		// xbmc.Refresh()
 
 	case "VideoLibrary.OnRemove":
 		var item struct {

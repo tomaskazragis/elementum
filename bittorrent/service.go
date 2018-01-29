@@ -356,8 +356,6 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		return nil, fmt.Errorf("Download path empty")
 	}
 
-	// TODO: Make proper ExistingTorrent check, for using existing torrents,
-	// without creating new ones for each Player creation.
 	var err error
 	var torrentHandle *gotorrent.Torrent
 	if strings.HasPrefix(uri, "magnet:") {

@@ -292,6 +292,7 @@ const (
 	recentExpiration        = 15 * time.Minute
 	imagesCacheExpiration   = 14 * 24 * time.Hour
 	resolveCacheExpiration  = 14 * 24 * time.Hour
+	findCacheExpiration     = 14 * 24 * time.Hour
 )
 
 var (
@@ -450,7 +451,7 @@ func Find(externalID string, externalSource string) *FindResult {
 			}
 
 			if result != nil {
-				cacheStore.Set(key, result, resolveCacheExpiration)
+				cacheStore.Set(key, result, findCacheExpiration)
 			}
 
 			return nil
