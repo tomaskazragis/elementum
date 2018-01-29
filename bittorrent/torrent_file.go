@@ -89,8 +89,8 @@ var (
 
 		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):         Resolution240p,
 		regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p,
-		regexp.MustCompile(`\W+(hdrip|bluray|b[rd]rip)\W*`):       Resolution720p,
-		regexp.MustCompile(`\W+(fullhd|fhd)\W*`):                  Resolution1080p,
+		regexp.MustCompile(`\W+(hdrip|b[rd]rip)\W*`):              Resolution720p,
+		regexp.MustCompile(`\W+(fullhd|fhd|blu\W*ray)\W*`):        Resolution1080p,
 		regexp.MustCompile(`\W+2K\W*`):                            Resolution1440p,
 		regexp.MustCompile(`\W+4K\W*`):                            Resolution4k,
 	}
