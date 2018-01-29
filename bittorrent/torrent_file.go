@@ -299,7 +299,7 @@ func (t *TorrentFile) initialize() {
 	}
 
 	if t.Resolution == ResolutionUnknown {
-		t.Resolution = matchTags(t, resolutionTags)
+		t.Resolution = matchLowerTags(t, resolutionTags)
 		if t.Resolution == ResolutionUnknown {
 			t.Resolution = Resolution480p
 		}
@@ -527,12 +527,24 @@ func matchTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
 	codec := 0
 	for re, value := range tokens {
 		if re.MatchString(lowName) {
+			// TODO: Do wee need to match for upper scale?
+			// is 720p is matched then it's not 1080p for sure?!
 			if value > codec {
 				codec = value
 			}
 		}
 	}
 	return codec
+}
+
+func matchLowerTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
+	lowName := strings.ToLower(t.Name)
+	for re, value := range tokens {
+		if re.MatchString(lowName) {
+			return value
+		}
+	}
+	return 0
 }
 
 // StreamInfo ...
