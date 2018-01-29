@@ -705,10 +705,12 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 	}
 
 	if len(fileName) > 0 {
-		id := findTMDBInFile(fileName, xbmcIDs.Unknown)
+		id, err := findTMDBInFile(fileName, xbmcIDs.Unknown)
 		if id != 0 {
 			i.TMDB = id
 			return
+		} else if err != nil {
+			log.Debugf("Error reading TMDB ID from the file %s: %#v", fileName, err)
 		}
 	}
 
@@ -735,7 +737,7 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 	return
 }
 
-func findTMDBInFile(fileName string, pattern string) (id int) {
+func findTMDBInFile(fileName string, pattern string) (id int, err error) {
 	if len(fileName) == 0 || !strings.HasSuffix(fileName, ".strm") {
 		return
 	}
@@ -746,19 +748,19 @@ func findTMDBInFile(fileName string, pattern string) (id int) {
 	// }
 	defer func() {
 		if id == 0 {
-			log.Debugf("Parsed id: %d === %s === %s", id, pattern, fileName)
+			log.Debugf("Count not get ID from the file %s with pattern %s", fileName, pattern)
 		}
 		// cacheStore.Set(cacheKey, id, resolveFileExpiration)
 	}()
 
-	if _, err := os.Stat(fileName); err != nil {
-		return
+	if _, errStat := os.Stat(fileName); errStat != nil {
+		return 0, errStat
 	}
 
-	fileContent, err := ioutil.ReadFile(fileName)
+	fileContent, errRead := ioutil.ReadFile(fileName)
 	// log.Debugf("C: %s === %s === %#v", fileName, fileContent, err)
-	if err != nil {
-		return
+	if errRead != nil {
+		return 0, errRead
 	}
 
 	// Dummy check. If Unknown is found in the strm file - we treat it as tmdb id

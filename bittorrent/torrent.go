@@ -559,6 +559,8 @@ func (t *Torrent) Drop(removeFiles bool) {
 					return
 				}
 			}
+
+			log.Debug("Count not delete downloaded files")
 		}()
 	}
 
