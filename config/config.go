@@ -415,7 +415,7 @@ func CheckBurst() {
 	enabledProviders := make([]Addon, 0)
 	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
 		if strings.HasPrefix(addon.ID, "script.elementum.") {
-			if addon.ID == "script.elementum.burst" && addon.Enabled == true {
+			if addon.Enabled == true {
 				hasBurst = true
 			}
 			enabledProviders = append(enabledProviders, Addon{
