@@ -134,12 +134,14 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 	if config.Get().UseOriginalTitle && movie.OriginalTitle != "" {
 		title = movie.OriginalTitle
 	}
+
 	sObject := &MovieSearchObject{
 		IMDBId: movie.IMDBId,
 		Title:  NormalizeTitle(title),
 		Year:   year,
 		Titles: map[string]string{
-			"Original": movie.OriginalTitle,
+			"original": NormalizeTitle(movie.OriginalTitle),
+			"source":   movie.OriginalTitle,
 		},
 	}
 	if movie.AlternativeTitles != nil && movie.AlternativeTitles.Titles != nil {
@@ -147,6 +149,8 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
 		}
 	}
+	sObject.Titles[strings.ToLower(movie.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
+	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(movie.Title)
 
 	return sObject
 }
@@ -163,7 +167,7 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 		IMDBId: show.ExternalIDs.IMDBId,
 		TVDBId: util.StrInterfaceToInt(show.ExternalIDs.TVDBID),
 		Title:  NormalizeTitle(title),
-		Titles: map[string]string{"Original": show.OriginalName},
+		Titles: map[string]string{"original": NormalizeTitle(show.OriginalName), "source": show.OriginalName},
 		Year:   year,
 		Season: season.Season,
 	}
@@ -172,6 +176,8 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
 		}
 	}
+	sObject.Titles[strings.ToLower(show.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
+	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
 
 	return sObject
 }
@@ -222,7 +228,7 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 		IMDBId:         show.ExternalIDs.IMDBId,
 		TVDBId:         tvdbID,
 		Title:          NormalizeTitle(title),
-		Titles:         map[string]string{"Original": show.OriginalName},
+		Titles:         map[string]string{"original": NormalizeTitle(show.OriginalName), "source": show.OriginalName},
 		Season:         episode.SeasonNumber,
 		Episode:        episode.EpisodeNumber,
 		Year:           year,
@@ -233,6 +239,8 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 			sObject.Titles[strings.ToLower(title.Iso3166_1)] = NormalizeTitle(title.Title)
 		}
 	}
+	sObject.Titles[strings.ToLower(show.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
+	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
 
 	return sObject
 }

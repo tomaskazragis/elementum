@@ -432,9 +432,9 @@ func (z *Crew) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Entity) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 13
+	// map header, size 14
 	// string "IsAdult"
-	o = append(o, 0x8d, 0xa7, 0x49, 0x73, 0x41, 0x64, 0x75, 0x6c, 0x74)
+	o = append(o, 0x8e, 0xa7, 0x49, 0x73, 0x41, 0x64, 0x75, 0x6c, 0x74)
 	o = msgp.AppendBool(o, z.IsAdult)
 	// string "BackdropPath"
 	o = append(o, 0xac, 0x42, 0x61, 0x63, 0x6b, 0x64, 0x72, 0x6f, 0x70, 0x50, 0x61, 0x74, 0x68)
@@ -461,6 +461,9 @@ func (z *Entity) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "OriginalTitle"
 	o = append(o, 0xad, 0x4f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x61, 0x6c, 0x54, 0x69, 0x74, 0x6c, 0x65)
 	o = msgp.AppendString(o, z.OriginalTitle)
+	// string "OriginalLanguage"
+	o = append(o, 0xb0, 0x4f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x61, 0x6c, 0x4c, 0x61, 0x6e, 0x67, 0x75, 0x61, 0x67, 0x65)
+	o = msgp.AppendString(o, z.OriginalLanguage)
 	// string "ReleaseDate"
 	o = append(o, 0xab, 0x52, 0x65, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x44, 0x61, 0x74, 0x65)
 	o = msgp.AppendString(o, z.ReleaseDate)
@@ -577,6 +580,11 @@ func (z *Entity) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "OriginalLanguage":
+			z.OriginalLanguage, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "ReleaseDate":
 			z.ReleaseDate, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
@@ -638,7 +646,7 @@ func (z *Entity) Msgsize() (s int) {
 			s += 1 + 3 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Genres[za0001].Name)
 		}
 	}
-	s += 14 + msgp.StringPrefixSize + len(z.OriginalTitle) + 12 + msgp.StringPrefixSize + len(z.ReleaseDate) + 13 + msgp.StringPrefixSize + len(z.FirstAirDate) + 11 + msgp.StringPrefixSize + len(z.PosterPath) + 6 + msgp.StringPrefixSize + len(z.Title) + 12 + msgp.Float32Size + 10 + msgp.IntSize + 13 + msgp.StringPrefixSize + len(z.OriginalName) + 5 + msgp.StringPrefixSize + len(z.Name)
+	s += 14 + msgp.StringPrefixSize + len(z.OriginalTitle) + 17 + msgp.StringPrefixSize + len(z.OriginalLanguage) + 12 + msgp.StringPrefixSize + len(z.ReleaseDate) + 13 + msgp.StringPrefixSize + len(z.FirstAirDate) + 11 + msgp.StringPrefixSize + len(z.PosterPath) + 6 + msgp.StringPrefixSize + len(z.Title) + 12 + msgp.Float32Size + 10 + msgp.IntSize + 13 + msgp.StringPrefixSize + len(z.OriginalName) + 5 + msgp.StringPrefixSize + len(z.Name)
 	return
 }
 

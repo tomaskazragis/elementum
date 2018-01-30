@@ -134,19 +134,20 @@ type Episode struct {
 
 // Entity ...
 type Entity struct {
-	IsAdult       bool      `json:"adult"`
-	BackdropPath  string    `json:"backdrop_path"`
-	ID            int       `json:"id"`
-	Genres        []*IDName `json:"genres"`
-	OriginalTitle string    `json:"original_title,omitempty"`
-	ReleaseDate   string    `json:"release_date"`
-	FirstAirDate  string    `json:"first_air_date"`
-	PosterPath    string    `json:"poster_path"`
-	Title         string    `json:"title,omitempty"`
-	VoteAverage   float32   `json:"vote_average"`
-	VoteCount     int       `json:"vote_count"`
-	OriginalName  string    `json:"original_name,omitempty"`
-	Name          string    `json:"name,omitempty"`
+	IsAdult          bool      `json:"adult"`
+	BackdropPath     string    `json:"backdrop_path"`
+	ID               int       `json:"id"`
+	Genres           []*IDName `json:"genres"`
+	OriginalTitle    string    `json:"original_title,omitempty"`
+	OriginalLanguage string    `json:"original_language,omitempty"`
+	ReleaseDate      string    `json:"release_date"`
+	FirstAirDate     string    `json:"first_air_date"`
+	PosterPath       string    `json:"poster_path"`
+	Title            string    `json:"title,omitempty"`
+	VoteAverage      float32   `json:"vote_average"`
+	VoteCount        int       `json:"vote_count"`
+	OriginalName     string    `json:"original_name,omitempty"`
+	Name             string    `json:"name,omitempty"`
 }
 
 // EntityList ...

@@ -860,33 +860,20 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 		if z.Seasons[za0001] == nil {
 			o = msgp.AppendNil(o)
 		} else {
-			// map header, size 2
-			// string "Season"
-			o = append(o, 0x82, 0xa6, 0x53, 0x65, 0x61, 0x73, 0x6f, 0x6e)
-			o = msgp.AppendInt(o, z.Seasons[za0001].Season)
-			// string "Episodes"
-			o = append(o, 0xa8, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x73)
-			o = msgp.AppendArrayHeader(o, uint32(len(z.Seasons[za0001].Episodes)))
-			for za0002 := range z.Seasons[za0001].Episodes {
-				if z.Seasons[za0001].Episodes[za0002] == nil {
-					o = msgp.AppendNil(o)
-				} else {
-					o, err = z.Seasons[za0001].Episodes[za0002].MarshalMsg(o)
-					if err != nil {
-						return
-					}
-				}
+			o, err = z.Seasons[za0001].MarshalMsg(o)
+			if err != nil {
+				return
 			}
 		}
 	}
 	// string "Banners"
 	o = append(o, 0xa7, 0x42, 0x61, 0x6e, 0x6e, 0x65, 0x72, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Banners)))
-	for za0003 := range z.Banners {
-		if z.Banners[za0003] == nil {
+	for za0002 := range z.Banners {
+		if z.Banners[za0002] == nil {
 			o = msgp.AppendNil(o)
 		} else {
-			o, err = z.Banners[za0003].MarshalMsg(o)
+			o, err = z.Banners[za0002].MarshalMsg(o)
 			if err != nil {
 				return
 			}
@@ -895,11 +882,11 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Actors"
 	o = append(o, 0xa6, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Actors)))
-	for za0004 := range z.Actors {
-		if z.Actors[za0004] == nil {
+	for za0003 := range z.Actors {
+		if z.Actors[za0003] == nil {
 			o = msgp.AppendNil(o)
 		} else {
-			o, err = z.Actors[za0004].MarshalMsg(o)
+			o, err = z.Actors[za0003].MarshalMsg(o)
 			if err != nil {
 				return
 			}
@@ -1061,111 +1048,63 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					if z.Seasons[za0001] == nil {
 						z.Seasons[za0001] = new(Season)
 					}
-					var zb0003 uint32
-					zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
+					bts, err = z.Seasons[za0001].UnmarshalMsg(bts)
 					if err != nil {
 						return
-					}
-					for zb0003 > 0 {
-						zb0003--
-						field, bts, err = msgp.ReadMapKeyZC(bts)
-						if err != nil {
-							return
-						}
-						switch msgp.UnsafeString(field) {
-						case "Season":
-							z.Seasons[za0001].Season, bts, err = msgp.ReadIntBytes(bts)
-							if err != nil {
-								return
-							}
-						case "Episodes":
-							var zb0004 uint32
-							zb0004, bts, err = msgp.ReadArrayHeaderBytes(bts)
-							if err != nil {
-								return
-							}
-							if cap(z.Seasons[za0001].Episodes) >= int(zb0004) {
-								z.Seasons[za0001].Episodes = (z.Seasons[za0001].Episodes)[:zb0004]
-							} else {
-								z.Seasons[za0001].Episodes = make(EpisodeList, zb0004)
-							}
-							for za0002 := range z.Seasons[za0001].Episodes {
-								if msgp.IsNil(bts) {
-									bts, err = msgp.ReadNilBytes(bts)
-									if err != nil {
-										return
-									}
-									z.Seasons[za0001].Episodes[za0002] = nil
-								} else {
-									if z.Seasons[za0001].Episodes[za0002] == nil {
-										z.Seasons[za0001].Episodes[za0002] = new(Episode)
-									}
-									bts, err = z.Seasons[za0001].Episodes[za0002].UnmarshalMsg(bts)
-									if err != nil {
-										return
-									}
-								}
-							}
-						default:
-							bts, err = msgp.Skip(bts)
-							if err != nil {
-								return
-							}
-						}
 					}
 				}
 			}
 		case "Banners":
-			var zb0005 uint32
-			zb0005, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0003 uint32
+			zb0003, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Banners) >= int(zb0005) {
-				z.Banners = (z.Banners)[:zb0005]
+			if cap(z.Banners) >= int(zb0003) {
+				z.Banners = (z.Banners)[:zb0003]
 			} else {
-				z.Banners = make([]*Banner, zb0005)
+				z.Banners = make([]*Banner, zb0003)
 			}
-			for za0003 := range z.Banners {
+			for za0002 := range z.Banners {
 				if msgp.IsNil(bts) {
 					bts, err = msgp.ReadNilBytes(bts)
 					if err != nil {
 						return
 					}
-					z.Banners[za0003] = nil
+					z.Banners[za0002] = nil
 				} else {
-					if z.Banners[za0003] == nil {
-						z.Banners[za0003] = new(Banner)
+					if z.Banners[za0002] == nil {
+						z.Banners[za0002] = new(Banner)
 					}
-					bts, err = z.Banners[za0003].UnmarshalMsg(bts)
+					bts, err = z.Banners[za0002].UnmarshalMsg(bts)
 					if err != nil {
 						return
 					}
 				}
 			}
 		case "Actors":
-			var zb0006 uint32
-			zb0006, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0004 uint32
+			zb0004, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Actors) >= int(zb0006) {
-				z.Actors = (z.Actors)[:zb0006]
+			if cap(z.Actors) >= int(zb0004) {
+				z.Actors = (z.Actors)[:zb0004]
 			} else {
-				z.Actors = make([]*Actor, zb0006)
+				z.Actors = make([]*Actor, zb0004)
 			}
-			for za0004 := range z.Actors {
+			for za0003 := range z.Actors {
 				if msgp.IsNil(bts) {
 					bts, err = msgp.ReadNilBytes(bts)
 					if err != nil {
 						return
 					}
-					z.Actors[za0004] = nil
+					z.Actors[za0003] = nil
 				} else {
-					if z.Actors[za0004] == nil {
-						z.Actors[za0004] = new(Actor)
+					if z.Actors[za0003] == nil {
+						z.Actors[za0003] = new(Actor)
 					}
-					bts, err = z.Actors[za0004].UnmarshalMsg(bts)
+					bts, err = z.Actors[za0003].UnmarshalMsg(bts)
 					if err != nil {
 						return
 					}
@@ -1189,30 +1128,23 @@ func (z *Show) Msgsize() (s int) {
 		if z.Seasons[za0001] == nil {
 			s += msgp.NilSize
 		} else {
-			s += 1 + 7 + msgp.IntSize + 9 + msgp.ArrayHeaderSize
-			for za0002 := range z.Seasons[za0001].Episodes {
-				if z.Seasons[za0001].Episodes[za0002] == nil {
-					s += msgp.NilSize
-				} else {
-					s += z.Seasons[za0001].Episodes[za0002].Msgsize()
-				}
-			}
+			s += z.Seasons[za0001].Msgsize()
 		}
 	}
 	s += 8 + msgp.ArrayHeaderSize
-	for za0003 := range z.Banners {
-		if z.Banners[za0003] == nil {
+	for za0002 := range z.Banners {
+		if z.Banners[za0002] == nil {
 			s += msgp.NilSize
 		} else {
-			s += z.Banners[za0003].Msgsize()
+			s += z.Banners[za0002].Msgsize()
 		}
 	}
 	s += 7 + msgp.ArrayHeaderSize
-	for za0004 := range z.Actors {
-		if z.Actors[za0004] == nil {
+	for za0003 := range z.Actors {
+		if z.Actors[za0003] == nil {
 			s += msgp.NilSize
 		} else {
-			s += z.Actors[za0004].Msgsize()
+			s += z.Actors[za0003].Msgsize()
 		}
 	}
 	return
