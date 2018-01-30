@@ -360,10 +360,10 @@ func Refresh() error {
 		return nil
 	}
 	if err := RefreshMovies(); err != nil {
-		return err
+		log.Debugf("RefreshMovies got an error: %v", err)
 	}
 	if err := RefreshShows(); err != nil {
-		return err
+		log.Debugf("RefreshMovies got an error: %v", err)
 	}
 
 	log.Debug("Library refresh finished")
@@ -482,10 +482,10 @@ func RefreshShows() error {
 	}
 
 	if err := RefreshSeasons(); err != nil {
-		return err
+		log.Debugf("RefreshSeasons got an error: %v", err)
 	}
 	if err := RefreshEpisodes(); err != nil {
-		return err
+		log.Debugf("RefreshEpisodes got an error: %v", err)
 	}
 
 	for _, show := range l.Shows {
@@ -752,8 +752,8 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 		if entityType == MovieType {
 			m := tmdb.GetMovie(localID, config.Get().Language)
 			if m != nil {
-				thisYear, _ := strconv.Atoi(m.FirstAirDate[0:4])
-				if thisYear > 1000 && thisYear == year {
+				dt, err := time.Parse("2006-01-02", m.FirstAirDate)
+				if err != nil || dt.Year() == year {
 					i.TMDB = m.ID
 					return
 				}
@@ -761,8 +761,8 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 		} else if entityType == ShowType {
 			s := tmdb.GetShow(localID, config.Get().Language)
 			if s != nil {
-				thisYear, _ := strconv.Atoi(s.FirstAirDate[0:4])
-				if thisYear > 1000 && thisYear == year {
+				dt, err := time.Parse("2006-01-02", s.FirstAirDate)
+				if err != nil || dt.Year() == year {
 					i.TMDB = s.ID
 					return
 				}
@@ -824,32 +824,46 @@ func findTMDBInFile(fileName string, pattern string) (id int, err error) {
 
 func findTMDBIDsWithYear(entityType int, source string, id string, year int) int {
 	results := tmdb.Find(id, source)
+	reserveID := 0
+
 	if results != nil {
 		if entityType == MovieType && len(results.MovieResults) > 0 {
 			for _, e := range results.MovieResults {
-				thisYear, _ := strconv.Atoi(e.FirstAirDate[0:4])
-				if year == 0 || (thisYear > 1000 && thisYear == year) {
+				dt, err := time.Parse("2006-01-02", e.FirstAirDate)
+				if err != nil || year == 0 || dt.Year() == 0 {
+					reserveID = e.ID
+					continue
+				}
+				if dt.Year() == year {
 					return e.ID
 				}
 			}
 		} else if entityType == ShowType && len(results.TVResults) > 0 {
 			for _, e := range results.TVResults {
-				thisYear, _ := strconv.Atoi(e.FirstAirDate[0:4])
-				if year == 0 || (thisYear > 1000 && thisYear == year) {
+				dt, err := time.Parse("2006-01-02", e.FirstAirDate)
+				if err != nil || year == 0 || dt.Year() == 0 {
+					reserveID = e.ID
+					continue
+				}
+				if dt.Year() == year {
 					return e.ID
 				}
 			}
 		} else if entityType == EpisodeType && len(results.TVEpisodeResults) > 0 {
 			for _, e := range results.TVEpisodeResults {
-				thisYear, _ := strconv.Atoi(e.FirstAirDate[0:4])
-				if year == 0 || (thisYear > 1000 && thisYear == year) {
+				dt, err := time.Parse("2006-01-02", e.FirstAirDate)
+				if err != nil || year == 0 || dt.Year() == 0 {
+					reserveID = e.ID
+					continue
+				}
+				if dt.Year() == year {
 					return e.ID
 				}
 			}
 		}
 	}
 
-	return 0
+	return reserveID
 }
 
 func findTMDBIDs(entityType int, source string, id string) int {
@@ -1509,7 +1523,6 @@ func RefreshTrakt() error {
 		Scanning = false
 	}()
 
-	log.Debugf("Starting Trakt sync")
 	if err := checkMoviesPath(); err != nil {
 		return err
 	}
@@ -1517,6 +1530,7 @@ func RefreshTrakt() error {
 		return err
 	}
 
+	log.Debugf("TraktSync: Watched")
 	if changes, err := SyncTraktWatched(); err != nil {
 		return err
 	} else if changes {
@@ -1524,23 +1538,28 @@ func RefreshTrakt() error {
 		xbmc.Refresh()
 	}
 	if config.Get().TraktSyncWatchlist {
+		log.Debugf("TraktSync: Movies Watchlist")
 		if err := SyncMoviesList("watchlist", true); err != nil {
 			return err
 		}
+		log.Debugf("TraktSync: Shows Watchlist")
 		if err := SyncShowsList("watchlist", true); err != nil {
 			return err
 		}
 	}
 	if config.Get().TraktSyncCollections {
+		log.Debugf("TraktSync: Movies Collections")
 		if err := SyncMoviesList("collection", true); err != nil {
 			return err
 		}
+		log.Debugf("TraktSync: Shows Collections")
 		if err := SyncShowsList("collection", true); err != nil {
 			return err
 		}
 	}
 
 	if config.Get().TraktSyncUserlists {
+		log.Debugf("TraktSync: Userlists")
 		lists := trakt.Userlists()
 		for _, list := range lists {
 			if err := SyncMoviesList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
@@ -1552,7 +1571,7 @@ func RefreshTrakt() error {
 		}
 	}
 
-	log.Notice("Trakt lists synced")
+	log.Debugf("TraktSync: Finished")
 	return nil
 }
 

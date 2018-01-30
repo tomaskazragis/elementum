@@ -218,8 +218,7 @@ func (s *BTService) configure() {
 		DataDir: config.Get().DownloadPath,
 
 		ListenAddr: s.ListenAddr,
-		// Debug:      false,
-		Debug: true,
+		Debug:      false,
 
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
