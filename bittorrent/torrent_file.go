@@ -2,6 +2,7 @@ package bittorrent
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base32"
@@ -9,14 +10,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/bogdanovich/dns_resolver"
 	"github.com/op/go-logging"
 	"github.com/zeebo/bencode"
 
@@ -199,8 +203,32 @@ var (
 )
 
 var (
+	dnsCache        sync.Map
+	resolverPublic  = dns_resolver.New([]string{"8.8.8.8", "8.8.4.4", "9.9.9.9"})
+	resolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
+
+	dialer = &net.Dialer{
+		Timeout:   7 * time.Second,
+		KeepAlive: 10 * time.Second,
+		DualStack: true,
+	}
 	tr = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			now := time.Now()
+			addrs := strings.Split(addr, ":")
+			if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
+				ipTest := net.ParseIP(addrs[0])
+				if ipTest == nil {
+					ip := resolveAddr(addrs[0])
+					log.Debugf("Resolved %s to %s in %s", addrs[0], ip, time.Since(now))
+					if ip != "" {
+						addr = ip + ":" + addrs[1]
+					}
+				}
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
 	}
 	httpClient = &http.Client{
 		Transport: tr,
@@ -212,6 +240,38 @@ const (
 	xtPrefix = "urn:btih:"
 	torCache = "http://itorrents.org/torrent/%s.torrent"
 )
+
+func resolveAddr(host string) (ip string) {
+	if cached, ok := dnsCache.Load(host); ok {
+		return cached.(string)
+	}
+
+	defer func() {
+		if strings.HasPrefix(ip, "127.") {
+			return
+		}
+
+		dnsCache.Store(host, ip)
+	}()
+
+	ips, err := resolverPublic.LookupHost(host)
+	if err == nil && len(ips) > 0 {
+		ip = ips[0].String()
+		return
+	}
+
+	if cached, ok := dnsCache.Load(host); ok {
+		return cached.(string)
+	}
+
+	ips, err = resolverOpennic.LookupHost(host)
+	if err == nil && len(ips) > 0 {
+		ip = ips[0].String()
+		return
+	}
+
+	return
+}
 
 // UnmarshalJSON ...
 func (t *TorrentFile) UnmarshalJSON(b []byte) error {
