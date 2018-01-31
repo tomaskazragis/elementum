@@ -151,7 +151,7 @@ type VideoLibraryMovieItem struct {
 	IMDBNumber string    `json:"imdbnumber"`
 	PlayCount  int       `json:"playcount"`
 	File       string    `json:"file"`
-	Year       int       `json:"year"`
+	Premiered  string    `json:"premiered"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 	Resume     *Resume
 }
@@ -166,7 +166,7 @@ type VideoLibraryShowItem struct {
 	ID         int       `json:"tvshowid"`
 	Title      string    `json:"label"`
 	IMDBNumber string    `json:"imdbnumber"`
-	Year       int       `json:"year"`
+	Premiered  string    `json:"premiered"`
 	Episodes   int       `json:"episode"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 }

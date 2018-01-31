@@ -423,7 +423,7 @@ func RefreshMovies() error {
 	}
 
 	for _, m := range l.Movies {
-		parseUniqueID(MovieType, m.UIDs, &m.Xbmc.UniqueIDs, m.Xbmc.File, m.Xbmc.Year)
+		parseUniqueID(MovieType, m.UIDs, &m.Xbmc.UniqueIDs, m.Xbmc.File, m.Xbmc.Premiered)
 	}
 
 	return nil
@@ -490,7 +490,7 @@ func RefreshShows() error {
 
 	for _, show := range l.Shows {
 		// Step 1: try to get information from what we get from Kodi
-		parseUniqueID(ShowType, show.UIDs, &show.Xbmc.UniqueIDs, "", show.Xbmc.Year)
+		parseUniqueID(ShowType, show.UIDs, &show.Xbmc.UniqueIDs, "", show.Xbmc.Premiered)
 
 		// Step 2: if TMDB not found - try to find it from episodes
 		if show.UIDs.TMDB == 0 {
@@ -500,7 +500,7 @@ func RefreshShows() error {
 				}
 
 				u := &UniqueIDs{}
-				parseUniqueID(EpisodeType, u, &e.Xbmc.UniqueIDs, e.Xbmc.File, 0)
+				parseUniqueID(EpisodeType, u, &e.Xbmc.UniqueIDs, e.Xbmc.File, "")
 				if u.TMDB != 0 {
 					show.UIDs.TMDB = u.TMDB
 					break
@@ -688,7 +688,7 @@ func RefreshUIDs() error {
 	return nil
 }
 
-func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, year int) {
+func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, entityDate string) {
 	i.MediaType = entityType
 	i.Kodi = xbmcIDs.Kodi
 	i.IMDB = xbmcIDs.IMDB
@@ -746,6 +746,12 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 		localID, _ := strconv.Atoi(xbmcIDs.Unknown)
 		if localID == 0 {
 			return
+		}
+
+		entityDt, errDt := time.Parse("2006-01-02", entityDate)
+		year := 0
+		if errDt == nil {
+			year = entityDt.Year()
 		}
 
 		// Try to treat as it is a TMDB id inside of Unknown field

@@ -40,7 +40,7 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 		"file",
 		"resume",
 		"uniqueid",
-		"year",
+		"premiered",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if err != nil {
@@ -75,7 +75,12 @@ func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 // VideoLibraryGetShows ...
 func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 	params := map[string]interface{}{
-		"properties": []interface{}{"imdbnumber", "episode", "uniqueid", "year"},
+		"properties": []interface{}{
+			"imdbnumber",
+			"episode",
+			"uniqueid",
+			"premiered",
+		},
 	}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
 	if err != nil {
