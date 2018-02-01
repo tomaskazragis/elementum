@@ -40,11 +40,22 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 		"file",
 		"resume",
 		"uniqueid",
-		"premiered",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if err != nil {
 		log.Errorf("Error getting movies: %#v", err)
+	}
+	return
+}
+
+// VideoLibraryGetMoviesDates ...
+func VideoLibraryGetMoviesDates() (movies *VideoLibraryMovies, err error) {
+	params := map[string]interface{}{"properties": []interface{}{
+		"premiered",
+	}}
+	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
+	if err != nil {
+		log.Errorf("Error getting movies dates: %#v", err)
 	}
 	return
 }
@@ -79,12 +90,25 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 			"imdbnumber",
 			"episode",
 			"uniqueid",
-			"premiered",
 		},
 	}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
 	if err != nil {
 		log.Errorf("Error getting tvshows: %#v", err)
+	}
+	return
+}
+
+// VideoLibraryGetShowsDates ...
+func VideoLibraryGetShowsDates() (shows *VideoLibraryShows, err error) {
+	params := map[string]interface{}{
+		"properties": []interface{}{
+			"premiered",
+		},
+	}
+	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+	if err != nil {
+		log.Errorf("Error getting tvshows dates: %#v", err)
 	}
 	return
 }

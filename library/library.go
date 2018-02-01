@@ -396,6 +396,24 @@ func RefreshMovies() error {
 	if movies == nil || movies.Movies == nil {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
+	for tries := 1; tries <= 3; tries++ {
+		mds, err := xbmc.VideoLibraryGetMoviesDates()
+		if mds == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+
+		for _, md := range mds.Movies {
+			for _, m := range movies.Movies {
+				if m.ID == md.ID {
+					m.Premiered = md.Premiered
+					break
+				}
+			}
+		}
+		break
+	}
+
 	started := time.Now()
 	defer func() {
 		log.Debugf("Fetched %d movies from Kodi Library in %s", len(movies.Movies), time.Since(started))
@@ -455,6 +473,24 @@ func RefreshShows() error {
 	if shows == nil || shows.Shows == nil {
 		return errors.New("Could not fetch Shows from Kodi")
 	}
+	for tries := 1; tries <= 3; tries++ {
+		sds, err := xbmc.VideoLibraryGetShowsDates()
+		if sds == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+
+		for _, sd := range sds.Shows {
+			for _, s := range shows.Shows {
+				if s.ID == sd.ID {
+					s.Premiered = sd.Premiered
+					break
+				}
+			}
+		}
+		break
+	}
+
 	started := time.Now()
 	defer func() {
 		log.Debugf("Fetched %d shows from Kodi Library in %s", len(shows.Shows), time.Since(started))
