@@ -1091,6 +1091,10 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		if episode == nil || season == nil {
 			continue
 		}
+		aired, errDate := time.Parse("2006-01-02", episode.AirDate)
+		if !config.Get().ShowUnairedEpisodes && errDate != nil && aired.After(time.Now()) {
+			continue
+		}
 
 		item := episode.ToListItem(show)
 		episodeLabel := fmt.Sprintf("%s | %dx%02d %s", show.Name, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
