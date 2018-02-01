@@ -92,6 +92,7 @@ type Configuration struct {
 	ResolutionPreferenceShows   int
 	PercentageAdditionalSeeders int
 
+	UsePublicDNS                 bool
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
 
@@ -311,6 +312,7 @@ func Reload() *Configuration {
 		ResolutionPreferenceShows:   settings["resolution_preference_shows"].(int),
 		PercentageAdditionalSeeders: settings["percentage_additional_seeders"].(int),
 
+		UsePublicDNS:                 settings["use_public_dns"].(bool),
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
 
