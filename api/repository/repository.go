@@ -82,7 +82,7 @@ func getAddonXML(user string, repository string) (string, error) {
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
 	var addons []xbmc.Addon
 
-	for _, repo := range []string{"plugin.video.elementum", "script.elementum.burst"} {
+	for _, repo := range []string{"plugin.video.elementum", "script.elementum.burst", "context.elementum"} {
 		addonXML, err := getAddonXML("elgatito", repo)
 		if err != nil {
 			continue
@@ -115,10 +115,9 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 	repository := ctx.Params.ByName("repository")
 	addons, err := getAddons(user, repository)
 	if len(addons.Addons) > 0 {
-		log.Infof("Last available release of %s: v%s", repository, addons.Addons[0].Version)
-	}
-	if len(addons.Addons) > 1 {
-		log.Infof("Last available release of script.elementum.burst: v%s", addons.Addons[1].Version)
+		for _, a := range addons.Addons {
+			log.Infof("Last available release of %s: v%s", a.Name, a.Version)
+		}
 	}
 	if err != nil {
 		ctx.Error(errors.New("Unable to retrieve the remote's addon.xml file"))
@@ -141,8 +140,9 @@ func GetAddonFiles(ctx *gin.Context) {
 		GetAddonsXML(ctx)
 		return
 	case "addons.xml.md5":
-		go writeChangelog(user, "plugin.video.elementum")
-		go writeChangelog(user, "script.elementum.burst")
+		// go writeChangelog(user, "plugin.video.elementum")
+		// go writeChangelog(user, "script.elementum.burst")
+		// go writeChangelog(user, "context.elementum")
 		GetAddonsXMLChecksum(ctx)
 		return
 	case "fanart.jpg":
