@@ -363,7 +363,7 @@ func Refresh() error {
 		log.Debugf("RefreshMovies got an error: %v", err)
 	}
 	if err := RefreshShows(); err != nil {
-		log.Debugf("RefreshMovies got an error: %v", err)
+		log.Debugf("RefreshShows got an error: %v", err)
 	}
 
 	log.Debug("Library refresh finished")
@@ -390,6 +390,7 @@ func RefreshMovies() error {
 			time.Sleep(time.Duration(tries*2) * time.Second)
 			continue
 		}
+
 		break
 	}
 
@@ -397,7 +398,7 @@ func RefreshMovies() error {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
 	for tries := 1; tries <= 3; tries++ {
-		mds, err := xbmc.VideoLibraryGetMoviesDates()
+		mds, err := xbmc.VideoLibraryGetMoviesInfo()
 		if mds == nil || err != nil {
 			time.Sleep(time.Duration(tries*2) * time.Second)
 			continue
@@ -406,7 +407,8 @@ func RefreshMovies() error {
 		for _, md := range mds.Movies {
 			for _, m := range movies.Movies {
 				if m.ID == md.ID {
-					m.Premiered = md.Premiered
+					m.Year = md.Year
+					m.UniqueIDs = md.UniqueIDs
 					break
 				}
 			}
@@ -441,7 +443,7 @@ func RefreshMovies() error {
 	}
 
 	for _, m := range l.Movies {
-		parseUniqueID(MovieType, m.UIDs, &m.Xbmc.UniqueIDs, m.Xbmc.File, m.Xbmc.Premiered)
+		parseUniqueID(MovieType, m.UIDs, &m.Xbmc.UniqueIDs, m.Xbmc.File, m.Xbmc.Year)
 	}
 
 	return nil
@@ -474,7 +476,7 @@ func RefreshShows() error {
 		return errors.New("Could not fetch Shows from Kodi")
 	}
 	for tries := 1; tries <= 3; tries++ {
-		sds, err := xbmc.VideoLibraryGetShowsDates()
+		sds, err := xbmc.VideoLibraryGetShowsInfo()
 		if sds == nil || err != nil {
 			time.Sleep(time.Duration(tries*2) * time.Second)
 			continue
@@ -483,7 +485,8 @@ func RefreshShows() error {
 		for _, sd := range sds.Shows {
 			for _, s := range shows.Shows {
 				if s.ID == sd.ID {
-					s.Premiered = sd.Premiered
+					s.Year = sd.Year
+					s.UniqueIDs = sd.UniqueIDs
 					break
 				}
 			}
@@ -526,7 +529,7 @@ func RefreshShows() error {
 
 	for _, show := range l.Shows {
 		// Step 1: try to get information from what we get from Kodi
-		parseUniqueID(ShowType, show.UIDs, &show.Xbmc.UniqueIDs, "", show.Xbmc.Premiered)
+		parseUniqueID(ShowType, show.UIDs, &show.Xbmc.UniqueIDs, "", show.Xbmc.Year)
 
 		// Step 2: if TMDB not found - try to find it from episodes
 		if show.UIDs.TMDB == 0 {
@@ -536,7 +539,7 @@ func RefreshShows() error {
 				}
 
 				u := &UniqueIDs{}
-				parseUniqueID(EpisodeType, u, &e.Xbmc.UniqueIDs, e.Xbmc.File, "")
+				parseUniqueID(EpisodeType, u, &e.Xbmc.UniqueIDs, e.Xbmc.File, 0)
 				if u.TMDB != 0 {
 					show.UIDs.TMDB = u.TMDB
 					break
@@ -627,6 +630,24 @@ func RefreshEpisodes() error {
 	if episodes == nil || episodes.Episodes == nil {
 		return errors.New("Could not fetch Episodes from Kodi")
 	}
+	for tries := 1; tries <= 3; tries++ {
+		eds, err := xbmc.VideoLibraryGetAllEpisodesInfo()
+		if eds == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+
+		for _, ed := range eds.Episodes {
+			for _, e := range episodes.Episodes {
+				if e.ID == ed.ID {
+					e.UniqueIDs = ed.UniqueIDs
+					break
+				}
+			}
+		}
+		break
+	}
+
 	started := time.Now()
 	defer func() {
 		log.Debugf("Fetched %d episodes from Kodi Library in %s", len(episodes.Episodes), time.Since(started))
@@ -724,7 +745,7 @@ func RefreshUIDs() error {
 	return nil
 }
 
-func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, entityDate string) {
+func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, entityYear int) {
 	i.MediaType = entityType
 	i.Kodi = xbmcIDs.Kodi
 	i.IMDB = xbmcIDs.IMDB
@@ -784,18 +805,12 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 			return
 		}
 
-		entityDt, errDt := time.Parse("2006-01-02", entityDate)
-		year := 0
-		if errDt == nil {
-			year = entityDt.Year()
-		}
-
 		// Try to treat as it is a TMDB id inside of Unknown field
 		if entityType == MovieType {
 			m := tmdb.GetMovie(localID, config.Get().Language)
 			if m != nil {
 				dt, err := time.Parse("2006-01-02", m.FirstAirDate)
-				if err != nil || dt.Year() == year {
+				if err != nil || dt.Year() == entityYear {
 					i.TMDB = m.ID
 					return
 				}
@@ -804,14 +819,14 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 			s := tmdb.GetShow(localID, config.Get().Language)
 			if s != nil {
 				dt, err := time.Parse("2006-01-02", s.FirstAirDate)
-				if err != nil || dt.Year() == year {
+				if err != nil || dt.Year() == entityYear {
 					i.TMDB = s.ID
 					return
 				}
 			}
 
 			// If not found, try to search as TVDB id
-			id := findTMDBIDsWithYear(ShowType, "tvdb_id", xbmcIDs.Unknown, year)
+			id := findTMDBIDsWithYear(ShowType, "tvdb_id", xbmcIDs.Unknown, entityYear)
 			if id != 0 {
 				i.TMDB = id
 				return

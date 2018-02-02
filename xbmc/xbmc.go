@@ -1,6 +1,9 @@
 package xbmc
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // UpdateAddonRepos ...
 func UpdateAddonRepos() (retVal string) {
@@ -39,19 +42,19 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 		"playcount",
 		"file",
 		"resume",
-		"uniqueid",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "invalid error") {
 		log.Errorf("Error getting movies: %#v", err)
 	}
 	return
 }
 
-// VideoLibraryGetMoviesDates ...
-func VideoLibraryGetMoviesDates() (movies *VideoLibraryMovies, err error) {
+// VideoLibraryGetMoviesInfo ...
+func VideoLibraryGetMoviesInfo() (movies *VideoLibraryMovies, err error) {
 	params := map[string]interface{}{"properties": []interface{}{
-		"premiered",
+		"year",
+		"uniqueid",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if err != nil {
@@ -89,7 +92,6 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 		"properties": []interface{}{
 			"imdbnumber",
 			"episode",
-			"uniqueid",
 		},
 	}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
@@ -99,11 +101,12 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 	return
 }
 
-// VideoLibraryGetShowsDates ...
-func VideoLibraryGetShowsDates() (shows *VideoLibraryShows, err error) {
+// VideoLibraryGetShowsInfo ...
+func VideoLibraryGetShowsInfo() (shows *VideoLibraryShows, err error) {
 	params := map[string]interface{}{
 		"properties": []interface{}{
-			"premiered",
+			"year",
+			"uniqueid",
 		},
 	}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
@@ -165,12 +168,23 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 func VideoLibraryGetAllEpisodes() (episodes *VideoLibraryEpisodes, err error) {
 	params := map[string]interface{}{"properties": []interface{}{
 		"tvshowid",
-		"uniqueid",
 		"season",
 		"episode",
 		"playcount",
 		"file",
 		"resume",
+	}}
+	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+	if err != nil {
+		log.Error(err)
+	}
+	return
+}
+
+// VideoLibraryGetAllEpisodesInfo ...
+func VideoLibraryGetAllEpisodesInfo() (episodes *VideoLibraryEpisodes, err error) {
+	params := map[string]interface{}{"properties": []interface{}{
+		"uniqueid",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
 	if err != nil {
