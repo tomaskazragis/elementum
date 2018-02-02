@@ -211,6 +211,11 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		library.GET("/play/show/:showId/season/:season/episode/:episode", PlayShow(btService))
 	}
 
+	context := r.Group("/context")
+	{
+		context.GET("/:media/:kodiID/play", ContextPlaySelector(btService))
+	}
+
 	provider := r.Group("/provider")
 	{
 		provider.GET("/", ProviderList)
