@@ -319,9 +319,9 @@ func movieLinks(tmdbID string) []*bittorrent.TorrentFile {
 
 // MoviePlaySelector ...
 func MoviePlaySelector(link string, btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
-	play := link == "play"
+	play := strings.Contains(link, "play")
 
-	if config.Get().ForceLinkType {
+	if !strings.Contains(link, "force") && config.Get().ForceLinkType {
 		if config.Get().ChooseStreamAuto {
 			play = true
 		} else {
