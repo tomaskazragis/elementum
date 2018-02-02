@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/library"
 )
 
@@ -17,14 +18,19 @@ func ContextPlaySelector(btService *bittorrent.BTService) gin.HandlerFunc {
 		kodiID, _ := strconv.Atoi(ctx.Params.ByName("kodiID"))
 		media := ctx.Params.ByName("media")
 
+		action := "forcelinks"
+		if config.Get().ChooseStreamAuto == true {
+			action = "forceplay"
+		}
+
 		if media == "movie" {
 			if m := library.GetLibraryMovie(kodiID); m != nil && m.UIDs.TMDB != 0 {
-				ctx.Redirect(302, URLQuery(URLForXBMC("/movie/%d/forceplay", m.UIDs.TMDB)))
+				ctx.Redirect(302, URLQuery(URLForXBMC("/movie/%d/%s", m.UIDs.TMDB, action)))
 				return
 			}
 		} else if media == "episode" {
 			if s, e := library.GetLibraryEpisode(kodiID); s != nil && e != nil && e.UIDs.TMDB != 0 {
-				ctx.Redirect(302, URLQuery(URLForXBMC("/show/%d/season/%d/episode/%d/forceplay", s.UIDs.TMDB, e.Season, e.Episode)))
+				ctx.Redirect(302, URLQuery(URLForXBMC("/show/%d/season/%d/episode/%d/%s", s.UIDs.TMDB, e.Season, e.Episode, action)))
 				return
 			}
 		}
