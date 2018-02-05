@@ -1,9 +1,7 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"time"
 
@@ -12,7 +10,6 @@ import (
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/providers"
-	"github.com/elgatito/elementum/util"
 
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
@@ -276,25 +273,4 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	}
 
 	return r
-}
-
-// URLForHTTP ...
-func URLForHTTP(pattern string, args ...interface{}) string {
-	u, _ := url.Parse(fmt.Sprintf(pattern, args...))
-	return util.GetHTTPHost() + u.String()
-}
-
-// URLForXBMC ...
-func URLForXBMC(pattern string, args ...interface{}) string {
-	u, _ := url.Parse(fmt.Sprintf(pattern, args...))
-	return "plugin://" + config.Get().Info.ID + u.String()
-}
-
-// URLQuery ...
-func URLQuery(route string, query ...string) string {
-	v := url.Values{}
-	for i := 0; i < len(query); i += 2 {
-		v.Add(query[i], query[i+1])
-	}
-	return route + "?" + v.Encode()
 }

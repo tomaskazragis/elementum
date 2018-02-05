@@ -408,19 +408,15 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 				item = movieListing.Movie.ToListItem()
 			}
 
-			playURL := URLForXBMC("/movie/%d/play", movieListing.Movie.IDs.TMDB)
-			linksURL := URLForXBMC("/movie/%d/links", movieListing.Movie.IDs.TMDB)
+			thisURL := URLForXBMC("/movie/%d/", movieListing.Movie.IDs.TMDB) + "%s"
 
-			defaultURL := linksURL
 			contextLabel := playLabel
-			contextURL := playURL
-			if config.Get().ChooseStreamAuto == true {
-				defaultURL = playURL
+			contextURL := contextPlayOppositeURL(thisURL, false)
+			if config.Get().ChooseStreamAuto {
 				contextLabel = linksLabel
-				contextURL = linksURL
 			}
 
-			item.Path = defaultURL
+			item.Path = contextPlayURL(thisURL, false)
 
 			libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movieListing.Movie.IDs.TMDB))}
 			if _, err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
@@ -901,19 +897,15 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 		item.Label = label
 		item.Info.Title = label
 
-		playURL := URLForXBMC("/movie/%d/play", movieListing.Movie.IDs.TMDB)
-		linksURL := URLForXBMC("/movie/%d/links", movieListing.Movie.IDs.TMDB)
+		thisURL := URLForXBMC("/movie/%d/", movieListing.Movie.IDs.TMDB) + "%s"
 
-		defaultURL := linksURL
 		contextLabel := playLabel
-		contextURL := playURL
-		if config.Get().ChooseStreamAuto == true {
-			defaultURL = playURL
+		contextURL := contextPlayOppositeURL(thisURL, false)
+		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
-			contextURL = linksURL
 		}
 
-		item.Path = defaultURL
+		item.Path = contextPlayURL(thisURL, false)
 
 		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d", movieListing.Movie.IDs.TMDB))}
 		if _, err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
@@ -1116,18 +1108,11 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 
 		item.Art.Poster = tmdb.ImageURL(season.Poster, "w500")
 
-		playLabel := "LOCALIZE[30023]"
-		playURL := URLForXBMC("/show/%d/season/%d/episode/%d/play",
+		thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
 			showListing.Show.IDs.TMDB,
 			episode.SeasonNumber,
 			episode.EpisodeNumber,
-		)
-		linksLabel := "LOCALIZE[30202]"
-		linksURL := URLForXBMC("/show/%d/season/%d/episode/%d/links",
-			showListing.Show.IDs.TMDB,
-			episode.SeasonNumber,
-			episode.EpisodeNumber,
-		)
+		) + "%s"
 		markWatchedLabel := "LOCALIZE[30313]"
 		markWatchedURL := URLForXBMC("/show/%d/season/%d/episode/%d/trakt/watched",
 			showListing.Show.IDs.TMDB,
@@ -1135,16 +1120,13 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			episode.EpisodeNumber,
 		)
 
-		defaultURL := linksURL
 		contextLabel := playLabel
-		contextURL := playURL
-		if config.Get().ChooseStreamAuto == true {
-			defaultURL = playURL
+		contextURL := contextPlayOppositeURL(thisURL, false)
+		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
-			contextURL = linksURL
 		}
 
-		item.Path = defaultURL
+		item.Path = contextPlayURL(thisURL, false)
 
 		item.ContextMenu = [][]string{
 			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},

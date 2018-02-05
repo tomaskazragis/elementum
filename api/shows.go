@@ -270,7 +270,7 @@ func ShowSeasons(ctx *gin.Context) {
 		item := items[i]
 		item.Path = URLForXBMC("/show/%d/season/%d/episodes", show.ID, item.Info.Season)
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", URLForXBMC("/show/%d/season/%d/links", show.ID, item.Info.Season))},
+			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", contextPlayOppositeURL(URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season)+"%s", false))},
 			[]string{"LOCALIZE[30036]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/seasons"))},
 		}
 		reversedItems = append(reversedItems, item)
@@ -302,29 +302,18 @@ func ShowEpisodes(ctx *gin.Context) {
 	items := season.Episodes.ToListItems(show, season)
 
 	for _, item := range items {
-		playLabel := "LOCALIZE[30023]"
-		playURL := URLForXBMC("/show/%d/season/%d/episode/%d/play",
+		thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
 			show.ID,
 			seasonNumber,
 			item.Info.Episode,
-		)
-		linksLabel := "LOCALIZE[30202]"
-		linksURL := URLForXBMC("/show/%d/season/%d/episode/%d/links",
-			show.ID,
-			seasonNumber,
-			item.Info.Episode,
-		)
-
-		defaultURL := linksURL
+		) + "%s"
 		contextLabel := playLabel
-		contextURL := playURL
-		if config.Get().ChooseStreamAuto == true {
-			defaultURL = playURL
+		contextURL := contextPlayOppositeURL(thisURL, false)
+		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
-			contextURL = linksURL
 		}
 
-		item.Path = defaultURL
+		item.Path = contextPlayURL(thisURL, false)
 
 		if config.Get().Platform.Kodi < 17 {
 			item.ContextMenu = [][]string{

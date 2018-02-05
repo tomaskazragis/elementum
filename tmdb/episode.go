@@ -81,13 +81,8 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 
 		item := episode.ToListItem(show)
 
-		if episode.StillPath != "" {
-			item.Art.FanArt = ImageURL(episode.StillPath, "w1280")
-			item.Art.Thumbnail = ImageURL(episode.StillPath, "w500")
-		} else {
-			if len(fanarts) > 0 {
-				item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
-			}
+		if item.Art.FanArt == "" && len(fanarts) > 0 {
+			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
 		}
 
 		item.Art.Poster = ImageURL(season.Poster, "w500")
@@ -128,6 +123,11 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 			Mediatype:     "episode",
 		},
 		Art: &xbmc.ListItemArt{},
+	}
+
+	if episode.StillPath != "" {
+		item.Art.FanArt = ImageURL(episode.StillPath, "w1280")
+		item.Art.Thumbnail = ImageURL(episode.StillPath, "w500")
 	}
 
 	return item

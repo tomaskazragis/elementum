@@ -19,7 +19,7 @@ func ContextPlaySelector(btService *bittorrent.BTService) gin.HandlerFunc {
 		media := ctx.Params.ByName("media")
 
 		action := "forcelinks"
-		if config.Get().ChooseStreamAuto == true {
+		if config.Get().ChooseStreamAuto {
 			action = "forceplay"
 		}
 
