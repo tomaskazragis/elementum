@@ -193,7 +193,7 @@ func UpdateTrakt(ctx *gin.Context) {
 
 // PlayMovie ...
 func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
-	if config.Get().ChooseStreamAuto == true {
+	if config.Get().ChooseStreamAuto {
 		return MoviePlay(btService, true)
 	}
 	return MovieLinks(btService, true)
@@ -201,7 +201,7 @@ func PlayMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 
 // PlayShow ...
 func PlayShow(btService *bittorrent.BTService) gin.HandlerFunc {
-	if config.Get().ChooseStreamAuto == true {
+	if config.Get().ChooseStreamAuto {
 		return ShowEpisodePlay(btService, true)
 	}
 	return ShowEpisodeLinks(btService, true)

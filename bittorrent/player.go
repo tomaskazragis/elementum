@@ -235,7 +235,7 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Infof("Chosen file: %s", btp.fileName)
 	btp.log.Infof("Saving torrent to database")
 
-	btp.s.UpdateDB(Update, infoHash, btp.p.TMDBId, btp.p.ContentType, int(btp.chosenFile.Offset()), btp.p.ShowID, btp.p.Season, btp.p.Episode)
+	btp.s.UpdateDB(Update, infoHash, btp.p.TMDBId, btp.p.ContentType, []*gotorrent.File{btp.chosenFile, btp.subtitlesFile}, btp.p.ShowID, btp.p.Season, btp.p.Episode)
 	btp.Torrent.DBItem = btp.s.GetDBItem(infoHash)
 
 	btp.log.Info("Setting file priorities")
@@ -452,7 +452,7 @@ func (btp *BTPlayer) Close() {
 			defer os.Remove(savedFilePath)
 		}
 
-		btp.s.UpdateDB(Delete, infoHash, 0, "")
+		btp.s.UpdateDB(Delete, infoHash, 0, "", nil)
 		btp.log.Infof("Removed %s from database", btp.Torrent.Name())
 
 		if btp.deleteAfter || deleteAnswer == true || btp.notEnoughSpace {

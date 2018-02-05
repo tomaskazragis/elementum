@@ -80,7 +80,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrentsLog.Info("Currently downloading:")
+		// torrentsLog.Debug("Currently downloading:")
 		for i, torrent := range btService.Torrents {
 			if torrent == nil {
 				continue
@@ -128,7 +128,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			}
 
 			// TODO: Add seeding time and ratio getter/output
-			torrentsLog.Infof("- %.2f%% - %s - %s", progress, status, torrentName)
+			// torrentsLog.Debugf("- %.2f%% - %s - %s", progress, status, torrentName)
 
 			var (
 				tmdb        string
@@ -191,7 +191,7 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrentsLog.Info("Currently downloading:")
+		// torrentsLog.Debugf("Currently downloading:")
 		for _, torrent := range btService.Torrents {
 			if torrent == nil {
 				continue
@@ -201,15 +201,15 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			progress := torrent.GetProgress()
 			status := torrent.GetStateString()
 
-			if status != statusFinished {
-				if progress >= 100 {
-					status = statusFinished
-				} else {
-					status = statusDownloading
-				}
-			} else if status == statusFinished || progress >= 100 {
-				status = statusSeeding
-			}
+			// if status != statusFinished {
+			// 	if progress >= 100 {
+			// 		status = statusFinished
+			// 	} else {
+			// 		status = statusDownloading
+			// 	}
+			// } else if status == statusFinished || progress >= 100 {
+			// 	status = statusSeeding
+			// }
 
 			size := humanize.Bytes(uint64(torrent.Length()))
 			downloadRate := float64(torrent.DownloadRate) / 1024
@@ -231,6 +231,8 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 				PeersTotal:   peersTotal,
 			}
 			torrents = append(torrents, &t)
+
+			// torrentsLog.Debugf("- %.2f%% - %s - %s", progress, status, torrentName)
 		}
 
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -361,11 +363,10 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		infoHash := torrent.InfoHash()
 		torrentFile := filepath.Join(torrentsPath, fmt.Sprintf("%s.torrent", infoHash))
 		if _, err := os.Stat(torrentFile); err == nil {
-			torrentsLog.Infof("Deleting torrent file at %s", torrentFile)
 			defer os.Remove(torrentFile)
 		}
 
-		btService.UpdateDB(bittorrent.Delete, infoHash, 0, "")
+		btService.UpdateDB(bittorrent.Delete, infoHash, 0, "", nil)
 		torrentsLog.Infof("Removed %s from database", infoHash)
 
 		keepSetting := config.Get().KeepFilesFinished

@@ -219,6 +219,7 @@ func (s *BTService) configure() {
 
 		ListenAddr: s.ListenAddr,
 		Debug:      false,
+		// Debug: true,
 
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
@@ -443,9 +444,21 @@ func (s *BTService) loadTorrentFiles() {
 			continue
 		}
 
-		torrent := NewTorrent(s, torrentHandle, torrentFile)
+		t, _ := s.AddTorrent(torrentFile)
+		if t != nil {
+			i := s.GetDBItem(t.InfoHash())
 
-		s.Torrents[torrent.infoHash] = torrent
+			if i != nil {
+				for _, p := range i.Files {
+					for _, f := range t.Torrent.Files() {
+						if f.Path() == p {
+							t.ChosenFiles = append(t.ChosenFiles, f)
+							f.Download()
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -632,7 +645,7 @@ func (s *BTService) downloadProgress() {
 							log.Warning(fileName, "moved to", dst)
 
 							log.Infof("Marking %s for removal from library and database...", torrentName)
-							s.UpdateDB(RemoveFromLibrary, infoHash, 0, "")
+							s.UpdateDB(RemoveFromLibrary, infoHash, 0, "", nil)
 						}
 					}()
 					return nil
@@ -675,19 +688,26 @@ func (s *BTService) downloadProgress() {
 //
 
 // UpdateDB ...
-func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, infos ...int) error {
+func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, Files []*gotorrent.File, infos ...int) error {
 	switch Operation {
 	case Delete:
 		return database.Get().Delete(Bucket, InfoHash)
 	case Update:
+		files := []string{}
+		for _, f := range Files {
+			if f != nil {
+				files = append(files, f.Path())
+			}
+		}
+
 		item := &database.BTItem{
 			State:   Active,
 			ID:      ID,
 			Type:    Type,
-			File:    infos[0],
-			ShowID:  infos[1],
-			Season:  infos[2],
-			Episode: infos[3],
+			Files:   files,
+			ShowID:  infos[0],
+			Season:  infos[1],
+			Episode: infos[2],
 		}
 		return database.Get().SetObject(Bucket, InfoHash, item)
 	case RemoveFromLibrary:

@@ -224,8 +224,8 @@ func (t *Torrent) progressEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 
 	stats := t.Torrent.Stats()
-	curDownloaded := stats.DataBytesRead
-	curUploaded := stats.DataBytesWritten
+	curDownloaded := stats.BytesRead
+	curUploaded := stats.BytesWritten
 
 	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
 	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize
@@ -489,8 +489,6 @@ func (t *Torrent) GetProgress() float64 {
 		progress = t.lastProgress
 	}
 
-	// TODO: replace with proper Rate calculator
-	// when it's available in the library
 	t.lastProgress = progress
 	return progress
 }
@@ -538,15 +536,18 @@ func (t *Torrent) Drop(removeFiles bool) {
 			r.Close()
 		}
 	}
-	t.Torrent.Drop()
 
-	if removeFiles {
-		go func() {
+	go func() {
+		t.Torrent.Drop()
+
+		if removeFiles {
 			// Try to delete in N attemps
 			// this is because of opened handles on files which silently goes by
 			// so we try until rm fails
+			left := 0
+		retryLoop:
 			for i := 1; i <= 4; i++ {
-				left := 0
+				left = 0
 				for _, f := range files {
 					path := filepath.Join(t.Service.ClientConfig.DataDir, f)
 					if _, err := os.Stat(path); err == nil {
@@ -561,17 +562,20 @@ func (t *Torrent) Drop(removeFiles bool) {
 				if left > 0 {
 					time.Sleep(time.Duration(i) * time.Second)
 				} else {
-					return
+					break retryLoop
 				}
 			}
 
-			log.Debug("Count not delete downloaded files")
-		}()
-	}
+			if left > 0 {
+				log.Debug("Count not delete downloaded files")
+			}
+		}
 
-	if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
-		s.Close()
-	}
+		if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
+			log.Debugf("Invoking storage.Close()")
+			s.Close()
+		}
+	}()
 }
 
 // Pause ...
