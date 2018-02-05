@@ -52,6 +52,7 @@ type Configuration struct {
 	// ShareRatioLimit     int
 	// SeedTimeRatioLimit  int
 	SeedTimeLimit    int
+	DisableUpload    bool
 	DisableDHT       bool
 	DisableTCP       bool
 	DisableUTP       bool
@@ -270,6 +271,7 @@ func Reload() *Configuration {
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit:    settings["seed_time_limit"].(int),
+		DisableUpload:    settings["disable_upload"].(bool),
 		DisableDHT:       settings["disable_dht"].(bool),
 		DisableTCP:       settings["disable_tcp"].(bool),
 		DisableUTP:       settings["disable_utp"].(bool),

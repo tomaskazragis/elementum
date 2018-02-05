@@ -232,7 +232,7 @@ func (s *BTService) configure() {
 		},
 
 		Seed:     s.config.SeedTimeLimit > 0,
-		NoUpload: s.config.SeedTimeLimit == 0,
+		NoUpload: s.config.DisableUpload,
 
 		EncryptionPolicy: gotorrent.EncryptionPolicy{
 			DisableEncryption: s.config.EncryptionPolicy == 0,
@@ -783,6 +783,10 @@ func (s *BTService) SetBufferingLimits() {
 
 // GetSeedTime ...
 func (s *BTService) GetSeedTime() int64 {
+	if s.config.DisableUpload {
+		return 0
+	}
+
 	return int64(s.config.SeedTimeLimit)
 }
 

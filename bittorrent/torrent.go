@@ -12,6 +12,7 @@ import (
 
 	gotorrent "github.com/anacrolix/torrent"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	estorage "github.com/elgatito/elementum/storage"
 )
@@ -88,7 +89,7 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		BufferProgress:       -1,
 		BufferEndPieces:      []int{},
 
-		needSeeding: true,
+		needSeeding: !config.Get().DisableUpload,
 
 		mu:        &sync.Mutex{},
 		muBuffer:  &sync.RWMutex{},
