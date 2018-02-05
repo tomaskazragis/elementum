@@ -449,6 +449,8 @@ func (s *BTService) loadTorrentFiles() {
 			i := s.GetDBItem(t.InfoHash())
 
 			if i != nil {
+				t.DBItem = i
+
 				for _, p := range i.Files {
 					for _, f := range t.Torrent.Files() {
 						if f.Path() == p {
