@@ -541,40 +541,44 @@ func (t *Torrent) Drop(removeFiles bool) {
 	go func() {
 		t.Torrent.Drop()
 
-		if removeFiles {
-			// Try to delete in N attemps
-			// this is because of opened handles on files which silently goes by
-			// so we try until rm fails
-			left := 0
-		retryLoop:
-			for i := 1; i <= 4; i++ {
-				left = 0
-				for _, f := range files {
-					path := filepath.Join(t.Service.ClientConfig.DataDir, f)
-					if _, err := os.Stat(path); err == nil {
-						log.Infof("Deleting torrent file at %s", path)
-						if errRm := os.Remove(path); errRm != nil {
-							continue
-						}
-						left++
-					}
-				}
+		defer func() {
+			if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
+				log.Debugf("Invoking storage.Close()")
+				s.Close()
+			}
+		}()
 
-				if left > 0 {
-					time.Sleep(time.Duration(i) * time.Second)
-				} else {
-					break retryLoop
+		if !removeFiles || t.Service.config.DownloadStorage == estorage.StorageMemory {
+			return
+		}
+
+		// Try to delete in N attemps
+		// this is because of opened handles on files which silently goes by
+		// so we try until rm fails
+		left := 0
+	retryLoop:
+		for i := 1; i <= 4; i++ {
+			left = 0
+			for _, f := range files {
+				path := filepath.Join(t.Service.ClientConfig.DataDir, f)
+				if _, err := os.Stat(path); err == nil {
+					log.Infof("Deleting torrent file at %s", path)
+					if errRm := os.Remove(path); errRm != nil {
+						continue
+					}
+					left++
 				}
 			}
 
 			if left > 0 {
-				log.Debug("Count not delete downloaded files")
+				time.Sleep(time.Duration(i) * time.Second)
+			} else {
+				break retryLoop
 			}
 		}
 
-		if s := t.Storage(); s != nil && t.Service.config.DownloadStorage == estorage.StorageMemory {
-			log.Debugf("Invoking storage.Close()")
-			s.Close()
+		if left > 0 {
+			log.Debug("Count not delete downloaded files")
 		}
 	}()
 }

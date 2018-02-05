@@ -682,18 +682,21 @@ playbackLoop:
 	}
 
 	btp.log.Info("Stopped playback")
-	btp.GetIdent()
-	btp.UpdateWatched()
-	if btp.scrobble {
-		trakt.Scrobble("stop", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
-	}
-	btp.p.Playing = false
-	btp.p.Paused = false
-	btp.p.Seeked = false
-	btp.p.WasPlaying = true
-	btp.p.FromLibrary = false
-	btp.p.WatchedTime = 0
-	btp.p.VideoDuration = 0
+	go func() {
+		btp.GetIdent()
+		btp.UpdateWatched()
+		if btp.scrobble {
+			trakt.Scrobble("stop", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
+		}
+
+		btp.p.Playing = false
+		btp.p.Paused = false
+		btp.p.Seeked = false
+		btp.p.WasPlaying = true
+		btp.p.FromLibrary = false
+		btp.p.WatchedTime = 0
+		btp.p.VideoDuration = 0
+	}()
 
 	btp.overlayStatus.Close()
 }

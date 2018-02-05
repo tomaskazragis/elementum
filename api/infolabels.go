@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -103,6 +104,12 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+		if season == nil {
+			ctx.Error(errors.New("Unable to find season"))
+			return
+		}
+
 		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
 		if episode == nil {
 			ctx.Error(errors.New("Unable to find episode"))
@@ -115,6 +122,16 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 			log.Debugf("Found episode in library: %+v", libraryItem)
 			item.Info.DBID = libraryItem.ID
 		}
+		if item.Art.FanArt == "" {
+			fanarts := make([]string, 0)
+			for _, backdrop := range show.Images.Backdrops {
+				fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
+			}
+			if len(fanarts) > 0 {
+				item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
+			}
+		}
+		item.Art.Poster = tmdb.ImageURL(season.Poster, "w500")
 
 		saveEncoded(encodeItem(item))
 
