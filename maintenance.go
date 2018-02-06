@@ -209,17 +209,16 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 		if err := json.Unmarshal(jsonData, &request); err != nil {
 			log.Error(err)
 			return
-		} else if request.Playcount == -1 {
-			return
+			// } else if request.Playcount == -1 {
+			// 	return
 		}
 
 		if request.Item.Type == movieType {
 			library.RefreshMovies()
-			xbmc.Refresh()
 		} else {
 			library.RefreshShows()
-			xbmc.Refresh()
 		}
+		xbmc.Refresh()
 		// TODO: don't know do we need this to set since we can sync it later?
 		// if config.Get().TraktToken != "" && !library.TraktScanning {
 		// 	var watched *trakt.WatchedItem
