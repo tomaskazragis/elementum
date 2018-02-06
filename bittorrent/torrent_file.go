@@ -71,30 +71,30 @@ const (
 	Resolution720p
 	// Resolution1080p ...
 	Resolution1080p
-	// Resolution1440p ...
-	Resolution1440p
+	// Resolution2K ...
+	Resolution2K
 	// Resolution4k ...
 	Resolution4k
 )
 
 var (
-	resolutionTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+240p\W*`):  Resolution240p,
-		regexp.MustCompile(`\W+480p\W*`):  Resolution480p,
-		regexp.MustCompile(`\W+720p\W*`):  Resolution720p,
-		regexp.MustCompile(`\W+1080p\W*`): Resolution1080p,
-		regexp.MustCompile(`\W+1440p\W*`): Resolution1440p,
-		regexp.MustCompile(`\W+2160p\W*`): Resolution4k,
+	resolutionTags = []map[*regexp.Regexp]int{
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+240p\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+480p\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+720p\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1080p\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1440p\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2160p\W*`): Resolution4k},
 
-		regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`):         Resolution240p,
-		regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p,
-		regexp.MustCompile(`\W+(hdrip|b[rd]rip)\W*`):              Resolution720p,
-		regexp.MustCompile(`\W+(fullhd|fhd|blu\W*ray)\W*`):        Resolution1080p,
-		regexp.MustCompile(`\W+2K\W*`):                            Resolution1440p,
-		regexp.MustCompile(`\W+4K\W*`):                            Resolution4k,
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(hdrip|b[rd]rip)\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(fullhd|fhd|blu\W*ray)\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2K\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+4K\W*`): Resolution4k},
 	}
 	// Resolutions ...
-	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "1440p", "4K"}
+	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "2K", "4K"}
 	// Colors ...
 	Colors = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
 )
@@ -516,8 +516,6 @@ func matchTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
 	codec := 0
 	for re, value := range tokens {
 		if re.MatchString(lowName) {
-			// TODO: Do wee need to match for upper scale?
-			// is 720p is matched then it's not 1080p for sure?!
 			if value > codec {
 				codec = value
 			}
@@ -526,11 +524,13 @@ func matchTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
 	return codec
 }
 
-func matchLowerTags(t *TorrentFile, tokens map[*regexp.Regexp]int) int {
+func matchLowerTags(t *TorrentFile, tokens []map[*regexp.Regexp]int) int {
 	lowName := strings.ToLower(t.Name)
-	for re, value := range tokens {
-		if re.MatchString(lowName) {
-			return value
+	for _, res := range tokens {
+		for re, value := range res {
+			if re.MatchString(lowName) {
+				return value
+			}
 		}
 	}
 	return 0
@@ -560,7 +560,7 @@ func (t *TorrentFile) StreamInfo() *xbmc.StreamInfo {
 		sie.Video.Width = 1920
 		sie.Video.Height = 1080
 		break
-	case Resolution1440p:
+	case Resolution2K:
 		sie.Video.Width = 2560
 		sie.Video.Height = 1440
 		break
