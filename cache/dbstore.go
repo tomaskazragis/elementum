@@ -15,7 +15,7 @@ import (
 
 // DBStore ...
 type DBStore struct {
-	db *database.Database
+	db *database.BoltDatabase
 }
 
 type dbStoreItem struct {

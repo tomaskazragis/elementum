@@ -1,25 +1,42 @@
 package database
 
 import (
+	"database/sql"
+	"sync"
+
 	bolt "github.com/coreos/bbolt"
+	"github.com/op/go-logging"
 )
 
-type callBack func([]byte, []byte)
-type callBackWithError func([]byte, []byte) error
-
-// DWriter ...
-type DWriter struct {
-	bucket   []byte
-	key      []byte
-	database *Database
-}
-
-// Database ...
-type Database struct {
+// BoltDatabase ...
+type BoltDatabase struct {
 	db             *bolt.DB
 	quit           chan struct{}
 	fileName       string
 	backupFileName string
+}
+
+// SqliteDatabase ...
+type SqliteDatabase struct {
+	*sql.DB
+	quit           chan struct{}
+	fileName       string
+	backupFileName string
+}
+
+type schemaChange struct {
+	version int
+	sql     string
+}
+
+type callBack func([]byte, []byte)
+type callBackWithError func([]byte, []byte) error
+
+// DBWriter ...
+type DBWriter struct {
+	bucket   []byte
+	key      []byte
+	database *BoltDatabase
 }
 
 // BTItem ...
@@ -33,3 +50,20 @@ type BTItem struct {
 	Season  int      `json:"season"`
 	Episode int      `json:"episode"`
 }
+
+var (
+	sqliteFileName       = "app.db"
+	backupSqliteFileName = "app-backup.db"
+	boltFileName         = "library.db"
+	backupBoltFileName   = "library-backup.db"
+	cacheFileName        = "cache.db"
+	backupCacheFileName  = "cache-backup.db"
+
+	log = logging.MustGetLogger("database")
+
+	sqliteDatabase *SqliteDatabase
+	boltDatabase   *BoltDatabase
+	cacheDatabase  *BoltDatabase
+
+	once sync.Once
+)

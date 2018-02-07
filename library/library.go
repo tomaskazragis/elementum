@@ -92,7 +92,7 @@ var (
 	moviesLibraryPath string
 	showsLibraryPath  string
 
-	db       *database.Database
+	db       *database.BoltDatabase
 	dbBucket = database.LibraryBucket
 
 	cacheStore *cache.DBStore
@@ -115,7 +115,7 @@ var l = &Library{
 
 // InitDB ...
 func InitDB() {
-	db = database.Get()
+	db = database.GetBolt()
 	cacheStore = cache.NewDBStore()
 }
 

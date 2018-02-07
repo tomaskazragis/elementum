@@ -83,7 +83,13 @@ func main() {
 
 	wasFirstRun := Migrate()
 
-	db, err := database.InitDB(conf)
+	db, err := database.InitSqliteDB(conf)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	boltDb, err := database.InitBoltDB(conf)
 	if err != nil {
 		log.Error(err)
 		return
@@ -103,6 +109,7 @@ func main() {
 		btService.Close(true)
 
 		db.Close()
+		boltDb.Close()
 		cacheDb.Close()
 
 		log.Info("Goodbye")
@@ -170,7 +177,7 @@ func main() {
 
 	go library.Init()
 	go trakt.TokenRefreshHandler()
-	go db.MaintenanceRefreshHandler()
+	go boltDb.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
 
 	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)

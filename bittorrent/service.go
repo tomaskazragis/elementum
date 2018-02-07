@@ -533,7 +533,7 @@ func (s *BTService) downloadProgress() {
 
 				item := &database.BTItem{}
 				func() error {
-					if err := database.Get().GetObject(Bucket, infoHash, item); err != nil {
+					if err := database.GetBolt().GetObject(Bucket, infoHash, item); err != nil {
 						warnedMissing[infoHash] = true
 						return err
 					}
@@ -693,7 +693,7 @@ func (s *BTService) downloadProgress() {
 func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, Files []*gotorrent.File, infos ...int) error {
 	switch Operation {
 	case Delete:
-		return database.Get().Delete(Bucket, InfoHash)
+		return database.GetBolt().Delete(Bucket, InfoHash)
 	case Update:
 		files := []string{}
 		for _, f := range Files {
@@ -711,16 +711,16 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 			Season:  infos[1],
 			Episode: infos[2],
 		}
-		return database.Get().SetObject(Bucket, InfoHash, item)
+		return database.GetBolt().SetObject(Bucket, InfoHash, item)
 	case RemoveFromLibrary:
 		item := &database.BTItem{}
-		if err := database.Get().GetObject(Bucket, InfoHash, item); err != nil {
+		if err := database.GetBolt().GetObject(Bucket, InfoHash, item); err != nil {
 			log.Error(err)
 			return err
 		}
 
 		item.State = Remove
-		return database.Get().SetObject(Bucket, InfoHash, item)
+		return database.GetBolt().SetObject(Bucket, InfoHash, item)
 	}
 
 	return nil
@@ -729,7 +729,7 @@ func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string
 // GetDBItem ...
 func (s *BTService) GetDBItem(infoHash string) *database.BTItem {
 	item := &database.BTItem{}
-	if err := database.Get().GetObject(Bucket, infoHash, item); err != nil {
+	if err := database.GetBolt().GetObject(Bucket, infoHash, item); err != nil {
 		return nil
 	}
 

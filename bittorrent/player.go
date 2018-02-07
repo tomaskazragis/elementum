@@ -795,7 +795,7 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 			for _, choice := range choices {
 				if re.MatchString(choice.Filename) {
 					log.Debugf("Saving torrent entry for TMDB: %#v", episode.ID)
-					database.Get().SetBytes(HistoryBucket, strconv.Itoa(episode.ID), b)
+					database.GetBolt().SetBytes(HistoryBucket, strconv.Itoa(episode.ID), b)
 				}
 			}
 		}

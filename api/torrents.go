@@ -53,19 +53,19 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	}
 
 	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
-	database.Get().SetBytes(HistoryBucket, tmdbID, b)
+	database.GetBolt().SetBytes(HistoryBucket, tmdbID, b)
 }
 
 // InTorrentsMap ...
 func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
-	if b, err := database.Get().GetBytes(HistoryBucket, tmdbID); err == nil && len(b) > 0 {
+	if b, err := database.GetBolt().GetBytes(HistoryBucket, tmdbID); err == nil && len(b) > 0 {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
 		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name))) {
 			return torrent
 		}
-		database.Get().Delete(HistoryBucket, tmdbID)
+		database.GetBolt().Delete(HistoryBucket, tmdbID)
 	}
 
 	return nil

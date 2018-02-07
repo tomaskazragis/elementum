@@ -232,7 +232,7 @@ func Migrate() (err error) {
 
 	migratedCounter := 0
 	bucket := []byte("Library")
-	newDB, _ := database.NewDB()
+	newDB, _ := database.NewBoltDB()
 	oldDB, errDB := bolt.Open(pluginDatabase, 0600, &bolt.Options{
 		ReadOnly: false,
 		Timeout:  15 * time.Second,

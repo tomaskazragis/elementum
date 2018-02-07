@@ -10,22 +10,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	bolt "github.com/coreos/bbolt"
-	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
-)
-
-var (
-	databaseFileName    = "library.db"
-	backupFileName      = "library-backup.db"
-	cacheFileName       = "cache.db"
-	backupCacheFileName = "cache-backup.db"
 )
 
 var (
@@ -58,46 +49,39 @@ var CacheBuckets = [][]byte{
 	CommonBucket,
 }
 
-var (
-	databaseLog   = logging.MustGetLogger("database")
-	database      *Database
-	cacheDatabase *Database
-	once          sync.Once
-)
-
-// InitDB ...
-func InitDB(conf *config.Configuration) (*Database, error) {
-	db, err := CreateDB(conf, databaseFileName, backupFileName)
+// InitBoltDB ...
+func InitBoltDB(conf *config.Configuration) (*BoltDatabase, error) {
+	db, err := CreateBoltDB(conf, boltFileName, backupBoltFileName)
 	if err != nil || db == nil {
 		return nil, errors.New("database not created")
 	}
 
-	database = &Database{
+	boltDatabase = &BoltDatabase{
 		db:             db,
 		quit:           make(chan struct{}, 2),
-		fileName:       databaseFileName,
-		backupFileName: backupFileName,
+		fileName:       boltFileName,
+		backupFileName: backupBoltFileName,
 	}
 
 	for _, bucket := range Buckets {
-		if err = database.CheckBucket(bucket); err != nil {
+		if err = boltDatabase.CheckBucket(bucket); err != nil {
 			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			databaseLog.Error(err)
-			return database, err
+			log.Error(err)
+			return boltDatabase, err
 		}
 	}
 
-	return database, nil
+	return boltDatabase, nil
 }
 
 // InitCacheDB ...
-func InitCacheDB(conf *config.Configuration) (*Database, error) {
-	db, err := CreateDB(conf, cacheFileName, backupCacheFileName)
+func InitCacheDB(conf *config.Configuration) (*BoltDatabase, error) {
+	db, err := CreateBoltDB(conf, cacheFileName, backupCacheFileName)
 	if err != nil || db == nil {
 		return nil, errors.New("database not created")
 	}
 
-	cacheDatabase = &Database{
+	cacheDatabase = &BoltDatabase{
 		db:             db,
 		quit:           make(chan struct{}, 2),
 		fileName:       cacheFileName,
@@ -107,7 +91,7 @@ func InitCacheDB(conf *config.Configuration) (*Database, error) {
 	for _, bucket := range CacheBuckets {
 		if err = cacheDatabase.CheckBucket(bucket); err != nil {
 			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			databaseLog.Error(err)
+			log.Error(err)
 			return cacheDatabase, err
 		}
 	}
@@ -115,8 +99,8 @@ func InitCacheDB(conf *config.Configuration) (*Database, error) {
 	return cacheDatabase, nil
 }
 
-// CreateDB ...
-func CreateDB(conf *config.Configuration, fileName string, backupFileName string) (*bolt.DB, error) {
+// CreateBoltDB ...
+func CreateBoltDB(conf *config.Configuration, fileName string, backupFileName string) (*bolt.DB, error) {
 	databasePath := filepath.Join(conf.Info.Profile, fileName)
 	backupPath := filepath.Join(conf.Info.Profile, backupFileName)
 
@@ -133,41 +117,41 @@ func CreateDB(conf *config.Configuration, fileName string, backupFileName string
 		NoSync:   true,
 	})
 	if err != nil {
-		databaseLog.Warningf("Could not open database at %s: %s", databasePath, err.Error())
+		log.Warningf("Could not open database at %s: %s", databasePath, err.Error())
 		return nil, err
 	}
 
 	return db, nil
 }
 
-// NewDB ...
-func NewDB() (*Database, error) {
-	if database == nil {
-		return InitDB(config.Reload())
+// NewBoltDB ...
+func NewBoltDB() (*BoltDatabase, error) {
+	if boltDatabase == nil {
+		return InitBoltDB(config.Reload())
 	}
 
-	return database, nil
+	return boltDatabase, nil
 }
 
-// Get returns common database
-func Get() *Database {
-	return database
+// GetBolt returns common database
+func GetBolt() *BoltDatabase {
+	return boltDatabase
 }
 
 // GetCache returns Cache database
-func GetCache() *Database {
+func GetCache() *BoltDatabase {
 	return cacheDatabase
 }
 
 // Close ...
-func (database *Database) Close() {
-	databaseLog.Debug("Closing Database")
+func (database *BoltDatabase) Close() {
+	log.Debug("Closing Database")
 	database.quit <- struct{}{}
 	database.db.Close()
 }
 
 // CheckBucket ...
-func (database *Database) CheckBucket(bucket []byte) error {
+func (database *BoltDatabase) CheckBucket(bucket []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucket)
 		return err
@@ -175,7 +159,7 @@ func (database *Database) CheckBucket(bucket []byte) error {
 }
 
 // MaintenanceRefreshHandler ...
-func (database *Database) MaintenanceRefreshHandler() {
+func (database *BoltDatabase) MaintenanceRefreshHandler() {
 	backupPath := filepath.Join(config.Get().Info.Profile, database.backupFileName)
 
 	database.CreateBackup(backupPath)
@@ -203,12 +187,12 @@ func (database *Database) MaintenanceRefreshHandler() {
 
 // RestoreBackup ...
 func RestoreBackup(databasePath string, backupPath string) {
-	databaseLog.Debug("Restoring backup")
+	log.Debug("Restoring backup")
 
 	// Remove existing library.db if needed
 	if _, err := os.Stat(databasePath); err == nil {
 		if err := os.Remove(databasePath); err != nil {
-			databaseLog.Warningf("Could not delete existing library file (%s): %s", databasePath, err)
+			log.Warningf("Could not delete existing library file (%s): %s", databasePath, err)
 			return
 		}
 	}
@@ -219,45 +203,47 @@ func RestoreBackup(databasePath string, backupPath string) {
 
 		srcFile, err := os.Open(backupPath)
 		if err != nil {
-			databaseLog.Warning(errorMsg, err)
+			log.Warning(errorMsg, err)
 			return
 		}
 		defer srcFile.Close()
 
 		destFile, err := os.Create(databasePath)
 		if err != nil {
-			databaseLog.Warning(errorMsg, err)
+			log.Warning(errorMsg, err)
 			return
 		}
 		defer destFile.Close()
 
 		if _, err := io.Copy(destFile, srcFile); err != nil {
-			databaseLog.Warning(errorMsg, err)
+			log.Warning(errorMsg, err)
 			return
 		}
 
 		if err := destFile.Sync(); err != nil {
-			databaseLog.Warning(errorMsg, err)
+			log.Warning(errorMsg, err)
 			return
 		}
 
-		databaseLog.Warningf("Restored backup to %s", databasePath)
+		log.Warningf("Restored backup to %s", databasePath)
 	}
 }
 
 // CreateBackup ...
-func (database *Database) CreateBackup(backupPath string) {
-	if err := database.CheckBucket(LibraryBucket); err == nil {
-		database.db.View(func(tx *bolt.Tx) error {
-			tx.CopyFile(backupPath, 0600)
-			databaseLog.Debugf("Database backup saved at: %s", backupPath)
-			return nil
-		})
+func (database *BoltDatabase) CreateBackup(backupPath string) {
+	if err := database.CheckBucket(LibraryBucket); err != nil {
+		return
 	}
+
+	database.db.View(func(tx *bolt.Tx) error {
+		tx.CopyFile(backupPath, 0600)
+		log.Debugf("Database backup saved at: %s", backupPath)
+		return nil
+	})
 }
 
 // CacheCleanup ...
-func (database *Database) CacheCleanup() {
+func (database *BoltDatabase) CacheCleanup() {
 	now := util.NowInt()
 	for _, bucket := range Buckets {
 		if !strings.Contains(string(bucket), "Cache") {
@@ -281,7 +267,7 @@ func (database *Database) CacheCleanup() {
 }
 
 // DeleteWithPrefix ...
-func (database *Database) DeleteWithPrefix(bucket []byte, prefix []byte) {
+func (database *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
 	toRemove := []string{}
 	database.ForEach(bucket, func(key []byte, v []byte) error {
 		if bytes.HasPrefix(key, prefix) {
@@ -301,7 +287,7 @@ func (database *Database) DeleteWithPrefix(bucket []byte, prefix []byte) {
 //
 
 // Seek ...
-func (database *Database) Seek(bucket []byte, prefix string, callback callBack) error {
+func (database *BoltDatabase) Seek(bucket []byte, prefix string, callback callBack) error {
 	return database.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(bucket).Cursor()
 		bytePrefix := []byte(prefix)
@@ -313,7 +299,7 @@ func (database *Database) Seek(bucket []byte, prefix string, callback callBack) 
 }
 
 // ForEach ...
-func (database *Database) ForEach(bucket []byte, callback callBackWithError) error {
+func (database *BoltDatabase) ForEach(bucket []byte, callback callBackWithError) error {
 	return database.db.View(func(tx *bolt.Tx) error {
 		tx.Bucket(bucket).ForEach(callback)
 		return nil
@@ -331,7 +317,7 @@ func ParseCacheItem(item []byte) (int, []byte) {
 }
 
 // GetCachedBytes ...
-func (database *Database) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
+func (database *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
 	var value []byte
 	err = database.db.View(func(tx *bolt.Tx) error {
 		value = tx.Bucket(bucket).Get([]byte(key))
@@ -352,20 +338,20 @@ func (database *Database) GetCachedBytes(bucket []byte, key string) (cacheValue 
 }
 
 // GetCached ...
-func (database *Database) GetCached(bucket []byte, key string) (string, error) {
+func (database *BoltDatabase) GetCached(bucket []byte, key string) (string, error) {
 	value, err := database.GetCachedBytes(bucket, key)
 	return string(value), err
 }
 
 // GetCachedObject ...
-func (database *Database) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
+func (database *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
 	v, err := database.GetCachedBytes(bucket, key)
 	if err != nil {
 		return err
 	}
 
 	if err = json.Unmarshal(v, &item); err != nil {
-		databaseLog.Warningf("Could not unmarshal object for key: '%s', in bucket '%s': %s; Value: %#v", key, bucket, err, string(v))
+		log.Warningf("Could not unmarshal object for key: '%s', in bucket '%s': %s; Value: %#v", key, bucket, err, string(v))
 		return err
 	}
 
@@ -377,7 +363,7 @@ func (database *Database) GetCachedObject(bucket []byte, key string, item interf
 //
 
 // Has checks for existence of a key
-func (database *Database) Has(bucket []byte, key string) (ret bool) {
+func (database *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
 	database.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		ret = len(b.Get([]byte(key))) > 0
@@ -388,7 +374,7 @@ func (database *Database) Has(bucket []byte, key string) (ret bool) {
 }
 
 // GetBytes ...
-func (database *Database) GetBytes(bucket []byte, key string) (value []byte, err error) {
+func (database *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte, err error) {
 	err = database.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		value = b.Get([]byte(key))
@@ -399,13 +385,13 @@ func (database *Database) GetBytes(bucket []byte, key string) (value []byte, err
 }
 
 // Get ...
-func (database *Database) Get(bucket []byte, key string) (string, error) {
+func (database *BoltDatabase) Get(bucket []byte, key string) (string, error) {
 	value, err := database.GetBytes(bucket, key)
 	return string(value), err
 }
 
 // GetObject ...
-func (database *Database) GetObject(bucket []byte, key string, item interface{}) (err error) {
+func (database *BoltDatabase) GetObject(bucket []byte, key string, item interface{}) (err error) {
 	v, err := database.GetBytes(bucket, key)
 	if err != nil {
 		return err
@@ -416,7 +402,7 @@ func (database *Database) GetObject(bucket []byte, key string, item interface{})
 	}
 
 	if err = json.Unmarshal(v, &item); err != nil {
-		databaseLog.Warningf("Could not unmarshal object for key: '%s', in bucket '%s': %s", key, bucket, err)
+		log.Warningf("Could not unmarshal object for key: '%s', in bucket '%s': %s", key, bucket, err)
 		return err
 	}
 
@@ -424,7 +410,7 @@ func (database *Database) GetObject(bucket []byte, key string, item interface{})
 }
 
 // SetCachedBytes ...
-func (database *Database) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
+func (database *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		value = append([]byte(strconv.Itoa(util.NowPlusSecondsInt(seconds))+"|"), value...)
 		return tx.Bucket(bucket).Put([]byte(key), value)
@@ -432,12 +418,12 @@ func (database *Database) SetCachedBytes(bucket []byte, seconds int, key string,
 }
 
 // SetCached ...
-func (database *Database) SetCached(bucket []byte, seconds int, key string, value string) error {
+func (database *BoltDatabase) SetCached(bucket []byte, seconds int, key string, value string) error {
 	return database.SetCachedBytes(bucket, seconds, key, []byte(value))
 }
 
 // SetCachedObject ...
-func (database *Database) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
+func (database *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
 	} else if err := database.SetCachedBytes(bucket, seconds, key, buf); err != nil {
@@ -448,19 +434,19 @@ func (database *Database) SetCachedObject(bucket []byte, seconds int, key string
 }
 
 // SetBytes ...
-func (database *Database) SetBytes(bucket []byte, key string, value []byte) error {
+func (database *BoltDatabase) SetBytes(bucket []byte, key string, value []byte) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Put([]byte(key), value)
 	})
 }
 
 // Set ...
-func (database *Database) Set(bucket []byte, key string, value string) error {
+func (database *BoltDatabase) Set(bucket []byte, key string, value string) error {
 	return database.SetBytes(bucket, key, []byte(value))
 }
 
 // SetObject ...
-func (database *Database) SetObject(bucket []byte, key string, item interface{}) error {
+func (database *BoltDatabase) SetObject(bucket []byte, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
 	} else if err := database.SetBytes(bucket, key, buf); err != nil {
@@ -471,7 +457,7 @@ func (database *Database) SetObject(bucket []byte, key string, item interface{})
 }
 
 // BatchSet ...
-func (database *Database) BatchSet(bucket []byte, objects map[string]string) error {
+func (database *BoltDatabase) BatchSet(bucket []byte, objects map[string]string) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for key, value := range objects {
@@ -484,7 +470,7 @@ func (database *Database) BatchSet(bucket []byte, objects map[string]string) err
 }
 
 // BatchSetBytes ...
-func (database *Database) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
+func (database *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for key, value := range objects {
@@ -497,7 +483,7 @@ func (database *Database) BatchSetBytes(bucket []byte, objects map[string][]byte
 }
 
 // BatchSetObject ...
-func (database *Database) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
+func (database *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
 	serialized := map[string][]byte{}
 	for k, item := range objects {
 		buf, err := json.Marshal(item)
@@ -511,14 +497,14 @@ func (database *Database) BatchSetObject(bucket []byte, objects map[string]inter
 }
 
 // Delete ...
-func (database *Database) Delete(bucket []byte, key string) error {
+func (database *BoltDatabase) Delete(bucket []byte, key string) error {
 	return database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Delete([]byte(key))
 	})
 }
 
 // BatchDelete ...
-func (database *Database) BatchDelete(bucket []byte, keys []string) error {
+func (database *BoltDatabase) BatchDelete(bucket []byte, keys []string) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for _, key := range keys {
@@ -531,8 +517,8 @@ func (database *Database) BatchDelete(bucket []byte, keys []string) error {
 }
 
 // AsWriter ...
-func (database *Database) AsWriter(bucket []byte, key string) *DWriter {
-	return &DWriter{
+func (database *BoltDatabase) AsWriter(bucket []byte, key string) *DBWriter {
+	return &DBWriter{
 		database: database,
 		bucket:   bucket,
 		key:      []byte(key),
@@ -540,7 +526,7 @@ func (database *Database) AsWriter(bucket []byte, key string) *DWriter {
 }
 
 // Write ...
-func (w *DWriter) Write(b []byte) (n int, err error) {
+func (w *DBWriter) Write(b []byte) (n int, err error) {
 	return len(b), w.database.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(w.bucket).Put(w.key, b)
 	})
