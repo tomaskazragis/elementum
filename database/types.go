@@ -24,10 +24,7 @@ type SqliteDatabase struct {
 	backupFileName string
 }
 
-type schemaChange struct {
-	version int
-	sql     string
-}
+type schemaChange func(*int, *SqliteDatabase) (bool, error)
 
 type callBack func([]byte, []byte)
 type callBackWithError func([]byte, []byte) error

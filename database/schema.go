@@ -1,12 +1,17 @@
 package database
 
 var schemaChanges = []schemaChange{
-	schemaV1(),
+	schemaV1,
 }
 
-func schemaV1() (s schemaChange) {
-	s.version = 1
-	s.sql = `
+func schemaV1(previousVersion *int, db *SqliteDatabase) (success bool, err error) {
+	version := 1
+
+	if *previousVersion > version {
+		return
+	}
+
+	sql := `
 
 -- Table that stores database specific info, like last rolled version
 CREATE TABLE IF NOT EXISTS meta (
@@ -37,5 +42,13 @@ CREATE TABLE IF NOT EXISTS torrent_links (
 CREATE INDEX IF NOT EXISTS torrent_links_idx ON torrent_links (item_id, infohash_id);
 
 `
+
+	// Just run an a bunch of statements
+	// If everything is fine - return success so we won't get in there again
+	if _, err = db.Exec(sql); err == nil {
+		*previousVersion = version
+		success = true
+	}
+
 	return
 }

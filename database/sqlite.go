@@ -30,17 +30,18 @@ func InitSqliteDB(conf *config.Configuration) (*SqliteDatabase, error) {
 
 	// Iterate through changesets and apply to the database
 	currentVersion := sqliteDatabase.getSchemaVersion()
-	newVersion := 0
+	newVersion := currentVersion
 	for _, s := range schemaChanges {
-		if currentVersion < s.version {
-			if _, err := sqliteDatabase.DB.Exec(s.sql); err != nil {
-				log.Debugf("Error executing query: %s; sql: %s", err, s.sql)
-				break
-			}
-			newVersion = s.version
+		if ok, err := s(&newVersion, sqliteDatabase); err != nil {
+			log.Debugf("Error migrating schema: %s", err)
+			break
+		} else if ok {
+			continue
 		}
+
+		break
 	}
-	if newVersion > 0 {
+	if newVersion > currentVersion {
 		log.Debugf("Updated database to version: %d", newVersion)
 		sqliteDatabase.setSchemaVersion(newVersion)
 	}
@@ -136,4 +137,42 @@ func (d *SqliteDatabase) setSchemaVersion(version int) {
 func (d *SqliteDatabase) GetCount(sql string) (count int) {
 	_ = d.DB.QueryRow(sql).Scan(&count)
 	return
+}
+
+// AddTorrentHistory saves link between torrent file and tmdbID entry
+func (d *SqliteDatabase) AddTorrentHistory(tmdbID, infoHash string, b []byte) {
+	log.Debugf("Saving torrent entry for TMDB %s with infohash %s", tmdbID, infoHash)
+
+	var infohashID int64
+	d.QueryRow(`SELECT rowid FROM torrent_items WHERE infohash = ?`, infoHash).Scan(&infohashID)
+	if infohashID == 0 {
+		res, err := d.Exec(`INSERT INTO torrent_items (infohash, metainfo) VALUES(?, ?)`, infoHash, b)
+		if err != nil {
+			log.Debugf("Could not insert torrent: %s", err)
+			return
+		}
+		infohashID, err = res.LastInsertId()
+		if err != nil {
+			log.Debugf("Could not get inserted rowid: %s", err)
+			return
+		}
+	}
+
+	if infohashID == 0 {
+		return
+	}
+
+	var oldInfohashID int64
+	d.QueryRow(`SELECT infohash_id FROM torrent_links WHERE item_id = ?`, tmdbID).Scan(&oldInfohashID)
+	d.Exec(`INSERT OR REPLACE INTO torrent_links (infohash_id, item_id) VALUES (?, ?)`, infohashID, tmdbID)
+
+	// Clean up previously saved torrent metainfo if there is any
+	// and it's not used by any other tmdbID entry
+	if oldInfohashID != 0 {
+		var left int
+		d.QueryRow(`SELECT COUNT(*) FROM torrent_links WHERE infohash_id = ?`, oldInfohashID).Scan(&left)
+		if left == 0 {
+			d.Exec(`DELETE FROM torrent_items WHERE rowid = ?`, oldInfohashID)
+		}
+	}
 }

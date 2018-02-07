@@ -36,11 +36,6 @@ const (
 	episodeMatchRegex       = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
 )
 
-var (
-	// HistoryBucket ...
-	HistoryBucket = database.TorrentHistoryBucket
-)
-
 // BTPlayer ...
 type BTPlayer struct {
 	s                    *BTService
@@ -330,7 +325,7 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 
 		if btp.p.Episode > 0 {
 			// In episode search we are using smart-match to store found episodes
-			//   in the history bucket
+			//   in the torrent history table
 			go btp.smartMatch(choices)
 
 			var lastMatched int
@@ -794,8 +789,7 @@ func (btp *BTPlayer) smartMatch(choices byFilename) {
 			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season.Season, episode.EpisodeNumber))
 			for _, choice := range choices {
 				if re.MatchString(choice.Filename) {
-					log.Debugf("Saving torrent entry for TMDB: %#v", episode.ID)
-					database.GetBolt().SetBytes(HistoryBucket, strconv.Itoa(episode.ID), b)
+					database.Get().AddTorrentHistory(strconv.Itoa(episode.ID), btp.Torrent.InfoHash(), b)
 				}
 			}
 		}

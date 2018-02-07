@@ -111,7 +111,7 @@ func searchHistoryEmpty(historyType string) bool {
 
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 	rowid := 0
-	database.Get().QueryRow("SELECT rowid FROM history_queries WHERE type = ? AND query = ?", historyType, query).Scan(&rowid)
+	database.Get().QueryRow(`SELECT rowid FROM history_queries WHERE type = ? AND query = ?`, historyType, query).Scan(&rowid)
 
 	if rowid > 0 {
 		database.Get().Exec(`UPDATE history_queries SET dt = ?`, time.Now().Unix())

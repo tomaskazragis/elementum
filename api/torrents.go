@@ -42,9 +42,6 @@ type TorrentsWeb struct {
 	PeersTotal    int     `json:"peers_total"`
 }
 
-// HistoryBucket ...
-var HistoryBucket = database.TorrentHistoryBucket
-
 // AddToTorrentsMap ...
 func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	b, err := ioutil.ReadFile(torrent.URI)
@@ -53,19 +50,31 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	}
 
 	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
-	database.GetBolt().SetBytes(HistoryBucket, tmdbID, b)
+
+	database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
 }
 
 // InTorrentsMap ...
 func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
-	if b, err := database.GetBolt().GetBytes(HistoryBucket, tmdbID); err == nil && len(b) > 0 {
+	var infohash string
+	var infohashID int64
+	var b []byte
+	database.Get().QueryRow(`SELECT l.infohash_id, i.infohash, i.metainfo FROM torrent_links l LEFT JOIN torrent_items i ON i.rowid = l.infohash_id WHERE l.item_id = ?`, tmdbID).Scan(&infohashID, &infohash, &b)
+
+	if len(infohash) > 0 && len(b) > 0 {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
 		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name))) {
 			return torrent
 		}
-		database.GetBolt().Delete(HistoryBucket, tmdbID)
+
+		database.Get().Exec(`DELETE FROM torrent_links WHERE item_id = ?`, tmdbID)
+		var left int
+		database.Get().QueryRow(`SELECT COUNT(*) FROM torrent_links WHERE infohash_id = ?`, infohashID).Scan(&left)
+		if left == 0 {
+			database.Get().Exec(`DELETE FROM torrent_items WHERE rowid = ?`, infohashID)
+		}
 	}
 
 	return nil
