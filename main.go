@@ -177,6 +177,7 @@ func main() {
 
 	go library.Init()
 	go trakt.TokenRefreshHandler()
+	go db.MaintenanceRefreshHandler()
 	go boltDb.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	// Importing sqlite driver
 	_ "github.com/mattn/go-sqlite3"
@@ -23,8 +24,8 @@ func InitSqliteDB(conf *config.Configuration) (*SqliteDatabase, error) {
 	sqliteDatabase = &SqliteDatabase{
 		DB:             db,
 		quit:           make(chan struct{}, 2),
-		fileName:       boltFileName,
-		backupFileName: backupBoltFileName,
+		fileName:       sqliteFileName,
+		backupFileName: backupSqliteFileName,
 	}
 
 	// Iterate through changesets and apply to the database
@@ -77,9 +78,40 @@ func Get() *SqliteDatabase {
 	return sqliteDatabase
 }
 
+// MaintenanceRefreshHandler ...
+func (d *SqliteDatabase) MaintenanceRefreshHandler() {
+	backupPath := filepath.Join(config.Get().Info.Profile, d.backupFileName)
+
+	d.CreateBackup(backupPath)
+
+	// database.CacheCleanup()
+
+	tickerBackup := time.NewTicker(1 * time.Hour)
+	defer tickerBackup.Stop()
+
+	defer close(d.quit)
+
+	for {
+		select {
+		case <-tickerBackup.C:
+			go func() {
+				d.CreateBackup(backupPath)
+			}()
+			// case <-tickerCache.C:
+			// 	go database.CacheCleanup()
+		case <-d.quit:
+			return
+		}
+	}
+}
+
 // CreateBackup ...
 func (d *SqliteDatabase) CreateBackup(backupPath string) {
-	util.CopyFile(d.fileName, d.backupFileName, true)
+	src := filepath.Join(config.Get().Info.Profile, d.fileName)
+	dest := filepath.Join(config.Get().Info.Profile, d.backupFileName)
+	if err := util.CopyFile(src, dest, true); err != nil {
+		log.Warningf("Could not backup from '%s' to '%s' the database: %s", src, dest, err)
+	}
 }
 
 // Close ...
