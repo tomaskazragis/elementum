@@ -176,10 +176,7 @@ func (s *BTService) configure() {
 		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
 	}
 
-	blocklist, err := iplist.MMapPacked("packed-blocklist")
-	if err != nil {
-		log.Debug(err)
-	}
+	blocklist := iplist.New([]iplist.Range{})
 
 	s.PeerID, s.UserAgent = util.GetUserAndPeer()
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
@@ -256,6 +253,7 @@ func (s *BTService) configure() {
 		s.RestoreLimits()
 	}
 
+	var err error
 	log.Debugf("BitClient config: %#v", s.ClientConfig)
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
 		// If client can't be created - we should panic

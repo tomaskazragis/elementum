@@ -11,6 +11,7 @@ import (
 	"time"
 
 	gotorrent "github.com/anacrolix/torrent"
+	"github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -59,7 +60,6 @@ type Torrent struct {
 	downRates      []int64
 	upRates        []int64
 	rateCounter    int
-	transferSize   int64
 	downloadedSize int64
 	uploadedSize   int64
 	lastProgress   float64
@@ -231,8 +231,6 @@ func (t *Torrent) progressEvent() {
 	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
 	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize
 
-	oldSize := t.transferSize
-	t.transferSize = t.Torrent.BytesCompleted()
 	if curDownloaded > t.downloadedSize {
 		t.downloadedSize = curDownloaded
 	}
@@ -261,7 +259,7 @@ func (t *Torrent) progressEvent() {
 	// }
 	// t.lastDownRate = t.downloadedSize
 
-	log.Debugf("PR: %#v (%d)/%#v; %#v = %.2f ", t.DownloadRate, t.transferSize-oldSize, t.UploadRate, t.GetStateString(), t.GetProgress())
+	log.Debugf("%.6s: %s/%s | %s (%.2f%%)", t.infoHash, humanize.Bytes(uint64(t.DownloadRate)), humanize.Bytes(uint64(t.UploadRate)), t.GetStateString(), t.GetProgress())
 	if t.needSeeding && t.Service.GetSeedTime() > 0 && t.GetProgress() >= 100 {
 		t.muSeeding.Lock()
 		seedingTime := time.Duration(t.Service.GetSeedTime()) * time.Hour
