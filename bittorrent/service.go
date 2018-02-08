@@ -176,7 +176,7 @@ func (s *BTService) configure() {
 		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
 	}
 
-	blocklist := iplist.New([]iplist.Range{})
+	blocklist, _ := iplist.MMapPacked(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
 
 	s.PeerID, s.UserAgent = util.GetUserAndPeer()
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
@@ -237,8 +237,6 @@ func (s *BTService) configure() {
 			ForceEncryption:   s.config.EncryptionPolicy == 2,
 		},
 
-		IPBlocklist: blocklist,
-
 		DownloadRateLimiter: s.DownloadLimiter,
 		UploadRateLimiter:   s.UploadLimiter,
 
@@ -265,6 +263,9 @@ func (s *BTService) configure() {
 	} else {
 		log.Debugf("Created bit client: %#v", s.Client)
 		log.Debugf("Client listening on: %s", s.Client.ListenAddr().String())
+
+		// Setting it here to avoid spamming the log file
+		s.Client.SetIPBlockList(blocklist)
 	}
 }
 
@@ -376,8 +377,8 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		}
 
 		log.Debugf("Adding torrent: %#v", uri)
-		log.Debugf("Service: %#v", s)
-		log.Debugf("Client: %#v", s.Client)
+		// log.Debugf("Service: %#v", s)
+		// log.Debugf("Client: %#v", s.Client)
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
 			log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err

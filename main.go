@@ -71,6 +71,7 @@ func main() {
 	log.Infof("Version: %s Go: %s", util.GetVersion(), runtime.Version())
 
 	conf := config.Reload()
+	xbmc.KodiVersion = conf.Platform.Kodi
 
 	log.Infof("Addon: %s v%s", conf.Info.ID, conf.Info.Version)
 

@@ -397,24 +397,6 @@ func RefreshMovies() error {
 	if movies == nil || movies.Movies == nil {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
-	for tries := 1; tries <= 3; tries++ {
-		mds, err := xbmc.VideoLibraryGetMoviesInfo()
-		if mds == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
-		}
-
-		for _, md := range mds.Movies {
-			for _, m := range movies.Movies {
-				if m.ID == md.ID {
-					m.Year = md.Year
-					m.UniqueIDs = md.UniqueIDs
-					break
-				}
-			}
-		}
-		break
-	}
 
 	started := time.Now()
 	defer func() {
@@ -474,24 +456,6 @@ func RefreshShows() error {
 
 	if shows == nil || shows.Shows == nil {
 		return errors.New("Could not fetch Shows from Kodi")
-	}
-	for tries := 1; tries <= 3; tries++ {
-		sds, err := xbmc.VideoLibraryGetShowsInfo()
-		if sds == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
-		}
-
-		for _, sd := range sds.Shows {
-			for _, s := range shows.Shows {
-				if s.ID == sd.ID {
-					s.Year = sd.Year
-					s.UniqueIDs = sd.UniqueIDs
-					break
-				}
-			}
-		}
-		break
 	}
 
 	started := time.Now()
@@ -569,9 +533,16 @@ func RefreshShows() error {
 // RefreshSeasons updates seasons list for selected show in the library
 func RefreshSeasons() error {
 	var seasons *xbmc.VideoLibrarySeasons
+
+	// Collect all shows IDs for possibly doing one-by-one calls to Kodi
+	shows := []int{}
+	for _, s := range l.Shows {
+		shows = append(shows, s.ID)
+	}
+
 	for tries := 1; tries <= 3; tries++ {
 		var err error
-		seasons, err = xbmc.VideoLibraryGetAllSeasons()
+		seasons, err = xbmc.VideoLibraryGetAllSeasons(shows)
 		if seasons == nil || err != nil {
 			time.Sleep(time.Duration(tries*2) * time.Second)
 			continue
@@ -629,23 +600,6 @@ func RefreshEpisodes() error {
 
 	if episodes == nil || episodes.Episodes == nil {
 		return errors.New("Could not fetch Episodes from Kodi")
-	}
-	for tries := 1; tries <= 3; tries++ {
-		eds, err := xbmc.VideoLibraryGetAllEpisodesInfo()
-		if eds == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
-		}
-
-		for _, ed := range eds.Episodes {
-			for _, e := range episodes.Episodes {
-				if e.ID == ed.ID {
-					e.UniqueIDs = ed.UniqueIDs
-					break
-				}
-			}
-		}
-		break
 	}
 
 	started := time.Now()

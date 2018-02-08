@@ -28,6 +28,9 @@ const (
 	IconOverlayHD
 )
 
+// KodiVersion saves Kodi platform
+var KodiVersion = 0
+
 // ListItems ...
 type ListItems []*ListItem
 

@@ -37,28 +37,19 @@ func VideoLibraryClean() (retVal string) {
 
 // VideoLibraryGetMovies ...
 func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
-	params := map[string]interface{}{"properties": []interface{}{
+	list := []interface{}{
 		"imdbnumber",
 		"playcount",
 		"file",
 		"resume",
-	}}
+	}
+	if KodiVersion > 16 {
+		list = append(list, "uniqueid", "year")
+	}
+	params := map[string]interface{}{"properties": list}
 	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
 	if err != nil && !strings.Contains(err.Error(), "invalid error") {
 		log.Errorf("Error getting movies: %#v", err)
-	}
-	return
-}
-
-// VideoLibraryGetMoviesInfo ...
-func VideoLibraryGetMoviesInfo() (movies *VideoLibraryMovies, err error) {
-	params := map[string]interface{}{"properties": []interface{}{
-		"year",
-		"uniqueid",
-	}}
-	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
-	if err != nil {
-		log.Errorf("Error getting movies dates: %#v", err)
 	}
 	return
 }
@@ -88,30 +79,17 @@ func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 
 // VideoLibraryGetShows ...
 func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
-	params := map[string]interface{}{
-		"properties": []interface{}{
-			"imdbnumber",
-			"episode",
-		},
+	list := []interface{}{
+		"imdbnumber",
+		"episode",
 	}
+	if KodiVersion > 16 {
+		list = append(list, "uniqueid", "year")
+	}
+	params := map[string]interface{}{"properties": list}
 	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
 	if err != nil {
 		log.Errorf("Error getting tvshows: %#v", err)
-	}
-	return
-}
-
-// VideoLibraryGetShowsInfo ...
-func VideoLibraryGetShowsInfo() (shows *VideoLibraryShows, err error) {
-	params := map[string]interface{}{
-		"properties": []interface{}{
-			"year",
-			"uniqueid",
-		},
-	}
-	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
-	if err != nil {
-		log.Errorf("Error getting tvshows dates: %#v", err)
 	}
 	return
 }
@@ -132,17 +110,29 @@ func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err err
 }
 
 // VideoLibraryGetAllSeasons ...
-func VideoLibraryGetAllSeasons() (seasons *VideoLibrarySeasons, err error) {
-	params := map[string]interface{}{"properties": []interface{}{
-		"tvshowid",
-		"season",
-		"episode",
-		"playcount",
-	}}
-	err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
-	if err != nil {
-		log.Errorf("Error getting seasons: %#v", err)
+func VideoLibraryGetAllSeasons(shows []int) (seasons *VideoLibrarySeasons, err error) {
+	if KodiVersion > 16 {
+		params := map[string]interface{}{"properties": []interface{}{
+			"tvshowid",
+			"season",
+			"episode",
+			"playcount",
+		}}
+		err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
+		if err != nil {
+			log.Errorf("Error getting seasons: %#v", err)
+		}
+		return
 	}
+
+	seasons = &VideoLibrarySeasons{}
+	for _, s := range shows {
+		res, err := VideoLibraryGetSeasons(s)
+		if res != nil && res.Seasons != nil && err == nil {
+			seasons.Seasons = append(seasons.Seasons, res.Seasons...)
+		}
+	}
+
 	return
 }
 
@@ -166,26 +156,18 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 
 // VideoLibraryGetAllEpisodes ...
 func VideoLibraryGetAllEpisodes() (episodes *VideoLibraryEpisodes, err error) {
-	params := map[string]interface{}{"properties": []interface{}{
+	list := []interface{}{
 		"tvshowid",
 		"season",
 		"episode",
 		"playcount",
 		"file",
 		"resume",
-	}}
-	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
-	if err != nil {
-		log.Error(err)
 	}
-	return
-}
-
-// VideoLibraryGetAllEpisodesInfo ...
-func VideoLibraryGetAllEpisodesInfo() (episodes *VideoLibraryEpisodes, err error) {
-	params := map[string]interface{}{"properties": []interface{}{
-		"uniqueid",
-	}}
+	if KodiVersion > 16 {
+		list = append(list, "uniqueid")
+	}
+	params := map[string]interface{}{"properties": list}
 	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
 	if err != nil {
 		log.Error(err)
