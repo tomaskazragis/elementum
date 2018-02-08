@@ -59,7 +59,7 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 	var infohash string
 	var infohashID int64
 	var b []byte
-	database.Get().QueryRow(`SELECT l.infohash_id, i.infohash, i.metainfo FROM torrent_links l LEFT JOIN torrent_items i ON i.rowid = l.infohash_id WHERE l.item_id = ?`, tmdbID).Scan(&infohashID, &infohash, &b)
+	database.Get().QueryRow(`SELECT l.infohash_id, i.infohash, i.metainfo FROM thistory_assign l LEFT JOIN thistory_metainfo i ON i.rowid = l.infohash_id WHERE l.item_id = ?`, tmdbID).Scan(&infohashID, &infohash, &b)
 
 	if len(infohash) > 0 && len(b) > 0 {
 		torrent := &bittorrent.TorrentFile{}
@@ -69,11 +69,11 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 			return torrent
 		}
 
-		database.Get().Exec(`DELETE FROM torrent_links WHERE item_id = ?`, tmdbID)
+		database.Get().Exec(`DELETE FROM thistory_assign WHERE item_id = ?`, tmdbID)
 		var left int
-		database.Get().QueryRow(`SELECT COUNT(*) FROM torrent_links WHERE infohash_id = ?`, infohashID).Scan(&left)
+		database.Get().QueryRow(`SELECT COUNT(*) FROM thistory_assign WHERE infohash_id = ?`, infohashID).Scan(&left)
 		if left == 0 {
-			database.Get().Exec(`DELETE FROM torrent_items WHERE rowid = ?`, infohashID)
+			database.Get().Exec(`DELETE FROM thistory_metainfo WHERE rowid = ?`, infohashID)
 		}
 	}
 

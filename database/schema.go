@@ -14,10 +14,11 @@ func schemaV1(previousVersion *int, db *SqliteDatabase) (success bool, err error
 	sql := `
 
 -- Table that stores database specific info, like last rolled version
-CREATE TABLE IF NOT EXISTS meta (
-  version INT NOT NULL DEFAULT 0
+CREATE TABLE IF NOT EXISTS settings (
+  name TEXT NOT NULL UNIQUE,
+  value TEXT NOT NULL
 );
-INSERT INTO meta (version) SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM meta);
+INSERT OR REPLACE INTO settings (name, value) VALUES ('version', '0');
 
 -- Table for Search queries history
 CREATE TABLE IF NOT EXISTS history_queries (
@@ -28,18 +29,18 @@ CREATE TABLE IF NOT EXISTS history_queries (
 CREATE INDEX IF NOT EXISTS history_queries_idx ON history_queries (type,  dt DESC);
 
 -- Table that stores torrents' metadata
-CREATE TABLE IF NOT EXISTS torrent_items (
+CREATE TABLE IF NOT EXISTS thistory_metainfo (
   infohash TEXT NOT NULL UNIQUE,
   metainfo BLOB
 );
-CREATE INDEX IF NOT EXISTS torrent_items_idx ON torrent_items (infohash);
+CREATE INDEX IF NOT EXISTS thistory_metainfo_idx ON thistory_metainfo (infohash);
 
 -- Table stores links between items and stored metadata
-CREATE TABLE IF NOT EXISTS torrent_links (
+CREATE TABLE IF NOT EXISTS thistory_assign (
   infohash_id INT NOT NULL,
   item_id INT NOT NULL UNIQUE
 );
-CREATE INDEX IF NOT EXISTS torrent_links_idx ON torrent_links (item_id, infohash_id);
+CREATE INDEX IF NOT EXISTS thistory_assign_idx ON thistory_assign (item_id, infohash_id);
 
 `
 

@@ -122,7 +122,7 @@ func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 		return
 	}
 
-	database.Get().Exec(`DELETE FROM history_queries WHERE rowid NOT IN (SELECT rowid FROM history_queries WHERE type = ? ORDER BY dt DESC LIMIT ?)`, historyType, historyMaxSize)
+	database.Get().Exec(`DELETE FROM history_queries WHERE type = ? AND rowid NOT IN (SELECT rowid FROM history_queries WHERE type = ? ORDER BY dt DESC LIMIT ?)`, historyType, historyType, historyMaxSize)
 
 	xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
 	ctx.String(200, "")

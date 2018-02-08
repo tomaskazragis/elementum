@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	// Importing sqlite driver
@@ -123,12 +124,14 @@ func (d *SqliteDatabase) Close() {
 }
 
 func (d *SqliteDatabase) getSchemaVersion() (version int) {
-	d.DB.QueryRow(`SELECT version FROM meta`).Scan(&version)
+	holder := ""
+	d.DB.QueryRow(`SELECT value FROM settings WHERE name = ?`, "version").Scan(&holder)
+	version, _ = strconv.Atoi(holder)
 	return
 }
 
 func (d *SqliteDatabase) setSchemaVersion(version int) {
-	if _, err := d.DB.Exec(`UPDATE meta SET version = ?`, version); err != nil {
+	if _, err := d.DB.Exec(`INSERT OR REPLACE INTO settings (name, value) VALUES (?, ?)`, "version", strconv.Itoa(version)); err != nil {
 		log.Debugf("Could not update schema version: %s", err)
 	}
 }
@@ -144,9 +147,9 @@ func (d *SqliteDatabase) AddTorrentHistory(tmdbID, infoHash string, b []byte) {
 	log.Debugf("Saving torrent entry for TMDB %s with infohash %s", tmdbID, infoHash)
 
 	var infohashID int64
-	d.QueryRow(`SELECT rowid FROM torrent_items WHERE infohash = ?`, infoHash).Scan(&infohashID)
+	d.QueryRow(`SELECT rowid FROM thistory_metainfo WHERE infohash = ?`, infoHash).Scan(&infohashID)
 	if infohashID == 0 {
-		res, err := d.Exec(`INSERT INTO torrent_items (infohash, metainfo) VALUES(?, ?)`, infoHash, b)
+		res, err := d.Exec(`INSERT INTO thistory_metainfo (infohash, metainfo) VALUES(?, ?)`, infoHash, b)
 		if err != nil {
 			log.Debugf("Could not insert torrent: %s", err)
 			return
@@ -163,16 +166,16 @@ func (d *SqliteDatabase) AddTorrentHistory(tmdbID, infoHash string, b []byte) {
 	}
 
 	var oldInfohashID int64
-	d.QueryRow(`SELECT infohash_id FROM torrent_links WHERE item_id = ?`, tmdbID).Scan(&oldInfohashID)
-	d.Exec(`INSERT OR REPLACE INTO torrent_links (infohash_id, item_id) VALUES (?, ?)`, infohashID, tmdbID)
+	d.QueryRow(`SELECT infohash_id FROM thistory_assign WHERE item_id = ?`, tmdbID).Scan(&oldInfohashID)
+	d.Exec(`INSERT OR REPLACE INTO thistory_assign (infohash_id, item_id) VALUES (?, ?)`, infohashID, tmdbID)
 
 	// Clean up previously saved torrent metainfo if there is any
 	// and it's not used by any other tmdbID entry
 	if oldInfohashID != 0 {
 		var left int
-		d.QueryRow(`SELECT COUNT(*) FROM torrent_links WHERE infohash_id = ?`, oldInfohashID).Scan(&left)
+		d.QueryRow(`SELECT COUNT(*) FROM thistory_assign WHERE infohash_id = ?`, oldInfohashID).Scan(&left)
 		if left == 0 {
-			d.Exec(`DELETE FROM torrent_items WHERE rowid = ?`, oldInfohashID)
+			d.Exec(`DELETE FROM thistory_metainfo WHERE rowid = ?`, oldInfohashID)
 		}
 	}
 }
