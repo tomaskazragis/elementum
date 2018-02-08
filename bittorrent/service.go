@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -409,6 +410,10 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 		return false
 	}
 
+	defer func() {
+		s.DeleteBTItem(torrent.InfoHash())
+	}()
+
 	if t, ok := s.Torrents[torrent.infoHash]; ok {
 		delete(s.Torrents, torrent.infoHash)
 		t.Drop(removeFiles)
@@ -446,7 +451,7 @@ func (s *BTService) loadTorrentFiles() {
 
 		t, _ := s.AddTorrent(torrentFile)
 		if t != nil {
-			i := s.GetDBItem(t.InfoHash())
+			i := s.GetBTItem(t.InfoHash())
 
 			if i != nil {
 				t.DBItem = i
@@ -579,8 +584,25 @@ func (s *BTService) downloadProgress() {
 						}
 					}
 
-					filePath := torrentHandle.Files()[item.File].Path()
-					fileName := filepath.Base(filePath)
+					if len(item.Files) <= 0 {
+						return errors.New("No files saved for BTItem")
+					}
+
+					// TODO: change logic to move all selected files, not just one
+					filePath := ""
+					fileName := ""
+					for _, p := range item.Files {
+						for _, f := range torrentHandle.Files() {
+							if f.Path() == p {
+								filePath = f.Path()
+								fileName = filepath.Base(filePath)
+							}
+						}
+					}
+
+					if filePath == "" {
+						return fmt.Errorf("Cannot find saved files: %#v", item.Files)
+					}
 
 					extracted := ""
 					re := regexp.MustCompile("(?i).*\\.rar")
@@ -647,7 +669,7 @@ func (s *BTService) downloadProgress() {
 							log.Warning(fileName, "moved to", dst)
 
 							log.Infof("Marking %s for removal from library and database...", torrentName)
-							s.UpdateDB(RemoveFromLibrary, infoHash, 0, "", nil)
+							s.UpdateStatusBTItem(infoHash, Remove)
 						}
 					}()
 					return nil
@@ -689,51 +711,65 @@ func (s *BTService) downloadProgress() {
 // Database updates
 //
 
-// UpdateDB ...
-func (s *BTService) UpdateDB(Operation int, InfoHash string, ID int, Type string, Files []*gotorrent.File, infos ...int) error {
-	switch Operation {
-	case Delete:
-		return database.GetBolt().Delete(Bucket, InfoHash)
-	case Update:
-		files := []string{}
-		for _, f := range Files {
-			if f != nil {
-				files = append(files, f.Path())
-			}
-		}
-
-		item := &database.BTItem{
-			State:   Active,
-			ID:      ID,
-			Type:    Type,
-			Files:   files,
-			ShowID:  infos[0],
-			Season:  infos[1],
-			Episode: infos[2],
-		}
-		return database.GetBolt().SetObject(Bucket, InfoHash, item)
-	case RemoveFromLibrary:
-		item := &database.BTItem{}
-		if err := database.GetBolt().GetObject(Bucket, InfoHash, item); err != nil {
-			log.Error(err)
-			return err
-		}
-
-		item.State = Remove
-		return database.GetBolt().SetObject(Bucket, InfoHash, item)
-	}
-
-	return nil
-}
-
-// GetDBItem ...
-func (s *BTService) GetDBItem(infoHash string) *database.BTItem {
+// GetBTItem ...
+func (s *BTService) GetBTItem(infoHash string) *database.BTItem {
 	item := &database.BTItem{}
-	if err := database.GetBolt().GetObject(Bucket, infoHash, item); err != nil {
+	rowid := 0
+	fileStr := ""
+	infoStr := ""
+
+	database.Get().QueryRow(`SELECT rowid, state, mediaID, mediaType, files, infos FROM tinfo WHERE infohash = ?`, infoHash).Scan(&rowid, &item.State, &item.ID, &item.Type, &fileStr, &infoStr)
+	if rowid == 0 {
 		return nil
 	}
 
+	item.Files = strings.Split(fileStr, "|")
+	infos := strings.Split(infoStr, "|")
+	if len(infos) >= 3 {
+		item.ShowID, _ = strconv.Atoi(infos[0])
+		item.Season, _ = strconv.Atoi(infos[1])
+		item.Episode, _ = strconv.Atoi(infos[2])
+	}
 	return item
+}
+
+// UpdateStatusBTItem ...
+func (s *BTService) UpdateStatusBTItem(infoHash string, status int) error {
+	_, err := database.Get().Exec(`UPDATE tinfo SET state = ? WHERE infohash = ?`, status, infoHash)
+	return err
+}
+
+// UpdateBTItem ...
+func (s *BTService) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []*gotorrent.File, infos ...int) error {
+	fileStr := ""
+	for _, f := range files {
+		if f != nil {
+			if len(fileStr) > 0 {
+				fileStr += "|"
+			}
+
+			fileStr += f.Path()
+		}
+	}
+	infoStr := ""
+	for _, f := range infos {
+		if len(infoStr) > 0 {
+			infoStr += "|"
+		}
+		infoStr += strconv.Itoa(f)
+	}
+
+	_, err := database.Get().Exec(`INSERT OR REPLACE INTO tinfo (infohash, state, mediaID, mediaType, files, infos) VALUES (?, ?, ?, ?, ?, ?)`, infoHash, Active, mediaID, mediaType, fileStr, infoStr)
+	if err != nil {
+		log.Debugf("UpdateBTItem failed: %s", err)
+	}
+	return err
+}
+
+// DeleteBTItem ...
+func (s *BTService) DeleteBTItem(infoHash string) error {
+	_, err := database.Get().Exec(`DELETE FROM tinfo WHERE infohash = ?`, infoHash)
+	return err
 }
 
 // SetDownloadLimit ...

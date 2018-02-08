@@ -375,7 +375,6 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 			defer os.Remove(torrentFile)
 		}
 
-		btService.UpdateDB(bittorrent.Delete, infoHash, 0, "", nil)
 		torrentsLog.Infof("Removed %s from database", infoHash)
 
 		keepSetting := config.Get().KeepFilesFinished

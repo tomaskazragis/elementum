@@ -42,6 +42,19 @@ CREATE TABLE IF NOT EXISTS thistory_assign (
 );
 CREATE INDEX IF NOT EXISTS thistory_assign_idx ON thistory_assign (item_id, infohash_id);
 
+-- Table stores torrent information, like TMDB ID and selected Files
+CREATE TABLE IF NOT EXISTS tinfo (
+  infohash TEXT NOT NULL UNIQUE,
+  state INT NOT NULL DEFAULT 0,
+  mediaID INT NOT NULL DEFAULT 0,
+  mediaType TEXT NOT NULL DEFAULT "",
+  files TEXT NOT NULL DEFAULT "",
+  infos TEXT NOT NULL DEFAULT ""
+);
+CREATE INDEX IF NOT EXISTS tinfo_idx ON tinfo (infohash);
+
+
+
 `
 
 	// Just run an a bunch of statements
