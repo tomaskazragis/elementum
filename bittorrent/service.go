@@ -233,7 +233,7 @@ func (s *BTService) configure() {
 		NoUpload: s.config.DisableUpload,
 
 		EncryptionPolicy: gotorrent.EncryptionPolicy{
-			DisableEncryption: s.config.EncryptionPolicy == 0,
+			DisableEncryption: s.config.EncryptionPolicy == 1,
 			ForceEncryption:   s.config.EncryptionPolicy == 2,
 		},
 
