@@ -72,6 +72,7 @@ type PlayerParams struct {
 	Seeked        bool
 	WasPlaying    bool
 	FromLibrary   bool
+	KodiPosition  int
 	WatchedTime   float64
 	VideoDuration float64
 	URI           string
@@ -715,6 +716,7 @@ func (btp *BTPlayer) UpdateWatched() {
 	if progress > 90 {
 		var watched *trakt.WatchedItem
 
+		// TODO: Make use of Playcount, possibly increment when Watched, use old value if in progress
 		if btp.p.ContentType == movieType {
 			watched = &trakt.WatchedItem{
 				MediaType: btp.p.ContentType,

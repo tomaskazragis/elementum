@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -176,7 +175,7 @@ func (s *BTService) configure() {
 		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
 	}
 
-	blocklist, _ := iplist.MMapPacked(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
+	blocklist, _ := iplist.MMapPackedFile(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
 
 	s.PeerID, s.UserAgent = util.GetUserAndPeer()
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)

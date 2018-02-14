@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"sync"
 
-	bolt "github.com/coreos/bbolt"
+	"github.com/boltdb/bolt"
 	"github.com/op/go-logging"
 )
 

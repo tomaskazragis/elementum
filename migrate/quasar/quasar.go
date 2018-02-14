@@ -16,7 +16,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/xbmc"
 
-	bolt "github.com/coreos/bbolt"
+	"github.com/boltdb/bolt"
 	"github.com/karrick/godirwalk"
 	"github.com/op/go-logging"
 )
@@ -236,12 +236,12 @@ func Migrate() (err error) {
 	oldDB, errDB := bolt.Open(pluginDatabase, 0600, &bolt.Options{
 		ReadOnly: false,
 		Timeout:  15 * time.Second,
-		NoSync:   true,
 	})
 	if errDB != nil {
 		log.Debugf("Could not open database at %s: %s", pluginDatabase, errDB.Error())
 		return errDB
 	}
+	oldDB.NoSync = true
 
 	log.Debugf("Migrating %#v items", len(migrateItems))
 	for _, item := range migrateItems {

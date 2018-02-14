@@ -4,14 +4,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/library"
-	// "github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -45,27 +43,25 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 	}
 
 	switch method {
-	// TODO: Investigave whether we can use "Position: 0"
-	// to detect we don't need to resume
-	// case "Playlist.OnAdd":
-	// 	p := s.GetActivePlayer()
-	// 	if p == nil || p.Params().VideoDuration == 0 {
-	// 		return
-	// 	}
-	// 	var request struct {
-	// 		Item struct {
-	// 			ID   int    `json:"id"`
-	// 			Type string `json:"type"`
-	// 		} `json:"item"`
-	// 		Position int `json:"position"`
-	// 	}
-	// 	request.Position = -1
-	//
-	// 	if err := json.Unmarshal(jsonData, &request); err != nil {
-	// 		log.Error(err)
-	// 		return
-	// 	}
-	// 	log.Debugf("Processing request: %#v", request)
+	case "Playlist.OnAdd":
+		p := s.GetActivePlayer()
+		if p == nil || p.Params().VideoDuration == 0 {
+			return
+		}
+		var request struct {
+			Item struct {
+				ID   int    `json:"id"`
+				Type string `json:"type"`
+			} `json:"item"`
+			Position int `json:"position"`
+		}
+		request.Position = -1
+
+		if err := json.Unmarshal(jsonData, &request); err != nil {
+			log.Error(err)
+			return
+		}
+		p.Params().KodiPosition = request.Position
 
 	case "Player.OnSeek":
 		p := s.GetActivePlayer()
@@ -95,7 +91,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			p.Params().Paused = false
 			return
 		}
-		if !p.Params().FromLibrary || !config.Get().PlayResume {
+		if !p.Params().FromLibrary || !config.Get().PlayResume || p.Params().KodiPosition == 0 {
 			return
 		}
 		var started struct {

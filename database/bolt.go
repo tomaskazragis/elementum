@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	bolt "github.com/coreos/bbolt"
+	"github.com/boltdb/bolt"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
@@ -114,8 +114,9 @@ func CreateBoltDB(conf *config.Configuration, fileName string, backupFileName st
 	db, err := bolt.Open(databasePath, 0600, &bolt.Options{
 		ReadOnly: false,
 		Timeout:  15 * time.Second,
-		NoSync:   true,
 	})
+	db.NoSync = true
+
 	if err != nil {
 		log.Warningf("Could not open database at %s: %s", databasePath, err.Error())
 		return nil, err
@@ -166,9 +167,9 @@ func (database *BoltDatabase) MaintenanceRefreshHandler() {
 
 	// database.CacheCleanup()
 
-	tickerBackup := time.NewTicker(1 * time.Hour)
-	defer tickerBackup.Stop()
+	tickerBackup := time.NewTicker(2 * time.Hour)
 
+	defer tickerBackup.Stop()
 	defer close(database.quit)
 
 	for {
@@ -508,9 +509,7 @@ func (database *BoltDatabase) BatchDelete(bucket []byte, keys []string) error {
 	return database.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for _, key := range keys {
-			if err := b.Delete([]byte(key)); err != nil {
-				return err
-			}
+			b.Delete([]byte(key))
 		}
 		return nil
 	})
