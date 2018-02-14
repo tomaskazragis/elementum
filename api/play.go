@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/elgatito/elementum/bittorrent"
+	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -137,7 +138,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 
 			if torrentHandle != nil {
 				infoHash := torrentHandle.Torrent.InfoHash().AsString()
-				dbItem := btService.GetBTItem(infoHash)
+				dbItem := database.Get().GetBTItem(infoHash)
 				if dbItem != nil && dbItem.Type != "" {
 					contentType = dbItem.Type
 					if contentType == movieType {

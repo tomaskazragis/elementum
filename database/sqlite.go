@@ -6,10 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	// Importing sqlite driver
 	_ "github.com/mattn/go-sqlite3"
+
+	gotorrent "github.com/anacrolix/torrent"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
@@ -70,6 +73,7 @@ func CreateSqliteDB(conf *config.Configuration, fileName string, backupFileName 
 
 	// Setting up default properties for connection
 	db.Exec("PRAGMA journal_mode=WAL")
+	db.Exec("PRAGMA foreign_keys=ON")
 	db.SetMaxOpenConns(1)
 
 	return db, nil
@@ -123,23 +127,51 @@ func (d *SqliteDatabase) Close() {
 	d.DB.Close()
 }
 
+// GetSetting ...
+func (d *SqliteDatabase) GetSetting(name string) (value string) {
+	d.DB.QueryRow(`SELECT value FROM settings WHERE name = ?`, name).Scan(&value)
+	return
+}
+
+// SetSetting ...
+func (d *SqliteDatabase) SetSetting(name, value string) {
+	if _, err := d.DB.Exec(`INSERT OR REPLACE INTO settings (name, value) VALUES (?, ?)`, name, value); err != nil {
+		log.Debugf("Could not update setting (%s=%s): %s", name, value, err)
+	}
+}
+
 func (d *SqliteDatabase) getSchemaVersion() (version int) {
-	holder := ""
-	d.DB.QueryRow(`SELECT value FROM settings WHERE name = ?`, "version").Scan(&holder)
-	version, _ = strconv.Atoi(holder)
+	v := d.GetSetting("version")
+	version, _ = strconv.Atoi(v)
 	return
 }
 
 func (d *SqliteDatabase) setSchemaVersion(version int) {
-	if _, err := d.DB.Exec(`INSERT OR REPLACE INTO settings (name, value) VALUES (?, ?)`, "version", strconv.Itoa(version)); err != nil {
-		log.Debugf("Could not update schema version: %s", err)
-	}
+	v := strconv.Itoa(version)
+	d.SetSetting("version", v)
 }
 
 // GetCount is a helper for returning single column int result
 func (d *SqliteDatabase) GetCount(sql string) (count int) {
 	_ = d.DB.QueryRow(sql).Scan(&count)
 	return
+}
+
+// AddSearchHistory adds query to search history, according to media type
+func (d *SqliteDatabase) AddSearchHistory(historyType, query string) {
+	rowid := 0
+	d.QueryRow(`SELECT rowid FROM history_queries WHERE type = ? AND query = ?`, historyType, query).Scan(&rowid)
+
+	if rowid > 0 {
+		d.Exec(`UPDATE history_queries SET dt = ?`, time.Now().Unix())
+		return
+	}
+
+	if _, err := d.Exec(`INSERT INTO history_queries (type, query, dt) VALUES(?, ?, ?)`, historyType, query, time.Now().Unix()); err != nil {
+		return
+	}
+
+	d.Exec(`DELETE FROM history_queries WHERE type = ? AND rowid NOT IN (SELECT rowid FROM history_queries WHERE type = ? ORDER BY dt DESC LIMIT ?)`, historyType, historyType, historyMaxSize)
 }
 
 // AddTorrentHistory saves link between torrent file and tmdbID entry
@@ -178,4 +210,67 @@ func (d *SqliteDatabase) AddTorrentHistory(tmdbID, infoHash string, b []byte) {
 			d.Exec(`DELETE FROM thistory_metainfo WHERE rowid = ?`, oldInfohashID)
 		}
 	}
+}
+
+// Bittorrent Database handlers
+
+// GetBTItem ...
+func (d *SqliteDatabase) GetBTItem(infoHash string) *BTItem {
+	item := &BTItem{}
+	rowid := 0
+	fileStr := ""
+	infoStr := ""
+
+	d.QueryRow(`SELECT rowid, state, mediaID, mediaType, files, infos FROM tinfo WHERE infohash = ?`, infoHash).Scan(&rowid, &item.State, &item.ID, &item.Type, &fileStr, &infoStr)
+	if rowid == 0 {
+		return nil
+	}
+
+	item.Files = strings.Split(fileStr, "|")
+	infos := strings.Split(infoStr, "|")
+	if len(infos) >= 3 {
+		item.ShowID, _ = strconv.Atoi(infos[0])
+		item.Season, _ = strconv.Atoi(infos[1])
+		item.Episode, _ = strconv.Atoi(infos[2])
+	}
+	return item
+}
+
+// UpdateStatusBTItem ...
+func (d *SqliteDatabase) UpdateStatusBTItem(infoHash string, status int) error {
+	_, err := d.Exec(`UPDATE tinfo SET state = ? WHERE infohash = ?`, status, infoHash)
+	return err
+}
+
+// UpdateBTItem ...
+func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []*gotorrent.File, infos ...int) error {
+	fileStr := ""
+	for _, f := range files {
+		if f != nil {
+			if len(fileStr) > 0 {
+				fileStr += "|"
+			}
+
+			fileStr += f.Path()
+		}
+	}
+	infoStr := ""
+	for _, f := range infos {
+		if len(infoStr) > 0 {
+			infoStr += "|"
+		}
+		infoStr += strconv.Itoa(f)
+	}
+
+	_, err := d.Exec(`INSERT OR REPLACE INTO tinfo (infohash, state, mediaID, mediaType, files, infos) VALUES (?, ?, ?, ?, ?, ?)`, infoHash, StatusActive, mediaID, mediaType, fileStr, infoStr)
+	if err != nil {
+		log.Debugf("UpdateBTItem failed: %s", err)
+	}
+	return err
+}
+
+// DeleteBTItem ...
+func (d *SqliteDatabase) DeleteBTItem(infoHash string) error {
+	_, err := d.Exec(`DELETE FROM tinfo WHERE infohash = ?`, infoHash)
+	return err
 }

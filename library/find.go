@@ -2,82 +2,11 @@ package library
 
 import (
 	"errors"
-
-	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/tmdb"
-	"github.com/elgatito/elementum/xbmc"
 )
 
 //
 // Library searchers
 //
-
-// FindByIDEpisodeInLibrary ...
-func FindByIDEpisodeInLibrary(showID int, seasonNumber int, episodeNumber int) *xbmc.VideoLibraryEpisodeItem {
-	show := tmdb.GetShow(showID, config.Get().Language)
-	if show == nil {
-		return nil
-	}
-
-	episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
-	if episode != nil {
-		return FindEpisodeInLibrary(show, episode)
-	}
-
-	return nil
-}
-
-// FindByIDMovieInLibrary ...
-func FindByIDMovieInLibrary(id string) *xbmc.VideoLibraryMovieItem {
-	movie := tmdb.GetMovieByID(id, config.Get().Language)
-	if movie != nil {
-		return FindMovieInLibrary(movie)
-	}
-
-	return nil
-}
-
-// FindMovieInLibrary ...
-func FindMovieInLibrary(movie *tmdb.Movie) *xbmc.VideoLibraryMovieItem {
-	if movie.ID == 0 || len(l.Movies) == 0 {
-		return nil
-	}
-
-	l.mu.Movies.RLock()
-	defer l.mu.Movies.RUnlock()
-
-	for _, existingMovie := range l.Movies {
-		if existingMovie.UIDs.TMDB == movie.ID {
-			return existingMovie.Xbmc
-		}
-	}
-
-	return nil
-}
-
-// FindEpisodeInLibrary ...
-func FindEpisodeInLibrary(show *tmdb.Show, episode *tmdb.Episode) *xbmc.VideoLibraryEpisodeItem {
-	if episode == nil || show == nil {
-		return nil
-	}
-
-	l.mu.Shows.RLock()
-	defer l.mu.Shows.RUnlock()
-
-	for _, existingShow := range l.Shows {
-		if existingShow.UIDs.TMDB != show.ID {
-			continue
-		}
-
-		for _, existingEpisode := range existingShow.Episodes {
-			if existingEpisode.Season == episode.SeasonNumber && existingEpisode.Episode == episode.EpisodeNumber {
-				return existingEpisode.Xbmc
-			}
-		}
-	}
-
-	return nil
-}
 
 // GetLibraryMovie finds Movie from library
 func GetLibraryMovie(kodiID int) *Movie {

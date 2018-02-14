@@ -230,8 +230,8 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Infof("Chosen file: %s", btp.fileName)
 	btp.log.Infof("Saving torrent to database")
 
-	btp.s.UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, []*gotorrent.File{btp.chosenFile, btp.subtitlesFile}, btp.p.ShowID, btp.p.Season, btp.p.Episode)
-	btp.Torrent.DBItem = btp.s.GetBTItem(infoHash)
+	database.Get().UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, []*gotorrent.File{btp.chosenFile, btp.subtitlesFile}, btp.p.ShowID, btp.p.Season, btp.p.Episode)
+	btp.Torrent.DBItem = database.Get().GetBTItem(infoHash)
 
 	btp.log.Info("Setting file priorities")
 	if btp.chosenFile != nil {

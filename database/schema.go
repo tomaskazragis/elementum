@@ -53,7 +53,30 @@ CREATE TABLE IF NOT EXISTS tinfo (
 );
 CREATE INDEX IF NOT EXISTS tinfo_idx ON tinfo (infohash);
 
+-- Table stores library-related items
+CREATE TABLE IF NOT EXISTS library_items (
+  tmdbId INTEGER NOT NULL UNIQUE,
+  state INT NOT NULL DEFAULT 0,
+  mediaType INTEGER NOT NULL DEFAULT 0,
+  showId INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS library_items_idx1 ON library_items (tmdbId);
+CREATE INDEX IF NOT EXISTS library_items_idx2 ON library_items (showId);
+CREATE INDEX IF NOT EXISTS library_items_idx3 ON library_items (tmdbId, mediaType, state);
+CREATE INDEX IF NOT EXISTS library_items_idx4 ON library_items (mediaType, state);
 
+-- Table stores resolved UIDs
+CREATE TABLE IF NOT EXISTS library_uids (
+  mediaType INTEGER NOT NULL DEFAULT 0,
+  kodi INTEGER NOT NULL DEFAULT 0,
+  tmdb INTEGER NOT NULL DEFAULT 0,
+  tvdb INTEGER NOT NULL DEFAULT 0,
+  trakt INTEGER NOT NULL DEFAULT 0,
+  imdb TEXT NOT NULL DEFAULT "",
+  playcount INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS library_uids_idx1 ON library_uids (mediaType, kodi);
+CREATE INDEX IF NOT EXISTS library_uids_idx2 ON library_uids (mediaType, tmdb);
 
 `
 

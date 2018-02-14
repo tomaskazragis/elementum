@@ -82,6 +82,7 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 	list := []interface{}{
 		"imdbnumber",
 		"episode",
+		"playcount",
 	}
 	if KodiVersion > 16 {
 		list = append(list, "uniqueid", "year")

@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
@@ -15,7 +14,6 @@ import (
 )
 
 var searchLog = logging.MustGetLogger("search")
-var historyMaxSize = 50
 
 // Search ...
 func Search(btService *bittorrent.BTService) gin.HandlerFunc {
@@ -110,19 +108,7 @@ func searchHistoryEmpty(historyType string) bool {
 }
 
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
-	rowid := 0
-	database.Get().QueryRow(`SELECT rowid FROM history_queries WHERE type = ? AND query = ?`, historyType, query).Scan(&rowid)
-
-	if rowid > 0 {
-		database.Get().Exec(`UPDATE history_queries SET dt = ?`, time.Now().Unix())
-		return
-	}
-
-	if _, err := database.Get().Exec(`INSERT INTO history_queries (type, query, dt) VALUES(?, ?, ?)`, historyType, query, time.Now().Unix()); err != nil {
-		return
-	}
-
-	database.Get().Exec(`DELETE FROM history_queries WHERE type = ? AND rowid NOT IN (SELECT rowid FROM history_queries WHERE type = ? ORDER BY dt DESC LIMIT ?)`, historyType, historyType, historyMaxSize)
+	database.Get().AddSearchHistory(historyType, query)
 
 	xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
 	ctx.String(200, "")
@@ -142,6 +128,7 @@ func searchHistoryList(ctx *gin.Context, historyType string) {
 		rows.Scan(&query)
 		historyList = append(historyList, query)
 	}
+	rows.Close()
 
 	urlPrefix := ""
 	if len(historyType) > 0 {

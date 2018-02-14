@@ -169,6 +169,7 @@ type VideoLibraryShowItem struct {
 	ID         int       `json:"tvshowid"`
 	Title      string    `json:"label"`
 	IMDBNumber string    `json:"imdbnumber"`
+	PlayCount  int       `json:"playcount"`
 	Year       int       `json:"year"`
 	Episodes   int       `json:"episode"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`

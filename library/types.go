@@ -37,29 +37,29 @@ type UniqueIDs struct {
 	TVDB      int    `json:"tvdb"`
 	IMDB      string `json:"imdb"`
 	Trakt     int    `json:"trakt"`
-	Watched   bool   `json:"watched"`
+	Playcount int    `json:"playcount"`
 }
 
 // Movie represents Movie content type
 type Movie struct {
-	ID      int
-	Title   string
-	Watched bool
-	File    string
-	UIDs    *UniqueIDs
-	Resume  *Resume
-	Xbmc    *xbmc.VideoLibraryMovieItem
+	ID       int
+	Title    string
+	File     string
+	Year     int
+	UIDs     *UniqueIDs
+	XbmcUIDs *xbmc.UniqueIDs
+	Resume   *Resume
 }
 
 // Show represents Show content type
 type Show struct {
 	ID       int
 	Title    string
-	Watched  bool
+	Year     int
 	Seasons  map[int]*Season
 	Episodes map[int]*Episode
 	UIDs     *UniqueIDs
-	Xbmc     *xbmc.VideoLibraryShowItem
+	XbmcUIDs *xbmc.UniqueIDs
 }
 
 // Season represents Season content type
@@ -68,21 +68,20 @@ type Season struct {
 	Title    string
 	Season   int
 	Episodes int
-	Watched  bool
 	UIDs     *UniqueIDs
-	Xbmc     *xbmc.VideoLibrarySeasonItem
+	XbmcUIDs *xbmc.UniqueIDs
 }
 
 // Episode represents Episode content type
 type Episode struct {
-	ID      int
-	Title   string
-	Season  int
-	Episode int
-	Watched bool
-	UIDs    *UniqueIDs
-	Resume  *Resume
-	Xbmc    *xbmc.VideoLibraryEpisodeItem
+	ID       int
+	Title    string
+	Season   int
+	Episode  int
+	File     string
+	UIDs     *UniqueIDs
+	XbmcUIDs *xbmc.UniqueIDs
+	Resume   *Resume
 }
 
 // Resume shows watched progress information
@@ -93,16 +92,16 @@ type Resume struct {
 
 // DBItem ...
 type DBItem struct {
-	ID       string `json:"id"`
-	Type     int    `json:"type"`
-	TVShowID int    `json:"showid"`
+	ID       int `json:"id"`
+	State    int `json:"state"`
+	Type     int `json:"type"`
+	TVShowID int `json:"showid"`
 }
 
 type removedEpisode struct {
-	ID        int
-	ShowID    int
-	ScraperID string
-	ShowName  string
-	Season    int
-	Episode   int
+	ID       int
+	ShowID   int
+	ShowName string
+	Season   int
+	Episode  int
 }

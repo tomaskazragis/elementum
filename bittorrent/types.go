@@ -1,9 +1,5 @@
 package bittorrent
 
-import (
-	"github.com/elgatito/elementum/database"
-)
-
 const (
 	movieType   = "movie"
 	showType    = "show"
@@ -63,8 +59,3 @@ var DefaultTrackers = []string{
 	"udp://public.popcorn-tracker.org:6969/announce",
 	"udp://explodie.org:6969",
 }
-
-var (
-	// Bucket that represents bittorrent database
-	Bucket = database.BitTorrentBucket
-)

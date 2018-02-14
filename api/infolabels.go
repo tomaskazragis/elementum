@@ -118,9 +118,11 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := episode.ToListItem(show)
 		item.Info.Duration = 0
-		if libraryItem := library.FindEpisodeInLibrary(show, episode); libraryItem != nil {
-			log.Debugf("Found episode in library: %+v", libraryItem)
-			item.Info.DBID = libraryItem.ID
+		if ls, err := library.GetShowByTMDB(show.ID); ls != nil && err == nil {
+			log.Debugf("Found show in library: %+v", ls)
+			if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
+				item.Info.DBID = le.UIDs.Kodi
+			}
 		}
 		if item.Art.FanArt == "" {
 			fanarts := make([]string, 0)
@@ -152,9 +154,9 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := movie.ToListItem()
 		item.Info.Duration = 0
-		if libraryItem := library.FindMovieInLibrary(movie); libraryItem != nil {
-			log.Debugf("Found movie in library: %+v", libraryItem)
-			item.Info.DBID = libraryItem.ID
+		if lm, err := library.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
+			log.Debugf("Found movie in library: %+v", lm)
+			item.Info.DBID = lm.UIDs.Kodi
 		}
 
 		saveEncoded(encodeItem(item))

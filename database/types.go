@@ -63,3 +63,14 @@ var (
 
 	once sync.Once
 )
+
+const (
+	// StatusRemove ...
+	StatusRemove = iota
+	// StatusActive ...
+	StatusActive
+)
+
+const (
+	historyMaxSize = 50
+)

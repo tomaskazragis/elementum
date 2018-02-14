@@ -116,17 +116,17 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 		}
 
 		if started.Item.Type == movieType {
-			movie := library.GetMovie(started.Item.ID)
-			if movie == nil {
+			r := library.GetMovieResume(started.Item.ID)
+			if r == nil {
 				return
 			}
-			position = movie.Resume.Position
+			position = r.Position
 		} else {
-			episode := library.GetEpisode(started.Item.ID)
-			if episode == nil {
+			r := library.GetEpisodeResume(started.Item.ID)
+			if r == nil {
 				return
 			}
-			position = episode.Resume.Position
+			position = r.Position
 		}
 		if position > 0 {
 			xbmc.PlayerSeek(position)
@@ -154,44 +154,6 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 
 		log.Infof("Stopped at %f%%", progress)
 
-		// General Watched state management moved to Player
-		// because we always play with it, non-plugin plays should be on Kodi's
-		// side
-		// if stopped.Ended && progress > 90 {
-		// 	var watched *trakt.WatchedItem
-		// 	if stopped.Item.Type == movieType {
-		// 		xbmc.SetMovieWatched(stopped.Item.ID, 1, 0, 0)
-		// 		watched = &trakt.WatchedItem{
-		// 			MediaType: stopped.Item.Type,
-		// 			Movie:     p.Params().TMDBId,
-		// 			Watched:   true,
-		// 		}
-		// 	} else {
-		// 		xbmc.SetEpisodeWatched(stopped.Item.ID, 1, 0, 0)
-		// 		watched = &trakt.WatchedItem{
-		// 			MediaType: stopped.Item.Type,
-		// 			Show:      p.Params().ShowID,
-		// 			Season:    p.Params().Season,
-		// 			Episode:   p.Params().Episode,
-		// 			Watched:   true,
-		// 		}
-		// 	}
-		//
-		// 	if config.Get().TraktToken != "" && watched != nil {
-		// 		log.Debugf("Settings Trakt watched: %#v", watched)
-		// 		go trakt.SetWatched(watched)
-		// 	}
-		// } else if p.Params().WatchedTime > 180 {
-		// 	if stopped.Item.Type == movieType {
-		// 		xbmc.SetMovieWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
-		// 	} else {
-		// 		xbmc.SetEpisodeWatched(stopped.Item.ID, 0, int(p.Params().WatchedTime), int(p.Params().VideoDuration))
-		// 	}
-		// } else {
-		// 	time.Sleep(200 * time.Millisecond)
-		// 	xbmc.Refresh()
-		// }
-
 	case "VideoLibrary.OnUpdate":
 		if library.Scanning {
 			return
@@ -209,69 +171,15 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 		if err := json.Unmarshal(jsonData, &request); err != nil {
 			log.Error(err)
 			return
-			// } else if request.Playcount == -1 {
-			// 	return
 		}
 
 		if request.Item.Type == movieType {
-			library.RefreshMovies()
-		} else {
-			library.RefreshShows()
+			library.RefreshMovie(request.Item.ID, library.ActionUpdate)
+		} else if request.Item.Type == showType {
+			library.RefreshShow(request.Item.ID, library.ActionUpdate)
+		} else if request.Item.Type == episodeType {
+			library.RefreshEpisode(request.Item.ID, library.ActionUpdate)
 		}
-		xbmc.Refresh()
-		// TODO: don't know do we need this to set since we can sync it later?
-		// if config.Get().TraktToken != "" && !library.TraktScanning {
-		// 	var watched *trakt.WatchedItem
-		// 	if request.Item.Type == movieType {
-		// 		movie := library.GetLibraryMovie(request.Item.ID)
-		// 		if movie != nil {
-		// 			watched = &trakt.WatchedItem{
-		// 				MediaType: request.Item.Type,
-		// 				Movie:     movie.UIDs.TMDB,
-		// 			}
-		// 		}
-		// 	} else if request.Item.Type == showType {
-		// 		show := library.GetLibraryShow(request.Item.ID)
-		// 		if show != nil {
-		// 			watched = &trakt.WatchedItem{
-		// 				MediaType: request.Item.Type,
-		// 				Show:      show.UIDs.TMDB,
-		// 			}
-		// 		}
-		// 	} else if request.Item.Type == seasonType {
-		// 		show, season := library.GetLibrarySeason(request.Item.ID)
-		// 		if show != nil && season != nil {
-		// 			watched = &trakt.WatchedItem{
-		// 				MediaType: request.Item.Type,
-		// 				Show:      show.UIDs.TMDB,
-		// 				Season:    season.Season,
-		// 			}
-		// 		}
-		// 	} else if request.Item.Type == episodeType {
-		// 		show, episode := library.GetLibraryEpisode(request.Item.ID)
-		// 		if show != nil && episode != nil {
-		// 			watched = &trakt.WatchedItem{
-		// 				MediaType: request.Item.Type,
-		// 				Show:      show.UIDs.TMDB,
-		// 				Season:    episode.Season,
-		// 				Episode:   episode.Episode,
-		// 			}
-		// 		}
-		// 	}
-		//
-		// 	if watched != nil {
-		// 		watched.Watched = request.Playcount > 0
-		// 		log.Debugf("Updating Trakt after onUpdate: %#v", watched)
-		// 		go trakt.SetWatched(watched)
-		// 	}
-		// }
-
-		// if request.Item.ID == 0 || library.TraktScanning || library.Scanning {
-		// 	return
-		// }
-		//
-		// library.Refresh()
-		// xbmc.Refresh()
 
 	case "VideoLibrary.OnRemove":
 		var item struct {
@@ -283,36 +191,18 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			return
 		}
 
-		uids := library.GetUIDsFromKodi(item.ID)
-		if uids == nil || uids.TMDB == 0 {
-			return
+		if item.Type == movieType {
+			library.RefreshMovie(item.ID, library.ActionDelete)
+		} else if item.Type == showType {
+			library.RefreshShow(item.ID, library.ActionDelete)
+		} else if item.Type == episodeType {
+			library.RefreshEpisode(item.ID, library.ActionDelete)
 		}
-
-		switch item.Type {
-		case episodeType:
-			show, episode := library.GetShowForEpisode(item.ID)
-			if show != nil && episode != nil {
-				if err := library.RemoveEpisode(uids.TMDB, show.UIDs.TMDB, strconv.Itoa(show.UIDs.TMDB), episode.Season, episode.Episode); err != nil {
-					log.Warning(err)
-				}
-			}
-		case movieType:
-			if _, err := library.RemoveMovie(uids.TMDB); err != nil {
-				log.Warning("Nothing left to remove from Elementum")
-			}
-		}
-
-		library.Refresh()
 
 	case "VideoLibrary.OnScanFinished":
-		// library.Scanning = false
-		fallthrough
+		go library.RefreshOnScan()
 
 	case "VideoLibrary.OnCleanFinished":
-		go func() {
-			library.ClearResolveCache()
-			library.Refresh()
-			library.ClearPageCache()
-		}()
+		go library.RefreshOnClean()
 	}
 }
