@@ -116,7 +116,7 @@ func GetAddonsXMLChecksum(ctx *gin.Context) {
 	addons, err := getAddons(user, repository)
 	if len(addons.Addons) > 0 {
 		for _, a := range addons.Addons {
-			log.Infof("Last available release of %s: v%s", a.Name, a.Version)
+			log.Infof("Last available release of %s: v%s", a.ID, a.Version)
 		}
 	}
 	if err != nil {
