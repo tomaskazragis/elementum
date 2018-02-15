@@ -481,7 +481,7 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 
 	if movie.Trailers != nil {
 		for _, trailer := range movie.Trailers.Youtube {
-			item.Info.Trailer = trailer.Source
+			item.Info.Trailer = util.TrailerURL(trailer.Source)
 			break
 		}
 	}
@@ -490,7 +490,7 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 		enMovie := GetMovie(movie.ID, "en")
 		if enMovie != nil && enMovie.Trailers != nil {
 			for _, trailer := range enMovie.Trailers.Youtube {
-				item.Info.Trailer = trailer.Source
+				item.Info.Trailer = util.TrailerURL(trailer.Source)
 				break
 			}
 		}

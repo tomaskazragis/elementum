@@ -12,6 +12,7 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
 )
@@ -581,7 +582,7 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			MPAA:          show.Certification,
 			Code:          show.IDs.IMDB,
 			IMDBNumber:    show.IDs.IMDB,
-			Trailer:       show.Trailer,
+			Trailer:       util.TrailerURL(show.Trailer),
 			PlayCount:     playcount.GetWatchedShowByTMDB(show.IDs.TMDB).Int(),
 			DBTYPE:        "tvshow",
 			Mediatype:     "tvshow",

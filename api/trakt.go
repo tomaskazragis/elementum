@@ -13,6 +13,7 @@ import (
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
 )
@@ -407,6 +408,9 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 			if item == nil {
 				item = movieListing.Movie.ToListItem()
 			}
+			if len(item.Info.Trailer) == 0 {
+				item.Info.Trailer = util.TrailerURL(movieListing.Movie.Trailer)
+			}
 
 			thisURL := URLForXBMC("/movie/%d/", movieListing.Movie.IDs.TMDB) + "%s"
 
@@ -627,6 +631,9 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		}
 		if item == nil {
 			item = showListing.Show.ToListItem()
+		}
+		if len(item.Info.Trailer) == 0 {
+			item.Info.Trailer = util.TrailerURL(showListing.Show.Trailer)
 		}
 
 		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
@@ -892,6 +899,9 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 			title = movieListing.Movie.Title
 			item = movieListing.Movie.ToListItem()
 		}
+		if len(item.Info.Trailer) == 0 {
+			item.Info.Trailer = util.TrailerURL(movieListing.Movie.Trailer)
+		}
 
 		label := fmt.Sprintf("%s - %s", movieListing.Released, title)
 		item.Label = label
@@ -990,6 +1000,9 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 		if item == nil {
 			title = showListing.Show.Title
 			item = showListing.Show.ToListItem()
+		}
+		if len(item.Info.Trailer) == 0 {
+			item.Info.Trailer = util.TrailerURL(showListing.Show.Trailer)
 		}
 
 		episode := showListing.Episode

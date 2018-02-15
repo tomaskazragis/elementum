@@ -233,8 +233,6 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	r.GET("/setviewmode/:content_type", SetViewMode)
 
-	r.GET("/youtube/:id", PlayYoutubeVideo)
-
 	r.GET("/subtitles", SubtitlesIndex)
 	r.GET("/subtitle/:id", SubtitleGet)
 

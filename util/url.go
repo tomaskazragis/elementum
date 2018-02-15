@@ -1,28 +1,21 @@
 package util
 
-// import (
-// 	"net/http"
-// 	"net/url"
+import (
+	"fmt"
+	"strings"
+)
 
-// 	"github.com/elgatito/elementum/providers"
-// )
+// TrailerURL returns trailer url, constructed for Kodi
+func TrailerURL(u string) (ret string) {
+	if len(u) == 0 {
+		return
+	}
 
-// func MakeProviderURL(p providers.TorrentProvider, path string) string {
-// 	return MakeProviderURLWithQuery(p, path, nil)
-// }
+	if strings.Contains(u, "?v=") {
+		ret = fmt.Sprintf("plugin://plugin.video.youtube/play/?video_id=%s", strings.Split(u, "?v=")[1])
+	} else {
+		ret = fmt.Sprintf("plugin://plugin.video.youtube/play/?video_id=%s", u)
+	}
 
-// func MakeProviderURLWithQuery(p providers.TorrentProvider, path string, query map[string]string) string {
-// 	urlObj, _ := url.Parse(p.URL())
-// 	pathObj, _ := url.Parse(path)
-// 	urlObj = urlObj.ResolveReference(pathObj)
-// 	v := url.Values{}
-// 	for key, value := range query {
-// 		v.Set(key, value)
-// 	}
-// 	urlObj.RawQuery = v.Encode()
-// 	return urlObj.String()
-// }
-
-// func httpGet(url string) (resp *http.Response, err error) {
-// 	return http.Get(url)
-// }
+	return
+}
