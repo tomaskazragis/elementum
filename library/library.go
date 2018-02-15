@@ -505,7 +505,7 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 		}
 	}
 
-	now := time.Now().UTC()
+	now := util.UTCBod()
 	addSpecials := config.Get().AddSpecials
 
 	for i, season := range show.Seasons {

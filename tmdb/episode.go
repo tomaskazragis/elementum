@@ -67,7 +67,7 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 		fanarts = append(fanarts, ImageURL(backdrop.FilePath, "w1280"))
 	}
 
-	now := time.Now().UTC()
+	now := util.UTCBod()
 	for _, episode := range episodes {
 		if config.Get().ShowUnairedEpisodes == false {
 			if episode.AirDate == "" {

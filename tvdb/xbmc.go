@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -23,7 +24,8 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 			fanarts = append(fanarts, imageURL(banner.BannerPath))
 		}
 	}
-	now := time.Now().UTC()
+
+	now := util.UTCBod()
 	for _, season := range seasons {
 		if len(season.Episodes) == 0 {
 			continue
@@ -55,7 +57,8 @@ func (episodes EpisodeList) ToListItems(show *Show) []*xbmc.ListItem {
 			fanarts = append(fanarts, imageURL(banner.BannerPath))
 		}
 	}
-	now := time.Now().UTC()
+
+	now := util.UTCBod()
 	for _, episode := range episodes {
 		if episode.FirstAired == "" {
 			continue

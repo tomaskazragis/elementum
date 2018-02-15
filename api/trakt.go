@@ -1079,6 +1079,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 	}
 
 	items := make(xbmc.ListItems, 0, len(shows)+hasNextPage)
+	now := util.UTCBod()
 
 	for _, showListing := range shows {
 		if showListing == nil {
@@ -1097,7 +1098,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			continue
 		}
 		aired, errDate := time.Parse("2006-01-02", episode.AirDate)
-		if !config.Get().ShowUnairedEpisodes && errDate != nil && aired.After(time.Now()) {
+		if !config.Get().ShowUnairedEpisodes && errDate != nil && aired.After(now) {
 			continue
 		}
 

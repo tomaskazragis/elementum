@@ -92,7 +92,7 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 		fanarts = append(fanarts, ImageURL(backdrop.FilePath, "w1280"))
 	}
 
-	now := time.Now().UTC()
+	now := util.UTCBod()
 	for _, season := range seasons {
 		if season.EpisodeCount == 0 {
 			continue
