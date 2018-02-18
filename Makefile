@@ -70,9 +70,9 @@ ifeq ($(TARGET_OS),windows-6.0)
 	$(eval GO_EXTRALDFLAGS = -static -static-libgcc -static-libstdc++)
 endif
 ifndef XGO_LOCAL
-	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GO_PKG)
+	xgo -go 1.10 -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GO_PKG)
 else
-	xgo -go 1.9.2 -image=elgatito/xgo-1.9.2 -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GOPATH)/src/$(GO_PKG)
+	xgo -go 1.10 -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GOPATH)/src/$(GO_PKG)
 endif
 	./move-binaries.sh
 
