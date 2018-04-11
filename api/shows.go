@@ -481,6 +481,95 @@ func ShowSeasonLinks(btService *bittorrent.BTService, fromLibrary bool) gin.Hand
 	}
 }
 
+// ShowSeasonPlay ...
+func ShowSeasonPlay(btService *bittorrent.BTService, fromLibrary bool) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+
+		showID, _ := strconv.Atoi(ctx.Params.ByName("showId"))
+		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
+		external := ctx.Query("external")
+		library := ""
+		if fromLibrary {
+			library = "1"
+		}
+
+		show := tmdb.GetShow(showID, "")
+		if show == nil {
+			ctx.Error(errors.New("Unable to find show"))
+			return
+		}
+
+		season := tmdb.GetSeason(showID, seasonNumber, "")
+		if season == nil {
+			ctx.Error(errors.New("Unable to find season"))
+			return
+		}
+
+		existingTorrent := btService.HasTorrentBySeason(showID, seasonNumber)
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", "LOCALIZE[30270]")) {
+			rURL := URLQuery(
+				URLForXBMC("/play"),
+				"resume", existingTorrent,
+				"tmdb", strconv.Itoa(season.ID),
+				"library", library,
+				"type", "episode")
+			if external != "" {
+				xbmc.PlayURL(rURL)
+			} else {
+				ctx.Redirect(302, rURL)
+			}
+			return
+		}
+
+		if torrent := InTorrentsMap(strconv.Itoa(season.ID)); torrent != nil {
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", torrent.URI,
+				"tmdb", strconv.Itoa(season.ID),
+				"library", library,
+				"type", "episode")
+			if external != "" {
+				xbmc.PlayURL(rURL)
+			} else {
+				ctx.Redirect(302, rURL)
+			}
+			return
+		}
+
+		torrents, err := showSeasonLinks(showID, seasonNumber)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		if len(torrents) == 0 {
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
+			return
+		}
+
+		if len(torrents) == 0 {
+			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
+			return
+		}
+
+		AddToTorrentsMap(strconv.Itoa(season.ID), torrents[0])
+
+		rURL := URLQuery(
+			URLForXBMC("/play"), "uri", torrents[0].URI,
+			"tmdb", strconv.Itoa(season.ID),
+			"show", strconv.Itoa(showID),
+			"season", ctx.Params.ByName("season"),
+			"episode", ctx.Params.ByName("episode"),
+			"library", library,
+			"type", "episode")
+		if external != "" {
+			xbmc.PlayURL(rURL)
+		} else {
+			ctx.Redirect(302, rURL)
+		}
+	}
+}
+
 func showEpisodeLinks(showID int, seasonNumber int, episodeNumber int) ([]*bittorrent.TorrentFile, error) {
 	log.Info("Searching links for TMDB Id:", showID)
 

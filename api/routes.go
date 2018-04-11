@@ -158,6 +158,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	{
 		show.GET("/:showId/seasons", ShowSeasons)
 		show.GET("/:showId/season/:season/links", ShowSeasonLinks(btService, false))
+		show.GET("/:showId/season/:season/play", ShowSeasonPlay(btService, false))
 		show.GET("/:showId/season/:season/episodes", ShowEpisodes)
 		show.GET("/:showId/season/:season/episode/:episode/infolabels", InfoLabelsEpisode(btService))
 		show.GET("/:showId/season/:season/episode/:episode/play", ShowEpisodePlaySelector("play", btService, false))
