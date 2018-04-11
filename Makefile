@@ -2,6 +2,7 @@ PROJECT = elgatito
 NAME = elementum
 GO_PKG = github.com/elgatito/elementum
 XGO_LOCAL =
+XGO_VERSION = 1.10.1
 GO = go
 GIT = git
 GIT_VERSION = $(shell $(GIT) describe --tags)
@@ -70,9 +71,9 @@ ifeq ($(TARGET_OS),windows-6.0)
 	$(eval GO_EXTRALDFLAGS = -static -static-libgcc -static-libstdc++)
 endif
 ifndef XGO_LOCAL
-	xgo -go 1.10 -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GO_PKG)
+	xgo -go $(XGO_VERSION) -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GO_PKG)
 else
-	xgo -go 1.10 -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GOPATH)/src/$(GO_PKG)
+	xgo -go $(XGO_VERSION) -image=elgatito/xgo-latest -targets=$(TARGET_OS)/$(TARGET_ARCH) -dest $(BUILD_PATH) -ldflags='$(GO_LDFLAGS) -extldflags "$(GO_EXTRALDFLAGS)"' $(GOPATH)/src/$(GO_PKG)
 endif
 	./move-binaries.sh
 
@@ -91,5 +92,5 @@ binaries:
 	cd binaries && git add * && git commit -m "Update to ${GIT_VERSION}"
 
 pull:
-	docker pull karalabe/xgo-latest
-	docker pull karalabe/xgo-1.8.3
+	docker pull elgatito/xgo-latest
+	docker pull elgatito/xgo-1.10.1
