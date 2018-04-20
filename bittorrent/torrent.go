@@ -116,7 +116,7 @@ func (t *Torrent) Storage() estorage.ElementumStorage {
 
 // Watch ...
 func (t *Torrent) Watch() {
-	// log.Debugf("Starting watch timers")
+	log.Debug("Starting watch events")
 	// debug.PrintStack()
 
 	t.progressTicker = time.NewTicker(1 * time.Second)
@@ -227,8 +227,8 @@ func (t *Torrent) progressEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 
 	stats := t.Torrent.Stats()
-	curDownloaded := stats.BytesRead
-	curUploaded := stats.BytesWritten
+	curDownloaded := stats.BytesReadData
+	curUploaded := stats.BytesWrittenData
 
 	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
 	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize

@@ -151,6 +151,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 			defer wg.Done()
 			if err := torrent.Resolve(); err != nil {
 				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
+				return
 			}
 			if !strings.HasPrefix(torrent.URI, "magnet") {
 				progress++
