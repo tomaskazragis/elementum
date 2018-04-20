@@ -183,12 +183,13 @@ func UpdateLibrary(ctx *gin.Context) {
 // UpdateTrakt ...
 func UpdateTrakt(ctx *gin.Context) {
 	xbmc.Notify("Elementum", "LOCALIZE[30358]", config.AddonIcon())
-	if err := library.RefreshTrakt(); err != nil {
-		ctx.String(200, err.Error())
-	}
-	if xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
-		xbmc.VideoLibraryScan()
-	}
+	ctx.String(200, "LOCALIZE[30358]")
+	go func() {
+		library.RefreshTrakt()
+		if xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+			xbmc.VideoLibraryScan()
+		}
+	}()
 }
 
 // PlayMovie ...
