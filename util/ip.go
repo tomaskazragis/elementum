@@ -50,7 +50,7 @@ func GetHTTPHost() string {
 
 // GetListenAddr parsing configuration setted for interfaces and port range
 // and returning "ip:port" string
-func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (listenAddr string) {
+func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (listenHost string, listenPort int) {
 	listenIPs := []string{}
 	if strings.TrimSpace(confInterfaces) != "" {
 	loopAddrs:
@@ -80,7 +80,7 @@ func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (lis
 		}
 	}
 	if len(listenIPs) == 0 {
-		listenIPs = append(listenIPs, "0.0.0.0")
+		listenIPs = append(listenIPs, "")
 	}
 
 loopPorts:
@@ -88,7 +88,8 @@ loopPorts:
 		for _, ip := range listenIPs {
 			addr := ip + ":" + strconv.Itoa(p)
 			if !testPortUsed("tcp", addr) && !testPortUsed("udp", ":::"+strconv.Itoa(p)) {
-				listenAddr = addr
+				listenHost = ip
+				listenPort = p
 				break loopPorts
 			}
 		}
@@ -103,8 +104,9 @@ loopPorts:
 	}
 
 	// this will allocate any free port, we don't need to find ourselves
-	if listenAddr == "" {
-		listenAddr = "0.0.0.0:0"
+	if listenHost == "" {
+		listenHost = ""
+		listenPort = 0
 	}
 
 	return

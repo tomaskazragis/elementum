@@ -67,7 +67,8 @@ type BTService struct {
 
 	UserAgent  string
 	PeerID     string
-	ListenAddr string
+	ListenHost string
+	ListenPort int
 
 	dialogProgressBG *xbmc.DialogProgressBG
 
@@ -170,10 +171,12 @@ func (s *BTService) configure() {
 	}
 
 	if s.config.ListenAutoDetect {
-		s.ListenAddr = "0.0.0.0:0"
+		s.ListenHost = ""
+		s.ListenPort = 0
 	} else {
-		s.ListenAddr = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+		s.ListenHost, s.ListenPort = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
 	}
+	log.Infof("ListenHost: %s, ListenPort: %d", s.ListenHost, s.ListenPort)
 
 	blocklist, _ := iplist.MMapPackedFile(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
 
@@ -214,19 +217,19 @@ func (s *BTService) configure() {
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
-		ListenAddr: s.ListenAddr,
+		ListenHost: func(string) string { return s.ListenHost },
+		ListenPort: s.ListenPort,
 		Debug:      false,
 		// Debug: true,
 
-		DisableTCP: s.config.DisableTCP,
-		DisableUTP: s.config.DisableUTP,
+		DisableIPv6: len(s.config.ListenInterfaces) != 0,
+		DisableTCP:  s.config.DisableTCP,
+		DisableUTP:  s.config.DisableUTP,
 
 		NoDefaultPortForwarding: s.config.DisableUPNP,
 
-		NoDHT: s.config.DisableDHT,
-		DHTConfig: dht.ServerConfig{
-			StartingNodes: dht.GlobalBootstrapAddrs,
-		},
+		NoDHT:            s.config.DisableDHT,
+		DhtStartingNodes: dht.GlobalBootstrapAddrs,
 
 		Seed:     s.config.SeedTimeLimit > 0,
 		NoUpload: s.config.DisableUpload,
@@ -252,6 +255,7 @@ func (s *BTService) configure() {
 
 	var err error
 	log.Debugf("BitClient config: %#v", s.ClientConfig)
+	s.ClientConfig.IPBlocklist = blocklist
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
 		// If client can't be created - we should panic
 		log.Errorf("Error creating bit client: %#v", err)
@@ -260,11 +264,15 @@ func (s *BTService) configure() {
 		xbmc.Notify("Elementum", "LOCALIZE[30354]", config.AddonIcon())
 		os.Exit(1)
 	} else {
-		log.Debugf("Created bit client: %#v", s.Client)
-		log.Debugf("Client listening on: %s", s.Client.ListenAddr().String())
+		log.Infof("Client created successfully")
+		// TODO: can't dump Client because of blocklist array
+		// log.Debugf("Created bit client: %#v", s.Client)
+		for _, addr := range s.Client.ListenAddrs() {
+			log.Debugf("Client listening on: %s", addr.String())
+		}
 
 		// Setting it here to avoid spamming the log file
-		s.Client.SetIPBlockList(blocklist)
+		// s.Client.SetIPBlockList(blocklist)
 	}
 }
 
