@@ -56,6 +56,7 @@ type Torrent struct {
 	mu        *sync.Mutex
 	muBuffer  *sync.RWMutex
 	muSeeding *sync.RWMutex
+	muReaders *sync.Mutex
 
 	downRates      []int64
 	upRates        []int64
@@ -94,6 +95,7 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		mu:        &sync.Mutex{},
 		muBuffer:  &sync.RWMutex{},
 		muSeeding: &sync.RWMutex{},
+		muReaders: &sync.Mutex{},
 
 		closing: make(chan struct{}),
 

@@ -35,6 +35,9 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 	log.Debugf("NewReader: %#v", fr.id)
 
 	if rmethod == "GET" {
+		t.muReaders.Lock()
+		defer t.muReaders.Unlock()
+
 		t.readers[fr.id] = fr
 		log.Debugf("Active readers: %#v", len(t.readers))
 
@@ -53,6 +56,9 @@ func (fr *FileReader) Close() error {
 
 	fr.Torrent.mu.Lock()
 	defer fr.Torrent.mu.Unlock()
+
+	fr.Torrent.muReaders.Lock()
+	defer fr.Torrent.muReaders.Unlock()
 
 	delete(fr.Torrent.readers, fr.id)
 	log.Debugf("Active readers: %#v", len(fr.Torrent.readers))
