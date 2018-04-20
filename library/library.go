@@ -913,6 +913,7 @@ func URLQuery(route string, query ...string) string {
 // RefreshTrakt starts a trakt sync
 func RefreshTrakt() error {
 	if Scanning {
+		log.Debugf("TraktSync: already in scanning")
 		return nil
 	}
 
@@ -930,7 +931,8 @@ func RefreshTrakt() error {
 
 	log.Debugf("TraktSync: Watched")
 	if changes, err := SyncTraktWatched(); err != nil {
-		return err
+		log.Debugf("TraktSync: Got error from SyncTraktWatched: %#v", err)
+		// return err
 	} else if changes {
 		Refresh()
 		xbmc.Refresh()
@@ -938,21 +940,25 @@ func RefreshTrakt() error {
 	if config.Get().TraktSyncWatchlist {
 		log.Debugf("TraktSync: Movies Watchlist")
 		if err := SyncMoviesList("watchlist", true); err != nil {
-			return err
+			log.Debugf("TraktSync: Got error from SyncMoviesList: %#v", err)
+			// return err
 		}
 		log.Debugf("TraktSync: Shows Watchlist")
 		if err := SyncShowsList("watchlist", true); err != nil {
-			return err
+			log.Debugf("TraktSync: Got error from SyncShowsList: %#v", err)
+			// return err
 		}
 	}
 	if config.Get().TraktSyncCollections {
 		log.Debugf("TraktSync: Movies Collections")
 		if err := SyncMoviesList("collection", true); err != nil {
-			return err
+			log.Debugf("TraktSync: Got error from SyncMoviesList: %#v", err)
+			// return err
 		}
 		log.Debugf("TraktSync: Shows Collections")
 		if err := SyncShowsList("collection", true); err != nil {
-			return err
+			log.Debugf("TraktSync: Got error from SyncShowsList: %#v", err)
+			// return err
 		}
 	}
 

@@ -15,7 +15,7 @@ import (
 
 const (
 	movieType   = "movie"
-	showType    = "show"
+	showType    = "tvshow"
 	seasonType  = "season"
 	episodeType = "episode"
 )

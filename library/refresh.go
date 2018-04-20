@@ -859,7 +859,7 @@ func refreshLocalShows() {
 	getStmt, _ := database.Get().Prepare(`SELECT 1 FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ? LIMIT 1`)
 	setStmt, _ := database.Get().Prepare(`INSERT OR IGNORE INTO library_items (tmdbId, mediaType, state) VALUES (?, ?, ?)`)
 	rid := 0
-	for _, id := range IDs {
+	for id := range IDs {
 		if err := getStmt.QueryRow(id, ShowType, StateActive).Scan(&rid); err != nil && err == sql.ErrNoRows {
 			setStmt.Exec(id, ShowType, StateActive)
 		}
