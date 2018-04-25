@@ -65,10 +65,12 @@ type BTService struct {
 	Players  map[string]*BTPlayer
 	Torrents map[string]*Torrent
 
-	UserAgent  string
-	PeerID     string
-	ListenHost string
-	ListenPort int
+	UserAgent   string
+	PeerID      string
+	ListenIP    string
+	ListenIPv6  string
+	ListenPort  int
+	DisableIPv6 bool
 
 	dialogProgressBG *xbmc.DialogProgressBG
 
@@ -170,13 +172,11 @@ func (s *BTService) configure() {
 		s.PieceCompletion = storage.NewMapPieceCompletion()
 	}
 
-	if s.config.ListenAutoDetect {
-		s.ListenHost = ""
-		s.ListenPort = 0
-	} else {
-		s.ListenHost, s.ListenPort = util.GetListenAddr(s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+	s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6 = util.GetListenAddr(s.config.ListenAutoDetectIP, s.config.ListenAutoDetectPort, s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+	log.Infof("ListenHost=%s, ListenHostv6=%s, ListenPort=%d, DisableIPv6=%v", s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6)
+	if s.ListenIP != "" && s.ListenIPv6 == "" {
+		s.DisableIPv6 = true
 	}
-	log.Infof("ListenHost: %s, ListenPort: %d", s.ListenHost, s.ListenPort)
 
 	blocklist, _ := iplist.MMapPackedFile(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
 
@@ -217,14 +217,15 @@ func (s *BTService) configure() {
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
-		ListenHost: func(string) string { return s.ListenHost },
+		ListenHost: s.GetListenHost,
 		ListenPort: s.ListenPort,
 		Debug:      false,
 		// Debug: true,
 
-		DisableIPv6: len(s.config.ListenInterfaces) != 0,
-		DisableTCP:  s.config.DisableTCP,
-		DisableUTP:  s.config.DisableUTP,
+		DisableIPv6: s.DisableIPv6,
+
+		DisableTCP: s.config.DisableTCP,
+		DisableUTP: s.config.DisableUTP,
 
 		NoDefaultPortForwarding: s.config.DisableUPNP,
 
@@ -268,7 +269,7 @@ func (s *BTService) configure() {
 		// TODO: can't dump Client because of blocklist array
 		// log.Debugf("Created bit client: %#v", s.Client)
 		for _, addr := range s.Client.ListenAddrs() {
-			log.Debugf("Client listening on: %s", addr.String())
+			log.Debugf("Client listening on %s: %s", addr.Network(), addr.String())
 		}
 
 		// Setting it here to avoid spamming the log file
@@ -962,4 +963,11 @@ func (s *BTService) HasTorrentByName(query string) string {
 	}
 
 	return ""
+}
+
+func (s *BTService) GetListenHost(network string) string {
+	if strings.Contains(network, "6") {
+		return s.ListenIPv6
+	}
+	return s.ListenIP
 }

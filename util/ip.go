@@ -49,12 +49,26 @@ func GetHTTPHost() string {
 }
 
 // GetListenAddr parsing configuration setted for interfaces and port range
-// and returning "ip:port" string
-func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (listenHost string, listenPort int) {
+// and returning IP, IPv6, and port
+func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, confPortMin int, confPortMax int) (listenIP, listenIPv6 string, listenPort int, disableIPv6 bool) {
+	if confAutoIP {
+		confInterfaces = ""
+	}
+	if confAutoPort {
+		confPortMin = 0
+		confPortMax = 0
+	}
+
 	listenIPs := []string{}
+	listenIPv6s := []string{}
 	if strings.TrimSpace(confInterfaces) != "" {
-	loopAddrs:
 		for _, iName := range strings.Split(strings.Replace(strings.TrimSpace(confInterfaces), " ", "", -1), ",") {
+			// Check whether value in interfaces string is already an IP value
+			if addr := net.ParseIP(iName); addr != nil {
+				listenIPs = append(listenIPs, addr.To4().String())
+				continue
+			}
+
 			i, err := net.InterfaceByName(iName)
 			// Maybe we need to raise an error that interface not available?
 			if err != nil {
@@ -70,10 +84,15 @@ func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (lis
 					case *net.IPAddr:
 						ip = v.IP
 					}
+
+					v6 := ip.To16()
 					v4 := ip.To4()
+
+					if v6 != nil && v4 == nil {
+						listenIPv6s = append(listenIPv6s, v6.String()+"%"+iName)
+					}
 					if v4 != nil {
 						listenIPs = append(listenIPs, v4.String())
-						break loopAddrs
 					}
 				}
 			}
@@ -82,31 +101,34 @@ func GetListenAddr(confInterfaces string, confPortMin int, confPortMax int) (lis
 	if len(listenIPs) == 0 {
 		listenIPs = append(listenIPs, "")
 	}
+	if len(listenIPv6s) == 0 {
+		listenIPv6s = append(listenIPv6s, "")
+	}
 
 loopPorts:
 	for p := confPortMax; p >= confPortMin; p-- {
 		for _, ip := range listenIPs {
 			addr := ip + ":" + strconv.Itoa(p)
 			if !testPortUsed("tcp", addr) && !testPortUsed("udp", ":::"+strconv.Itoa(p)) {
-				listenHost = ip
+				listenIP = ip
 				listenPort = p
 				break loopPorts
 			}
 		}
-
-		// ln, err := net.Listen("tcp", ":"+strconv.Itoa(p))
-		// if err != nil {
-		// 	continue
-		// }
-		//
-		// ln.Close()
-		// listenPorts = append(listenPorts, strconv.Itoa(p))
 	}
 
-	// this will allocate any free port, we don't need to find ourselves
-	if listenHost == "" {
-		listenHost = ""
-		listenPort = 0
+	if len(listenIPv6s) != 0 {
+		for _, ip := range listenIPv6s {
+			addr := ip + ":" + strconv.Itoa(listenPort)
+			if !testPortUsed("tcp6", addr) {
+				listenIPv6 = ip
+				break
+			}
+		}
+	}
+
+	if (listenIP != "" && listenIPv6 == "") || testPortUsed("tcp6", listenIPv6+":"+strconv.Itoa(listenPort)) {
+		disableIPv6 = true
 	}
 
 	return
@@ -121,6 +143,5 @@ func testPortUsed(network string, addr string) bool {
 		conn.Close()
 		return true
 	}
-
 	return false
 }
