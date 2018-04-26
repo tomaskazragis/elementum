@@ -91,7 +91,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			p.Params().Paused = false
 			return
 		}
-		if !p.Params().FromLibrary || !config.Get().PlayResume || p.Params().KodiPosition == 0 {
+		log.Debugf("OnPlay Resume check. KodiPosition: %#v, FromLibrary: %#v, Resume: %#v", p.Params().KodiPosition, p.Params().FromLibrary, p.Params().Resume)
+		if !p.Params().FromLibrary || !config.Get().PlayResume || p.Params().KodiPosition == 0 || p.Params().Resume == nil {
 			return
 		}
 		var started struct {
@@ -104,28 +105,9 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			log.Error(err)
 			return
 		}
-		var position float64
-		uids := library.GetUIDsFromKodi(started.Item.ID)
-		if uids == nil {
-			log.Warningf("No item found with ID: %d", started.Item.ID)
-			return
-		}
 
-		if started.Item.Type == movieType {
-			r := library.GetMovieResume(started.Item.ID)
-			if r == nil {
-				return
-			}
-			position = r.Position
-		} else {
-			r := library.GetEpisodeResume(started.Item.ID)
-			if r == nil {
-				return
-			}
-			position = r.Position
-		}
-		if position > 0 {
-			xbmc.PlayerSeek(position)
+		if p.Params().Resume.Position > 0 {
+			xbmc.PlayerSeek(p.Params().Resume.Position)
 		}
 
 	case "Player.OnStop":

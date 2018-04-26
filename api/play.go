@@ -77,15 +77,16 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		params := bittorrent.PlayerParams{
-			URI:         uri,
-			FromLibrary: fromLibrary,
-			FileIndex:   fileIndex,
-			ResumeIndex: resumeIndex,
-			ContentType: contentType,
-			TMDBId:      tmdbID,
-			ShowID:      showID,
-			Season:      seasonNumber,
-			Episode:     episodeNumber,
+			URI:          uri,
+			FromLibrary:  fromLibrary,
+			FileIndex:    fileIndex,
+			ResumeIndex:  resumeIndex,
+			KodiPosition: -1,
+			ContentType:  contentType,
+			TMDBId:       tmdbID,
+			ShowID:       showID,
+			Season:       seasonNumber,
+			Episode:      episodeNumber,
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)

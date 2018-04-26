@@ -194,7 +194,7 @@ func (s *BTService) configure() {
 		s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
 	}
 
-	log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
+	log.Infof("DownloadStorage: %s", estorage.Storages[s.config.DownloadStorage])
 	if s.config.DownloadStorage == estorage.StorageMemory {
 		memSize := int64(config.Get().MemorySize)
 		needSize := int64(s.config.BufferSize) + endBufferSize + 6*1024*1024

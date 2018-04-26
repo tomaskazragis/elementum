@@ -18,6 +18,14 @@ const (
 	StorageMMap
 )
 
+// Storages lists basic names of used storage engines
+var Storages = map[int]string{
+	StorageFile:   "File",
+	StorageMMap:   "MMap",
+	StorageFat32:  "FAT32",
+	StorageMemory: "Memory",
+}
+
 // ElementumStorage basic interface for storages, used in the plugin
 type ElementumStorage interface {
 	storage.ClientImpl

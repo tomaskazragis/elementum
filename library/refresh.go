@@ -172,6 +172,11 @@ func RefreshMovies() error {
 			UIDs:     &UniqueIDs{Kodi: m.ID, Playcount: m.PlayCount},
 			XbmcUIDs: &m.UniqueIDs,
 		}
+
+		if m.Resume != nil {
+			l.Movies[m.ID].Resume.Position = m.Resume.Position
+			l.Movies[m.ID].Resume.Total = m.Resume.Total
+		}
 	}
 
 	if err := database.Get().Ping(); err != nil {
@@ -256,6 +261,8 @@ func RefreshShows() error {
 	getUIDsStmt, _ := database.Get().Prepare(`SELECT kodi, tmdb, tvdb, imdb, trakt FROM library_uids WHERE mediaType = ? AND kodi = ? LIMIT 1`)
 	setUIDsStmt, _ := database.Get().Prepare(`INSERT OR REPLACE INTO library_uids (mediaType, kodi, tmdb, tvdb, imdb, trakt, playcount) VALUES (?, ?, ?, ?, ?, ?, ?)`)
 
+	// TODO: This needs refactor to avoid setting global Lock on processing,
+	// should use temporary container to process and then sync to Shows
 	for _, show := range l.Shows {
 		// Step 1: try to get information from what we get from Kodi
 		parseUniqueID(ShowType, show.UIDs, show.XbmcUIDs, "", show.Year, getUIDsStmt, setUIDsStmt)
@@ -403,6 +410,11 @@ func RefreshEpisodes() error {
 			Resume:   &Resume{},
 			UIDs:     &UniqueIDs{Kodi: e.ID, Playcount: e.PlayCount},
 			XbmcUIDs: &e.UniqueIDs,
+		}
+
+		if e.Resume != nil {
+			l.Shows[e.TVShowID].Episodes[e.ID].Resume.Position = e.Resume.Position
+			l.Shows[e.TVShowID].Episodes[e.ID].Resume.Total = e.Resume.Total
 		}
 	}
 

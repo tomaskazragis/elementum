@@ -268,9 +268,17 @@ func ShowSeasons(ctx *gin.Context) {
 	reversedItems := make(xbmc.ListItems, 0)
 	for i := len(items) - 1; i >= 0; i-- {
 		item := items[i]
+
+		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s"
+		contextLabel := playLabel
+		contextURL := contextPlayOppositeURL(thisURL, false)
+		if config.Get().ChooseStreamAuto {
+			contextLabel = linksLabel
+		}
+
 		item.Path = URLForXBMC("/show/%d/season/%d/episodes", show.ID, item.Info.Season)
 		item.ContextMenu = [][]string{
-			[]string{"LOCALIZE[30202]", fmt.Sprintf("XBMC.PlayMedia(%s)", contextPlayOppositeURL(URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season)+"%s", false))},
+			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			[]string{"LOCALIZE[30036]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/seasons"))},
 		}
 		reversedItems = append(reversedItems, item)
