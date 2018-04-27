@@ -91,8 +91,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			p.Params().Paused = false
 			return
 		}
-		log.Debugf("OnPlay Resume check. KodiPosition: %#v, FromLibrary: %#v, Resume: %#v", p.Params().KodiPosition, p.Params().FromLibrary, p.Params().Resume)
-		if !p.Params().FromLibrary || !config.Get().PlayResume || p.Params().KodiPosition == 0 || p.Params().Resume == nil {
+		log.Debugf("OnPlay Resume check. KodiPosition: %#v, Resume: %#v", p.Params().KodiPosition, p.Params().Resume)
+		if !config.Get().PlayResume || p.Params().KodiPosition == 0 || p.Params().Resume == nil {
 			return
 		}
 		var started struct {

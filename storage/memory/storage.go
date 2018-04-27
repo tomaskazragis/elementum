@@ -7,6 +7,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
 
+	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/config"
@@ -31,7 +32,7 @@ type Storage struct {
 
 // NewMemoryStorage initializer function
 func NewMemoryStorage(maxMemorySize int64) *Storage {
-	log.Debugf("Initializing memory storage of size: %#v", maxMemorySize)
+	log.Debugf("Initializing memory storage of size: %s", humanize.Bytes(uint64(maxMemorySize)))
 	s := &Storage{
 		mu:       &sync.Mutex{},
 		capacity: maxMemorySize,

@@ -173,7 +173,7 @@ func (s *BTService) configure() {
 	}
 
 	s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6 = util.GetListenAddr(s.config.ListenAutoDetectIP, s.config.ListenAutoDetectPort, s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
-	log.Infof("ListenHost=%s, ListenHostv6=%s, ListenPort=%d, DisableIPv6=%v", s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6)
+	log.Infof("ListenIP=%s, ListenIPv6=%s, ListenPort=%d, DisableIPv6=%v", s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6)
 	if s.ListenIP != "" && s.ListenIPv6 == "" {
 		s.DisableIPv6 = true
 	}
@@ -217,7 +217,7 @@ func (s *BTService) configure() {
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
-		ListenHost: s.GetListenHost,
+		ListenHost: s.GetListenIP,
 		ListenPort: s.ListenPort,
 		Debug:      false,
 		// Debug: true,
@@ -965,7 +965,8 @@ func (s *BTService) HasTorrentByName(query string) string {
 	return ""
 }
 
-func (s *BTService) GetListenHost(network string) string {
+// GetListenIP returns calculated IP for TCP/TCP6
+func (s *BTService) GetListenIP(network string) string {
 	if strings.Contains(network, "6") {
 		return s.ListenIPv6
 	}

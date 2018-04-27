@@ -22,7 +22,7 @@ const (
 var Storages = map[int]string{
 	StorageFile:   "File",
 	StorageMMap:   "MMap",
-	StorageFat32:  "FAT32",
+	StorageFat32:  "Fat32",
 	StorageMemory: "Memory",
 }
 

@@ -339,7 +339,12 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.muBuffer.Unlock()
 
-	log.Debugf("Setting buffer for file: %s (%#v / %#v). Desired: %#v. Pieces: %#v-%#v + %#v-%#v, Length: %#v / %#v / %#v, Offset: %#v / %#v (%#v)", file.DisplayPath(), file.Length(), file.Torrent().Length(), t.Service.GetBufferSize(), preBufferStart, preBufferEnd, postBufferStart, postBufferEnd, file.Torrent().Info().PieceLength, preBufferSize, postBufferSize, preBufferOffset, postBufferOffset, file.Offset())
+	log.Debugf("Setting buffer for file: %s (%s / %s). Desired: %s. Pieces: %#v-%#v + %#v-%#v, PieceLength: %s, Pre: %s, Post: %s, WithOffset: %#v / %#v (%#v)",
+		file.DisplayPath(), humanize.Bytes(uint64(file.Length())), humanize.Bytes(uint64(file.Torrent().Length())),
+		humanize.Bytes(uint64(t.Service.GetBufferSize())),
+		preBufferStart, preBufferEnd, postBufferStart, postBufferEnd,
+		humanize.Bytes(uint64(file.Torrent().Info().PieceLength)), humanize.Bytes(uint64(preBufferSize)), humanize.Bytes(uint64(postBufferSize)),
+		preBufferOffset, postBufferOffset, file.Offset())
 
 	t.Service.SetBufferingLimits()
 
