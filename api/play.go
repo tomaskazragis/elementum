@@ -18,7 +18,6 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
-		library := ctx.Query("library")
 		contentType := ctx.Query("type")
 		tmdb := ctx.Query("tmdb")
 		show := ctx.Query("show")
@@ -41,11 +40,6 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			if position, err := strconv.Atoi(resume); err == nil && position >= 0 {
 				resumeIndex = position
 			}
-		}
-
-		fromLibrary := false
-		if library != "" {
-			fromLibrary = true
 		}
 
 		tmdbID := 0
@@ -78,7 +72,6 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		params := bittorrent.PlayerParams{
 			URI:          uri,
-			FromLibrary:  fromLibrary,
 			FileIndex:    fileIndex,
 			ResumeIndex:  resumeIndex,
 			KodiPosition: -1,
@@ -119,7 +112,6 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
-		library := ctx.Query("library")
 
 		if uri == "" && resume == "" {
 			return
@@ -158,8 +150,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				"show", show,
 				"season", season,
 				"episode", episode,
-				"type", contentType,
-				"library", library))
+				"type", contentType))
 		}
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		ctx.String(200, "")

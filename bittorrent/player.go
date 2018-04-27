@@ -71,7 +71,6 @@ type PlayerParams struct {
 	Paused        bool
 	Seeked        bool
 	WasPlaying    bool
-	FromLibrary   bool
 	KodiPosition  int
 	WatchedTime   float64
 	VideoDuration float64
@@ -689,7 +688,6 @@ playbackLoop:
 		btp.p.Paused = false
 		btp.p.Seeked = false
 		btp.p.WasPlaying = true
-		btp.p.FromLibrary = false
 		btp.p.WatchedTime = 0
 		btp.p.VideoDuration = 0
 	}()
