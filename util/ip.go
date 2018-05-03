@@ -127,7 +127,7 @@ loopPorts:
 		}
 	}
 
-	if (listenIP != "" && listenIPv6 == "") || testPortUsed("tcp6", listenIPv6+":"+strconv.Itoa(listenPort)) {
+	if testPortUsed("tcp6", listenIPv6+":"+strconv.Itoa(listenPort)) {
 		disableIPv6 = true
 	}
 
@@ -143,5 +143,6 @@ func testPortUsed(network string, addr string) bool {
 		conn.Close()
 		return true
 	}
+
 	return false
 }

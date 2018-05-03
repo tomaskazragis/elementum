@@ -217,12 +217,11 @@ func (s *BTService) configure() {
 	s.ClientConfig = &gotorrent.Config{
 		DataDir: config.Get().DownloadPath,
 
-		ListenHost: s.GetListenIP,
-		ListenPort: s.ListenPort,
-		Debug:      false,
-		// Debug: true,
-
 		DisableIPv6: s.DisableIPv6,
+		ListenHost:  s.GetListenIP,
+		ListenPort:  s.ListenPort,
+
+		Debug: false,
 
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
