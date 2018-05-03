@@ -3,6 +3,7 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -172,6 +173,20 @@ type GenreList struct {
 	Genres []*Genre `json:"genres"`
 }
 
+// Country ...
+type Country struct {
+	Iso31661    string `json:"iso_3166_1"`
+	EnglishName string `json:"english_name"`
+}
+
+// CountryList ...
+type CountryList []*Country
+
+// LanguageList ...
+type LanguageList struct {
+	Languages []*Language `json:"languages"`
+}
+
 // Image ...
 type Image struct {
 	FilePath string `json:"file_path"`
@@ -281,6 +296,13 @@ type ReleaseDate struct {
 	Note          string `json:"note"`
 	ReleaseDate   string `json:"release_date"`
 	Type          int    `json:"type"`
+}
+
+// DiscoverFilters ...
+type DiscoverFilters struct {
+	Genre    string
+	Country  string
+	Language string
 }
 
 const (
@@ -460,4 +482,94 @@ func Find(externalID string, externalSource string) *FindResult {
 	}
 
 	return result
+}
+
+// GetCountries ...
+func GetCountries(language string) []*Country {
+	countries := CountryList{}
+
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.tmdb.countries.%s", language)
+	if err := cacheStore.Get(key, &countries); err != nil {
+		rl.Call(func() error {
+			urlValues := napping.Params{
+				"api_key": apiKey,
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint+"configuration/countries",
+				&urlValues,
+				&countries,
+				nil,
+			)
+
+			if err != nil {
+				log.Error(err)
+				xbmc.Notify("Elementum", "Failed getting countries, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warning("Rate limit exceeded getting countries, cooling down...")
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
+			} else if resp.Status() != 200 {
+				message := fmt.Sprintf("Bad status getting countries: %d", resp.Status())
+				log.Error(message)
+				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
+			}
+
+			return nil
+		})
+		sort.Slice(countries, func(i, j int) bool {
+			return countries[i].EnglishName < countries[j].EnglishName
+		})
+		cacheStore.Set(key, countries, cacheExpiration)
+	}
+	return countries
+}
+
+// GetLanguages ...
+func GetLanguages(language string) []*Language {
+	languages := []*Language{}
+	cacheStore := cache.NewDBStore()
+
+	key := fmt.Sprintf("com.tmdb.languages.%s", language)
+	if err := cacheStore.Get(key, &languages); err != nil {
+		rl.Call(func() error {
+			urlValues := napping.Params{
+				"api_key": apiKey,
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint+"configuration/languages",
+				&urlValues,
+				&languages,
+				nil,
+			)
+
+			if err != nil {
+				log.Error(err)
+				xbmc.Notify("Elementum", "Failed getting languages, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warning("Rate limit exceeded getting languages, cooling down...")
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
+			} else if resp.Status() != 200 {
+				message := fmt.Sprintf("Bad status getting languages: %d", resp.Status())
+				log.Error(message)
+				xbmc.Notify("Elementum", message, config.AddonIcon())
+				return util.ErrHTTP
+			}
+
+			return nil
+		})
+		for _, l := range languages {
+			if l.Name == "" {
+				l.Name = l.EnglishName
+			}
+		}
+
+		sort.Slice(languages, func(i, j int) bool {
+			return languages[i].Name < languages[j].Name
+		})
+		cacheStore.Set(key, languages, cacheExpiration)
+	}
+	return languages
 }

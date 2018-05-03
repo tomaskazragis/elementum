@@ -39,6 +39,11 @@ func TVIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30211]", Path: URLForXBMC("/shows/top"), Thumbnail: config.AddonResource("img", "top_rated.png")},
 		{Label: "LOCALIZE[30212]", Path: URLForXBMC("/shows/mostvoted"), Thumbnail: config.AddonResource("img", "most_voted.png")},
 		{Label: "LOCALIZE[30289]", Path: URLForXBMC("/shows/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
+		{Label: "LOCALIZE[30373]", Path: URLForXBMC("/shows/languages"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
+		// Note: Search by countries is implemented, but TMDB does not support it yet,
+		// so we are not showing this. When there is an endpoint - we can enable
+		// and modify the URL params to /discover endpoint
+		// {Label: "LOCALIZE[30374]", Path: URLForXBMC("/shows/countries"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
 
 		{Label: "LOCALIZE[30361]", Path: URLForXBMC("/shows/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
 	}
@@ -58,16 +63,50 @@ func TVGenres(ctx *gin.Context) {
 		slug, _ := genreSlugs[genre.ID]
 		items = append(items, &xbmc.ListItem{
 			Label:     genre.Name,
-			Path:      URLForXBMC("/shows/popular/%s", strconv.Itoa(genre.ID)),
+			Path:      URLForXBMC("/shows/popular/genre/%s", strconv.Itoa(genre.ID)),
 			Thumbnail: config.AddonResource("img", fmt.Sprintf("genre_%s.png", slug)),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30237]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/shows/%s", strconv.Itoa(genre.ID)))},
-				[]string{"LOCALIZE[30238]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/episodes/%s", strconv.Itoa(genre.ID)))},
+				[]string{"LOCALIZE[30237]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/shows/genre/%s", strconv.Itoa(genre.ID)))},
+				[]string{"LOCALIZE[30238]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/episodes/genre/%s", strconv.Itoa(genre.ID)))},
 				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_tvshows_genres"))},
 			},
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_tvshows_genres", filterListItems(items)))
+}
+
+// TVLanguages ...
+func TVLanguages(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
+	for _, language := range tmdb.GetLanguages(config.Get().Language) {
+		items = append(items, &xbmc.ListItem{
+			Label: language.Name,
+			Path:  URLForXBMC("/shows/popular/language/%s", language.Iso639_1),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30237]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/shows/language/%s", language.Iso639_1))},
+				[]string{"LOCALIZE[30238]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/episodes/language/%s", language.Iso639_1))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_tvshows_languages"))},
+			},
+		})
+	}
+	ctx.JSON(200, xbmc.NewView("menus_tvshows_languages", filterListItems(items)))
+}
+
+// TVCountries ...
+func TVCountries(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
+	for _, country := range tmdb.GetCountries(config.Get().Language) {
+		items = append(items, &xbmc.ListItem{
+			Label: country.EnglishName,
+			Path:  URLForXBMC("/shows/popular/country/%s", country.Iso31661),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30237]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/shows/country/%s", country.Iso31661))},
+				[]string{"LOCALIZE[30238]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/shows/recent/episodes/country/%s", country.Iso31661))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_tvshows_countries"))},
+			},
+		})
+	}
+	ctx.JSON(200, xbmc.NewView("menus_tvshows_countries", filterListItems(items)))
 }
 
 // TVTraktLists ...
@@ -182,34 +221,46 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 
 // PopularShows ...
 func PopularShows(ctx *gin.Context) {
-	genre := ctx.Params.ByName("genre")
-	if genre == "0" {
-		genre = ""
+	p := tmdb.DiscoverFilters{}
+	p.Genre = ctx.Params.ByName("genre")
+	p.Language = ctx.Params.ByName("language")
+	p.Country = ctx.Params.ByName("country")
+	if p.Genre == "0" {
+		p.Genre = ""
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	shows, total := tmdb.PopularShows(genre, config.Get().Language, page)
+	shows, total := tmdb.PopularShows(p, config.Get().Language, page)
 	renderShows(ctx, shows, page, total, "")
 }
 
 // RecentShows ...
 func RecentShows(ctx *gin.Context) {
-	genre := ctx.Params.ByName("genre")
-	if genre == "0" {
-		genre = ""
+	p := tmdb.DiscoverFilters{}
+	p.Genre = ctx.Params.ByName("genre")
+	p.Language = ctx.Params.ByName("language")
+	p.Country = ctx.Params.ByName("country")
+	if p.Genre == "0" {
+		p.Genre = ""
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	shows, total := tmdb.RecentShows(genre, config.Get().Language, page)
+	shows, total := tmdb.RecentShows(p, config.Get().Language, page)
 	renderShows(ctx, shows, page, total, "")
 }
 
 // RecentEpisodes ...
 func RecentEpisodes(ctx *gin.Context) {
-	genre := ctx.Params.ByName("genre")
-	if genre == "0" {
-		genre = ""
+	p := tmdb.DiscoverFilters{}
+	p.Genre = ctx.Params.ByName("genre")
+	p.Language = ctx.Params.ByName("language")
+	p.Country = ctx.Params.ByName("country")
+	if p.Genre == "0" {
+		p.Genre = ""
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	shows, total := tmdb.RecentEpisodes(genre, config.Get().Language, page)
+	shows, total := tmdb.RecentEpisodes(p, config.Get().Language, page)
 	renderShows(ctx, shows, page, total, "")
 }
 

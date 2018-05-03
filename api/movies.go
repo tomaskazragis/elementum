@@ -72,6 +72,8 @@ func MoviesIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30236]", Path: URLForXBMC("/movies/recent"), Thumbnail: config.AddonResource("img", "clock.png")},
 		{Label: "LOCALIZE[30213]", Path: URLForXBMC("/movies/imdb250"), Thumbnail: config.AddonResource("img", "imdb.png")},
 		{Label: "LOCALIZE[30289]", Path: URLForXBMC("/movies/genres"), Thumbnail: config.AddonResource("img", "genre_comedy.png")},
+		{Label: "LOCALIZE[30373]", Path: URLForXBMC("/movies/languages"), Thumbnail: config.AddonResource("img", "movies.png")},
+		{Label: "LOCALIZE[30374]", Path: URLForXBMC("/movies/countries"), Thumbnail: config.AddonResource("img", "movies.png")},
 
 		{Label: "LOCALIZE[30361]", Path: URLForXBMC("/movies/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
 	}
@@ -90,15 +92,47 @@ func MovieGenres(ctx *gin.Context) {
 		slug, _ := genreSlugs[genre.ID]
 		items = append(items, &xbmc.ListItem{
 			Label:     genre.Name,
-			Path:      URLForXBMC("/movies/popular/%s", strconv.Itoa(genre.ID)),
+			Path:      URLForXBMC("/movies/popular/genre/%s", strconv.Itoa(genre.ID)),
 			Thumbnail: config.AddonResource("img", fmt.Sprintf("genre_%s.png", slug)),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/movies/recent/%s", strconv.Itoa(genre.ID)))},
+				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/movies/recent/genre/%s", strconv.Itoa(genre.ID)))},
 				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies_genres"))},
 			},
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies_genres", filterListItems(items)))
+}
+
+// MovieLanguages ...
+func MovieLanguages(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
+	for _, language := range tmdb.GetLanguages(config.Get().Language) {
+		items = append(items, &xbmc.ListItem{
+			Label: language.Name,
+			Path:  URLForXBMC("/movies/popular/language/%s", language.Iso639_1),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/movies/recent/language/%s", language.Iso639_1))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies_languages"))},
+			},
+		})
+	}
+	ctx.JSON(200, xbmc.NewView("menus_movies_languages", filterListItems(items)))
+}
+
+// MovieCountries ...
+func MovieCountries(ctx *gin.Context) {
+	items := make(xbmc.ListItems, 0)
+	for _, country := range tmdb.GetCountries(config.Get().Language) {
+		items = append(items, &xbmc.ListItem{
+			Label: country.EnglishName,
+			Path:  URLForXBMC("/movies/popular/country/%s", country.Iso31661),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30236]", fmt.Sprintf("Container.Update(%s)", URLForXBMC("/movies/recent/country/%s", country.Iso31661))},
+				[]string{"LOCALIZE[30144]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies_countries"))},
+			},
+		})
+	}
+	ctx.JSON(200, xbmc.NewView("menus_movies_countries", filterListItems(items)))
 }
 
 // MoviesTraktLists ...
@@ -226,23 +260,31 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 
 // PopularMovies ...
 func PopularMovies(ctx *gin.Context) {
-	genre := ctx.Params.ByName("genre")
-	if genre == "0" {
-		genre = ""
+	p := tmdb.DiscoverFilters{}
+	p.Genre = ctx.Params.ByName("genre")
+	p.Language = ctx.Params.ByName("language")
+	p.Country = ctx.Params.ByName("country")
+	if p.Genre == "0" {
+		p.Genre = ""
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	movies, total := tmdb.PopularMovies(genre, config.Get().Language, page)
+	movies, total := tmdb.PopularMovies(p, config.Get().Language, page)
 	renderMovies(ctx, movies, page, total, "")
 }
 
 // RecentMovies ...
 func RecentMovies(ctx *gin.Context) {
-	genre := ctx.Params.ByName("genre")
-	if genre == "0" {
-		genre = ""
+	p := tmdb.DiscoverFilters{}
+	p.Genre = ctx.Params.ByName("genre")
+	p.Language = ctx.Params.ByName("language")
+	p.Country = ctx.Params.ByName("country")
+	if p.Genre == "0" {
+		p.Genre = ""
 	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
-	movies, total := tmdb.RecentMovies(genre, config.Get().Language, page)
+	movies, total := tmdb.RecentMovies(p, config.Get().Language, page)
 	renderMovies(ctx, movies, page, total, "")
 }
 

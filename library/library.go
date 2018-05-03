@@ -264,8 +264,8 @@ func Init() {
 	}()
 	started := time.Now()
 	language := config.Get().Language
-	tmdb.PopularMovies("", language, 1)
-	tmdb.PopularShows("", language, 1)
+	tmdb.PopularMovies(tmdb.DiscoverFilters{}, language, 1)
+	tmdb.PopularShows(tmdb.DiscoverFilters{}, language, 1)
 	if _, _, err := trakt.TopMovies("trending", "1"); err != nil {
 		log.Warning(err)
 	}

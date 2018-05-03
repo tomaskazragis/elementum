@@ -285,18 +285,28 @@ func GetIMDBList(listID string, language string, page int) (movies Movies, total
 func listMovies(endpoint string, cacheKey string, params napping.Params, page int) (Movies, int) {
 	params["api_key"] = apiKey
 	totalResults := -1
+
 	genre := params["with_genres"]
+	country := params["region"]
+	language := params["with_original_language"]
 	if params["with_genres"] == "" {
 		genre = "all"
 	}
+	if params["region"] == "" {
+		country = "all"
+	}
+	if params["with_original_language"] == "" {
+		language = "all"
+	}
+
 	limit := ResultsPerPage * PagesAtOnce
 	pageGroup := (page-1)*ResultsPerPage/limit + 1
 
 	movies := make(Movies, limit)
 
 	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%d", cacheKey, genre, pageGroup)
-	totalKey := fmt.Sprintf("com.tmdb.topmovies.%s.%s.total", cacheKey, genre)
+	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%s.%s.%d", cacheKey, genre, country, language, pageGroup)
+	totalKey := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%s.%s.total", cacheKey, genre, country, language)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		wg := sync.WaitGroup{}
 		for p := 0; p < PagesAtOnce; p++ {
@@ -369,34 +379,66 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 }
 
 // PopularMovies ...
-func PopularMovies(genre string, language string, page int) (Movies, int) {
+func PopularMovies(params DiscoverFilters, language string, page int) (Movies, int) {
 	var p napping.Params
-	if genre == "" {
+	if params.Genre != "" {
 		p = napping.Params{
 			"language":                 language,
 			"sort_by":                  "popularity.desc",
 			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"with_genres":              params.Genre,
+		}
+	} else if params.Country != "" {
+		p = napping.Params{
+			"language":                 language,
+			"sort_by":                  "popularity.desc",
+			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"region":                   params.Country,
+		}
+	} else if params.Language != "" {
+		p = napping.Params{
+			"language":                 language,
+			"sort_by":                  "popularity.desc",
+			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"with_original_language":   params.Language,
 		}
 	} else {
 		p = napping.Params{
 			"language":                 language,
 			"sort_by":                  "popularity.desc",
 			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
-			"with_genres":              genre,
 		}
 	}
+
 	return listMovies("discover/movie", "popular", p, page)
 }
 
 // RecentMovies ...
-func RecentMovies(genre string, language string, page int) (Movies, int) {
+func RecentMovies(params DiscoverFilters, language string, page int) (Movies, int) {
 	var p napping.Params
-	if genre == "" {
+	if params.Genre != "" {
 		p = napping.Params{
 			"language":                 language,
 			"sort_by":                  "primary_release_date.desc",
 			"vote_count.gte":           "10",
 			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"with_genres":              params.Genre,
+		}
+	} else if params.Country != "" {
+		p = napping.Params{
+			"language":                 language,
+			"sort_by":                  "primary_release_date.desc",
+			"vote_count.gte":           "10",
+			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"region":                   params.Country,
+		}
+	} else if params.Language != "" {
+		p = napping.Params{
+			"language":                 language,
+			"sort_by":                  "primary_release_date.desc",
+			"vote_count.gte":           "10",
+			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
+			"with_original_language":   params.Language,
 		}
 	} else {
 		p = napping.Params{
@@ -404,9 +446,9 @@ func RecentMovies(genre string, language string, page int) (Movies, int) {
 			"sort_by":                  "primary_release_date.desc",
 			"vote_count.gte":           "10",
 			"primary_release_date.lte": time.Now().UTC().Format("2006-01-02"),
-			"with_genres":              genre,
 		}
 	}
+
 	return listMovies("discover/movie", "recent", p, page)
 }
 
