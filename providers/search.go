@@ -6,11 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anacrolix/missinggo"
+	"github.com/op/go-logging"
+
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
-	"github.com/op/go-logging"
 )
 
 const (
@@ -139,6 +141,13 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	progress := 0
 	progressTotal := 1
 	progressUpdate := make(chan string)
+	closed := missinggo.Event{}
+
+	defer func() {
+		log.Debug("Closing progressupdate")
+		closed.Set()
+		close(progressUpdate)
+	}()
 
 	wg := sync.WaitGroup{}
 	for torrent := range torrentsChan {
@@ -149,15 +158,38 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 		torrents = append(torrents, torrent)
 		go func(torrent *bittorrent.TorrentFile) {
 			defer wg.Done()
-			if err := torrent.Resolve(); err != nil {
-				log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
-				return
-			}
-			if !strings.HasPrefix(torrent.URI, "magnet") {
-				progress++
-				progressUpdate <- "LOCALIZE[30117]"
-			} else {
-				progressUpdate <- "skip"
+
+			resolved := make(chan bool)
+			failed := make(chan bool)
+
+			go func(torrent *bittorrent.TorrentFile) {
+				if err := torrent.Resolve(); err != nil {
+					log.Warningf("Resolve failed for %s : %s", torrent.URI, err.Error())
+					close(failed)
+				}
+				close(resolved)
+			}(torrent)
+
+			for {
+				select {
+				case <-time.After(trackerTimeout * 2): // Resolve timeout...
+					return
+				case <-failed:
+					return
+				case <-resolved:
+					if closed.IsSet() {
+						return
+					}
+
+					if !strings.HasPrefix(torrent.URI, "magnet") {
+						progress++
+						progressUpdate <- "LOCALIZE[30117]"
+					} else {
+						progressUpdate <- "skip"
+					}
+
+					return
+				}
 			}
 		}(torrent)
 	}
@@ -267,7 +299,9 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 				defer wg.Done()
 				defer func() {
 					progress += 2
-					progressUpdate <- progressMsg
+					if !closed.IsSet() {
+						progressUpdate <- progressMsg
+					}
 				}()
 
 				failed := make(chan bool)
@@ -312,6 +346,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 				}
 			}(tracker)
 		}
+		log.Debug("Waiting for scrape from trackers")
 		wg.Wait()
 
 		dialogProgressBG.Update(100, "Elementum", progressMsg)
@@ -330,7 +365,6 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 		dialogProgressBG.Close()
 		dialogProgressBG = nil
 
-		close(progressUpdate)
 		close(scrapeResults)
 	}()
 
