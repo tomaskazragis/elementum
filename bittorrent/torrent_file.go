@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
 	"github.com/zeebo/bencode"
 
@@ -28,17 +29,18 @@ var torrentFileLog = logging.MustGetLogger("torrentFile")
 
 // TorrentFile represents a physical torrent file
 type TorrentFile struct {
-	URI       string   `json:"uri"`
-	InfoHash  string   `json:"info_hash"`
-	Name      string   `json:"name"`
-	Trackers  []string `json:"trackers"`
-	Size      string   `json:"size"`
-	Seeds     int64    `json:"seeds"`
-	Peers     int64    `json:"peers"`
-	IsPrivate bool     `json:"is_private"`
-	Provider  string   `json:"provider"`
-	Icon      string   `json:"icon"`
-	Multi     bool
+	URI        string   `json:"uri"`
+	InfoHash   string   `json:"info_hash"`
+	Name       string   `json:"name"`
+	Trackers   []string `json:"trackers"`
+	Size       string   `json:"size"`
+	SizeParsed uint64   `jsin:"-"`
+	Seeds      int64    `json:"seeds"`
+	Peers      int64    `json:"peers"`
+	IsPrivate  bool     `json:"is_private"`
+	Provider   string   `json:"provider"`
+	Icon       string   `json:"icon"`
+	Multi      bool
 
 	Resolution  int    `json:"resolution"`
 	VideoCodec  int    `json:"video_codec"`
@@ -97,6 +99,8 @@ var (
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "2K", "4K"}
 	// Colors ...
 	Colors = []string{"", "FFFC3401", "FFA56F01", "FF539A02", "FF0166FC", "FFF15052", "FF6BB9EC"}
+	// Size regexp
+	sizeMatcher = regexp.MustCompile(`^\s*([\d\.\,]+)\s*`)
 )
 
 const (
@@ -305,6 +309,8 @@ func (t *TorrentFile) initialize() {
 	if t.SceneRating == RatingUnkown {
 		t.SceneRating = matchTags(t, sceneTags)
 	}
+	t.beautifySize()
+	t.parseSize()
 }
 
 func (t *TorrentFile) initializeFromMagnet() {
@@ -571,4 +577,29 @@ func (t *TorrentFile) StreamInfo() *xbmc.StreamInfo {
 	}
 
 	return sie
+}
+
+func (t *TorrentFile) beautifySize() {
+	// To upper-case
+	t.Size = strings.ToUpper(t.Size)
+
+	// Cyrillic-specific translation
+	t.Size = strings.Replace(t.Size, "КБ", "KB", -1)
+	t.Size = strings.Replace(t.Size, "МБ", "MB", -1)
+	t.Size = strings.Replace(t.Size, "ГБ", "GB", -1)
+	t.Size = strings.Replace(t.Size, "ТБ", "TB", -1)
+
+	// Replacing "," with "."
+	t.Size = strings.Replace(t.Size, ",", ".", -1)
+
+	// Adding whitespace after number
+	t.Size = sizeMatcher.ReplaceAllString(t.Size, "$1 ")
+}
+
+func (t *TorrentFile) parseSize() {
+	if v, err := humanize.ParseBytes(t.Size); err == nil {
+		t.SizeParsed = v
+	} else {
+		log.Debugf("Could not parse torrent size for '%s': %#v", t.Size, err)
+	}
 }

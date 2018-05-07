@@ -29,6 +29,8 @@ const (
 	SortByResolution
 	// SortBalanced ...
 	SortBalanced
+	// SortBySize ...
+	SortBySize
 )
 
 const (
@@ -396,7 +398,11 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	resolution720p480p := func(c1, c2 *bittorrent.TorrentFile) bool { return Resolution720p480p(c1) < Resolution720p480p(c2) }
 	balanced := func(c1, c2 *bittorrent.TorrentFile) bool { return float64(c1.Seeds) > Balanced(c2) }
 
-	if sortMode == SortBySeeders {
+	if sortMode == SortBySize {
+		sort.Slice(torrents, func(i, j int) bool {
+			return torrents[i].SizeParsed > torrents[j].SizeParsed
+		})
+	} else if sortMode == SortBySeeders {
 		sort.Sort(sort.Reverse(BySeeds(torrents)))
 	} else {
 		switch resolutionPreference {
