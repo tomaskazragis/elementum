@@ -87,15 +87,10 @@ type PlayerParams struct {
 }
 
 type candidateFile struct {
-	Index    int
-	Filename string
+	Index       int
+	Filename    string
+	DisplayName string
 }
-
-type byFilename []*candidateFile
-
-func (a byFilename) Len() int           { return len(a) }
-func (a byFilename) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byFilename) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
 // NewBTPlayer ...
 func NewBTPlayer(bts *BTService, params PlayerParams) *BTPlayer {
@@ -314,14 +309,35 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 			return files[candidateFiles[btp.p.FileIndex]], nil
 		}
 
-		choices := make(byFilename, 0, len(candidateFiles))
+		choices := make([]*candidateFile, 0, len(candidateFiles))
 		for _, index := range candidateFiles {
 			fileName := filepath.Base(files[index].Path())
 			candidate := &candidateFile{
-				Index:    index,
-				Filename: fileName,
+				Index:       index,
+				Filename:    fileName,
+				DisplayName: files[index].Path(),
 			}
 			choices = append(choices, candidate)
+		}
+
+		// We are trying to see whether all files belong to the same directory.
+		// If yes - we can remove that directory from printed files list
+		for _, d := range strings.Split(choices[0].DisplayName, "/") {
+			ret := true
+			for _, c := range choices {
+				if !strings.HasPrefix(c.DisplayName, d+"/") {
+					ret = false
+					break
+				}
+			}
+
+			if ret {
+				for _, c := range choices {
+					c.DisplayName = strings.Replace(c.DisplayName, d+"/", "", 1)
+				}
+			} else {
+				break
+			}
 		}
 
 		if btp.p.Episode > 0 {
@@ -346,11 +362,13 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 			}
 		}
 
-		sort.Sort(byFilename(choices))
+		sort.Slice(choices, func(i, j int) bool {
+			return choices[i].DisplayName < choices[j].DisplayName
+		})
 
 		items := make([]string, 0, len(choices))
 		for _, choice := range choices {
-			items = append(items, choice.Filename)
+			items = append(items, choice.DisplayName)
 		}
 
 		choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
@@ -767,7 +785,7 @@ func (btp *BTPlayer) IsWatched() bool {
 	return (100 * btp.p.WatchedTime / btp.p.VideoDuration) > 90
 }
 
-func (btp *BTPlayer) smartMatch(choices byFilename) {
+func (btp *BTPlayer) smartMatch(choices []*candidateFile) {
 	if !config.Get().SmartEpisodeMatch {
 		return
 	}
