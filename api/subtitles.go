@@ -82,6 +82,9 @@ func SubtitlesIndex(ctx *gin.Context) {
 	q := ctx.Request.URL.Query()
 	searchString := q.Get("searchstring")
 	languages := strings.Split(q.Get("languages"), ",")
+	if !config.Get().OSDBAutoLanguage && config.Get().OSDBLanguage != "" {
+		languages = []string{config.Get().OSDBLanguage}
+	}
 
 	labels := xbmc.InfoLabels(
 		"VideoPlayer.Title",
@@ -142,7 +145,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 		ctx.String(200, err.Error())
 		return
 	}
-	if err := client.LogIn(config.Get().OSDBUser, config.Get().OSDBPass, config.Get().Language); err != nil {
+	if err := client.LogIn(config.Get().OSDBUser, config.Get().OSDBPass, config.Get().OSDBLanguage); err != nil {
 		subLog.Error(err)
 		ctx.String(200, err.Error())
 		return

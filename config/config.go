@@ -92,8 +92,11 @@ type Configuration struct {
 	UseCloudHole    bool
 	CloudHoleKey    string
 	TMDBApiKey      string
-	OSDBUser        string
-	OSDBPass        string
+
+	OSDBUser         string
+	OSDBPass         string
+	OSDBLanguage     string
+	OSDBAutoLanguage bool
 
 	SortingModeMovies           int
 	SortingModeShows            int
@@ -309,15 +312,17 @@ func Reload() *Configuration {
 		TraktSyncWatched:     settings["trakt_sync_watched"].(bool),
 		TraktSyncWatchedBack: settings["trakt_sync_watchedback"].(bool),
 
-		UpdateFrequency: settings["library_update_frequency"].(int),
-		UpdateDelay:     settings["library_update_delay"].(int),
-		UpdateAutoScan:  settings["library_auto_scan"].(bool),
-		PlayResume:      settings["play_resume"].(bool),
-		UseCloudHole:    settings["use_cloudhole"].(bool),
-		CloudHoleKey:    settings["cloudhole_key"].(string),
-		TMDBApiKey:      settings["tmdb_api_key"].(string),
-		OSDBUser:        settings["osdb_user"].(string),
-		OSDBPass:        settings["osdb_pass"].(string),
+		UpdateFrequency:  settings["library_update_frequency"].(int),
+		UpdateDelay:      settings["library_update_delay"].(int),
+		UpdateAutoScan:   settings["library_auto_scan"].(bool),
+		PlayResume:       settings["play_resume"].(bool),
+		UseCloudHole:     settings["use_cloudhole"].(bool),
+		CloudHoleKey:     settings["cloudhole_key"].(string),
+		TMDBApiKey:       settings["tmdb_api_key"].(string),
+		OSDBUser:         settings["osdb_user"].(string),
+		OSDBPass:         settings["osdb_pass"].(string),
+		OSDBLanguage:     settings["osdb_language"].(string),
+		OSDBAutoLanguage: settings["osdb_auto_language"].(bool),
 
 		SortingModeMovies:           settings["sorting_mode_movies"].(int),
 		SortingModeShows:            settings["sorting_mode_shows"].(int),
@@ -370,6 +375,11 @@ func Reload() *Configuration {
 				}
 			}
 		}
+	}
+
+	// Setup OSDB language
+	if newConfig.OSDBAutoLanguage || newConfig.OSDBLanguage == "" {
+		newConfig.OSDBLanguage = newConfig.Language
 	}
 
 	lock.Lock()
