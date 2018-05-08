@@ -183,6 +183,155 @@ func (z *Cast) Msgsize() (s int) {
 }
 
 // MarshalMsg implements msgp.Marshaler
+func (z Country) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 2
+	// string "Iso31661"
+	o = append(o, 0x82, 0xa8, 0x49, 0x73, 0x6f, 0x33, 0x31, 0x36, 0x36, 0x31)
+	o = msgp.AppendString(o, z.Iso31661)
+	// string "EnglishName"
+	o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
+	o = msgp.AppendString(o, z.EnglishName)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *Country) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Iso31661":
+			z.Iso31661, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "EnglishName":
+			z.EnglishName, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z Country) Msgsize() (s int) {
+	s = 1 + 9 + msgp.StringPrefixSize + len(z.Iso31661) + 12 + msgp.StringPrefixSize + len(z.EnglishName)
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z CountryList) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	o = msgp.AppendArrayHeader(o, uint32(len(z)))
+	for za0001 := range z {
+		if z[za0001] == nil {
+			o = msgp.AppendNil(o)
+		} else {
+			// map header, size 2
+			// string "Iso31661"
+			o = append(o, 0x82, 0xa8, 0x49, 0x73, 0x6f, 0x33, 0x31, 0x36, 0x36, 0x31)
+			o = msgp.AppendString(o, z[za0001].Iso31661)
+			// string "EnglishName"
+			o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
+			o = msgp.AppendString(o, z[za0001].EnglishName)
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *CountryList) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var zb0002 uint32
+	zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	if cap((*z)) >= int(zb0002) {
+		(*z) = (*z)[:zb0002]
+	} else {
+		(*z) = make(CountryList, zb0002)
+	}
+	for zb0001 := range *z {
+		if msgp.IsNil(bts) {
+			bts, err = msgp.ReadNilBytes(bts)
+			if err != nil {
+				return
+			}
+			(*z)[zb0001] = nil
+		} else {
+			if (*z)[zb0001] == nil {
+				(*z)[zb0001] = new(Country)
+			}
+			var field []byte
+			_ = field
+			var zb0003 uint32
+			zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			for zb0003 > 0 {
+				zb0003--
+				field, bts, err = msgp.ReadMapKeyZC(bts)
+				if err != nil {
+					return
+				}
+				switch msgp.UnsafeString(field) {
+				case "Iso31661":
+					(*z)[zb0001].Iso31661, bts, err = msgp.ReadStringBytes(bts)
+					if err != nil {
+						return
+					}
+				case "EnglishName":
+					(*z)[zb0001].EnglishName, bts, err = msgp.ReadStringBytes(bts)
+					if err != nil {
+						return
+					}
+				default:
+					bts, err = msgp.Skip(bts)
+					if err != nil {
+						return
+					}
+				}
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z CountryList) Msgsize() (s int) {
+	s = msgp.ArrayHeaderSize
+	for zb0004 := range z {
+		if z[zb0004] == nil {
+			s += msgp.NilSize
+		} else {
+			s += 1 + 9 + msgp.StringPrefixSize + len(z[zb0004].Iso31661) + 12 + msgp.StringPrefixSize + len(z[zb0004].EnglishName)
+		}
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
 func (z *Credits) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 2
@@ -426,6 +575,70 @@ func (z *Crew) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Crew) Msgsize() (s int) {
 	s = 1 + 7 + 1 + 3 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.IDName.Name) + 9 + msgp.StringPrefixSize + len(z.CreditID) + 11 + msgp.StringPrefixSize + len(z.Department) + 4 + msgp.StringPrefixSize + len(z.Job) + 12 + msgp.StringPrefixSize + len(z.ProfilePath)
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z DiscoverFilters) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 3
+	// string "Genre"
+	o = append(o, 0x83, 0xa5, 0x47, 0x65, 0x6e, 0x72, 0x65)
+	o = msgp.AppendString(o, z.Genre)
+	// string "Country"
+	o = append(o, 0xa7, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x72, 0x79)
+	o = msgp.AppendString(o, z.Country)
+	// string "Language"
+	o = append(o, 0xa8, 0x4c, 0x61, 0x6e, 0x67, 0x75, 0x61, 0x67, 0x65)
+	o = msgp.AppendString(o, z.Language)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *DiscoverFilters) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Genre":
+			z.Genre, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Country":
+			z.Country, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Language":
+			z.Language, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z DiscoverFilters) Msgsize() (s int) {
+	s = 1 + 6 + msgp.StringPrefixSize + len(z.Genre) + 8 + msgp.StringPrefixSize + len(z.Country) + 9 + msgp.StringPrefixSize + len(z.Language)
 	return
 }
 
@@ -1867,6 +2080,130 @@ func (z *Language) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z Language) Msgsize() (s int) {
 	s = 1 + 9 + msgp.StringPrefixSize + len(z.Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Name) + 12 + msgp.StringPrefixSize + len(z.EnglishName)
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *LanguageList) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "Languages"
+	o = append(o, 0x81, 0xa9, 0x4c, 0x61, 0x6e, 0x67, 0x75, 0x61, 0x67, 0x65, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Languages)))
+	for za0001 := range z.Languages {
+		if z.Languages[za0001] == nil {
+			o = msgp.AppendNil(o)
+		} else {
+			// map header, size 3
+			// string "Iso639_1"
+			o = append(o, 0x83, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
+			o = msgp.AppendString(o, z.Languages[za0001].Iso639_1)
+			// string "Name"
+			o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
+			o = msgp.AppendString(o, z.Languages[za0001].Name)
+			// string "EnglishName"
+			o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
+			o = msgp.AppendString(o, z.Languages[za0001].EnglishName)
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *LanguageList) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Languages":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if cap(z.Languages) >= int(zb0002) {
+				z.Languages = (z.Languages)[:zb0002]
+			} else {
+				z.Languages = make([]*Language, zb0002)
+			}
+			for za0001 := range z.Languages {
+				if msgp.IsNil(bts) {
+					bts, err = msgp.ReadNilBytes(bts)
+					if err != nil {
+						return
+					}
+					z.Languages[za0001] = nil
+				} else {
+					if z.Languages[za0001] == nil {
+						z.Languages[za0001] = new(Language)
+					}
+					var zb0003 uint32
+					zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
+					if err != nil {
+						return
+					}
+					for zb0003 > 0 {
+						zb0003--
+						field, bts, err = msgp.ReadMapKeyZC(bts)
+						if err != nil {
+							return
+						}
+						switch msgp.UnsafeString(field) {
+						case "Iso639_1":
+							z.Languages[za0001].Iso639_1, bts, err = msgp.ReadStringBytes(bts)
+							if err != nil {
+								return
+							}
+						case "Name":
+							z.Languages[za0001].Name, bts, err = msgp.ReadStringBytes(bts)
+							if err != nil {
+								return
+							}
+						case "EnglishName":
+							z.Languages[za0001].EnglishName, bts, err = msgp.ReadStringBytes(bts)
+							if err != nil {
+								return
+							}
+						default:
+							bts, err = msgp.Skip(bts)
+							if err != nil {
+								return
+							}
+						}
+					}
+				}
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *LanguageList) Msgsize() (s int) {
+	s = 1 + 10 + msgp.ArrayHeaderSize
+	for za0001 := range z.Languages {
+		if z.Languages[za0001] == nil {
+			s += msgp.NilSize
+		} else {
+			s += 1 + 9 + msgp.StringPrefixSize + len(z.Languages[za0001].Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Languages[za0001].Name) + 12 + msgp.StringPrefixSize + len(z.Languages[za0001].EnglishName)
+		}
+	}
 	return
 }
 
