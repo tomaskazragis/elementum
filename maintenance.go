@@ -170,11 +170,11 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 		}
 
 		if item.Type == movieType {
-			library.RefreshMovie(item.ID, library.ActionDelete)
+			library.RefreshMovie(item.ID, library.ActionSafeDelete)
 		} else if item.Type == showType {
-			library.RefreshShow(item.ID, library.ActionDelete)
+			library.RefreshShow(item.ID, library.ActionSafeDelete)
 		} else if item.Type == episodeType {
-			library.RefreshEpisode(item.ID, library.ActionDelete)
+			library.RefreshEpisode(item.ID, library.ActionSafeDelete)
 		}
 
 	case "VideoLibrary.OnScanFinished":

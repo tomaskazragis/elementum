@@ -59,6 +59,8 @@ const (
 	ActionUpdate = iota
 	// ActionDelete ...
 	ActionDelete
+	// ActionSafeDelete ...
+	ActionSafeDelete
 )
 
 const (
@@ -242,14 +244,29 @@ func Init() {
 			case <-closing:
 				return
 			default:
-				if err := doUpdateLibrary(); err != nil {
-					log.Warning(err)
-				}
-				if config.Get().UpdateAutoScan && Scanning == false {
-					Scanning = true
-					xbmc.VideoLibraryScan()
-					Scanning = false
-				}
+				go func() {
+					if config.Get().UpdateFrequency > 0 {
+						if err := doUpdateLibrary(); err != nil {
+							log.Warning(err)
+						}
+						if config.Get().UpdateAutoScan && Scanning == false {
+							Scanning = true
+							xbmc.VideoLibraryScan()
+							Scanning = false
+						}
+					}
+
+					if config.Get().TraktSyncFrequency > 0 {
+						if err := RefreshTrakt(); err != nil {
+							log.Warning(err)
+						}
+						if config.Get().UpdateAutoScan && Scanning == false {
+							Scanning = true
+							xbmc.VideoLibraryScan()
+							Scanning = false
+						}
+					}
+				}()
 			}
 		}()
 	}
@@ -302,25 +319,29 @@ func Init() {
 		select {
 		case <-updateTicker.C:
 			if config.Get().UpdateFrequency > 0 {
-				if err := doUpdateLibrary(); err != nil {
-					log.Warning(err)
-				}
-				if config.Get().UpdateAutoScan && Scanning == false && updateFrequency != traktFrequency {
-					Scanning = true
-					xbmc.VideoLibraryScan()
-					Scanning = false
-				}
+				go func() {
+					if err := doUpdateLibrary(); err != nil {
+						log.Warning(err)
+					}
+					if config.Get().UpdateAutoScan && Scanning == false && updateFrequency != traktFrequency {
+						Scanning = true
+						xbmc.VideoLibraryScan()
+						Scanning = false
+					}
+				}()
 			}
 		case <-traktSyncTicker.C:
 			if config.Get().TraktSyncFrequency > 0 {
-				if err := RefreshTrakt(); err != nil {
-					log.Warning(err)
-				}
-				if config.Get().UpdateAutoScan && Scanning == false {
-					Scanning = true
-					xbmc.VideoLibraryScan()
-					Scanning = false
-				}
+				go func() {
+					if err := RefreshTrakt(); err != nil {
+						log.Warning(err)
+					}
+					if config.Get().UpdateAutoScan && Scanning == false {
+						Scanning = true
+						xbmc.VideoLibraryScan()
+						Scanning = false
+					}
+				}()
 			}
 		case <-markedForRemovalTicker.C:
 			rows, err := database.Get().Query(`SELECT infohash FROM tinfo WHERE state = 0`)

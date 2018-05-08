@@ -423,13 +423,16 @@ func RefreshEpisodes() error {
 
 // RefreshMovie ...
 func RefreshMovie(kodiID, action int) {
-	if action == ActionDelete {
+	if action == ActionDelete || action == ActionSafeDelete {
 		uids := GetUIDsFromKodi(kodiID)
 		if uids == nil || uids.TMDB == 0 {
 			return
 		}
-		if _, err := RemoveMovie(uids.TMDB); err != nil {
-			log.Warning("Nothing left to remove from Elementum")
+
+		if action == ActionDelete {
+			if _, err := RemoveMovie(uids.TMDB); err != nil {
+				log.Warning("Nothing left to remove from Elementum")
+			}
 		}
 
 		l.mu.Movies.Lock()
@@ -444,15 +447,17 @@ func RefreshMovie(kodiID, action int) {
 
 // RefreshShow ...
 func RefreshShow(kodiID, action int) {
-	if action == ActionDelete {
+	if action == ActionDelete || action == ActionSafeDelete {
 		uids := GetUIDsFromKodi(kodiID)
 		if uids == nil || uids.TMDB == 0 {
 			return
 		}
 
-		id := strconv.Itoa(uids.TMDB)
-		if _, err := RemoveShow(id); err != nil {
-			log.Warning("Nothing left to remove from Elementum")
+		if action == ActionDelete {
+			id := strconv.Itoa(uids.TMDB)
+			if _, err := RemoveShow(id); err != nil {
+				log.Warning("Nothing left to remove from Elementum")
+			}
 		}
 
 		l.mu.Shows.Lock()
@@ -467,7 +472,7 @@ func RefreshShow(kodiID, action int) {
 
 // RefreshEpisode ...
 func RefreshEpisode(kodiID, action int) {
-	if action != ActionDelete {
+	if action != ActionDelete && action != ActionSafeDelete {
 		return
 	}
 
@@ -476,7 +481,9 @@ func RefreshEpisode(kodiID, action int) {
 		return
 	}
 
-	RemoveEpisode(e.UIDs.TMDB, s.UIDs.TMDB, e.Season, e.Episode)
+	if action == ActionDelete {
+		RemoveEpisode(e.UIDs.TMDB, s.UIDs.TMDB, e.Season, e.Episode)
+	}
 
 	l.mu.Shows.Lock()
 	delete(l.Shows[s.UIDs.Kodi].Episodes, kodiID)
