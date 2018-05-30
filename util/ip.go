@@ -142,6 +142,11 @@ func testPortUsed(network string, addr string) bool {
 	if conn != nil && err == nil {
 		conn.Close()
 		return true
+	} else if err != nil {
+		cause := err.Error()
+		if !strings.Contains(cause, "refused") {
+			return true
+		}
 	}
 
 	return false
