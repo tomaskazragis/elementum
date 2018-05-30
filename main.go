@@ -1,7 +1,7 @@
 package main
 
 import (
-	// _ "net/http/pprof"
+	_ "github.com/anacrolix/envpprof"
 
 	"io/ioutil"
 	"net/http"
@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/anacrolix/sync"
 	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/api"
@@ -27,6 +28,10 @@ import (
 )
 
 var log = logging.MustGetLogger("main")
+
+func init() {
+	sync.Enable()
+}
 
 func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, err error) {
 	file := filepath.Join(conf.Info.Path, ".lockfile")
