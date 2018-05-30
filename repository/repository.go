@@ -37,7 +37,7 @@ func MakeElementumRepositoryAddon() error {
 	addon := &xbmc.Addon{
 		ID:           addonID,
 		Name:         addonName,
-		Version:      util.Version[2 : len(util.Version)-1],
+		Version:      util.GetVersion(),
 		ProviderName: config.Get().Info.Author,
 		Extensions: []*xbmc.AddonExtension{
 			&xbmc.AddonExtension{

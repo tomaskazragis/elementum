@@ -407,7 +407,7 @@ func Versions(btService *bittorrent.BTService) gin.HandlerFunc {
 			UserAgent string `json:"user-agent"`
 		}
 		versions := Versions{
-			Version:   util.Version[1 : len(util.Version)-1],
+			Version:   util.GetVersion(),
 			UserAgent: btService.UserAgent,
 		}
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")

@@ -8,17 +8,32 @@ import (
 	"github.com/elgatito/elementum/config"
 )
 
-// Version ...
-var Version string
+var (
+	// Version ...
+	Version = "v0.0.1"
+
+	// GoTorrentVersion
+	GoTorrentVersion = "v0.0.1"
+)
 
 // GetVersion returns version, provided to compiler
 func GetVersion() string {
 	if len(Version) > 0 {
-		return Version[1 : len(Version)-1]
+		return Version[1:]
 	}
 
 	// Return Dummy version if none provided by compiler
-	return "v0.0.1"
+	return "0.0.1"
+}
+
+// GetTorrentVersion returns version of GoTorrent, provided to compiler
+func GetTorrentVersion() string {
+	if len(GoTorrentVersion) > 0 {
+		return GoTorrentVersion[:8]
+	}
+
+	// Return Dummy version if none provided by compiler
+	return "0.0.1"
 }
 
 // DefaultUserAgent ...

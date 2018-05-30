@@ -6,10 +6,11 @@ XGO_VERSION = 1.10.2
 GO = go
 GIT = git
 GIT_VERSION = $(shell $(GIT) describe --tags)
+GOTORRENT_VERSION = $(shell (cd $(GOPATH)/src/github.com/anacrolix/torrent; $(GIT) rev-parse HEAD))
 OUTPUT_NAME = $(NAME)$(EXT)
 BUILD_PATH = build/
 GO_BUILD_TAGS =
-GO_LDFLAGS = -w -X $(GO_PKG)/util.Version="$(GIT_VERSION)"
+GO_LDFLAGS = -w -X $(GO_PKG)/util.Version=$(GIT_VERSION) -X $(GO_PKG)/util.GoTorrentVersion=$(GOTORRENT_VERSION)
 GO_EXTRALDFLAGS =
 PLATFORMS = \
 	android-16/arm \
