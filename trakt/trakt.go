@@ -960,7 +960,7 @@ func Scrobble(action string, contentType string, tmdbID int, watched float64, ru
 
 	endPoint := fmt.Sprintf("scrobble/%s", action)
 	payload := fmt.Sprintf(`{"%s": {"ids": {"tmdb": %d}}, "progress": %f, "app_version": "%s"}`,
-		contentType, tmdbID, progress, util.Version[1:len(util.Version)-1])
+		contentType, tmdbID, progress, util.GetVersion())
 	resp, err := Post(endPoint, bytes.NewBufferString(payload))
 	if err != nil {
 		log.Error(err.Error())

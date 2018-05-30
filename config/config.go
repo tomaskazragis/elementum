@@ -377,6 +377,11 @@ func Reload() *Configuration {
 		}
 	}
 
+	// Set default Trakt Frequency
+	if newConfig.TraktToken != "" && newConfig.TraktSyncFrequency == 0 {
+		newConfig.TraktSyncFrequency = 6
+	}
+
 	// Setup OSDB language
 	if newConfig.OSDBAutoLanguage || newConfig.OSDBLanguage == "" {
 		newConfig.OSDBLanguage = newConfig.Language

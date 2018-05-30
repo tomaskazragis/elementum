@@ -145,6 +145,10 @@ func RefreshMovies() error {
 		break
 	}
 
+	if movies.Limits.Total == 0 {
+		return nil
+	}
+
 	if movies == nil || movies.Movies == nil {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
@@ -216,6 +220,10 @@ func RefreshShows() error {
 			continue
 		}
 		break
+	}
+
+	if shows.Limits.Total == 0 {
+		return nil
 	}
 
 	if shows == nil || shows.Shows == nil {

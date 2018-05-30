@@ -142,8 +142,16 @@ type StreamInfoEntry struct {
 	Channels int     `json:"channels,omitempty"`
 }
 
+// VideoLibraryLimits ...
+type VideoLibraryLimits struct {
+	End   int `json:"end"`
+	Start int `json:"start"`
+	Total int `json:"total"`
+}
+
 // VideoLibraryMovies ...
 type VideoLibraryMovies struct {
+	Limits *VideoLibraryLimits      `json:"limits"`
 	Movies []*VideoLibraryMovieItem `json:"movies"`
 }
 
@@ -161,7 +169,8 @@ type VideoLibraryMovieItem struct {
 
 // VideoLibraryShows ...
 type VideoLibraryShows struct {
-	Shows []*VideoLibraryShowItem `json:"tvshows"`
+	Limits *VideoLibraryLimits     `json:"limits"`
+	Shows  []*VideoLibraryShowItem `json:"tvshows"`
 }
 
 // VideoLibraryShowItem ...
