@@ -47,7 +47,7 @@ func Migrate() bool {
 }
 
 func migrateDB() bool {
-	firstRun := filepath.Join(config.Get().Info.Path, ".dbfirstrun")
+	firstRun := filepath.Join(config.Get().Info.Profile, ".dbfirstrun")
 	if _, err := os.Stat(firstRun); err == nil {
 		return false
 	}
@@ -55,6 +55,9 @@ func migrateDB() bool {
 	defer file.Close()
 
 	log.Info("Migrating old bolt DB to Sqlite ...")
+	defer func() {
+		log.Info("... migration finished")
+	}()
 
 	newDB := database.Get()
 	oldDB, err := database.NewBoltDB()
@@ -70,6 +73,8 @@ func migrateDB() bool {
 		for i := len(list) - 1; i >= 0; i-- {
 			newDB.AddSearchHistory(t, list[i])
 		}
+
+		oldDB.Delete(database.HistoryBucket, "list"+t)
 	}
 
 	oldDB.Seek(database.TorrentHistoryBucket, "", func(k, v []byte) {
@@ -80,13 +85,12 @@ func migrateDB() bool {
 
 		torrent := &bittorrent.TorrentFile{}
 		err = torrent.LoadFromBytes(v)
-		if err != nil {
+		if err != nil || len(v) <= 0 || torrent.InfoHash == "" {
 			return
 		}
 
-		if torrent.InfoHash != "" {
-			newDB.AddTorrentHistory(string(k), torrent.InfoHash, v)
-		}
+		newDB.AddTorrentHistory(string(k), torrent.InfoHash, v)
+		oldDB.Delete(database.TorrentHistoryBucket, string(k))
 	})
 	return true
 }
