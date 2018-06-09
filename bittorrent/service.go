@@ -30,24 +30,6 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
-// const (
-// 	ProxyTypeNone = iota
-// 	ProxyTypeSocks4
-// 	ProxyTypeSocks5
-// 	ProxyTypeSocks5Password
-// 	ProxyTypeSocksHTTP
-// 	ProxyTypeSocksHTTPPassword
-// 	ProxyTypeI2PSAM
-// )
-
-// type ProxySettings struct {
-// 	Type     int
-// 	Port     int
-// 	Hostname string
-// 	Username string
-// 	Password string
-// }
-
 // BTService ...
 type BTService struct {
 	config *config.Configuration
@@ -226,6 +208,8 @@ func (s *BTService) configure() {
 		DisableTCP: s.config.DisableTCP,
 		DisableUTP: s.config.DisableUTP,
 
+		ProxyURL: s.config.ProxyURL,
+
 		NoDefaultPortForwarding: s.config.DisableUPNP,
 
 		NoDHT:            s.config.DisableDHT,
@@ -244,8 +228,9 @@ func (s *BTService) configure() {
 
 		DefaultStorage: s.DefaultStorage,
 
-		Bep20:         s.PeerID,
-		PeerID:        util.PeerIDRandom(s.PeerID),
+		Bep20:  s.PeerID,
+		PeerID: util.PeerIDRandom(s.PeerID),
+
 		HTTPUserAgent: s.UserAgent,
 	}
 
@@ -263,17 +248,16 @@ func (s *BTService) configure() {
 		// Maybe we should use Dialog() to show a windows
 		xbmc.Notify("Elementum", "LOCALIZE[30354]", config.AddonIcon())
 		os.Exit(1)
-	} else {
-		log.Infof("Client created successfully")
-		// TODO: can't dump Client because of blocklist array
-		// log.Debugf("Created bit client: %#v", s.Client)
-		for _, addr := range s.Client.ListenAddrs() {
-			log.Debugf("Client listening on %s: %s", addr.Network(), addr.String())
-		}
-
-		// Setting it here to avoid spamming the log file
-		// s.Client.SetIPBlockList(blocklist)
 	}
+	log.Infof("Client created successfully")
+	// TODO: can't dump Client because of blocklist array
+	// log.Debugf("Created bit client: %#v", s.Client)
+	for _, addr := range s.Client.ListenAddrs() {
+		log.Debugf("Client listening on %s: %s", addr.Network(), addr.String())
+	}
+
+	// Setting it here to avoid spamming the log file
+	// s.Client.SetIPBlockList(blocklist)
 }
 
 func (s *BTService) stopServices() {

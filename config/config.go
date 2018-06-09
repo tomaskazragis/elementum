@@ -108,12 +108,13 @@ type Configuration struct {
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
 
-	// ProxyType     int
-	// SocksEnabled  bool
-	// SocksHost     string
-	// SocksPort     int
-	// SocksLogin    string
-	// SocksPassword string
+	ProxyURL      string
+	ProxyType     int
+	ProxyEnabled  bool
+	ProxyHost     string
+	ProxyPort     int
+	ProxyLogin    string
+	ProxyPassword string
 
 	CompletedMove       bool
 	CompletedMoviesPath string
@@ -133,6 +134,13 @@ var (
 	lock            = sync.RWMutex{}
 	settingsAreSet  = false
 	settingsWarning = ""
+
+	proxyTypes = []string{
+		"Socks4",
+		"Socks5",
+		"HTTP",
+		"HTTPS",
+	}
 )
 
 const (
@@ -334,12 +342,12 @@ func Reload() *Configuration {
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
 
-		// ProxyType:     settings["proxy_type"].(int),
-		// SocksEnabled:  settings["socks_enabled"].(bool),
-		// SocksHost:     settings["socks_host"].(string),
-		// SocksPort:     settings["socks_port"].(int),
-		// SocksLogin:    settings["socks_login"].(string),
-		// SocksPassword: settings["socks_password"].(string),
+		ProxyType:     settings["proxy_type"].(int),
+		ProxyEnabled:  settings["proxy_enabled"].(bool),
+		ProxyHost:     settings["proxy_host"].(string),
+		ProxyPort:     settings["proxy_port"].(int),
+		ProxyLogin:    settings["proxy_login"].(string),
+		ProxyPassword: settings["proxy_password"].(string),
 
 		CompletedMove:       settings["completed_move"].(bool),
 		CompletedMoviesPath: settings["completed_movies_path"].(string),
@@ -385,6 +393,16 @@ func Reload() *Configuration {
 	// Setup OSDB language
 	if newConfig.OSDBAutoLanguage || newConfig.OSDBLanguage == "" {
 		newConfig.OSDBLanguage = newConfig.Language
+	}
+
+	// Collect proxy settings
+	if newConfig.ProxyEnabled && newConfig.ProxyHost != "" {
+		newConfig.ProxyURL = proxyTypes[newConfig.ProxyType] + "://"
+		if newConfig.ProxyLogin != "" || newConfig.ProxyPassword != "" {
+			newConfig.ProxyURL += newConfig.ProxyLogin + ":" + newConfig.ProxyPassword + "@"
+		}
+
+		newConfig.ProxyURL += newConfig.ProxyHost + ":" + strconv.Itoa(newConfig.ProxyPort)
 	}
 
 	lock.Lock()
