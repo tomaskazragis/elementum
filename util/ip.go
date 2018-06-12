@@ -109,7 +109,7 @@ loopPorts:
 	for p := confPortMax; p >= confPortMin; p-- {
 		for _, ip := range listenIPs {
 			addr := ip + ":" + strconv.Itoa(p)
-			if !testPortUsed("tcp", addr) && !testPortUsed("udp", ":::"+strconv.Itoa(p)) {
+			if !isPortUsed("tcp", addr) && !isPortUsed("udp", addr) {
 				listenIP = ip
 				listenPort = p
 				break loopPorts
@@ -120,24 +120,28 @@ loopPorts:
 	if len(listenIPv6s) != 0 {
 		for _, ip := range listenIPv6s {
 			addr := ip + ":" + strconv.Itoa(listenPort)
-			if !testPortUsed("tcp6", addr) {
+			if !isPortUsed("tcp6", addr) {
 				listenIPv6 = ip
 				break
 			}
 		}
 	}
 
-	if testPortUsed("tcp6", listenIPv6+":"+strconv.Itoa(listenPort)) {
+	if isPortUsed("tcp6", listenIPv6+":"+strconv.Itoa(listenPort)) {
 		disableIPv6 = true
 	}
 
 	return
 }
 
-// testPortUsed tries to do simple net connection to detect if it's available.
-// Not using net.Listen, because it does not always really Close the socket
-// (see socket reuse settings)
-func testPortUsed(network string, addr string) bool {
+func isPortUsed(network string, addr string) bool {
+	if strings.Contains(network, "tcp") {
+		return isTCPPortUsed(network, addr)
+	}
+	return isUDPPortUsed(network, addr)
+}
+
+func isTCPPortUsed(network string, addr string) bool {
 	conn, err := net.DialTimeout(network, addr, 100*time.Millisecond)
 	if conn != nil && err == nil {
 		conn.Close()
@@ -150,4 +154,16 @@ func testPortUsed(network string, addr string) bool {
 	}
 
 	return false
+}
+
+// isUDPPortUsed checks whether UDP port is used by anyone
+func isUDPPortUsed(network string, addr string) bool {
+	udpaddr, _ := net.ResolveUDPAddr(network, addr)
+	conn, err := net.ListenUDP(network, udpaddr)
+	if conn != nil && err == nil {
+		conn.Close()
+		return false
+	}
+
+	return true
 }

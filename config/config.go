@@ -23,38 +23,39 @@ const maxMemorySize = 200 * 1024 * 1024
 
 // Configuration ...
 type Configuration struct {
-	DownloadPath           string
-	TorrentsPath           string
-	LibraryPath            string
-	Info                   *xbmc.AddonInfo
-	Platform               *xbmc.Platform
-	Language               string
-	ProfilePath            string
-	SpoofUserAgent         int
-	KeepDownloading        int
-	KeepFilesPlaying       int
-	KeepFilesFinished      int
-	DisableBgProgress      bool
-	ForceUseTrakt          bool
-	ResultsPerPage         int
-	EnableOverlayStatus    bool
-	SilentStreamStart      bool
-	ChooseStreamAuto       bool
-	ForceLinkType          bool
-	UseOriginalTitle       bool
-	AddSpecials            bool
-	ShowUnairedSeasons     bool
-	ShowUnairedEpisodes    bool
-	SmartEpisodeMatch      bool
-	DownloadStorage        int
-	AutoMemorySize         bool
-	AutoMemorySizeStrategy int
-	MemorySize             int
-	BufferSize             int
-	UploadRateLimit        int
-	DownloadRateLimit      int
-	LimitAfterBuffering    bool
-	ConnectionsLimit       int
+	DownloadPath              string
+	TorrentsPath              string
+	LibraryPath               string
+	Info                      *xbmc.AddonInfo
+	Platform                  *xbmc.Platform
+	Language                  string
+	ProfilePath               string
+	SpoofUserAgent            int
+	KeepDownloading           int
+	KeepFilesPlaying          int
+	KeepFilesFinished         int
+	DisableBgProgress         bool
+	DisableBgProgressPlayback bool
+	ForceUseTrakt             bool
+	ResultsPerPage            int
+	EnableOverlayStatus       bool
+	SilentStreamStart         bool
+	ChooseStreamAuto          bool
+	ForceLinkType             bool
+	UseOriginalTitle          bool
+	AddSpecials               bool
+	ShowUnairedSeasons        bool
+	ShowUnairedEpisodes       bool
+	SmartEpisodeMatch         bool
+	DownloadStorage           int
+	AutoMemorySize            bool
+	AutoMemorySizeStrategy    int
+	MemorySize                int
+	BufferSize                int
+	UploadRateLimit           int
+	DownloadRateLimit         int
+	LimitAfterBuffering       bool
+	ConnectionsLimit          int
 	// SessionSave         int
 	// ShareRatioLimit     int
 	// SeedTimeRatioLimit  int
@@ -258,37 +259,38 @@ func Reload() *Configuration {
 	}
 
 	newConfig := Configuration{
-		DownloadPath:           downloadPath,
-		LibraryPath:            libraryPath,
-		TorrentsPath:           filepath.Join(downloadPath, "Torrents"),
-		Info:                   info,
-		Platform:               platform,
-		Language:               xbmc.GetLanguageISO639_1(),
-		ProfilePath:            info.Profile,
-		DownloadStorage:        settings["download_storage"].(int),
-		AutoMemorySize:         settings["auto_memory_size"].(bool),
-		AutoMemorySizeStrategy: settings["auto_memory_size_strategy"].(int),
-		MemorySize:             settings["memory_size"].(int) * 1024 * 1024,
-		BufferSize:             settings["buffer_size"].(int) * 1024 * 1024,
-		UploadRateLimit:        settings["max_upload_rate"].(int) * 1024,
-		DownloadRateLimit:      settings["max_download_rate"].(int) * 1024,
-		SpoofUserAgent:         settings["spoof_user_agent"].(int),
-		LimitAfterBuffering:    settings["limit_after_buffering"].(bool),
-		KeepDownloading:        settings["keep_downloading"].(int),
-		KeepFilesPlaying:       settings["keep_files_playing"].(int),
-		KeepFilesFinished:      settings["keep_files_finished"].(int),
-		DisableBgProgress:      settings["disable_bg_progress"].(bool),
-		ForceUseTrakt:          settings["force_use_trakt"].(bool),
-		ResultsPerPage:         settings["results_per_page"].(int),
-		EnableOverlayStatus:    settings["enable_overlay_status"].(bool),
-		SilentStreamStart:      settings["silent_stream_start"].(bool),
-		ChooseStreamAuto:       settings["choose_stream_auto"].(bool),
-		ForceLinkType:          settings["force_link_type"].(bool),
-		UseOriginalTitle:       settings["use_original_title"].(bool),
-		AddSpecials:            settings["add_specials"].(bool),
-		ShowUnairedSeasons:     settings["unaired_seasons"].(bool),
-		ShowUnairedEpisodes:    settings["unaired_episodes"].(bool),
-		SmartEpisodeMatch:      settings["smart_episode_match"].(bool),
+		DownloadPath:              downloadPath,
+		LibraryPath:               libraryPath,
+		TorrentsPath:              filepath.Join(downloadPath, "Torrents"),
+		Info:                      info,
+		Platform:                  platform,
+		Language:                  xbmc.GetLanguageISO639_1(),
+		ProfilePath:               info.Profile,
+		DownloadStorage:           settings["download_storage"].(int),
+		AutoMemorySize:            settings["auto_memory_size"].(bool),
+		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
+		MemorySize:                settings["memory_size"].(int) * 1024 * 1024,
+		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
+		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
+		DownloadRateLimit:         settings["max_download_rate"].(int) * 1024,
+		SpoofUserAgent:            settings["spoof_user_agent"].(int),
+		LimitAfterBuffering:       settings["limit_after_buffering"].(bool),
+		KeepDownloading:           settings["keep_downloading"].(int),
+		KeepFilesPlaying:          settings["keep_files_playing"].(int),
+		KeepFilesFinished:         settings["keep_files_finished"].(int),
+		DisableBgProgress:         settings["disable_bg_progress"].(bool),
+		DisableBgProgressPlayback: settings["disable_bg_progress_playback"].(bool),
+		ForceUseTrakt:             settings["force_use_trakt"].(bool),
+		ResultsPerPage:            settings["results_per_page"].(int),
+		EnableOverlayStatus:       settings["enable_overlay_status"].(bool),
+		SilentStreamStart:         settings["silent_stream_start"].(bool),
+		ChooseStreamAuto:          settings["choose_stream_auto"].(bool),
+		ForceLinkType:             settings["force_link_type"].(bool),
+		UseOriginalTitle:          settings["use_original_title"].(bool),
+		AddSpecials:               settings["add_specials"].(bool),
+		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),
+		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
+		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit:        settings["seed_time_limit"].(int),

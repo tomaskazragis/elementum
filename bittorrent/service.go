@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/sanity-io/litter"
 	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/dht"
@@ -155,10 +156,10 @@ func (s *BTService) configure() {
 	}
 
 	s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6 = util.GetListenAddr(s.config.ListenAutoDetectIP, s.config.ListenAutoDetectPort, s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+	// if s.ListenIP != "" && s.ListenIPv6 == "" {
+	// 	s.DisableIPv6 = true
+	// }
 	log.Infof("ListenIP=%s, ListenIPv6=%s, ListenPort=%d, DisableIPv6=%v", s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6)
-	if s.ListenIP != "" && s.ListenIPv6 == "" {
-		s.DisableIPv6 = true
-	}
 
 	blocklist, _ := iplist.MMapPackedFile(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
 
@@ -239,7 +240,7 @@ func (s *BTService) configure() {
 	}
 
 	var err error
-	log.Debugf("BitClient config: %#v", s.ClientConfig)
+	log.Debugf("BitClient config: %s", litter.Sdump(s.ClientConfig))
 	s.ClientConfig.IPBlocklist = blocklist
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
 		// If client can't be created - we should panic
@@ -681,7 +682,7 @@ func (s *BTService) downloadProgress() {
 					showTorrent = fmt.Sprintf("%s - %s - %s", torrentName, humanize.Bytes(uint64(activeTorrents[showNext].downloadRate))+"/s", humanize.Bytes(uint64(activeTorrents[showNext].uploadRate))+"/s")
 					showNext++
 				}
-				if !s.config.DisableBgProgress {
+				if !s.config.DisableBgProgress && (!s.config.DisableBgProgressPlayback || !s.anyPlayerIsPlaying()) {
 					if s.dialogProgressBG == nil {
 						s.dialogProgressBG = xbmc.NewDialogProgressBG("Elementum", "")
 					}
@@ -689,7 +690,7 @@ func (s *BTService) downloadProgress() {
 						s.dialogProgressBG.Update(showProgress, "Elementum", showTorrent)
 					}
 				}
-			} else if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
+			} else if (!s.config.DisableBgProgress || (s.config.DisableBgProgressPlayback && s.anyPlayerIsPlaying())) && s.dialogProgressBG != nil {
 				s.dialogProgressBG.Close()
 				s.dialogProgressBG = nil
 			}
