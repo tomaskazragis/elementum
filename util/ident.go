@@ -12,8 +12,8 @@ var (
 	// Version ...
 	Version = "v0.0.1"
 
-	// GoTorrentVersion
-	GoTorrentVersion = "v0.0.1"
+	// GoTorrentVersion ...
+	GoTorrentVersion = "v0.0.1-000000"
 )
 
 // GetVersion returns version, provided to compiler

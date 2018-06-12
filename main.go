@@ -136,9 +136,12 @@ func main() {
 	go watchParentProcess()
 
 	http.Handle("/", api.Routes(btService))
+
 	http.Handle("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.ClientInfo(w)
 	}))
+	http.Handle("/debug/bundle", bittorrent.DebugBundle(btService))
+
 	http.Handle("/files/", bittorrent.ServeTorrent(btService, config.Get().DownloadPath))
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.Reconfigure()
