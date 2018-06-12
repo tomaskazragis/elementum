@@ -3,10 +3,10 @@ package bittorrent
 import (
 	"fmt"
 	"io"
-	"strconv"  
-	"strings"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/config"
@@ -26,10 +26,9 @@ func DebugBundle(s *BTService) http.Handler {
 
 		now := time.Now()
 		fileName := fmt.Sprintf("bundle_%d_%d_%d_%d_%d.log", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute())
-		w.Header().Set("Content-Disposition", "attachment; filename=" + fileName)
+		w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
 		w.Header().Set("Content-Type", "text/plain")
 
-		
 		writeHeader(w, "Torrent Client")
 		writeResponse(w, "/info")
 
@@ -56,7 +55,7 @@ func writeHeader(w http.ResponseWriter, title string) {
 func writeResponse(w http.ResponseWriter, url string) {
 	w.Write([]byte("Response for url: " + url + "\n\n"))
 
-	resp, err := http.Get("http://127.0.0.1:"+strconv.Itoa(config.ListenPort) + url)
+	resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(config.ListenPort) + url)
 	if err != nil {
 		return
 	}
