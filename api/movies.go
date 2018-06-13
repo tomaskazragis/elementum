@@ -411,7 +411,14 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents := movieLinks(tmdbID)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		if torrents, err = GetCachedTorrents(tmdbID); err != nil || len(torrents) == 0 {
+			torrents = movieLinks(tmdbID)
+
+			SetCachedTorrents(tmdbID, torrents)
+		}
 
 		if len(torrents) == 0 {
 			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
@@ -516,7 +523,15 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents := movieLinks(tmdbID)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		if torrents, err = GetCachedTorrents(tmdbID); err != nil || len(torrents) == 0 {
+			torrents = movieLinks(tmdbID)
+
+			SetCachedTorrents(tmdbID, torrents)
+		}
+
 		if len(torrents) == 0 {
 			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
 			return

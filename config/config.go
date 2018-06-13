@@ -12,6 +12,7 @@ import (
 
 	"github.com/elgatito/elementum/xbmc"
 
+	"github.com/bogdanovich/dns_resolver"
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
 	"github.com/pbnjay/memory"
@@ -38,6 +39,9 @@ type Configuration struct {
 	DisableBgProgress         bool
 	DisableBgProgressPlayback bool
 	ForceUseTrakt             bool
+	UseCacheSelection         bool
+	UseCacheSearch            bool
+	CacheSearchDuration       int
 	ResultsPerPage            int
 	EnableOverlayStatus       bool
 	SilentStreamStart         bool
@@ -107,6 +111,8 @@ type Configuration struct {
 	PercentageAdditionalSeeders int
 
 	UsePublicDNS                 bool
+	PublicDNSList                string
+	OpennicDNSList               string
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
 
@@ -143,6 +149,14 @@ var (
 		"HTTP",
 		"HTTPS",
 	}
+)
+
+var (
+	// ResolverPublic ...
+	ResolverPublic = dns_resolver.New([]string{"8.8.8.8", "8.8.4.4", "9.9.9.9"})
+
+	// ResolverOpennic ...
+	ResolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
 )
 
 const (
@@ -282,6 +296,9 @@ func Reload() *Configuration {
 		DisableBgProgress:         settings["disable_bg_progress"].(bool),
 		DisableBgProgressPlayback: settings["disable_bg_progress_playback"].(bool),
 		ForceUseTrakt:             settings["force_use_trakt"].(bool),
+		UseCacheSelection:         settings["use_cache_selection"].(bool),
+		UseCacheSearch:            settings["use_cache_search"].(bool),
+		CacheSearchDuration:       settings["cache_search_duration"].(int),
 		ResultsPerPage:            settings["results_per_page"].(int),
 		EnableOverlayStatus:       settings["enable_overlay_status"].(bool),
 		SilentStreamStart:         settings["silent_stream_start"].(bool),
@@ -342,6 +359,8 @@ func Reload() *Configuration {
 		PercentageAdditionalSeeders: settings["percentage_additional_seeders"].(int),
 
 		UsePublicDNS:                 settings["use_public_dns"].(bool),
+		PublicDNSList:                settings["public_dns_list"].(string),
+		OpennicDNSList:               settings["opennic_dns_list"].(string),
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
 
@@ -406,6 +425,17 @@ func Reload() *Configuration {
 		}
 
 		newConfig.ProxyURL += newConfig.ProxyHost + ":" + strconv.Itoa(newConfig.ProxyPort)
+	}
+
+	// Reloading DNS resolvers
+	newConfig.PublicDNSList = strings.Replace(newConfig.PublicDNSList, " ", "", -1)
+	if newConfig.PublicDNSList != "" {
+		ResolverPublic = dns_resolver.New(strings.Split(newConfig.PublicDNSList, ","))
+	}
+
+	newConfig.OpennicDNSList = strings.Replace(newConfig.OpennicDNSList, " ", "", -1)
+	if newConfig.OpennicDNSList != "" {
+		ResolverOpennic = dns_resolver.New(strings.Split(newConfig.OpennicDNSList, ","))
 	}
 
 	lock.Lock()

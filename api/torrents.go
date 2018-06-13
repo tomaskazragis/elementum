@@ -19,8 +19,10 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
-var torrentsLog = logging.MustGetLogger("torrents")
-var cachedTorrents = map[int]string{}
+var (
+	torrentsLog    = logging.MustGetLogger("torrents")
+	cachedTorrents = map[int]string{}
+)
 
 // TorrentsWeb ...
 type TorrentsWeb struct {
@@ -56,6 +58,10 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 
 // InTorrentsMap ...
 func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
+	if !config.Get().UseCacheSelection {
+		return nil
+	}
+
 	var infohash string
 	var infohashID int64
 	var b []byte
@@ -78,6 +84,26 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 	}
 
 	return nil
+}
+
+// GetCachedTorrents searches for torrent entries in the cache
+func GetCachedTorrents(tmdbID string) ([]*bittorrent.TorrentFile, error) {
+	if !config.Get().UseCacheSearch {
+		return nil, fmt.Errorf("Caching is disabled")
+	}
+
+	cacheDB := database.GetCache()
+
+	var ret []*bittorrent.TorrentFile
+	err := cacheDB.GetCachedObject(database.CommonBucket, tmdbID, &ret)
+	return ret, err
+}
+
+// SetCachedTorrents caches torrent search results in cache
+func SetCachedTorrents(tmdbID string, torrents []*bittorrent.TorrentFile) error {
+	cacheDB := database.GetCache()
+
+	return cacheDB.SetCachedObject(database.CommonBucket, config.Get().CacheSearchDuration, tmdbID, torrents)
 }
 
 // ListTorrents ...

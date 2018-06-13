@@ -467,7 +467,16 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents, err := showSeasonLinks(showID, seasonNumber)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		fakeTmdbID := strconv.Itoa(showID) + "_" + strconv.Itoa(seasonNumber)
+		if torrents, err = GetCachedTorrents(fakeTmdbID); err != nil || len(torrents) == 0 {
+			torrents, err = showSeasonLinks(showID, seasonNumber)
+
+			SetCachedTorrents(fakeTmdbID, torrents)
+		}
+
 		if err != nil {
 			ctx.Error(err)
 			return
@@ -583,7 +592,16 @@ func ShowSeasonPlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents, err := showSeasonLinks(showID, seasonNumber)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		fakeTmdbID := strconv.Itoa(showID) + "_" + strconv.Itoa(seasonNumber)
+		if torrents, err = GetCachedTorrents(fakeTmdbID); err != nil || len(torrents) == 0 {
+			torrents, err = showSeasonLinks(showID, seasonNumber)
+
+			SetCachedTorrents(fakeTmdbID, torrents)
+		}
+
 		if err != nil {
 			ctx.Error(err)
 			return
@@ -718,7 +736,16 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents, err := showEpisodeLinks(showID, seasonNumber, episodeNumber)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		fakeTmdbID := strconv.Itoa(showID) + "_" + strconv.Itoa(seasonNumber) + "_" + strconv.Itoa(episodeNumber)
+		if torrents, err = GetCachedTorrents(fakeTmdbID); err != nil || len(torrents) == 0 {
+			torrents, err = showEpisodeLinks(showID, seasonNumber, episodeNumber)
+
+			SetCachedTorrents(fakeTmdbID, torrents)
+		}
+
 		if err != nil {
 			ctx.Error(err)
 			return
@@ -847,10 +874,14 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		torrents, err := showEpisodeLinks(showID, seasonNumber, episodeNumber)
-		if err != nil {
-			ctx.Error(err)
-			return
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		fakeTmdbID := strconv.Itoa(showID) + "_" + strconv.Itoa(seasonNumber) + "_" + strconv.Itoa(episodeNumber)
+		if torrents, err = GetCachedTorrents(fakeTmdbID); err != nil || len(torrents) == 0 {
+			torrents, err = showEpisodeLinks(showID, seasonNumber, episodeNumber)
+
+			SetCachedTorrents(fakeTmdbID, torrents)
 		}
 
 		if len(torrents) == 0 {

@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bogdanovich/dns_resolver"
-
 	"github.com/elgatito/elementum/config"
 )
 
@@ -23,8 +21,6 @@ import (
 var (
 	dnsCacheResults sync.Map
 	dnsCacheLocks   sync.Map
-	resolverPublic  = dns_resolver.New([]string{"8.8.8.8", "8.8.4.4", "9.9.9.9"})
-	resolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
 
 	dialer = &net.Dialer{
 		Timeout:   10 * time.Second,
@@ -96,7 +92,7 @@ func resolveAddr(host string) (ip string) {
 		return cached.(string)
 	}
 
-	ips, err := resolverPublic.LookupHost(host)
+	ips, err := config.ResolverPublic.LookupHost(host)
 	if err == nil && len(ips) > 0 {
 		ip = ips[0].String()
 		return
@@ -106,7 +102,7 @@ func resolveAddr(host string) (ip string) {
 		return cached.(string)
 	}
 
-	ips, err = resolverOpennic.LookupHost(host)
+	ips, err = config.ResolverOpennic.LookupHost(host)
 	if err == nil && len(ips) > 0 {
 		ip = ips[0].String()
 		return

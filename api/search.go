@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/elgatito/elementum/bittorrent"
@@ -9,6 +10,8 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/xbmc"
+
+	"github.com/cespare/xxhash"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 )
@@ -42,10 +45,27 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		searchLog.Infof("Searching providers for: %s", query)
+		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
+		if torrent := InTorrentsMap(fakeTmdbID); torrent != nil {
+			rURL := URLQuery(
+				URLForXBMC("/play"), "uri", torrent.URI,
+				"tmdb", fakeTmdbID,
+				"type", "search")
+			xbmc.PlayURL(rURL)
+			return
+		}
 
-		searchers := providers.GetSearchers()
-		torrents := providers.Search(searchers, query)
+		var torrents []*bittorrent.TorrentFile
+		var err error
+
+		if torrents, err = GetCachedTorrents(fakeTmdbID); err != nil || len(torrents) == 0 {
+			searchLog.Infof("Searching providers for: %s", query)
+
+			searchers := providers.GetSearchers()
+			torrents = providers.Search(searchers, query)
+
+			SetCachedTorrents(fakeTmdbID, torrents)
+		}
 
 		if len(torrents) == 0 {
 			xbmc.Notify("Elementum", "LOCALIZE[30205]", config.AddonIcon())
@@ -95,7 +115,11 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		choice := xbmc.ListDialogLarge("LOCALIZE[30228]", query, choices...)
 		if choice >= 0 {
-			xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", torrents[choice].URI))
+			AddToTorrentsMap(fakeTmdbID, torrents[choice])
+
+			xbmc.PlayURL(URLQuery(URLForXBMC("/play"),
+				"uri", torrents[choice].URI,
+				"type", "search"))
 		}
 	}
 }
