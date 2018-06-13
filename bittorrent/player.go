@@ -177,13 +177,17 @@ func (btp *BTPlayer) Buffer() error {
 }
 
 func (btp *BTPlayer) waitCheckAvailableSpace() {
+	if btp.s.config.DownloadStorage == estorage.StorageMemory {
+		return
+	}
+
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if btp.hasChosenFile && btp.isDownloading {
+			if btp.hasChosenFile {
 				status := btp.s.CheckAvailableSpace(btp.Torrent)
 				if !status {
 					btp.bufferEvents.Broadcast(errors.New("Not enough space on download destination"))
