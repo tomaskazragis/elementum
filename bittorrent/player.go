@@ -26,6 +26,7 @@ import (
 	estorage "github.com/elgatito/elementum/storage"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -139,9 +140,9 @@ func (btp *BTPlayer) addTorrent() error {
 func (btp *BTPlayer) PlayURL() string {
 	if btp.Torrent.IsRarArchive {
 		extractedPath := filepath.Join(filepath.Dir(btp.chosenFile.Path()), "extracted", btp.extracted)
-		return strings.Join(strings.Split(extractedPath, string(os.PathSeparator)), "/")
+		return util.EncodeFileURL(extractedPath)
 	}
-	return strings.Join(strings.Split(btp.chosenFile.Path(), string(os.PathSeparator)), "/")
+	return util.EncodeFileURL(btp.chosenFile.Path())
 }
 
 // Buffer ...

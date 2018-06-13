@@ -12,6 +12,8 @@ import (
 	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/op/go-logging"
+
+	"github.com/elgatito/elementum/util"
 )
 
 var tfsLog = logging.MustGetLogger("torrentfs")
@@ -47,7 +49,8 @@ func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 }
 
 // GetTorrentForPath ...
-func GetTorrentForPath(s *BTService, path string, url string, r *http.Request) (*FileReader, error) {
+func GetTorrentForPath(s *BTService, upath string, url string, r *http.Request) (*FileReader, error) {
+	path := util.DecodeFileURL(upath)
 	dir := string(http.Dir(path))
 	if file, err := os.Open(filepath.Join(dir, url)); err == nil {
 		// make sure we don't open a file that's locked, as it can happen

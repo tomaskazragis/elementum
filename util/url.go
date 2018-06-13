@@ -2,6 +2,8 @@ package util
 
 import (
 	"fmt"
+	"net/url"
+	"os"
 	"strings"
 )
 
@@ -18,4 +20,24 @@ func TrailerURL(u string) (ret string) {
 	}
 
 	return
+}
+
+// DecodeFileURL decodes file path from url
+func DecodeFileURL(u string) (ret string) {
+	us := strings.Split(u, string("/"))
+	for _, v := range us {
+		v, _ = url.PathUnescape(v)
+	}
+
+	return strings.Join(us, string(os.PathSeparator))
+}
+
+// EncodeFileURL encode file path into proper url
+func EncodeFileURL(u string) (ret string) {
+	us := strings.Split(u, string(os.PathSeparator))
+	for _, v := range us {
+		v = url.PathEscape(v)
+	}
+
+	return strings.Join(us, "/")
 }

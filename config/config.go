@@ -15,6 +15,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
 	"github.com/pbnjay/memory"
+	"github.com/sanity-io/litter"
 )
 
 var log = logging.MustGetLogger("config")
@@ -412,6 +413,8 @@ func Reload() *Configuration {
 	lock.Unlock()
 
 	go CheckBurst()
+
+	log.Debugf("Using configuration: %s", litter.Sdump(config))
 
 	return config
 }
