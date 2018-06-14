@@ -25,6 +25,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	r.GET("/", Index)
 	r.GET("/search", Search(btService))
+	r.GET("/search/:tmdbId/infolabels", InfoLabelsSearch(btService))
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(btService))
 	r.GET("/changelog", Changelog)

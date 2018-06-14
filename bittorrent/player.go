@@ -84,6 +84,7 @@ type PlayerParams struct {
 	ShowID        int
 	Season        int
 	Episode       int
+	Query         string
 	Resume        *library.Resume
 }
 
@@ -231,7 +232,7 @@ func (btp *BTPlayer) onMetadataReceived() {
 	btp.log.Infof("Chosen file: %s", btp.fileName)
 	btp.log.Infof("Saving torrent to database")
 
-	database.Get().UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, []*gotorrent.File{btp.chosenFile, btp.subtitlesFile}, btp.p.ShowID, btp.p.Season, btp.p.Episode)
+	database.Get().UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, []*gotorrent.File{btp.chosenFile, btp.subtitlesFile}, btp.p.Query, btp.p.ShowID, btp.p.Season, btp.p.Episode)
 	btp.Torrent.DBItem = database.Get().GetBTItem(infoHash)
 
 	btp.log.Info("Setting file priorities")

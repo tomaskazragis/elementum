@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -155,6 +158,48 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 		if lm, err := library.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
 			log.Debugf("Found movie in library: %+v", lm)
 			item.Info.DBID = lm.UIDs.Kodi
+		}
+
+		saveEncoded(encodeItem(item))
+
+		ctx.JSON(200, item)
+	}
+}
+
+// InfoLabelsSearch ...
+func InfoLabelsSearch(btService *bittorrent.BTService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		tmdbID := ctx.Params.ByName("tmdbId")
+
+		torrent := btService.GetTorrentByFakeID(tmdbID)
+		if torrent == nil || torrent.DBItem == nil {
+			ctx.Error(errors.New("Unable to find the torrent"))
+			return
+		}
+
+		// Collecting downloaded file names into string to show in a subtitle
+		chosenFiles := map[string]bool{}
+		for _, f := range torrent.ChosenFiles {
+			chosenFiles[filepath.Base(f.DisplayPath())] = true
+		}
+		chosenFileNames := []string{}
+		for k := range chosenFiles {
+			chosenFileNames = append(chosenFileNames, k)
+		}
+		sort.Sort(sort.StringSlice(chosenFileNames))
+		subtitle := strings.Join(chosenFileNames, ", ")
+
+		item := &xbmc.ListItem{
+			Label:  torrent.DBItem.Query,
+			Label2: subtitle,
+			Info: &xbmc.ListItemInfo{
+				Title:         torrent.DBItem.Query,
+				OriginalTitle: torrent.DBItem.Query,
+				TVShowTitle:   subtitle,
+				DBTYPE:        "episode",
+				Mediatype:     "episode",
+			},
+			Art: &xbmc.ListItemArt{},
 		}
 
 		saveEncoded(encodeItem(item))

@@ -18,6 +18,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
+		query := ctx.Query("query")
 		contentType := ctx.Query("type")
 		tmdb := ctx.Query("tmdb")
 		show := ctx.Query("show")
@@ -80,6 +81,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			ShowID:       showID,
 			Season:       seasonNumber,
 			Episode:      episodeNumber,
+			Query:        query,
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)
@@ -125,6 +127,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				show        string
 				season      string
 				episode     string
+				query       string
 				contentType string
 			)
 			torrentHandle := btService.Torrents[resume]
@@ -141,6 +144,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 						season = strconv.Itoa(dbItem.Season)
 						episode = strconv.Itoa(dbItem.Episode)
 					}
+					query = dbItem.Query
 				}
 			}
 			xbmc.PlayURL(URLQuery(URLForXBMC("/play"),
@@ -150,6 +154,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				"show", show,
 				"season", season,
 				"episode", episode,
+				"query", query,
 				"type", contentType))
 		}
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")

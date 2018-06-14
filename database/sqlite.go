@@ -233,6 +233,10 @@ func (d *SqliteDatabase) GetBTItem(infoHash string) *BTItem {
 		item.Season, _ = strconv.Atoi(infos[1])
 		item.Episode, _ = strconv.Atoi(infos[2])
 	}
+	if len(infos) >= 4 {
+		item.Query = infos[3]
+	}
+
 	return item
 }
 
@@ -243,7 +247,7 @@ func (d *SqliteDatabase) UpdateStatusBTItem(infoHash string, status int) error {
 }
 
 // UpdateBTItem ...
-func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []*gotorrent.File, infos ...int) error {
+func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []*gotorrent.File, query string, infos ...int) error {
 	fileStr := ""
 	for _, f := range files {
 		if f != nil {
@@ -261,6 +265,10 @@ func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType st
 		}
 		infoStr += strconv.Itoa(f)
 	}
+	if len(infoStr) > 0 {
+		infoStr += "|"
+	}
+	infoStr += query
 
 	_, err := d.Exec(`INSERT OR REPLACE INTO tinfo (infohash, state, mediaID, mediaType, files, infos) VALUES (?, ?, ?, ?, ?, ?)`, infoHash, StatusActive, mediaID, mediaType, fileStr, infoStr)
 	if err != nil {

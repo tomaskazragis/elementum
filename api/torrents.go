@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
@@ -96,6 +97,16 @@ func GetCachedTorrents(tmdbID string) ([]*bittorrent.TorrentFile, error) {
 
 	var ret []*bittorrent.TorrentFile
 	err := cacheDB.GetCachedObject(database.CommonBucket, tmdbID, &ret)
+	if len(ret) > 0 {
+		for _, t := range ret {
+			if !strings.HasPrefix(t.URI, "magnet:") {
+				if _, err = os.Open(t.URI); err != nil {
+					return nil, fmt.Errorf("Cache is not up to date")
+				}
+			}
+		}
+	}
+
 	return ret, err
 }
 

@@ -347,7 +347,7 @@ func (database *BoltDatabase) GetCached(bucket []byte, key string) (string, erro
 // GetCachedObject ...
 func (database *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
 	v, err := database.GetCachedBytes(bucket, key)
-	if err != nil {
+	if err != nil || len(v) == 0 {
 		return err
 	}
 

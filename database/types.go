@@ -45,6 +45,7 @@ type BTItem struct {
 	ShowID  int      `json:"showid"`
 	Season  int      `json:"season"`
 	Episode int      `json:"episode"`
+	Query   string   `json:"query"`
 }
 
 var (

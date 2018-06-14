@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/sanity-io/litter"
 	"golang.org/x/time/rate"
@@ -895,6 +897,24 @@ func (s *BTService) HasTorrentByID(tmdbID int) string {
 	return ""
 }
 
+// HasTorrentByQuery checks whether there is active torrent with searches query
+func (s *BTService) HasTorrentByQuery(query string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil || t.DBItem == nil {
+			continue
+		}
+
+		if t.DBItem.Query == query {
+			return t.InfoHash()
+		}
+	}
+
+	return ""
+}
+
 // HasTorrentBySeason checks whether there is active torrent for queried season
 func (s *BTService) HasTorrentBySeason(tmdbID int, season int) string {
 	s.mu.Lock()
@@ -947,6 +967,25 @@ func (s *BTService) HasTorrentByName(query string) string {
 	}
 
 	return ""
+}
+
+// GetTorrentByFakeID checks whether there is active torrent with fake id
+func (s *BTService) GetTorrentByFakeID(query string) *Torrent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, t := range s.Torrents {
+		if t == nil || t.DBItem == nil {
+			continue
+		}
+
+		id := strconv.FormatUint(xxhash.Sum64String(t.DBItem.Query), 10)
+		if id == query {
+			return t
+		}
+	}
+
+	return nil
 }
 
 // GetListenIP returns calculated IP for TCP/TCP6
