@@ -94,4 +94,4 @@ binaries:
 
 pull:
 	docker pull elgatito/xgo-latest
-	docker pull elgatito/xgo-1.10.1
+	docker pull elgatito/xgo-1.10.3
