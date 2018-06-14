@@ -235,6 +235,8 @@ func (s *BTService) configure() {
 		PeerID: util.PeerIDRandom(s.PeerID),
 
 		HTTPUserAgent: s.UserAgent,
+
+		EstablishedConnsPerTorrent: s.config.ConnectionsLimit,
 	}
 
 	if !s.config.LimitAfterBuffering {

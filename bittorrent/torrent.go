@@ -397,7 +397,9 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 func (t *Torrent) GetState() int {
 	// log.Debugf("Status: %#v, %#v, %#v, %#v ", t.IsBuffering, t.BytesCompleted(), t.BytesMissing(), t.Stats())
 
-	if t.IsBuffering {
+	if t.IsPaused {
+		return StatusPaused
+	} else if t.IsBuffering {
 		return StatusBuffering
 	}
 
@@ -599,7 +601,7 @@ func (t *Torrent) Pause() {
 // Resume ...
 func (t *Torrent) Resume() {
 	if t.Torrent != nil {
-		t.Torrent.SetMaxEstablishedConns(1000)
+		t.Torrent.SetMaxEstablishedConns(config.Get().ConnectionsLimit)
 	}
 	t.IsPaused = false
 }

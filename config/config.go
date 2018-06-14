@@ -438,6 +438,12 @@ func Reload() *Configuration {
 		ResolverOpennic = dns_resolver.New(strings.Split(newConfig.OpennicDNSList, ","))
 	}
 
+	// Setting default connection limit per torrent.
+	// This should be taken from gotorrent.Config{} defaults, but it's set internally.
+	if newConfig.ConnectionsLimit == 0 {
+		newConfig.ConnectionsLimit = 50
+	}
+
 	lock.Lock()
 	config = &newConfig
 	lock.Unlock()
