@@ -35,8 +35,8 @@ func DecodeFileURL(u string) (ret string) {
 // EncodeFileURL encode file path into proper url
 func EncodeFileURL(u string) (ret string) {
 	us := strings.Split(u, string(os.PathSeparator))
-	for _, v := range us {
-		v = url.PathEscape(v)
+	for i, v := range us {
+		us[i] = url.PathEscape(v)
 	}
 
 	return strings.Join(us, "/")
