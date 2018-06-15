@@ -112,6 +112,15 @@ func PlayTorrent(ctx *gin.Context) {
 func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
+		file, header, fileError := ctx.Request.FormFile("file")
+
+		if file != nil && header != nil && fileError == nil {
+			t, err := saveTorrentFile(file, header)
+			if err == nil && t != "" {
+				uri = t
+			}
+		}
+
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
 

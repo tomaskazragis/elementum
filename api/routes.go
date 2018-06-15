@@ -43,7 +43,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	torrents := r.Group("/torrents")
 	{
 		torrents.GET("/", ListTorrents(btService))
-		torrents.GET("/add", AddTorrent(btService))
+		torrents.Any("/add", AddTorrent(btService))
 		torrents.GET("/pause", PauseSession(btService))
 		torrents.GET("/resume", ResumeSession(btService))
 		torrents.GET("/move/:torrentId", MoveTorrent(btService))
@@ -253,7 +253,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r.GET("/subtitle/:id", SubtitleGet)
 
 	r.GET("/play", Play(btService))
-	r.GET("/playuri", PlayURI(btService))
+	r.Any("/playuri", PlayURI(btService))
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
 

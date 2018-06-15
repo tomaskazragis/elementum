@@ -3,7 +3,9 @@ package api
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -310,6 +312,15 @@ func ResumeSession(btService *bittorrent.BTService) gin.HandlerFunc {
 func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
+		file, header, fileError := ctx.Request.FormFile("file")
+
+		if file != nil && header != nil && fileError == nil {
+			t, err := saveTorrentFile(file, header)
+			if err == nil && t != "" {
+				uri = t
+			}
+		}
+
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 		if uri == "" {
@@ -463,4 +474,32 @@ func GetTorrentFromParam(btService *bittorrent.BTService, param string) (*bittor
 		return nil, errors.New("Torrent not found")
 	}
 	return t, nil
+}
+
+func saveTorrentFile(file multipart.File, header *multipart.FileHeader) (string, error) {
+	if file == nil || header == nil {
+		return "", fmt.Errorf("Not a valid file entry")
+	}
+
+	var err error
+	path := filepath.Join(config.Get().TemporaryPath, filepath.Base(header.Filename))
+	log.Debugf("Saving incoming torrent file to: %s", path)
+
+	if _, err = os.Stat(path); err != nil && !os.IsNotExist(err) {
+		err = os.Remove(path)
+		if err != nil {
+			return "", fmt.Errorf("Could not remove the file: %s", err)
+		}
+	}
+
+	out, err := os.Create(path)
+	if err != nil {
+		return "", fmt.Errorf("Could not create file: %s", err)
+	}
+	defer out.Close()
+	if _, err = io.Copy(out, file); err != nil {
+		return "", fmt.Errorf("Could not write file content: %s", err)
+	}
+
+	return path, nil
 }

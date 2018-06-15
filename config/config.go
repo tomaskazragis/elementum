@@ -31,6 +31,7 @@ type Configuration struct {
 	Info                      *xbmc.AddonInfo
 	Platform                  *xbmc.Platform
 	Language                  string
+	TemporaryPath             string
 	ProfilePath               string
 	SpoofUserAgent            int
 	KeepDownloading           int
@@ -280,6 +281,7 @@ func Reload() *Configuration {
 		Info:                      info,
 		Platform:                  platform,
 		Language:                  xbmc.GetLanguageISO639_1(),
+		TemporaryPath:             info.TempPath,
 		ProfilePath:               info.Profile,
 		DownloadStorage:           settings["download_storage"].(int),
 		AutoMemorySize:            settings["auto_memory_size"].(bool),
