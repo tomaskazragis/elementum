@@ -84,6 +84,11 @@ func Get() *SqliteDatabase {
 	return sqliteDatabase
 }
 
+// GetFilename returns sqlite filename
+func (d *SqliteDatabase) GetFilename() string {
+	return d.fileName
+}
+
 // MaintenanceRefreshHandler ...
 func (d *SqliteDatabase) MaintenanceRefreshHandler() {
 	backupPath := filepath.Join(config.Get().Info.Profile, d.backupFileName)

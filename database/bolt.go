@@ -144,6 +144,11 @@ func GetCache() *BoltDatabase {
 	return cacheDatabase
 }
 
+// GetFilename returns bolt filename
+func (d *BoltDatabase) GetFilename() string {
+	return d.fileName
+}
+
 // Close ...
 func (database *BoltDatabase) Close() {
 	log.Debug("Closing Database")

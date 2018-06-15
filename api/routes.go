@@ -29,6 +29,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(btService))
 	r.GET("/changelog", Changelog)
+	r.GET("/status", Status)
 
 	r.LoadHTMLGlob(filepath.Join(config.Get().Info.Path, "resources", "web", "*.html"))
 	web := r.Group("/web")
