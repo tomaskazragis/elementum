@@ -230,7 +230,9 @@ func Reload() *Configuration {
 	}
 
 	os.RemoveAll(info.TempPath)
-	os.MkdirAll(info.TempPath, 0777)
+	if err := os.MkdirAll(info.TempPath, 0777); err != nil {
+		log.Infof("Could not create temporary directory: %#v", err)
+	}
 
 	if platform.OS == "android" {
 		legacyPath := strings.Replace(info.Path, "/storage/emulated/0", "/storage/emulated/legacy", 1)
