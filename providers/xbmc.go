@@ -253,6 +253,7 @@ func (as *AddonSearcher) call(method string, searchObject interface{}) []*bittor
 	payload := &SearchPayload{
 		Method:       method,
 		CallbackURL:  cbURL,
+		ProxyURL:     config.Get().ProxyURL,
 		SearchObject: searchObject,
 	}
 

@@ -9,6 +9,7 @@ import (
 type SearchPayload struct {
 	Method       string      `json:"method"`
 	CallbackURL  string      `json:"callback_url"`
+	ProxyURL     string      `json:"proxy_url"`
 	SearchObject interface{} `json:"search_object"`
 }
 
