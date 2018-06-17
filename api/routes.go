@@ -24,12 +24,22 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r.GET("/", Index)
-	r.GET("/search", Search(btService))
-	r.GET("/search/:tmdbId/infolabels", InfoLabelsSearch(btService))
+	// r.GET("/search", Search(btService))
+	// r.GET("/search/remove", SearchRemove)
+	// r.GET("/search/clear", SearchClear)
+	// r.GET("/search/:tmdbId/infolabels", InfoLabelsSearch(btService))
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(btService))
 	r.GET("/changelog", Changelog)
 	r.GET("/status", Status)
+
+	search := r.Group("/search")
+	{
+		search.GET("", Search(btService))
+		search.GET("/remove", SearchRemove)
+		search.GET("/clear", SearchClear)
+		search.GET("/infolabels/:tmdbId", InfoLabelsSearch(btService))
+	}
 
 	r.LoadHTMLGlob(filepath.Join(config.Get().Info.Path, "resources", "web", "*.html"))
 	web := r.Group("/web")

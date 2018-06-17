@@ -178,11 +178,47 @@ func searchHistoryList(ctx *gin.Context, historyType string) {
 		item := &xbmc.ListItem{
 			Label: query,
 			Path:  searchHistoryGetXbmcURL(historyType, query),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
+					URLQuery(URLForXBMC("/search/remove"),
+						"query", query,
+						"type", historyType,
+					))},
+			},
 		}
 		items = append(items, item)
 	}
 
 	ctx.JSON(200, xbmc.NewView("", items))
+}
+
+// SearchRemove ...
+func SearchRemove(ctx *gin.Context) {
+	query := ctx.DefaultQuery("query", "")
+	historyType := ctx.DefaultQuery("type", "")
+
+	if len(query) == 0 {
+		return
+	}
+
+	log.Debugf("Removing query '%s' with history type '%s'", query, historyType)
+	database.Get().Exec("DELETE FROM history_queries WHERE query = ? AND type = ?", query, historyType)
+	xbmc.Refresh()
+
+	ctx.String(200, "")
+	return
+}
+
+// SearchClear ...
+func SearchClear(ctx *gin.Context) {
+	historyType := ctx.DefaultQuery("type", "")
+
+	log.Debugf("Cleaning queries with history type %s", historyType)
+	database.Get().Exec("DELETE FROM history_queries WHERE type = ?", historyType)
+	xbmc.Refresh()
+
+	ctx.String(200, "")
+	return
 }
 
 func searchHistoryGetXbmcURL(historyType string, query string) string {
