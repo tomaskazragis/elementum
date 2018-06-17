@@ -576,6 +576,7 @@ func CheckBurst() {
 
 		if xbmc.DialogConfirm("Elementum", "LOCALIZE[30271]") {
 			xbmc.PlayURL("plugin://script.elementum.burst/")
+			time.Sleep(4 * time.Second)
 			for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
 				if addon.ID == "script.elementum.burst" && addon.Enabled == true {
 					hasBurst = true
