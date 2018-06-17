@@ -9,6 +9,7 @@ type AddonInfo struct {
 	Description string
 	Disclaimer  string
 	Fanart      string
+	Home        string
 	Icon        string
 	ID          string
 	Name        string
@@ -19,6 +20,7 @@ type AddonInfo struct {
 	Summary     string
 	Type        string
 	Version     string
+	Xbmc        string
 }
 
 // Setting ...

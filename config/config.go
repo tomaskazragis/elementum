@@ -33,6 +33,8 @@ type Configuration struct {
 	Language                  string
 	TemporaryPath             string
 	ProfilePath               string
+	HomePath                  string
+	XbmcPath                  string
 	SpoofUserAgent            int
 	KeepDownloading           int
 	KeepFilesPlaying          int
@@ -198,8 +200,34 @@ func Reload() *Configuration {
 	info := xbmc.GetAddonInfo()
 	info.Path = xbmc.TranslatePath(info.Path)
 	info.Profile = xbmc.TranslatePath(info.Profile)
+	info.Home = xbmc.TranslatePath(info.Home)
+	info.Xbmc = xbmc.TranslatePath(info.Xbmc)
 	info.TempPath = filepath.Join(xbmc.TranslatePath("special://temp"), "elementum")
+
 	platform := xbmc.GetPlatform()
+
+	// If it's Windows and it's installed from Store - we should try to find real path
+	// and change addon settings accordingly
+	if platform != nil && strings.ToLower(platform.OS) == "windows" && strings.Contains(info.Xbmc, "XBMCFoundation") {
+		path := findExistingPath([]string{
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "/Packages/XBMCFoundation.Kodi_4n2hpmxwrvr6p/LocalCache/Roaming/Kodi/"),
+			filepath.Join(os.Getenv("APPDATA"), "/kodi/"),
+		}, "/userdata/addon_data/"+info.ID)
+
+		if path != "" {
+			info.Path = strings.Replace(info.Path, info.Home, "", 1)
+			info.Profile = strings.Replace(info.Profile, info.Home, "", 1)
+			info.TempPath = strings.Replace(info.TempPath, info.Home, "", 1)
+			info.Icon = strings.Replace(info.Icon, info.Home, "", 1)
+
+			info.Path = filepath.Join(path, info.Path)
+			info.Profile = filepath.Join(path, info.Profile)
+			info.TempPath = filepath.Join(path, info.TempPath)
+			info.Icon = filepath.Join(path, info.Icon)
+
+			info.Home = path
+		}
+	}
 
 	os.RemoveAll(info.TempPath)
 	os.MkdirAll(info.TempPath, 0777)
@@ -283,6 +311,8 @@ func Reload() *Configuration {
 		Language:                  xbmc.GetLanguageISO639_1(),
 		TemporaryPath:             info.TempPath,
 		ProfilePath:               info.Profile,
+		HomePath:                  info.Home,
+		XbmcPath:                  info.Xbmc,
 		DownloadStorage:           settings["download_storage"].(int),
 		AutoMemorySize:            settings["auto_memory_size"].(bool),
 		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
@@ -559,4 +589,18 @@ func CheckBurst() {
 			}
 		}
 	}
+}
+
+func findExistingPath(paths []string, addon string) string {
+	// We add plugin folder to avoid getting dummy path, we should take care only for real folder
+	for _, v := range paths {
+		p := filepath.Join(v, addon)
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+
+		return v
+	}
+
+	return ""
 }
