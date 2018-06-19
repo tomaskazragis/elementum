@@ -229,8 +229,6 @@ func (s *BTService) configure() {
 		DownloadRateLimiter: s.DownloadLimiter,
 		UploadRateLimiter:   s.UploadLimiter,
 
-		DefaultStorage: s.DefaultStorage,
-
 		Bep20:  s.PeerID,
 		PeerID: util.PeerIDRandom(s.PeerID),
 
@@ -243,9 +241,12 @@ func (s *BTService) configure() {
 		s.RestoreLimits()
 	}
 
-	var err error
 	log.Debugf("BitClient config: %s", litter.Sdump(s.ClientConfig))
+
 	s.ClientConfig.IPBlocklist = blocklist
+	s.ClientConfig.DefaultStorage = s.DefaultStorage
+
+	var err error
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
 		// If client can't be created - we should panic
 		log.Errorf("Error creating bit client: %#v", err)
