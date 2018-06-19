@@ -24,10 +24,6 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r.GET("/", Index)
-	// r.GET("/search", Search(btService))
-	// r.GET("/search/remove", SearchRemove)
-	// r.GET("/search/clear", SearchClear)
-	// r.GET("/search/:tmdbId/infolabels", InfoLabelsSearch(btService))
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(btService))
 	r.GET("/changelog", Changelog)
