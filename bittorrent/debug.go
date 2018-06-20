@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -55,7 +54,7 @@ func writeHeader(w http.ResponseWriter, title string) {
 func writeResponse(w http.ResponseWriter, url string) {
 	w.Write([]byte("Response for url: " + url + "\n\n"))
 
-	resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(config.ListenPort) + url)
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d%s", config.Args.LocalHost, config.Args.LocalPort, url))
 	if err != nil {
 		return
 	}

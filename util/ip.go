@@ -41,11 +41,16 @@ func LocalIP() (net.IP, error) {
 
 // GetHTTPHost ...
 func GetHTTPHost() string {
-	hostname := "localhost"
-	// if localIP, err := LocalIP(); err == nil {
-	// 	hostname = localIP.String()
-	// }
-	return fmt.Sprintf("http://%s:%d", hostname, config.ListenPort)
+	// We should always use local IP, instead of external one, if possible
+	// to avoid situations when ip has changed and Kodi expects it anyway.
+	host := "127.0.0.1"
+	if config.Args.RemoteHost != "127.0.0.1" {
+		if localIP, err := LocalIP(); err == nil {
+			host = localIP.String()
+		}
+	}
+
+	return fmt.Sprintf("http://%s:%d", host, config.Args.LocalPort)
 }
 
 // GetListenAddr parsing configuration setted for interfaces and port range

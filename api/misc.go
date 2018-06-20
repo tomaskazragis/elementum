@@ -59,7 +59,7 @@ func Status(ctx *gin.Context) {
 `
 
 	ip, _ := util.LocalIP()
-	port := config.ListenPort
+	port := config.Args.LocalPort
 	webAddress := fmt.Sprintf("http://%s:%d/web", ip.String(), port)
 	debugAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip.String(), port)
 	infoAddress := fmt.Sprintf("http://%s:%d/info", ip.String(), port)

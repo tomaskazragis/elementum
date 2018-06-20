@@ -37,7 +37,7 @@ var log = logging.MustGetLogger("trakt")
 var (
 	// PagesAtOnce ...
 	PagesAtOnce             = 5
-	clearance, _            = cloudhole.GetClearance()
+	clearance               = &cloudhole.Clearance{}
 	retriesLeft             = 3
 	burstRate               = 50
 	burstTime               = 10 * time.Second
@@ -394,6 +394,11 @@ type WatchedProgressShow struct {
 type ProgressShow struct {
 	Episode *Episode `json:"episode"`
 	Show    *Show    `json:"show"`
+}
+
+// GetClearance updates clearance after config reload
+func GetClearance() {
+	clearance, _ = cloudhole.GetClearance()
 }
 
 func totalFromHeaders(headers http.Header) (total int, err error) {

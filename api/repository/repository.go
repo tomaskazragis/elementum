@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	// githubUserContentURL = "https://raw.githubusercontent.com/%s/%s/%s"
 	githubUserContentURL = "http://elementum.surge.sh/packages/%s/%s"
 	releaseChangelog     = "[B]%s[/B] - %s\n%s\n\n"
 )

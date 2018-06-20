@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -160,11 +161,21 @@ var (
 
 	// ResolverOpennic ...
 	ResolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
-)
 
-const (
-	// ListenPort ...
-	ListenPort = 65220
+	// Args for cli arguments parsing
+	Args = struct {
+		RemoteHost string `help:"remote host, default is '127.0.0.1'"`
+		RemotePort int    `help:"remote port, default is '65221'"`
+
+		LocalHost string `help:"local host, default is '0.0.0.0'"`
+		LocalPort int    `help:"local port, default is '65220'"`
+	}{
+		RemoteHost: "127.0.0.1",
+		RemotePort: 65221,
+
+		LocalHost: "127.0.0.1",
+		LocalPort: 65220,
+	}
 )
 
 // Get ...
@@ -177,6 +188,11 @@ func Get() *Configuration {
 // Reload ...
 func Reload() *Configuration {
 	log.Info("Reloading configuration...")
+
+	// Reloading RPC Hosts
+	log.Infof("Setting remote address to %s:%d", Args.RemoteHost, Args.RemotePort)
+	xbmc.XBMCJSONRPCHosts = []string{net.JoinHostPort(Args.RemoteHost, "9090")}
+	xbmc.XBMCExJSONRPCHosts = []string{net.JoinHostPort(Args.RemoteHost, strconv.Itoa(Args.RemotePort))}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -198,6 +214,11 @@ func Reload() *Configuration {
 	}()
 
 	info := xbmc.GetAddonInfo()
+	if info == nil || info.ID == "" {
+		settingsWarning = "LOCALIZE[30113]"
+		panic(settingsWarning)
+	}
+
 	info.Path = xbmc.TranslatePath(info.Path)
 	info.Profile = xbmc.TranslatePath(info.Profile)
 	info.Home = xbmc.TranslatePath(info.Home)

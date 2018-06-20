@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/sync"
+	"github.com/anacrolix/tagflag"
 	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/api"
@@ -64,6 +65,8 @@ func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, 
 }
 
 func main() {
+	tagflag.Parse(&config.Args)
+
 	// Make sure we are properly multithreaded.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -177,12 +180,14 @@ func main() {
 		xbmc.ResetRPC()
 	}()
 
+	trakt.GetClearance()
+
 	go library.Init()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
 
-	http.ListenAndServe(":"+strconv.Itoa(config.ListenPort), nil)
+	http.ListenAndServe(":"+strconv.Itoa(config.Args.LocalPort), nil)
 
 	// s := &http.Server{
 	// 	Addr:         ":" + strconv.Itoa(config.ListenPort),

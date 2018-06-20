@@ -33,7 +33,7 @@ func MakeElementumRepositoryAddon() error {
 	addonID := "repository.elementum"
 	addonName := "Elementum Repository"
 
-	elementumHost := fmt.Sprintf("http://localhost:%d", config.ListenPort)
+	elementumHost := fmt.Sprintf("http://%s:%d", config.Args.LocalHost, config.Args.LocalPort)
 	addon := &xbmc.Addon{
 		ID:           addonID,
 		Name:         addonName,
