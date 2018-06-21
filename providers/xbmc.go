@@ -127,6 +127,15 @@ func NewAddonSearcher(addonID string) *AddonSearcher {
 	}
 }
 
+// GetQuerySearchObject ...
+func (as *AddonSearcher) GetQuerySearchObject(query string) *QuerySearchObject {
+	sObject := &QuerySearchObject{
+		Query: query,
+	}
+	sObject.ProxyURL = config.Get().ProxyURL
+	return sObject
+}
+
 // GetMovieSearchObject ...
 func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObject {
 	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])
@@ -151,6 +160,8 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 	}
 	sObject.Titles[strings.ToLower(movie.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(movie.Title)
+
+	sObject.ProxyURL = config.Get().ProxyURL
 
 	return sObject
 }
@@ -178,6 +189,8 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 	}
 	sObject.Titles[strings.ToLower(show.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
+
+	sObject.ProxyURL = config.Get().ProxyURL
 
 	return sObject
 }
@@ -242,6 +255,8 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 	sObject.Titles[strings.ToLower(show.OriginalLanguage)] = NormalizeTitle(sObject.Titles["source"])
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
 
+	sObject.ProxyURL = config.Get().ProxyURL
+
 	return sObject
 }
 
@@ -253,7 +268,6 @@ func (as *AddonSearcher) call(method string, searchObject interface{}) []*bittor
 	payload := &SearchPayload{
 		Method:       method,
 		CallbackURL:  cbURL,
-		ProxyURL:     config.Get().ProxyURL,
 		SearchObject: searchObject,
 	}
 
@@ -277,7 +291,7 @@ func (as *AddonSearcher) call(method string, searchObject interface{}) []*bittor
 
 // SearchLinks ...
 func (as *AddonSearcher) SearchLinks(query string) []*bittorrent.TorrentFile {
-	return as.call("search", query)
+	return as.call("search", as.GetQuerySearchObject(query))
 }
 
 // SearchMovieLinks ...

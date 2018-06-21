@@ -9,12 +9,23 @@ import (
 type SearchPayload struct {
 	Method       string      `json:"method"`
 	CallbackURL  string      `json:"callback_url"`
-	ProxyURL     string      `json:"proxy_url"`
 	SearchObject interface{} `json:"search_object"`
+}
+
+// ProxySearchObject ...
+type ProxySearchObject struct {
+	ProxyURL string `json:"proxy_url"`
+}
+
+// QuerySearchObject ...
+type QuerySearchObject struct {
+	ProxySearchObject
+	Query string `json:"query"`
 }
 
 // MovieSearchObject ...
 type MovieSearchObject struct {
+	ProxySearchObject
 	IMDBId string            `json:"imdb_id"`
 	Title  string            `json:"title"`
 	Year   int               `json:"year"`
@@ -23,6 +34,7 @@ type MovieSearchObject struct {
 
 // SeasonSearchObject ...
 type SeasonSearchObject struct {
+	ProxySearchObject
 	IMDBId string            `json:"imdb_id"`
 	TVDBId int               `json:"tvdb_id"`
 	Title  string            `json:"title"`
@@ -33,6 +45,7 @@ type SeasonSearchObject struct {
 
 // EpisodeSearchObject ...
 type EpisodeSearchObject struct {
+	ProxySearchObject
 	IMDBId         string            `json:"imdb_id"`
 	TVDBId         int               `json:"tvdb_id"`
 	Title          string            `json:"title"`
