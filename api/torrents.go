@@ -311,7 +311,7 @@ func ResumeSession(btService *bittorrent.BTService) gin.HandlerFunc {
 // AddTorrent ...
 func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		uri := ctx.Query("uri")
+		uri := ctx.Request.FormValue("uri")
 		file, header, fileError := ctx.Request.FormFile("file")
 
 		if file != nil && header != nil && fileError == nil {
