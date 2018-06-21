@@ -179,6 +179,13 @@ func DialogConfirm(title string, message string) bool {
 	return retVal != 0
 }
 
+// DialogConfirmFocused ...
+func DialogConfirmFocused(title string, message string, autoclose int) bool {
+	retVal := 0
+	executeJSONRPCEx("Dialog_Confirm_Focused", &retVal, Args{title, message, autoclose * 1000})
+	return retVal == 0
+}
+
 // DialogText ...
 func DialogText(title string, text string) bool {
 	retVal := 0

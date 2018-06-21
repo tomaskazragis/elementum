@@ -74,7 +74,7 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
-		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name))) {
+		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name), xbmc.DialogExpiration.InTorrents)) {
 			return torrent
 		}
 
