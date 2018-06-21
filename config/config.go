@@ -131,6 +131,8 @@ type Configuration struct {
 	CompletedMove       bool
 	CompletedMoviesPath string
 	CompletedShowsPath  string
+
+	LocalOnlyClient bool
 }
 
 // Addon ...
@@ -429,6 +431,8 @@ func Reload() *Configuration {
 		CompletedMove:       settings["completed_move"].(bool),
 		CompletedMoviesPath: settings["completed_movies_path"].(string),
 		CompletedShowsPath:  settings["completed_shows_path"].(string),
+
+		LocalOnlyClient: settings["local_only_client"].(bool),
 	}
 
 	// For memory storage we are changing configuration

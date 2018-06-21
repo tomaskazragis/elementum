@@ -97,8 +97,8 @@ func SubtitlesIndex(ctx *gin.Context) {
 	playingFile := xbmc.PlayerGetPlayingFile()
 
 	// Check if we are reading a file from Elementum
-	if strings.HasPrefix(playingFile, util.GetHTTPHost()) {
-		playingFile = strings.Replace(playingFile, util.GetHTTPHost()+"/files", config.Get().DownloadPath, 1)
+	if strings.HasPrefix(playingFile, util.GetContextHTTPHost(ctx)) {
+		playingFile = strings.Replace(playingFile, util.GetContextHTTPHost(ctx)+"/files", config.Get().DownloadPath, 1)
 		playingFile, _ = url.QueryUnescape(playingFile)
 	}
 

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/elgatito/elementum/config"
+
+	"github.com/gin-gonic/gin"
 )
 
 // LocalIP ...
@@ -45,6 +47,20 @@ func GetHTTPHost() string {
 	// to avoid situations when ip has changed and Kodi expects it anyway.
 	host := "127.0.0.1"
 	if config.Args.RemoteHost != "127.0.0.1" {
+		if localIP, err := LocalIP(); err == nil {
+			host = localIP.String()
+		}
+	}
+
+	return fmt.Sprintf("http://%s:%d", host, config.Args.LocalPort)
+}
+
+// GetContextHTTPHost ...
+func GetContextHTTPHost(ctx *gin.Context) string {
+	// We should always use local IP, instead of external one, if possible
+	// to avoid situations when ip has changed and Kodi expects it anyway.
+	host := "127.0.0.1"
+	if config.Args.RemoteHost != "127.0.0.1" || !strings.HasPrefix(ctx.Request.RemoteAddr, "127.0.0.1") {
 		if localIP, err := LocalIP(); err == nil {
 			host = localIP.String()
 		}

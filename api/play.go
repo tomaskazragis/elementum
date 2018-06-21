@@ -9,6 +9,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -94,7 +95,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		rURL, _ := url.Parse(fmt.Sprintf("%s/files/%s", util.GetHTTPHost(), player.PlayURL()))
+		rURL, _ := url.Parse(fmt.Sprintf("%s/files/%s", util.GetContextHTTPHost(ctx), player.PlayURL()))
 		ctx.Redirect(302, rURL.String())
 	}
 }

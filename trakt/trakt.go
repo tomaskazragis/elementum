@@ -37,7 +37,7 @@ var log = logging.MustGetLogger("trakt")
 var (
 	// PagesAtOnce ...
 	PagesAtOnce             = 5
-	clearance               = &cloudhole.Clearance{}
+	clearance, _            = cloudhole.GetClearance()
 	retriesLeft             = 3
 	burstRate               = 50
 	burstTime               = 10 * time.Second

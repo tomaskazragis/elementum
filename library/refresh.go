@@ -145,7 +145,7 @@ func RefreshMovies() error {
 		break
 	}
 
-	if movies.Limits.Total == 0 {
+	if movies != nil && movies.Limits != nil && movies.Limits.Total == 0 {
 		return nil
 	}
 
@@ -222,7 +222,7 @@ func RefreshShows() error {
 		break
 	}
 
-	if shows.Limits.Total == 0 {
+	if shows != nil && shows.Limits != nil && shows.Limits.Total == 0 {
 		return nil
 	}
 
