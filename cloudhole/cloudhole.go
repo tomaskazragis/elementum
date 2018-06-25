@@ -94,7 +94,9 @@ func GetClearance() (clearance *Clearance, errRet error) {
 
 	resp, err := napping.Send(&req)
 
-	if err == nil && resp.Status() == 200 {
+	if resp == nil {
+		return defaultClearance, nil
+	} else if err == nil && resp.Status() == 200 {
 		resp.Unmarshal(&clearances)
 	} else if resp.Status() == 503 {
 		GetSurgeClearances()
