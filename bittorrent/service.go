@@ -39,7 +39,7 @@ type BTService struct {
 	mu     sync.Mutex
 
 	Client       *gotorrent.Client
-	ClientConfig *gotorrent.Config
+	ClientConfig *gotorrent.ClientConfig
 
 	PieceCompletion storage.PieceCompletion
 	DefaultStorage  estorage.ElementumStorage
@@ -199,43 +199,44 @@ func (s *BTService) configure() {
 	}
 	s.DefaultStorage.SetReadaheadSize(s.GetBufferSize())
 
-	s.ClientConfig = &gotorrent.Config{
-		DataDir: config.Get().DownloadPath,
+	s.ClientConfig = gotorrent.NewDefaultClientConfig()
 
-		DisableIPv6: s.DisableIPv6,
-		ListenHost:  s.GetListenIP,
-		ListenPort:  s.ListenPort,
+	s.ClientConfig.DataDir = config.Get().DownloadPath
+	s.ClientConfig.DisableIPv6 = s.DisableIPv6
+	s.ClientConfig.ListenHost = s.GetListenIP
+	s.ClientConfig.ListenPort = s.ListenPort
 
-		Debug: false,
+	s.ClientConfig.Debug = false
 
-		DisableTCP: s.config.DisableTCP,
-		DisableUTP: s.config.DisableUTP,
+	s.ClientConfig.DisableTCP = s.config.DisableTCP
+	s.ClientConfig.DisableUTP = s.config.DisableUTP
 
-		ProxyURL: s.config.ProxyURL,
+	s.ClientConfig.ProxyURL = s.config.ProxyURL
 
-		NoDefaultPortForwarding: s.config.DisableUPNP,
+	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
 
-		NoDHT:            s.config.DisableDHT,
-		DhtStartingNodes: dht.GlobalBootstrapAddrs,
+	s.ClientConfig.NoDHT = s.config.DisableDHT
+	s.ClientConfig.DhtStartingNodes = dht.GlobalBootstrapAddrs
 
-		Seed:     s.config.SeedTimeLimit > 0,
-		NoUpload: s.config.DisableUpload,
+	s.ClientConfig.Seed = s.config.SeedTimeLimit > 0
+	s.ClientConfig.NoUpload = s.config.DisableUpload
 
-		EncryptionPolicy: gotorrent.EncryptionPolicy{
-			DisableEncryption: s.config.EncryptionPolicy == 1,
-			ForceEncryption:   s.config.EncryptionPolicy == 2,
-		},
-
-		DownloadRateLimiter: s.DownloadLimiter,
-		UploadRateLimiter:   s.UploadLimiter,
-
-		Bep20:  s.PeerID,
-		PeerID: util.PeerIDRandom(s.PeerID),
-
-		HTTPUserAgent: s.UserAgent,
-
-		EstablishedConnsPerTorrent: s.config.ConnectionsLimit,
+	s.ClientConfig.EncryptionPolicy = gotorrent.EncryptionPolicy{
+		DisableEncryption: s.config.EncryptionPolicy == 1,
+		ForceEncryption:   s.config.EncryptionPolicy == 2,
 	}
+
+	s.ClientConfig.DownloadRateLimiter = s.DownloadLimiter
+	s.ClientConfig.UploadRateLimiter = s.UploadLimiter
+
+	s.ClientConfig.Bep20 = s.PeerID
+	s.ClientConfig.PeerID = util.PeerIDRandom(s.PeerID)
+
+	s.ClientConfig.HTTPUserAgent = s.UserAgent
+
+	s.ClientConfig.EstablishedConnsPerTorrent = s.config.ConnectionsLimit
+	s.ClientConfig.TorrentPeersHighWater = 3000
+	s.ClientConfig.HalfOpenConnsPerTorrent = 50
 
 	if !s.config.LimitAfterBuffering {
 		s.RestoreLimits()

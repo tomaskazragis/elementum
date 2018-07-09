@@ -227,8 +227,8 @@ func (t *Torrent) progressEvent() {
 	// log.Noticef(strings.Repeat("=", 20))
 
 	stats := t.Torrent.Stats()
-	curDownloaded := stats.BytesReadData
-	curUploaded := stats.BytesWrittenData
+	curDownloaded := stats.BytesReadData.Int64()
+	curUploaded := stats.BytesWrittenData.Int64()
 
 	t.downRates[t.rateCounter] = curDownloaded - t.downloadedSize
 	t.upRates[t.rateCounter] = curUploaded - t.uploadedSize
