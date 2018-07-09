@@ -210,7 +210,7 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 			nextPath = URLForXBMC(fmt.Sprintf("%s?q=%s&page=%d", path, query, page+1))
 		}
 		next := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      nextPath,
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
@@ -322,14 +322,18 @@ func ShowSeasons(ctx *gin.Context) {
 
 		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s"
 		contextLabel := playLabel
+		contextOppositeLabel := linksLabel
 		contextURL := contextPlayOppositeURL(thisURL, false)
+		contextOppositeURL := contextPlayURL(thisURL, false)
 		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
+			contextOppositeLabel = playLabel
 		}
 
 		item.Path = URLForXBMC("/show/%d/season/%d/episodes", show.ID, item.Info.Season)
 		item.ContextMenu = [][]string{
 			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+			[]string{contextOppositeLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextOppositeURL)},
 			[]string{"LOCALIZE[30036]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/seasons"))},
 		}
 		reversedItems = append(reversedItems, item)

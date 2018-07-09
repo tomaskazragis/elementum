@@ -249,7 +249,7 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 			nextPath = URLForXBMC(fmt.Sprintf("%s?q=%s&page=%d", path, query, page+1))
 		}
 		next := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      nextPath,
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}

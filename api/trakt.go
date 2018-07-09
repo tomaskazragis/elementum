@@ -460,7 +460,7 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
@@ -669,7 +669,7 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
@@ -951,7 +951,7 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
@@ -1048,7 +1048,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
@@ -1158,7 +1158,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30218]",
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
 			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
 			Thumbnail: config.AddonResource("img", "nextpage.png"),
 		}
