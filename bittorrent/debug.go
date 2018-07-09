@@ -12,6 +12,25 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
+// DebugAll ...
+func DebugAll(s *BTService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+
+		writeHeader(w, "Torrent Client")
+		writeResponse(w, "/info")
+
+		writeHeader(w, "Debug Perf")
+		writeResponse(w, "/debug/perf")
+
+		writeHeader(w, "Debug LockTimes")
+		writeResponse(w, "/debug/lockTimes")
+
+		writeHeader(w, "Debug Vars")
+		writeResponse(w, "/debug/vars")
+	})
+}
+
 // DebugBundle ...
 func DebugBundle(s *BTService) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -31,14 +50,14 @@ func DebugBundle(s *BTService) http.Handler {
 		writeHeader(w, "Torrent Client")
 		writeResponse(w, "/info")
 
+		writeHeader(w, "Debug Perf")
+		writeResponse(w, "/debug/perf")
+
 		writeHeader(w, "Debug LockTimes")
 		writeResponse(w, "/debug/lockTimes")
 
 		writeHeader(w, "Debug Vars")
 		writeResponse(w, "/debug/vars")
-
-		writeHeader(w, "Debug Perf")
-		writeResponse(w, "/debug/perf")
 
 		writeHeader(w, "kodi.log")
 		io.Copy(w, logFile)
@@ -46,9 +65,9 @@ func DebugBundle(s *BTService) http.Handler {
 }
 
 func writeHeader(w http.ResponseWriter, title string) {
-	w.Write([]byte("\n\n" + strings.Repeat("-", 40) + "\n"))
+	w.Write([]byte("\n\n" + strings.Repeat("-", 70) + "\n"))
 	w.Write([]byte(title))
-	w.Write([]byte("\n" + strings.Repeat("-", 40) + "\n\n"))
+	w.Write([]byte("\n" + strings.Repeat("-", 70) + "\n\n"))
 }
 
 func writeResponse(w http.ResponseWriter, url string) {

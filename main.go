@@ -143,6 +143,7 @@ func main() {
 	http.Handle("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.ClientInfo(w)
 	}))
+	http.Handle("/debug/all", bittorrent.DebugAll(btService))
 	http.Handle("/debug/bundle", bittorrent.DebugBundle(btService))
 
 	http.Handle("/files/", bittorrent.ServeTorrent(btService, config.Get().DownloadPath))
