@@ -80,13 +80,14 @@ const (
 )
 
 var (
+	// [pр] actually contains "p" from latin and "р" from cyrillic, which looks the same, but it's not.
 	resolutionTags = []map[*regexp.Regexp]int{
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+240p\W*`): Resolution240p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+480p\W*`): Resolution480p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+720p\W*`): Resolution720p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1080p\W*`): Resolution1080p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1440p\W*`): Resolution2K},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2160p\W*`): Resolution4k},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+240[pр]\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+480[pр]\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+720[pр]\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1080[piр]\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1440[pр]\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2160[pр]\W*`): Resolution4k},
 
 		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
 		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
