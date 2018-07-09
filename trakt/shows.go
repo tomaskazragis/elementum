@@ -476,24 +476,27 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 		full = ".full"
 	}
 	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listID, full)
-	if err := cacheStore.Get(key, &shows); err != nil {
+	if errGet := cacheStore.Get(key, &shows); errGet != nil {
 		if erra := Authorized(); erra != nil {
-			resp, err = Get(endPoint, params)
+			resp, errGet = Get(endPoint, params)
 		} else {
-			resp, err = GetWithAuth(endPoint, params)
+			resp, errGet = GetWithAuth(endPoint, params)
 		}
 
-		if err != nil || resp.Status() != 200 {
-			return shows, err
+		if errGet != nil || resp.Status() != 200 {
+			return shows, errGet
 		}
 
 		var list []*ListItem
-		if err := resp.Unmarshal(&list); err != nil {
+		if err = resp.Unmarshal(&list); err != nil {
 			log.Warning(err)
 		}
 
 		showListing := make([]*Shows, 0)
 		for _, show := range list {
+			if show.Show == nil {
+				continue
+			}
 			showItem := Shows{
 				Show: show.Show,
 			}
@@ -508,7 +511,7 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
-	return
+	return shows, err
 }
 
 // CalendarShows ...
