@@ -85,6 +85,7 @@ type PlayerParams struct {
 	Season        int
 	Episode       int
 	Query         string
+	UIDs          *library.UniqueIDs
 	Resume        *library.Resume
 }
 
@@ -736,7 +737,7 @@ func (btp *BTPlayer) UpdateWatched() {
 
 	log.Infof("Currently at %f%%, KodiID: %d", progress, btp.p.KodiID)
 
-	if progress > 90 {
+	if progress > float64(config.Get().PlaybackPercent) {
 		var watched *trakt.WatchedItem
 
 		// TODO: Make use of Playcount, possibly increment when Watched, use old value if in progress
@@ -777,9 +778,9 @@ func (btp *BTPlayer) UpdateWatched() {
 		}
 
 		if btp.p.ContentType == movieType {
-			xbmc.SetMovieWatched(btp.p.KodiID, 0, int(btp.p.WatchedTime), int(btp.p.VideoDuration))
+			xbmc.SetMovieProgress(btp.p.KodiID, int(btp.p.WatchedTime), int(btp.p.VideoDuration))
 		} else if btp.p.ContentType == episodeType {
-			xbmc.SetEpisodeWatched(btp.p.KodiID, 0, int(btp.p.WatchedTime), int(btp.p.VideoDuration))
+			xbmc.SetEpisodeProgress(btp.p.KodiID, int(btp.p.WatchedTime), int(btp.p.VideoDuration))
 		}
 	}
 	time.Sleep(200 * time.Millisecond)
@@ -788,7 +789,7 @@ func (btp *BTPlayer) UpdateWatched() {
 
 // IsWatched ...
 func (btp *BTPlayer) IsWatched() bool {
-	return (100 * btp.p.WatchedTime / btp.p.VideoDuration) > 90
+	return (100 * btp.p.WatchedTime / btp.p.VideoDuration) > float64(config.Get().PlaybackPercent)
 }
 
 func (btp *BTPlayer) smartMatch(choices []*candidateFile) {
@@ -837,6 +838,7 @@ func (btp *BTPlayer) GetIdent() {
 		if movie != nil {
 			btp.p.KodiID = movie.UIDs.Kodi
 			btp.p.Resume = movie.Resume
+			btp.p.UIDs = movie.UIDs
 		}
 	} else if btp.p.ContentType == episodeType {
 		show, _ := library.GetShowByTMDB(btp.p.ShowID)
@@ -845,6 +847,7 @@ func (btp *BTPlayer) GetIdent() {
 			if episode != nil {
 				btp.p.KodiID = episode.UIDs.Kodi
 				btp.p.Resume = episode.Resume
+				btp.p.UIDs = episode.UIDs
 			}
 		}
 	}

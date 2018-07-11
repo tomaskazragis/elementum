@@ -1043,7 +1043,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 			if r.UIDs.Playcount == 0 {
 				haveChanges = true
-				xbmc.SetMovieWatched(r.UIDs.Kodi, 1, 0, 0)
+				xbmc.SetMovieWatched(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total))
 			}
 		}
 	}
@@ -1107,7 +1107,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 						if e.UIDs.Playcount == 0 {
 							haveChanges = true
-							xbmc.SetEpisodeWatched(e.UIDs.Kodi, 1, 0, 0)
+							xbmc.SetEpisodeWatched(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total))
 						}
 					}
 				}

@@ -56,6 +56,7 @@ type Configuration struct {
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
 	SmartEpisodeMatch         bool
+	PlaybackPercent int
 	DownloadStorage           int
 	AutoMemorySize            bool
 	AutoMemorySizeStrategy    int
@@ -365,6 +366,7 @@ func Reload() *Configuration {
 		AddSpecials:               settings["add_specials"].(bool),
 		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
+		PlaybackPercent: settings["playback_percent"].(int),
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
