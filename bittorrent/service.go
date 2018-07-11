@@ -1,10 +1,13 @@
 package bittorrent
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -212,6 +215,9 @@ func (s *BTService) configure() {
 	s.ClientConfig.DisableUTP = s.config.DisableUTP
 
 	s.ClientConfig.ProxyURL = s.config.ProxyURL
+	if s.config.ProxyURL != "" {
+		s.setHTTPProxyURL()
+	}
 
 	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
 
@@ -998,4 +1004,17 @@ func (s *BTService) GetListenIP(network string) string {
 		return s.ListenIPv6
 	}
 	return s.ListenIP
+}
+
+func (s *BTService) setHTTPProxyURL() {
+	fixedURL, err := url.Parse(s.config.ProxyURL)
+	if err != nil {
+		return
+	}
+
+	s.ClientConfig.TrackerHttpClient.Transport = &http.Transport{
+		Proxy:               http.ProxyURL(fixedURL),
+		TLSHandshakeTimeout: 15 * time.Second,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+	}
 }
