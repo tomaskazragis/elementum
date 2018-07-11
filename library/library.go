@@ -331,7 +331,7 @@ func Init() {
 				}()
 			}
 		case <-traktSyncTicker.C:
-			if config.Get().TraktSyncFrequency > 0 {
+			if config.Get().TraktSyncFrequency > 0 && config.Get().TraktToken != "" {
 				go func() {
 					if err := RefreshTrakt(); err != nil {
 						log.Warning(err)
