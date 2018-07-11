@@ -256,7 +256,7 @@ func Init() {
 						}
 					}
 
-					if config.Get().TraktSyncFrequency > 0 {
+					if config.Get().TraktSyncFrequency > 0 && config.Get().TraktToken != "" {
 						if err := RefreshTrakt(); err != nil {
 							log.Warning(err)
 						}
