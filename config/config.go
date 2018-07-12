@@ -64,6 +64,7 @@ type Configuration struct {
 	BufferSize                int
 	UploadRateLimit           int
 	DownloadRateLimit         int
+	AutoloadTorrents          bool
 	LimitAfterBuffering       bool
 	ConnectionsLimit          int
 	// SessionSave         int
@@ -350,6 +351,7 @@ func Reload() *Configuration {
 		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
 		DownloadRateLimit:         settings["max_download_rate"].(int) * 1024,
+		AutoloadTorrents:          settings["autoload_torrents"].(bool),
 		SpoofUserAgent:            settings["spoof_user_agent"].(int),
 		LimitAfterBuffering:       settings["limit_after_buffering"].(bool),
 		KeepDownloading:           settings["keep_downloading"].(int),

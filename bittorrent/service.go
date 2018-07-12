@@ -429,7 +429,7 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 func (s *BTService) loadTorrentFiles() {
 	// Not loading previous torrents on start
 	// Otherwise we can dig out all the memory and halt the device
-	if s.config.DownloadStorage == estorage.StorageMemory {
+	if s.config.DownloadStorage == estorage.StorageMemory || !s.config.AutoloadTorrents {
 		return
 	}
 
