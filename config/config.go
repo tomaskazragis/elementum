@@ -56,7 +56,7 @@ type Configuration struct {
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
 	SmartEpisodeMatch         bool
-	PlaybackPercent int
+	PlaybackPercent           int
 	DownloadStorage           int
 	AutoMemorySize            bool
 	AutoMemorySizeStrategy    int
@@ -85,16 +85,20 @@ type Configuration struct {
 	// TunedStorage        bool
 	Scrobble bool
 
-	TraktUsername        string
-	TraktToken           string
-	TraktRefreshToken    string
-	TraktTokenExpiry     int
-	TraktSyncFrequency   int
-	TraktSyncCollections bool
-	TraktSyncWatchlist   bool
-	TraktSyncUserlists   bool
-	TraktSyncWatched     bool
-	TraktSyncWatchedBack bool
+	TraktUsername            string
+	TraktToken               string
+	TraktRefreshToken        string
+	TraktTokenExpiry         int
+	TraktSyncFrequency       int
+	TraktSyncCollections     bool
+	TraktSyncWatchlist       bool
+	TraktSyncUserlists       bool
+	TraktSyncWatched         bool
+	TraktSyncWatchedBack     bool
+	TraktSyncAdded           bool
+	TraktSyncAddedLocation   int
+	TraktSyncRemoved         bool
+	TraktSyncRemovedLocation int
 
 	UpdateFrequency int
 	UpdateDelay     int
@@ -366,7 +370,7 @@ func Reload() *Configuration {
 		AddSpecials:               settings["add_specials"].(bool),
 		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
-		PlaybackPercent: settings["playback_percent"].(int),
+		PlaybackPercent:           settings["playback_percent"].(int),
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
@@ -388,16 +392,20 @@ func Reload() *Configuration {
 		// SessionSave:         settings["session_save"].(int),
 		Scrobble: settings["trakt_scrobble"].(bool),
 
-		TraktUsername:        settings["trakt_username"].(string),
-		TraktToken:           settings["trakt_token"].(string),
-		TraktRefreshToken:    settings["trakt_refresh_token"].(string),
-		TraktTokenExpiry:     settings["trakt_token_expiry"].(int),
-		TraktSyncFrequency:   settings["trakt_sync"].(int),
-		TraktSyncCollections: settings["trakt_sync_collections"].(bool),
-		TraktSyncWatchlist:   settings["trakt_sync_watchlist"].(bool),
-		TraktSyncUserlists:   settings["trakt_sync_userlists"].(bool),
-		TraktSyncWatched:     settings["trakt_sync_watched"].(bool),
-		TraktSyncWatchedBack: settings["trakt_sync_watchedback"].(bool),
+		TraktUsername:            settings["trakt_username"].(string),
+		TraktToken:               settings["trakt_token"].(string),
+		TraktRefreshToken:        settings["trakt_refresh_token"].(string),
+		TraktTokenExpiry:         settings["trakt_token_expiry"].(int),
+		TraktSyncFrequency:       settings["trakt_sync"].(int),
+		TraktSyncCollections:     settings["trakt_sync_collections"].(bool),
+		TraktSyncWatchlist:       settings["trakt_sync_watchlist"].(bool),
+		TraktSyncUserlists:       settings["trakt_sync_userlists"].(bool),
+		TraktSyncWatched:         settings["trakt_sync_watched"].(bool),
+		TraktSyncWatchedBack:     settings["trakt_sync_watchedback"].(bool),
+		TraktSyncAdded:           settings["trakt_sync_added"].(bool),
+		TraktSyncAddedLocation:   settings["trakt_sync_added_location"].(int),
+		TraktSyncRemoved:         settings["trakt_sync_removed"].(bool),
+		TraktSyncRemovedLocation: settings["trakt_sync_removed_location"].(int),
 
 		UpdateFrequency:  settings["library_update_frequency"].(int),
 		UpdateDelay:      settings["library_update_delay"].(int),

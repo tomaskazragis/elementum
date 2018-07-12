@@ -820,6 +820,28 @@ func Authorized() error {
 	return nil
 }
 
+// SyncAddedItem adds item (movie/show) to watchlist or collection
+func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+	if location == 0 {
+		return AddToCollection(itemType, tmdbID)
+	} else if location == 1 {
+		return AddToWatchlist(itemType, tmdbID)
+	}
+
+	return
+}
+
+// SyncRemovedItem removes item (movie/show) from watchlist or collection
+func SyncRemovedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+	if location == 0 {
+		return RemoveFromCollection(itemType, tmdbID)
+	} else if location == 1 {
+		return RemoveFromWatchlist(itemType, tmdbID)
+	}
+
+	return
+}
+
 // AddToWatchlist ...
 func AddToWatchlist(itemType string, tmdbID string) (resp *napping.Response, err error) {
 	if err := Authorized(); err != nil {

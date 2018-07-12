@@ -52,8 +52,8 @@ func AddMovie(ctx *gin.Context) {
 		ctx.String(200, err.Error())
 		return
 	}
-	if config.Get().TraktToken != "" {
-		go trakt.AddToCollection("movies", tmdbID)
+	if config.Get().TraktToken != "" && config.Get().TraktSyncAdded {
+		go trakt.SyncAddedItem("movies", tmdbID, config.Get().TraktSyncAddedLocation)
 	}
 
 	if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", movie.Title)) {
@@ -87,8 +87,8 @@ func RemoveMovie(ctx *gin.Context) {
 	if err != nil {
 		ctx.String(200, err.Error())
 	}
-	if config.Get().TraktToken != "" {
-		go trakt.RemoveFromCollection("movies", tmdbStr)
+	if config.Get().TraktToken != "" && config.Get().TraktSyncRemoved {
+		go trakt.SyncRemovedItem("movies", tmdbStr, config.Get().TraktSyncRemovedLocation)
 	}
 
 	if ctx != nil {
@@ -116,8 +116,8 @@ func AddShow(ctx *gin.Context) {
 		ctx.String(200, err.Error())
 		return
 	}
-	if config.Get().TraktToken != "" {
-		go trakt.AddToCollection("shows", tmdbID)
+	if config.Get().TraktToken != "" && config.Get().TraktSyncAdded {
+		go trakt.SyncAddedItem("shows", tmdbID, config.Get().TraktSyncAddedLocation)
 	}
 
 	label := "LOCALIZE[30277]"
@@ -155,8 +155,8 @@ func RemoveShow(ctx *gin.Context) {
 	if err != nil {
 		ctx.String(200, err.Error())
 	}
-	if config.Get().TraktToken != "" {
-		go trakt.RemoveFromCollection("shows", tmdbID)
+	if config.Get().TraktToken != "" && config.Get().TraktSyncRemoved {
+		go trakt.SyncRemovedItem("shows", tmdbID, config.Get().TraktSyncRemovedLocation)
 	}
 
 	if ctx != nil {

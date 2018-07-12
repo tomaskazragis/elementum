@@ -11,6 +11,7 @@ import (
 	"time"
 
 	gotorrent "github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/peer_protocol"
 	"github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/config"
@@ -334,7 +335,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.BufferPiecesLength = 0
 	for i := range t.BufferPiecesProgress {
-		t.BufferPiecesLength += t.Torrent.Piece(i).Info().Length()
+		t.BufferPiecesLength += t.Torrent.Piece(peer_protocol.Integer(i)).Info().Length()
 	}
 
 	t.muBuffer.Unlock()
@@ -372,11 +373,13 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 	offsetEnd := offsetStart + length
 	pieceOffsetEnd := offsetEnd % pieceLength
 	endPiece = int(float64(offsetEnd) / float64(pieceLength))
+
+	piecesCount := int(t.Torrent.NumPieces())
 	if pieceOffsetEnd == 0 {
 		endPiece--
 	}
-	if endPiece >= t.Torrent.NumPieces() {
-		endPiece = t.Torrent.NumPieces() - 1
+	if endPiece >= piecesCount {
+		endPiece = piecesCount - 1
 	}
 
 	size = int64(endPiece-startPiece+1) * pieceLength
