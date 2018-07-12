@@ -397,14 +397,20 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 				return
 			}
 
-			tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
 			var item *xbmc.ListItem
-			if !config.Get().ForceUseTrakt {
-				movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-				if movie != nil {
-					item = movie.ToListItem()
+			tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
+
+			if movieListing.Movie.IDs.TMDB != 0 {
+				if !config.Get().ForceUseTrakt {
+					movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+					if movie != nil {
+						item = movie.ToListItem()
+					}
+				} else {
+					rebuildImages(movieListing.Movie.Images, tmdb.GetImages(movieListing.Movie.IDs.TMDB))
 				}
 			}
+
 			if item == nil {
 				item = movieListing.Movie.ToListItem()
 			}
@@ -621,14 +627,20 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 			continue
 		}
 
-		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
 		var item *xbmc.ListItem
-		if !config.Get().ForceUseTrakt {
-			show := tmdb.GetShowByID(tmdbID, config.Get().Language)
-			if show != nil {
-				item = show.ToListItem()
+		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
+
+		if showListing.Show.IDs.TMDB != 0 {
+			if !config.Get().ForceUseTrakt {
+				show := tmdb.GetShowByID(tmdbID, config.Get().Language)
+				if show != nil {
+					item = show.ToListItem()
+				}
+			} else {
+				rebuildImages(showListing.Show.Images, tmdb.GetShowImages(showListing.Show.IDs.TMDB))
 			}
 		}
+
 		if item == nil {
 			item = showListing.Show.ToListItem()
 		}
@@ -885,16 +897,22 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 			continue
 		}
 
+		var item *xbmc.ListItem
 		tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
 		title := ""
-		var item *xbmc.ListItem
-		if !config.Get().ForceUseTrakt {
-			movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-			if movie != nil {
-				title = movie.Title
-				item = movie.ToListItem()
+
+		if movieListing.Movie.IDs.TMDB != 0 {
+			if !config.Get().ForceUseTrakt {
+				movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+				if movie != nil {
+					title = movie.Title
+					item = movie.ToListItem()
+				}
+			} else {
+				rebuildImages(movieListing.Movie.Images, tmdb.GetImages(movieListing.Movie.IDs.TMDB))
 			}
 		}
+
 		if item == nil {
 			title = movieListing.Movie.Title
 			item = movieListing.Movie.ToListItem()
@@ -987,16 +1005,22 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			continue
 		}
 
+		var item *xbmc.ListItem
 		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
 		title := ""
-		var item *xbmc.ListItem
-		if !config.Get().ForceUseTrakt {
-			show := tmdb.GetShowByID(tmdbID, config.Get().Language)
-			if show != nil {
-				title = show.Title
-				item = show.ToListItem()
+
+		if showListing.Show.IDs.TMDB != 0 {
+			if !config.Get().ForceUseTrakt {
+				show := tmdb.GetShowByID(tmdbID, config.Get().Language)
+				if show != nil {
+					title = show.Title
+					item = show.ToListItem()
+				}
+			} else {
+				rebuildImages(showListing.Show.Images, tmdb.GetShowImages(showListing.Show.IDs.TMDB))
 			}
 		}
+
 		if item == nil {
 			title = showListing.Show.Title
 			item = showListing.Show.ToListItem()
@@ -1165,4 +1189,35 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		items = append(items, nextpage)
 	}
 	ctx.JSON(200, xbmc.NewView("tvshows", items))
+}
+
+func rebuildImages(traktImages *trakt.Images, tmdbImages *tmdb.Images) {
+	if tmdbImages == nil {
+		return
+	}
+	if traktImages == nil {
+		traktImages = &trakt.Images{}
+	}
+
+	if len(tmdbImages.Posters) > 0 {
+		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
+		for _, image := range tmdbImages.Posters {
+			if image.Iso639_1 == config.Get().Language {
+				posterImage = tmdb.ImageURL(image.FilePath, "w500")
+			}
+		}
+		traktImages.Poster.Full = posterImage
+		traktImages.Thumbnail.Full = posterImage
+	}
+
+	if len(tmdbImages.Backdrops) > 0 {
+		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
+		for _, image := range tmdbImages.Backdrops {
+			if image.Iso639_1 == config.Get().Language {
+				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
+			}
+		}
+		traktImages.FanArt.Full = backdropImage
+		traktImages.Banner.Full = backdropImage
+	}
 }

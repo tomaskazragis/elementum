@@ -550,7 +550,7 @@ func WatchedMovies() (movies []*WatchedMovie, err error) {
 
 // ToListItem ...
 func (movie *Movie) ToListItem() *xbmc.ListItem {
-	return &xbmc.ListItem{
+	li := &xbmc.ListItem{
 		Label: movie.Title,
 		Info: &xbmc.ListItemInfo{
 			Count:         rand.Int(),
@@ -572,11 +572,26 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 			DBTYPE:        "movie",
 			Mediatype:     "movie",
 		},
-		Art: &xbmc.ListItemArt{
-			Poster:    movie.Images.Poster.Full,
-			FanArt:    movie.Images.FanArt.Full,
-			Banner:    movie.Images.Banner.Full,
-			Thumbnail: movie.Images.Thumbnail.Full,
-		},
+		Art: &xbmc.ListItemArt{},
 	}
+
+	if movie.Images != nil {
+		if movie.Images.Poster != nil {
+			li.Art.Poster = movie.Images.Poster.Full
+		}
+		if movie.Images.FanArt != nil {
+			li.Art.FanArt = movie.Images.FanArt.Full
+		}
+		if movie.Images.Banner != nil {
+			li.Art.Banner = movie.Images.Banner.Full
+		}
+		if movie.Images.Thumbnail != nil {
+			li.Art.Thumbnail = movie.Images.Thumbnail.Full
+		}
+		if movie.Images.ClearArt != nil {
+			li.Art.ClearArt = movie.Images.ClearArt.Full
+		}
+	}
+
+	return li
 }

@@ -569,7 +569,7 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 
 // ToListItem ...
 func (show *Show) ToListItem() *xbmc.ListItem {
-	return &xbmc.ListItem{
+	li := &xbmc.ListItem{
 		Label: show.Title,
 		Info: &xbmc.ListItemInfo{
 			Count:         rand.Int(),
@@ -590,13 +590,29 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 			DBTYPE:        "tvshow",
 			Mediatype:     "tvshow",
 		},
-		Art: &xbmc.ListItemArt{
-			Poster:    show.Images.Poster.Full,
-			FanArt:    show.Images.FanArt.Full,
-			Banner:    show.Images.Banner.Full,
-			Thumbnail: show.Images.Thumbnail.Full,
-		},
+		Art: &xbmc.ListItemArt{},
 	}
+
+	if show.Images != nil {
+		if show.Images.Poster != nil {
+			li.Art.Poster = show.Images.Poster.Full
+			li.Art.TvShowPoster = show.Images.Poster.Full
+		}
+		if show.Images.FanArt != nil {
+			li.Art.FanArt = show.Images.FanArt.Full
+		}
+		if show.Images.Banner != nil {
+			li.Art.Banner = show.Images.Banner.Full
+		}
+		if show.Images.Thumbnail != nil {
+			li.Art.Thumbnail = show.Images.Thumbnail.Full
+		}
+		if show.Images.ClearArt != nil {
+			li.Art.ClearArt = show.Images.ClearArt.Full
+		}
+	}
+
+	return li
 }
 
 // WatchedShows ...
