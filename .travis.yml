@@ -42,7 +42,7 @@ services:
 
 install:
   #- travis_wait 60 docker pull karalabe/xgo-1.8.3
-  - travis_wait 60 docker pull elgatito/xgo-1.9.2
+  - travis_wait 60 docker pull elgatito/xgo-1.10.3
   - go get github.com/karalabe/xgo
   - go get -d ./...
 
