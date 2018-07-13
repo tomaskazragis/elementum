@@ -145,24 +145,8 @@ func CalendarShows(ctx *gin.Context) {
 func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query string) {
 	hasNextPage := 0
 	if page > 0 {
-		resultsPerPage := config.Get().ResultsPerPage
-
-		if total == -1 {
-			total = len(shows)
-		}
-		if total > resultsPerPage {
-			if page*resultsPerPage < total {
-				hasNextPage = 1
-			}
-		}
-
-		if len(shows) > resultsPerPage {
-			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
-			end := start + resultsPerPage
-			if end > len(shows) {
-				end = len(shows)
-			}
-			shows = shows[start:end]
+		if page*config.Get().ResultsPerPage < total {
+			hasNextPage = 1
 		}
 	}
 

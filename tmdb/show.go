@@ -206,24 +206,27 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 		language = "all"
 	}
 
-	limit := ResultsPerPage * PagesAtOnce
-	pageGroup := (page-1)*ResultsPerPage/limit + 1
+	requestPerPage := config.Get().ResultsPerPage
+	requestLimitStart := (page - 1) * requestPerPage
+	requestLimitEnd := page*requestPerPage - 1
 
-	shows := make(Shows, limit)
+	pageStart := requestLimitStart / TMDBResultsPerPage
+	pageEnd := requestLimitEnd / TMDBResultsPerPage
+
+	shows := make(Shows, requestPerPage)
 
 	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf("com.tmdb.topshows.%s.%s.%s.%s.%d", cacheKey, genre, country, language, pageGroup)
+	key := fmt.Sprintf("com.tmdb.topshows.%s.%s.%s.%s.%d.%d", cacheKey, genre, country, language, requestPerPage, page)
 	totalKey := fmt.Sprintf("com.tmdb.topshows.%s.%s.%s.%s.total", cacheKey, genre, country, language)
 	if err := cacheStore.Get(key, &shows); err != nil {
 		wg := sync.WaitGroup{}
-		for p := 0; p < PagesAtOnce; p++ {
+		for p := pageStart; p <= pageEnd; p++ {
 			wg.Add(1)
-			currentPage := (pageGroup-1)*ResultsPerPage + p + 1
-			go func(p int) {
+			go func(currentPage int) {
 				defer wg.Done()
 				var results *EntityList
 				pageParams := napping.Params{
-					"page": strconv.Itoa(currentPage),
+					"page": strconv.Itoa(currentPage + 1),
 				}
 				for k, v := range params {
 					pageParams[k] = v
@@ -244,8 +247,8 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 						rl.CoolDown(resp.HttpResponse().Header)
 						return util.ErrExceeded
 					} else if resp.Status() != 200 {
-						message := fmt.Sprintf("Bad status while listing shows: %d", resp.Status())
-						log.Error(message)
+						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
+						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
 						// xbmc.Notify("Elementum", message, config.AddonIcon())
 						return util.ErrHTTP
 					}
@@ -261,15 +264,16 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 					var wgItems sync.WaitGroup
 					wgItems.Add(len(results.Results))
 					for s, show := range results.Results {
-						if show == nil {
+						rindex := currentPage*TMDBResultsPerPage - requestLimitStart + s
+						if show == nil || rindex >= len(shows) || rindex < 0 {
 							wgItems.Done()
 							continue
 						}
 
-						go func(i int, tmdbId int) {
+						go func(rindex int, tmdbId int) {
 							defer wgItems.Done()
-							shows[i] = GetShow(tmdbId, params["language"])
-						}(p*ResultsPerPage+s, show.ID)
+							shows[rindex] = GetShow(tmdbId, params["language"])
+						}(rindex, show.ID)
 					}
 					wgItems.Wait()
 				}

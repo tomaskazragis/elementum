@@ -199,24 +199,8 @@ func CalendarMovies(ctx *gin.Context) {
 func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, query string) {
 	hasNextPage := 0
 	if page > 0 {
-		resultsPerPage := config.Get().ResultsPerPage
-
-		if total == -1 {
-			total = len(movies)
-		}
-		if total > resultsPerPage {
-			if page*resultsPerPage < total {
-				hasNextPage = 1
-			}
-		}
-
-		if len(movies) > resultsPerPage {
-			start := (page - 1) % tmdb.PagesAtOnce * resultsPerPage
-			end := start + resultsPerPage
-			if end > len(movies) {
-				end = len(movies)
-			}
-			movies = movies[start:end]
+		if page*config.Get().ResultsPerPage < total {
+			hasNextPage = 1
 		}
 	}
 

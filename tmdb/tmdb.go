@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strconv"
-	"sync"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -19,10 +17,8 @@ import (
 //go:generate msgp -o msgp.go -io=false -tests=false
 
 const (
-	// PagesAtOnce ...
-	PagesAtOnce = 5
-	// ResultsPerPage ...
-	ResultsPerPage = 20
+	// TMDBResultsPerPage reflects TMDB number of results on the page. It's statically set to 20, so we should work with that
+	TMDBResultsPerPage = 20
 )
 
 var (
@@ -397,52 +393,52 @@ func ImageURL(uri string, size string) string {
 
 // ListEntities ...
 // TODO Unused...
-func ListEntities(endpoint string, params napping.Params) []*Entity {
-	var wg sync.WaitGroup
-	resultsPerPage := config.Get().ResultsPerPage
-	entities := make([]*Entity, PagesAtOnce*resultsPerPage)
-	params["api_key"] = apiKey
-	params["language"] = config.Get().Language
+// func ListEntities(endpoint string, params napping.Params) []*Entity {
+// 	var wg sync.WaitGroup
+// 	resultsPerPage := config.Get().ResultsPerPage
+// 	entities := make([]*Entity, PagesAtOnce*resultsPerPage)
+// 	params["api_key"] = apiKey
+// 	params["language"] = config.Get().Language
 
-	wg.Add(PagesAtOnce)
-	for i := 0; i < PagesAtOnce; i++ {
-		go func(page int) {
-			defer wg.Done()
-			var tmp *EntityList
-			tmpParams := napping.Params{
-				"page": strconv.Itoa(page),
-			}
-			for k, v := range params {
-				tmpParams[k] = v
-			}
-			urlValues := tmpParams.AsUrlValues()
-			rl.Call(func() error {
-				resp, err := napping.Get(
-					tmdbEndpoint+endpoint,
-					&urlValues,
-					&tmp,
-					nil,
-				)
-				if err != nil {
-					log.Error(err.Error())
-					xbmc.Notify("Elementum", "Failed listing entities, check your logs.", config.AddonIcon())
-				} else if resp.Status() != 200 {
-					message := fmt.Sprintf("Bad status listing entities: %d", resp.Status())
-					log.Error(message)
-					xbmc.Notify("Elementum", message, config.AddonIcon())
-				}
+// 	wg.Add(PagesAtOnce)
+// 	for i := 0; i < PagesAtOnce; i++ {
+// 		go func(page int) {
+// 			defer wg.Done()
+// 			var tmp *EntityList
+// 			tmpParams := napping.Params{
+// 				"page": strconv.Itoa(page),
+// 			}
+// 			for k, v := range params {
+// 				tmpParams[k] = v
+// 			}
+// 			urlValues := tmpParams.AsUrlValues()
+// 			rl.Call(func() error {
+// 				resp, err := napping.Get(
+// 					tmdbEndpoint+endpoint,
+// 					&urlValues,
+// 					&tmp,
+// 					nil,
+// 				)
+// 				if err != nil {
+// 					log.Error(err.Error())
+// 					xbmc.Notify("Elementum", "Failed listing entities, check your logs.", config.AddonIcon())
+// 				} else if resp.Status() != 200 {
+// 					message := fmt.Sprintf("Bad status listing entities: %d", resp.Status())
+// 					log.Error(message)
+// 					xbmc.Notify("Elementum", message, config.AddonIcon())
+// 				}
 
-				return nil
-			})
-			for i, entity := range tmp.Results {
-				entities[page*resultsPerPage+i] = entity
-			}
-		}(i)
-	}
-	wg.Wait()
+// 				return nil
+// 			})
+// 			for i, entity := range tmp.Results {
+// 				entities[page*resultsPerPage+i] = entity
+// 			}
+// 		}(i)
+// 	}
+// 	wg.Wait()
 
-	return entities
-}
+// 	return entities
+// }
 
 // Find ...
 func Find(externalID string, externalSource string) *FindResult {

@@ -227,12 +227,13 @@ func SearchMovies(query string, language string, page int) (Movies, int) {
 func GetIMDBList(listID string, language string, page int) (movies Movies, totalResults int) {
 	var results *List
 	totalResults = -1
-	resultsPerPage := config.Get().ResultsPerPage
-	limit := resultsPerPage * PagesAtOnce
-	pageGroup := (page-1)*resultsPerPage/limit + 1
+
+	requestPerPage := config.Get().ResultsPerPage
+	requestLimitStart := (page - 1) * requestPerPage
+	requestLimitEnd := page*requestPerPage - 1
 
 	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf("com.imdb.list.%s.%d", listID, pageGroup)
+	key := fmt.Sprintf("com.imdb.list.%s.%d.%d", listID, requestPerPage, page)
 	totalKey := fmt.Sprintf("com.imdb.list.%s.total", listID)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		rl.Call(func() error {
@@ -262,11 +263,12 @@ func GetIMDBList(listID string, language string, page int) (movies Movies, total
 			return nil
 		})
 		tmdbIds := make([]int, 0)
-		for i, movie := range results.Items {
-			if i >= limit {
-				break
+		for i := requestLimitStart; i <= requestLimitEnd; i++ {
+			if i >= len(results.Items) || results.Items[i] == nil {
+				continue
 			}
-			tmdbIds = append(tmdbIds, movie.ID)
+
+			tmdbIds = append(tmdbIds, results.Items[i].ID)
 		}
 		movies = GetMovies(tmdbIds, language)
 		if movies != nil && len(movies) > 0 {
@@ -299,24 +301,27 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 		language = "all"
 	}
 
-	limit := ResultsPerPage * PagesAtOnce
-	pageGroup := (page-1)*ResultsPerPage/limit + 1
+	requestPerPage := config.Get().ResultsPerPage
+	requestLimitStart := (page - 1) * requestPerPage
+	requestLimitEnd := page*requestPerPage - 1
 
-	movies := make(Movies, limit)
+	pageStart := requestLimitStart / TMDBResultsPerPage
+	pageEnd := requestLimitEnd / TMDBResultsPerPage
+
+	movies := make(Movies, requestPerPage)
 
 	cacheStore := cache.NewDBStore()
-	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%s.%s.%d", cacheKey, genre, country, language, pageGroup)
+	key := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%s.%s.%d.%d", cacheKey, genre, country, language, requestPerPage, page)
 	totalKey := fmt.Sprintf("com.tmdb.topmovies.%s.%s.%s.%s.total", cacheKey, genre, country, language)
 	if err := cacheStore.Get(key, &movies); err != nil {
 		wg := sync.WaitGroup{}
-		for p := 0; p < PagesAtOnce; p++ {
+		for p := pageStart; p <= pageEnd; p++ {
 			wg.Add(1)
-			currentPage := (pageGroup-1)*ResultsPerPage + p + 1
-			go func(p int) {
+			go func(currentPage int) {
 				defer wg.Done()
 				var results *EntityList
 				pageParams := napping.Params{
-					"page": strconv.Itoa(currentPage),
+					"page": strconv.Itoa(currentPage + 1),
 				}
 				for k, v := range params {
 					pageParams[k] = v
@@ -331,15 +336,15 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 					)
 					if err != nil {
 						log.Error(err)
-						xbmc.Notify("Elementum", "Failed while listing movies, check your logs.", config.AddonIcon())
+						// xbmc.Notify("Elementum", "Failed while listing movies, check your logs.", config.AddonIcon())
 					} else if resp.Status() == 429 {
-						log.Warningf("Rate limit exceeded listing movies from %s, cooling down...", endpoint)
+						log.Warningf("Rate limit exceeded while listing movies from %s, cooling down...", endpoint)
 						rl.CoolDown(resp.HttpResponse().Header)
 						return util.ErrExceeded
 					} else if resp.Status() != 200 {
 						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
 						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
-						xbmc.Notify("Elementum", message, config.AddonIcon())
+						// xbmc.Notify("Elementum", message, config.AddonIcon())
 						return util.ErrHTTP
 					}
 
@@ -354,15 +359,16 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 					var wgItems sync.WaitGroup
 					wgItems.Add(len(results.Results))
 					for m, movie := range results.Results {
-						if movie == nil {
+						rindex := currentPage*TMDBResultsPerPage - requestLimitStart + m
+						if movie == nil || rindex >= len(movies) || rindex < 0 {
 							wgItems.Done()
 							continue
 						}
 
-						go func(i int, tmdbId int) {
+						go func(rindex int, tmdbId int) {
 							defer wgItems.Done()
-							movies[i] = GetMovie(tmdbId, params["language"])
-						}(p*ResultsPerPage+m, movie.ID)
+							movies[rindex] = GetMovie(tmdbId, params["language"])
+						}(rindex, movie.ID)
 					}
 					wgItems.Wait()
 				}
@@ -375,6 +381,7 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 			totalResults = -1
 		}
 	}
+
 	return movies, totalResults
 }
 
