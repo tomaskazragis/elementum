@@ -304,6 +304,9 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 // TopShows ...
 func TopShows(topCategory string, page string) (shows []*Shows, total int, err error) {
 	endPoint := "shows/" + topCategory
+	if topCategory == "recommendations" {
+		endPoint = topCategory + "/shows"
+	}
 
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
@@ -321,8 +324,15 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.shows.%s.%s", topCategory, page)
 	totalKey := fmt.Sprintf("com.trakt.shows.%s.total", topCategory)
-	if err := cacheStore.Get(key, &shows); err != nil {
-		resp, err := Get(endPoint, params)
+	if err := cacheStore.Get(key, &shows); err != nil || len(shows) == 0 {
+		var resp *napping.Response
+		var err error
+
+		if erra := Authorized(); erra != nil {
+			resp, err = Get(endPoint, params)
+		} else {
+			resp, err = GetWithAuth(endPoint, params)
+		}
 
 		if err != nil {
 			return shows, 0, err
@@ -330,7 +340,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 			return shows, 0, fmt.Errorf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status())
 		}
 
-		if topCategory == "popular" {
+		if topCategory == "popular" || topCategory == "recommendations" {
 			var showList []*Show
 			if errUnm := resp.Unmarshal(&showList); errUnm != nil {
 				return shows, 0, errUnm
@@ -354,7 +364,8 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 			shows = setShowsFanart(shows)
 		}
 
-		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		pagination := getPagination(resp.HttpResponse().Header)
+		total = pagination.ItemCount
 		if err != nil {
 			log.Warning(err)
 		} else {
@@ -550,7 +561,8 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 			shows = setCalendarShowsFanart(shows)
 		}
 
-		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		pagination := getPagination(resp.HttpResponse().Header)
+		total = pagination.ItemCount
 		if err != nil {
 			total = -1
 		} else {

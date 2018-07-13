@@ -201,6 +201,9 @@ func SearchMovies(query string, page string) (movies []*Movies, err error) {
 // TopMovies ...
 func TopMovies(topCategory string, page string) (movies []*Movies, total int, err error) {
 	endPoint := "movies/" + topCategory
+	if topCategory == "recommendations" {
+		endPoint = topCategory + "/movies"
+	}
 
 	resultsPerPage := config.Get().ResultsPerPage
 	limit := resultsPerPage * PagesAtOnce
@@ -218,8 +221,15 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.movies.%s.%s", topCategory, page)
 	totalKey := fmt.Sprintf("com.trakt.movies.%s.total", topCategory)
-	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := Get(endPoint, params)
+	if err := cacheStore.Get(key, &movies); err != nil || len(movies) == 0 {
+		var resp *napping.Response
+		var err error
+
+		if erra := Authorized(); erra != nil {
+			resp, err = Get(endPoint, params)
+		} else {
+			resp, err = GetWithAuth(endPoint, params)
+		}
 
 		if err != nil {
 			return movies, 0, err
@@ -227,7 +237,7 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 			return movies, 0, fmt.Errorf("Bad status getting top %s Trakt shows: %d", topCategory, resp.Status())
 		}
 
-		if topCategory == "popular" {
+		if topCategory == "popular" || topCategory == "recommendations" {
 			var movieList []*Movie
 			if errUnm := resp.Unmarshal(&movieList); errUnm != nil {
 				log.Warning(errUnm)
@@ -259,7 +269,8 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 			movies = setFanarts(movies)
 		}
 
-		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		pagination := getPagination(resp.HttpResponse().Header)
+		total = pagination.ItemCount
 		if err != nil {
 			log.Warning(err)
 		} else {
@@ -407,9 +418,58 @@ func Userlists() (lists []*List) {
 	return lists
 }
 
+// TopLists ...
+func TopLists(page string) (lists []*ListContainer, hasNext bool) {
+	pageInt, _ := strconv.Atoi(page)
+
+	endPoint := "lists/popular"
+	params := napping.Params{
+		"page":  page,
+		"limit": strconv.Itoa(config.Get().ResultsPerPage),
+	}.AsUrlValues()
+
+	var resp *napping.Response
+	var err error
+
+	if erra := Authorized(); erra != nil {
+		resp, err = Get(endPoint, params)
+	} else {
+		resp, err = GetWithAuth(endPoint, params)
+	}
+
+	if err != nil {
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+		log.Error(err)
+		return lists, hasNext
+	}
+	if resp.Status() != 200 {
+		errMsg := fmt.Sprintf("Bad status getting top lists: %d", resp.Status())
+		xbmc.Notify("Elementum", errMsg, config.AddonIcon())
+		log.Warningf(errMsg)
+		return lists, hasNext
+	}
+
+	if err := resp.Unmarshal(&lists); err != nil {
+		log.Warning(err)
+	}
+
+	sort.Slice(lists, func(i int, j int) bool {
+		return lists[i].List.Name < lists[j].List.Name
+	})
+
+	p := getPagination(resp.HttpResponse().Header)
+	hasNext = p.PageCount > pageInt
+
+	return lists, hasNext
+}
+
 // ListItemsMovies ...
-func ListItemsMovies(listID string, withImages bool) (movies []*Movies, err error) {
-	endPoint := fmt.Sprintf("users/%s/lists/%s/items/movies", config.Get().TraktUsername, listID)
+func ListItemsMovies(user string, listID string, withImages bool) (movies []*Movies, err error) {
+	if user == "" || user == "id" {
+		user = config.Get().TraktUsername
+	}
+
+	endPoint := fmt.Sprintf("users/%s/lists/%s/items/movies", user, listID)
 
 	params := napping.Params{}.AsUrlValues()
 
@@ -497,7 +557,8 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 			movies = setCalendarFanarts(movies)
 		}
 
-		total, err = totalFromHeaders(resp.HttpResponse().Header)
+		pagination := getPagination(resp.HttpResponse().Header)
+		total = pagination.ItemCount
 		if err != nil {
 			total = -1
 		} else {

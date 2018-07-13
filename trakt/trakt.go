@@ -294,6 +294,13 @@ type TokenRefresh struct {
 	GrantType    string `json:"grant_type"`
 }
 
+// ListContainer ...
+type ListContainer struct {
+	LikeCount    int   `json:"like_count"`
+	CommentCount int   `json:"comment_count"`
+	List         *List `json:"list"`
+}
+
 // List ...
 type List struct {
 	Name           string `json:"name"`
@@ -308,7 +315,8 @@ type List struct {
 	ItemCount      int    `json:"item_count"`
 	CommentCount   int    `json:"comment_count"`
 	Likes          int    `json:"likes"`
-	IDs            *IDs
+	IDs            *IDs   `json:"IDs"`
+	User           *User  `json:"User"`
 }
 
 // ListItem ...
@@ -333,6 +341,18 @@ type CalendarShow struct {
 type CalendarMovie struct {
 	Released string `json:"released"`
 	Movie    *Movie `json:"movie"`
+}
+
+// User ...
+type User struct {
+	Username string `json:"username"`
+	Private  bool   `json:"private"`
+	Name     string `json:"name"`
+	Vip      bool   `json:"vip"`
+	VipEp    bool   `json:"vip_ep"`
+	Ids      struct {
+		Slug string `json:"slug"`
+	} `json:"ids"`
 }
 
 // UserSettings ...
@@ -396,6 +416,14 @@ type ProgressShow struct {
 	Show    *Show    `json:"show"`
 }
 
+// Pagination ...
+type Pagination struct {
+	ItemCount int `json:"x_pagination_item_count"`
+	Limit     int `json:"x_pagination_limit"`
+	Page      int `json:"x_pagination_page"`
+	PageCount int `json:"x_pagination_page_count"`
+}
+
 // GetClearance updates clearance after config reload
 func GetClearance() {
 	clearance, _ = cloudhole.GetClearance()
@@ -413,6 +441,30 @@ func totalFromHeaders(headers http.Header) (total int, err error) {
 		return -1, errors.New("No X-Pagination-Item-Count header found")
 	}
 	return -1, errors.New("No valid headers in request")
+}
+
+func getPagination(headers http.Header) *Pagination {
+	return &Pagination{
+		ItemCount: getIntFromHeader(headers, "X-Pagination-Item-Count"),
+		Limit:     getIntFromHeader(headers, "X-Pagination-Limit"),
+		Page:      getIntFromHeader(headers, "X-Pagination-Page"),
+		PageCount: getIntFromHeader(headers, "X-Pagination-Page-Count"),
+	}
+}
+
+func getIntFromHeader(headers http.Header, key string) (res int) {
+	if len(headers) > 0 {
+		if itemCount, exists := headers[key]; exists {
+			if itemCount != nil {
+				res, _ = strconv.Atoi(itemCount[0])
+				return res
+			}
+			return -1
+		}
+		return -1
+	}
+
+	return -1
 }
 
 func newClearance() (err error) {

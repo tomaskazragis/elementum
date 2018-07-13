@@ -86,7 +86,9 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			trakt.GET("/watchlist", WatchlistMovies)
 			trakt.GET("/collection", CollectionMovies)
 			trakt.GET("/popular", TraktPopularMovies)
+			trakt.GET("/recommendations", TraktRecommendationsMovies)
 			trakt.GET("/trending", TraktTrendingMovies)
+			trakt.GET("/toplists", TopTraktLists)
 			trakt.GET("/played", TraktMostPlayedMovies)
 			trakt.GET("/watched", TraktMostWatchedMovies)
 			trakt.GET("/collected", TraktMostCollectedMovies)
@@ -97,7 +99,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			lists := trakt.Group("/lists")
 			{
 				lists.GET("/", MoviesTraktLists)
-				lists.GET("/id/:listId", UserlistMovies)
+				lists.GET("/:user/:listId", UserlistMovies)
 			}
 
 			calendars := trakt.Group("/calendars")
@@ -150,6 +152,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			trakt.GET("/watchlist", WatchlistShows)
 			trakt.GET("/collection", CollectionShows)
 			trakt.GET("/popular", TraktPopularShows)
+			trakt.GET("/recommendations", TraktRecommendationsShows)
 			trakt.GET("/trending", TraktTrendingShows)
 			trakt.GET("/played", TraktMostPlayedShows)
 			trakt.GET("/watched", TraktMostWatchedShows)
@@ -161,7 +164,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 			lists := trakt.Group("/lists")
 			{
 				lists.GET("/", TVTraktLists)
-				lists.GET("/id/:listId", UserlistShows)
+				lists.GET("/:user/:listId", UserlistShows)
 			}
 
 			calendars := trakt.Group("/calendars")

@@ -26,6 +26,7 @@ func TVIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30254]", Path: URLForXBMC("/shows/trakt/watchlist"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/watchlist"))}}, TraktAuth: true},
 		{Label: "LOCALIZE[30257]", Path: URLForXBMC("/shows/trakt/collection"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/collection"))}}, TraktAuth: true},
 		{Label: "LOCALIZE[30290]", Path: URLForXBMC("/shows/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png"), TraktAuth: true},
+		{Label: "LOCALIZE[30423]", Path: URLForXBMC("/shows/trakt/recommendations"), Thumbnail: config.AddonResource("img", "tv.png"), TraktAuth: true},
 		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/shows/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/shows/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30247]", Path: URLForXBMC("/shows/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},

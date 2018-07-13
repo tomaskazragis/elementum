@@ -1207,7 +1207,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 		movies, err = trakt.CollectionMovies()
 		label = "LOCALIZE[30257]"
 	default:
-		movies, err = trakt.ListItemsMovies(listID, false)
+		movies, err = trakt.ListItemsMovies("", listID, false)
 		label = "LOCALIZE[30263]"
 	}
 

@@ -58,6 +58,8 @@ func MoviesIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30254]", Path: URLForXBMC("/movies/trakt/watchlist"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/watchlist"))}}, TraktAuth: true},
 		{Label: "LOCALIZE[30257]", Path: URLForXBMC("/movies/trakt/collection"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/collection"))}}, TraktAuth: true},
 		{Label: "LOCALIZE[30290]", Path: URLForXBMC("/movies/trakt/calendars/"), Thumbnail: config.AddonResource("img", "most_anticipated.png"), TraktAuth: true},
+		{Label: "LOCALIZE[30423]", Path: URLForXBMC("/movies/trakt/recommendations"), Thumbnail: config.AddonResource("img", "movies.png"), TraktAuth: true},
+		{Label: "LOCALIZE[30422]", Path: URLForXBMC("/movies/trakt/toplists"), Thumbnail: config.AddonResource("img", "most_collected.png")},
 		{Label: "LOCALIZE[30246]", Path: URLForXBMC("/movies/trakt/trending"), Thumbnail: config.AddonResource("img", "trending.png")},
 		{Label: "LOCALIZE[30210]", Path: URLForXBMC("/movies/trakt/popular"), Thumbnail: config.AddonResource("img", "popular.png")},
 		{Label: "LOCALIZE[30247]", Path: URLForXBMC("/movies/trakt/played"), Thumbnail: config.AddonResource("img", "most_played.png")},
@@ -133,6 +135,37 @@ func MovieCountries(ctx *gin.Context) {
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies_countries", filterListItems(items)))
+}
+
+// TopTraktLists ...
+func TopTraktLists(ctx *gin.Context) {
+	pageParam := ctx.DefaultQuery("page", "1")
+	page, _ := strconv.Atoi(pageParam)
+
+	items := xbmc.ListItems{}
+	lists, hasNextPage := trakt.TopLists(pageParam)
+	for _, list := range lists {
+		item := &xbmc.ListItem{
+			Label:     list.List.Name,
+			Path:      URLForXBMC("/movies/trakt/lists/%s/%d", list.List.User.Username, list.List.IDs.Trakt),
+			Thumbnail: config.AddonResource("img", "trakt.png"),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/%d", list.List.IDs.Trakt))},
+			},
+		}
+		items = append(items, item)
+	}
+	if hasNextPage {
+		path := ctx.Request.URL.Path
+		nextpage := &xbmc.ListItem{
+			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
+			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
+			Thumbnail: config.AddonResource("img", "nextpage.png"),
+		}
+		items = append(items, nextpage)
+	}
+
+	ctx.JSON(200, xbmc.NewView("menus_movies", filterListItems(items)))
 }
 
 // MoviesTraktLists ...
