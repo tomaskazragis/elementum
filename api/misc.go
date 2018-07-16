@@ -48,6 +48,7 @@ func Status(ctx *gin.Context) {
 [COLOR pink][B]LOCALIZE[30399]:[/B][/COLOR]
     [B]LOCALIZE[30397]:[/B] %s
     [B]LOCALIZE[30401]:[/B] %s
+    [B]LOCALIZE[30439]:[/B] %s
     [B]LOCALIZE[30398]:[/B] %s
 
 [COLOR pink][B]LOCALIZE[30400]:[/B][/COLOR]
@@ -61,7 +62,8 @@ func Status(ctx *gin.Context) {
 	ip, _ := util.LocalIP()
 	port := config.Args.LocalPort
 	webAddress := fmt.Sprintf("http://%s:%d/web", ip.String(), port)
-	debugAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip.String(), port)
+	debugAllAddress := fmt.Sprintf("http://%s:%d/debug/all", ip.String(), port)
+	debugBundleAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip.String(), port)
 	infoAddress := fmt.Sprintf("http://%s:%d/info", ip.String(), port)
 
 	appSize := fileSize(filepath.Join(config.Get().Info.Profile, database.Get().GetFilename()))
@@ -80,7 +82,8 @@ func Status(ctx *gin.Context) {
 
 		webAddress,
 		infoAddress,
-		debugAddress,
+		debugAllAddress,
+		debugBundleAddress,
 
 		appSize,
 		cacheSize,
