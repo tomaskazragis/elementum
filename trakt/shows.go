@@ -627,35 +627,74 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 	return li
 }
 
+// GetLastActivities ...
+func GetLastActivities() (a *UserActivities, err error) {
+	if err := Authorized(); err != nil {
+		return nil, fmt.Errorf("Not authorized")
+	}
+
+	endPoint := "sync/last_activities"
+
+	params := napping.Params{}.AsUrlValues()
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return nil, err
+	} else if resp.Status() != 200 {
+		return nil, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
+	}
+
+	if err := resp.Unmarshal(&a); err != nil {
+		log.Warning(err)
+	}
+
+	return
+}
+
 // WatchedShows ...
 func WatchedShows() (shows []*WatchedShow, err error) {
 	if err := Authorized(); err != nil {
 		return shows, nil
 	}
 
-	endPoint := "sync/watched/shows"
-
-	params := napping.Params{
-		"extended": "full,images",
-	}.AsUrlValues()
+	lastActivities, errAct := GetLastActivities()
+	if errAct != nil {
+		return shows, errAct
+	}
 
 	cacheStore := cache.NewDBStore()
+
 	key := "com.trakt.episodes.watched"
-	if err := cacheStore.Get(key, &shows); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
+	watchedKey := "com.trakt.progress.episodes.watched"
 
-		if err != nil {
-			return shows, err
-		} else if resp.Status() != 200 {
-			return shows, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
+	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
+
+	var cachedWatchedAt time.Time
+	cacheStore.Get(watchedKey, &cachedWatchedAt)
+	if err := cacheStore.Get(watchedKey, &cachedWatchedAt); err == nil && !lastActivities.Episodes.WatchedAt.After(cachedWatchedAt) {
+		if err := cacheStore.Get(key, &shows); err == nil {
+			return shows, nil
 		}
-
-		if err := resp.Unmarshal(&shows); err != nil {
-			log.Warning(err)
-		}
-
-		cacheStore.Set(key, shows, watchedExpiration)
 	}
+
+	endPoint := "sync/watched/shows"
+	params := napping.Params{
+		"extended": "full,images,noseasons",
+	}.AsUrlValues()
+
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return shows, err
+	} else if resp.Status() != 200 {
+		return shows, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
+	}
+
+	if err := resp.Unmarshal(&shows); err != nil {
+		log.Warning(err)
+	}
+
+	cacheStore.Set(key, shows, progressExpiration)
 
 	return
 }
@@ -672,6 +711,11 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 		return nil, errWatched
 	}
 
+	cacheStore := cache.NewDBStore()
+
+	key := "com.trakt.episodes.watched.%d"
+	watchedKey := "com.trakt.progress.episodes.watched.%d"
+
 	params := napping.Params{
 		"hidden":         "false",
 		"specials":       "false",
@@ -685,7 +729,29 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 	wg.Add(len(watchedShows))
 	for i, show := range watchedShows {
 		go func(i int, show *WatchedShow) {
-			defer wg.Done()
+			var watchedProgressShow *WatchedProgressShow
+			var cachedWatchedAt time.Time
+
+			defer func() {
+				wg.Done()
+				cacheStore.Set(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), show.LastWatchedAt, activitiesExpiration)
+
+				watchedProgressShows[i] = watchedProgressShow
+
+				if watchedProgressShow != nil && watchedProgressShow.NextEpisode != nil && watchedProgressShow.NextEpisode.Number != 0 && watchedProgressShow.NextEpisode.Season != 0 {
+					showsList[i] = &ProgressShow{
+						Show:    show.Show,
+						Episode: watchedProgressShow.NextEpisode,
+					}
+				}
+			}()
+
+			if err := cacheStore.Get(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), &cachedWatchedAt); err == nil && !show.LastWatchedAt.After(cachedWatchedAt) {
+				if err := cacheStore.Get(fmt.Sprintf(key, show.Show.IDs.Trakt), &watchedProgressShow); err == nil {
+					return
+				}
+			}
+
 			endPoint := fmt.Sprintf("shows/%d/progress/watched", show.Show.IDs.Trakt)
 
 			resp, err := GetWithAuth(endPoint, params)
@@ -696,19 +762,11 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 				log.Errorf("Got %d response status getting endpoint %s for show '%d'", resp.Status(), endPoint, show.Show.IDs.Trakt)
 				return
 			}
-			var watchedProgressShow *WatchedProgressShow
 			if err := resp.Unmarshal(&watchedProgressShow); err != nil {
 				log.Warningf("Can't unmarshal response: %#v", err)
 			}
 
-			watchedProgressShows[i] = watchedProgressShow
-
-			if watchedProgressShow.NextEpisode != nil && watchedProgressShow.NextEpisode.Number != 0 && watchedProgressShow.NextEpisode.Season != 0 {
-				showsList[i] = &ProgressShow{
-					Show:    show.Show,
-					Episode: watchedProgressShow.NextEpisode,
-				}
-			}
+			cacheStore.Set(fmt.Sprintf(key, show.Show.IDs.Trakt), watchedProgressShow, progressExpiration)
 		}(i, show)
 	}
 	wg.Wait()

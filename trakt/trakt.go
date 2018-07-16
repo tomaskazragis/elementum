@@ -2,6 +2,7 @@ package trakt
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -46,6 +47,19 @@ var (
 	recentExpiration        = 15 * time.Minute
 	userlistExpiration      = 1 * time.Minute
 	watchedExpiration       = 10 * time.Minute
+	activitiesExpiration    = 7 * 24 * time.Hour
+	progressExpiration      = 7 * 24 * time.Hour
+)
+
+const (
+	// ProgressSortWatched ...
+	ProgressSortWatched = iota
+	// ProgressSortShow ...
+	ProgressSortShow
+	// ProgressSortAiredNewer ...
+	ProgressSortAiredNewer
+	// ProgressSortAiredOlder ...
+	ProgressSortAiredOlder
 )
 
 var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
@@ -424,6 +438,54 @@ type Pagination struct {
 	PageCount int `json:"x_pagination_page_count"`
 }
 
+// UserActivities is a structure, returned by sync/last_activities
+type UserActivities struct {
+	All    time.Time `json:"all"`
+	Movies struct {
+		WatchedAt     time.Time `json:"watched_at"`
+		CollectedAt   time.Time `json:"collected_at"`
+		RatedAt       time.Time `json:"rated_at"`
+		WatchlistedAt time.Time `json:"watchlisted_at"`
+		CommentedAt   time.Time `json:"commented_at"`
+		PausedAt      time.Time `json:"paused_at"`
+		HiddenAt      time.Time `json:"hidden_at"`
+	} `json:"movies"`
+	Episodes struct {
+		WatchedAt     time.Time `json:"watched_at"`
+		CollectedAt   time.Time `json:"collected_at"`
+		RatedAt       time.Time `json:"rated_at"`
+		WatchlistedAt time.Time `json:"watchlisted_at"`
+		CommentedAt   time.Time `json:"commented_at"`
+		PausedAt      time.Time `json:"paused_at"`
+	} `json:"episodes"`
+	Shows struct {
+		RatedAt       time.Time `json:"rated_at"`
+		WatchlistedAt time.Time `json:"watchlisted_at"`
+		CommentedAt   time.Time `json:"commented_at"`
+		HiddenAt      time.Time `json:"hidden_at"`
+	} `json:"shows"`
+	Seasons struct {
+		RatedAt       time.Time `json:"rated_at"`
+		WatchlistedAt time.Time `json:"watchlisted_at"`
+		CommentedAt   time.Time `json:"commented_at"`
+		HiddenAt      time.Time `json:"hidden_at"`
+	} `json:"seasons"`
+	Comments struct {
+		LikedAt time.Time `json:"liked_at"`
+	} `json:"comments"`
+	Lists struct {
+		LikedAt     time.Time `json:"liked_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
+		CommentedAt time.Time `json:"commented_at"`
+	} `json:"lists"`
+}
+
+// ListItemsPayload describes items to add/remove from userlists
+type ListItemsPayload struct {
+	Movies []*Movie `json:"movies,omitempty"`
+	Shows  []*Show  `json:"shows,omitempty"`
+}
+
 // GetClearance updates clearance after config reload
 func GetClearance() {
 	clearance, _ = cloudhole.GetClearance()
@@ -559,6 +621,17 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		return nil
 	})
 	return
+}
+
+// PostJSON ...
+func PostJSON(endPoint string, obj interface{}) (resp *napping.Response, err error) {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	return Post(endPoint, bytes.NewBuffer(b))
 }
 
 // Post ...
@@ -878,6 +951,8 @@ func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.
 		return AddToCollection(itemType, tmdbID)
 	} else if location == 1 {
 		return AddToWatchlist(itemType, tmdbID)
+	} else if location == 2 && config.Get().TraktSyncAddedList != 0 {
+		return AddToUserlist(config.Get().TraktSyncAddedList, itemType, tmdbID)
 	}
 
 	return
@@ -889,6 +964,8 @@ func SyncRemovedItem(itemType string, tmdbID string, location int) (resp *nappin
 		return RemoveFromCollection(itemType, tmdbID)
 	} else if location == 1 {
 		return RemoveFromWatchlist(itemType, tmdbID)
+	} else if location == 2 && config.Get().TraktSyncRemovedList != 0 {
+		return RemoveFromUserlist(config.Get().TraktSyncRemovedList, itemType, tmdbID)
 	}
 
 	return
@@ -902,6 +979,50 @@ func AddToWatchlist(itemType string, tmdbID string) (resp *napping.Response, err
 
 	endPoint := "sync/watchlist"
 	return Post(endPoint, bytes.NewBufferString(fmt.Sprintf(`{"%s": [{"ids": {"tmdb": %s}}]}`, itemType, tmdbID)))
+}
+
+// AddToUserlist ...
+func AddToUserlist(listID int, itemType string, tmdbID string) (resp *napping.Response, err error) {
+	if err := Authorized(); err != nil {
+		return nil, err
+	}
+
+	id, _ := strconv.Atoi(tmdbID)
+	endPoint := fmt.Sprintf("/users/%s/lists/%s/items", config.Get().TraktUsername, strconv.Itoa(listID))
+	payload := ListItemsPayload{}
+	if itemType == "movies" {
+		i := &Movie{}
+		i.IDs = &IDs{TMDB: id}
+		payload.Movies = append(payload.Movies, i)
+	} else if itemType == "shows" {
+		i := &Show{}
+		i.IDs = &IDs{TMDB: id}
+		payload.Shows = append(payload.Shows, i)
+	}
+
+	return PostJSON(endPoint, payload)
+}
+
+// RemoveFromUserlist ...
+func RemoveFromUserlist(listID int, itemType string, tmdbID string) (resp *napping.Response, err error) {
+	if err := Authorized(); err != nil {
+		return nil, err
+	}
+
+	id, _ := strconv.Atoi(tmdbID)
+	endPoint := fmt.Sprintf("/users/%s/lists/%s/items/remove", config.Get().TraktUsername, strconv.Itoa(listID))
+	payload := ListItemsPayload{}
+	if itemType == "movies" {
+		i := &Movie{}
+		i.IDs = &IDs{TMDB: id}
+		payload.Movies = append(payload.Movies, i)
+	} else if itemType == "shows" {
+		i := &Show{}
+		i.IDs = &IDs{TMDB: id}
+		payload.Shows = append(payload.Shows, i)
+	}
+
+	return PostJSON(endPoint, payload)
 }
 
 // RemoveFromWatchlist ...

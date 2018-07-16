@@ -86,20 +86,28 @@ type Configuration struct {
 	// TunedStorage        bool
 	Scrobble bool
 
-	TraktUsername            string
-	TraktToken               string
-	TraktRefreshToken        string
-	TraktTokenExpiry         int
-	TraktSyncFrequency       int
-	TraktSyncCollections     bool
-	TraktSyncWatchlist       bool
-	TraktSyncUserlists       bool
-	TraktSyncWatched         bool
-	TraktSyncWatchedBack     bool
-	TraktSyncAdded           bool
-	TraktSyncAddedLocation   int
-	TraktSyncRemoved         bool
-	TraktSyncRemovedLocation int
+	TraktUsername             string
+	TraktToken                string
+	TraktRefreshToken         string
+	TraktTokenExpiry          int
+	TraktSyncFrequency        int
+	TraktSyncCollections      bool
+	TraktSyncWatchlist        bool
+	TraktSyncUserlists        bool
+	TraktSyncWatched          bool
+	TraktSyncWatchedBack      bool
+	TraktSyncAdded            bool
+	TraktSyncAddedLocation    int
+	TraktSyncAddedList        int
+	TraktSyncRemoved          bool
+	TraktSyncRemovedLocation  int
+	TraktSyncRemovedList      int
+	TraktProgressUnaired      bool
+	TraktProgressSort         int
+	TraktProgressDateFormat   string
+	TraktProgressColorDate    string
+	TraktProgressColorShow    string
+	TraktProgressColorEpisode string
 
 	UpdateFrequency int
 	UpdateDelay     int
@@ -394,20 +402,28 @@ func Reload() *Configuration {
 		// SessionSave:         settings["session_save"].(int),
 		Scrobble: settings["trakt_scrobble"].(bool),
 
-		TraktUsername:            settings["trakt_username"].(string),
-		TraktToken:               settings["trakt_token"].(string),
-		TraktRefreshToken:        settings["trakt_refresh_token"].(string),
-		TraktTokenExpiry:         settings["trakt_token_expiry"].(int),
-		TraktSyncFrequency:       settings["trakt_sync"].(int),
-		TraktSyncCollections:     settings["trakt_sync_collections"].(bool),
-		TraktSyncWatchlist:       settings["trakt_sync_watchlist"].(bool),
-		TraktSyncUserlists:       settings["trakt_sync_userlists"].(bool),
-		TraktSyncWatched:         settings["trakt_sync_watched"].(bool),
-		TraktSyncWatchedBack:     settings["trakt_sync_watchedback"].(bool),
-		TraktSyncAdded:           settings["trakt_sync_added"].(bool),
-		TraktSyncAddedLocation:   settings["trakt_sync_added_location"].(int),
-		TraktSyncRemoved:         settings["trakt_sync_removed"].(bool),
-		TraktSyncRemovedLocation: settings["trakt_sync_removed_location"].(int),
+		TraktUsername:             settings["trakt_username"].(string),
+		TraktToken:                settings["trakt_token"].(string),
+		TraktRefreshToken:         settings["trakt_refresh_token"].(string),
+		TraktTokenExpiry:          settings["trakt_token_expiry"].(int),
+		TraktSyncFrequency:        settings["trakt_sync"].(int),
+		TraktSyncCollections:      settings["trakt_sync_collections"].(bool),
+		TraktSyncWatchlist:        settings["trakt_sync_watchlist"].(bool),
+		TraktSyncUserlists:        settings["trakt_sync_userlists"].(bool),
+		TraktSyncWatched:          settings["trakt_sync_watched"].(bool),
+		TraktSyncWatchedBack:      settings["trakt_sync_watchedback"].(bool),
+		TraktSyncAdded:            settings["trakt_sync_added"].(bool),
+		TraktSyncAddedLocation:    settings["trakt_sync_added_location"].(int),
+		TraktSyncAddedList:        settings["trakt_sync_added_list"].(int),
+		TraktSyncRemoved:          settings["trakt_sync_removed"].(bool),
+		TraktSyncRemovedLocation:  settings["trakt_sync_removed_location"].(int),
+		TraktSyncRemovedList:      settings["trakt_sync_removed_list"].(int),
+		TraktProgressUnaired:      settings["trakt_progress_unaired"].(bool),
+		TraktProgressSort:         settings["trakt_progress_sort"].(int),
+		TraktProgressDateFormat:   settings["trakt_progress_date_format"].(string),
+		TraktProgressColorDate:    settings["trakt_progress_color_date"].(string),
+		TraktProgressColorShow:    settings["trakt_progress_color_show"].(string),
+		TraktProgressColorEpisode: settings["trakt_progress_color_episode"].(string),
 
 		UpdateFrequency:  settings["library_update_frequency"].(int),
 		UpdateDelay:      settings["library_update_delay"].(int),

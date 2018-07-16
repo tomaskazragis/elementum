@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -1125,6 +1126,10 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		}
 	}
 
+	colorDate := config.Get().TraktProgressColorDate
+	colorShow := config.Get().TraktProgressColorShow
+	colorEpisode := config.Get().TraktProgressColorEpisode
+
 	items := make(xbmc.ListItems, 0, len(shows)+hasNextPage)
 	now := util.UTCBod()
 
@@ -1145,12 +1150,12 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			continue
 		}
 		aired, errDate := time.Parse("2006-01-02", episode.AirDate)
-		if !config.Get().ShowUnairedEpisodes && errDate != nil && (aired.After(now) || aired.Equal(now)) {
+		if config.Get().TraktProgressUnaired && errDate != nil && (aired.After(now) || aired.Equal(now)) {
 			continue
 		}
 
 		item := episode.ToListItem(show)
-		episodeLabel := fmt.Sprintf("%s | %dx%02d %s", show.Name, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+		episodeLabel := fmt.Sprintf("[[COLOR %s]%s[/COLOR]] [COLOR %s][B]%s[/B][/COLOR] - [COLOR %s][I]%dx%02d %s[/I][/COLOR]", colorDate, aired.Format(config.Get().TraktProgressDateFormat), colorShow, show.Name, colorEpisode, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
 		item.Label = episodeLabel
 		item.Info.Title = episodeLabel
 
@@ -1202,6 +1207,25 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		item.IsPlayable = true
 		items = append(items, item)
 	}
+
+	if config.Get().TraktProgressSort == trakt.ProgressSortShow {
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].Info.TVShowTitle < items[j].Info.TVShowTitle
+		})
+	} else if config.Get().TraktProgressSort == trakt.ProgressSortAiredNewer {
+		sort.Slice(items, func(i, j int) bool {
+			id, _ := time.Parse("2006-01-02", items[i].Info.Aired)
+			jd, _ := time.Parse("2006-01-02", items[j].Info.Aired)
+			return id.After(jd)
+		})
+	} else if config.Get().TraktProgressSort == trakt.ProgressSortAiredOlder {
+		sort.Slice(items, func(i, j int) bool {
+			id, _ := time.Parse("2006-01-02", items[i].Info.Aired)
+			jd, _ := time.Parse("2006-01-02", items[j].Info.Aired)
+			return id.Before(jd)
+		})
+	}
+
 	if page >= 0 && hasNextPage > 0 {
 		path := ctx.Request.URL.Path
 		nextpage := &xbmc.ListItem{
@@ -1243,4 +1267,24 @@ func rebuildImages(traktImages *trakt.Images, tmdbImages *tmdb.Images) {
 		traktImages.FanArt.Full = backdropImage
 		traktImages.Banner.Full = backdropImage
 	}
+}
+
+// SelectTraktUserList ...
+func SelectTraktUserList(ctx *gin.Context) {
+	action := ctx.Params.ByName("action")
+
+	lists := trakt.Userlists()
+	items := make([]string, 0, len(lists))
+
+	for _, l := range lists {
+		items = append(items, l.Name)
+	}
+	choice := xbmc.ListDialog("LOCALIZE[30438]", items...)
+	if choice >= 0 {
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_location", action), "2")
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_list_name", action), lists[choice].Name)
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_list", action), strconv.Itoa(lists[choice].IDs.Trakt))
+	}
+
+	ctx.String(200, "")
 }
