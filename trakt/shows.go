@@ -328,7 +328,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 		var resp *napping.Response
 		var err error
 
-		if erra := Authorized(); erra != nil {
+		if config.Get().TraktToken == "" {
 			resp, err = Get(endPoint, params)
 		} else {
 			resp, err = GetWithAuth(endPoint, params)
@@ -488,7 +488,7 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 	}
 	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listID, full)
 	if errGet := cacheStore.Get(key, &shows); errGet != nil {
-		if erra := Authorized(); erra != nil {
+		if config.Get().TraktToken == "" {
 			resp, errGet = Get(endPoint, params)
 		} else {
 			resp, errGet = GetWithAuth(endPoint, params)

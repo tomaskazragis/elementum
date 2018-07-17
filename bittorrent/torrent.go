@@ -335,7 +335,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 
 	t.BufferPiecesLength = 0
 	for i := range t.BufferPiecesProgress {
-		t.BufferPiecesLength += t.Torrent.Piece(peer_protocol.Integer(i)).Info().Length()
+		t.BufferPiecesLength += t.Torrent.Piece(peer_protocol.Integer(i).Int()).Info().Length()
 	}
 
 	t.muBuffer.Unlock()

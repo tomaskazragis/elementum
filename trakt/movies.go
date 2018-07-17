@@ -225,7 +225,7 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 		var resp *napping.Response
 		var err error
 
-		if erra := Authorized(); erra != nil {
+		if config.Get().TraktToken == "" {
 			resp, err = Get(endPoint, params)
 		} else {
 			resp, err = GetWithAuth(endPoint, params)
@@ -389,7 +389,7 @@ func Userlists() (lists []*List) {
 	var resp *napping.Response
 	var err error
 
-	if erra := Authorized(); erra != nil {
+	if config.Get().TraktToken == "" {
 		resp, err = Get(endPoint, params)
 	} else {
 		resp, err = GetWithAuth(endPoint, params)
@@ -431,7 +431,7 @@ func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 	var resp *napping.Response
 	var err error
 
-	if erra := Authorized(); erra != nil {
+	if config.Get().TraktToken == "" {
 		resp, err = Get(endPoint, params)
 	} else {
 		resp, err = GetWithAuth(endPoint, params)
@@ -482,7 +482,7 @@ func ListItemsMovies(user string, listID string, withImages bool) (movies []*Mov
 	}
 	key := fmt.Sprintf("com.trakt.movies.list.%s%s", listID, full)
 	if errGet := cacheStore.Get(key, &movies); errGet != nil {
-		if erra := Authorized(); erra != nil {
+		if config.Get().TraktToken == "" {
 			resp, errGet = Get(endPoint, params)
 		} else {
 			resp, errGet = GetWithAuth(endPoint, params)
