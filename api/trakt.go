@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -1129,6 +1130,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 	colorDate := config.Get().TraktProgressColorDate
 	colorShow := config.Get().TraktProgressColorShow
 	colorEpisode := config.Get().TraktProgressColorEpisode
+	dateFormat := getProgressDateFormat()
 
 	items := make(xbmc.ListItems, 0, len(shows)+hasNextPage)
 	now := util.UTCBod()
@@ -1155,7 +1157,8 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		}
 
 		item := episode.ToListItem(show)
-		episodeLabel := fmt.Sprintf("[[COLOR %s]%s[/COLOR]] [COLOR %s][B]%s[/B][/COLOR] - [COLOR %s][I]%dx%02d %s[/I][/COLOR]", colorDate, aired.Format(config.Get().TraktProgressDateFormat), colorShow, show.Name, colorEpisode, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+		episodeLabel := fmt.Sprintf("[[COLOR %s]%s[/COLOR]] [COLOR %s][B]%s[/B][/COLOR] - [COLOR %s][I]%dx%02d %s[/I][/COLOR]",
+			colorDate, aired.Format(dateFormat), colorShow, show.Name, colorEpisode, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
 		item.Label = episodeLabel
 		item.Info.Title = episodeLabel
 
@@ -1287,4 +1290,14 @@ func SelectTraktUserList(ctx *gin.Context) {
 	}
 
 	ctx.String(200, "")
+}
+
+func getProgressDateFormat() string {
+	f := strings.ToLower(config.Get().TraktProgressDateFormat)
+	f = strings.Replace(f, "yyyy", "2006", -1)
+	f = strings.Replace(f, "yy", "06", -1)
+	f = strings.Replace(f, "mm", "01", -1)
+	f = strings.Replace(f, "dd", "02", -1)
+
+	return f
 }
