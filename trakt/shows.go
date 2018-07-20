@@ -188,8 +188,50 @@ func GetShowByTVDB(tvdbID string) (show *Show) {
 	return
 }
 
+// GetSeasonEpisodes ...
+func GetSeasonEpisodes(showID, seasonNumber int) (episodes []*Episode) {
+	endPoint := fmt.Sprintf("shows/%d/seasons/%d", showID, seasonNumber)
+	params := napping.Params{"extended": "episodes,full"}.AsUrlValues()
+
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.trakt.season.%d.%d", showID, seasonNumber)
+	if err := cacheStore.Get(key, &episodes); err != nil {
+		resp, err := Get(endPoint, params)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		if err := resp.Unmarshal(&episodes); err != nil {
+			log.Warning(err)
+		}
+		cacheStore.Set(key, episodes, cacheExpiration)
+	}
+	return
+}
+
 // GetEpisode ...
-func GetEpisode(id string) (episode *Episode) {
+func GetEpisode(showID, seasonNumber, episodeNumber int) (episode *Episode) {
+	endPoint := fmt.Sprintf("shows/%d/seasons/%d/episodes/%d", showID, seasonNumber, episodeNumber)
+	params := napping.Params{"extended": "full,images"}.AsUrlValues()
+
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.trakt.episode.%d.%d.%d", showID, seasonNumber, episodeNumber)
+	if err := cacheStore.Get(key, &episode); err != nil || true {
+		resp, err := Get(endPoint, params)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		if err := resp.Unmarshal(&episode); err != nil {
+			log.Warning(err)
+		}
+		cacheStore.Set(key, episode, cacheExpiration)
+	}
+	return
+}
+
+// GetEpisodeByID ...
+func GetEpisodeByID(id string) (episode *Episode) {
 	endPoint := fmt.Sprintf("search/trakt/%s?type=episode", id)
 
 	params := napping.Params{}.AsUrlValues()
@@ -749,4 +791,51 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 	}
 
 	return
+}
+
+// ToListItem ...
+func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
+	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.Season, episode.Number, episode.Title)
+
+	runtime := 1800
+	if show.Runtime > 0 {
+		runtime = show.Runtime
+	}
+
+	show = setShowFanart(show)
+	item := &xbmc.ListItem{
+		Label:  episodeLabel,
+		Label2: fmt.Sprintf("%f", episode.Rating),
+		Info: &xbmc.ListItemInfo{
+			Count:         rand.Int(),
+			Title:         episodeLabel,
+			OriginalTitle: episode.Title,
+			Season:        episode.Season,
+			Episode:       episode.Number,
+			TVShowTitle:   show.Title,
+			Plot:          episode.Overview,
+			PlotOutline:   episode.Overview,
+			Rating:        episode.Rating,
+			Aired:         episode.FirstAired,
+			Duration:      runtime,
+			Code:          show.IDs.IMDB,
+			IMDBNumber:    show.IDs.IMDB,
+			PlayCount:     playcount.GetWatchedEpisodeByTMDB(show.IDs.TMDB, episode.Season, episode.Number).Int(),
+			DBTYPE:        "episode",
+			Mediatype:     "episode",
+		},
+		Art: &xbmc.ListItemArt{
+			TvShowPoster: show.Images.Poster.Full,
+			Poster:       show.Images.Poster.Full,
+			FanArt:       show.Images.FanArt.Full,
+			Banner:       show.Images.Banner.Full,
+			Thumbnail:    show.Images.Thumbnail.Full,
+			ClearArt:     show.Images.ClearArt.Full,
+		},
+		Thumbnail: show.Images.Poster.Full,
+	}
+
+	item.Info.Genre = strings.Join(show.Genres, " / ")
+
+	return item
 }

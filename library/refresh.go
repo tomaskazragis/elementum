@@ -793,7 +793,7 @@ func findTraktIDs(entityType int, source int, id string) (ids *trakt.IDs) {
 		if source == TMDBScraper {
 			r = trakt.GetEpisodeByTMDB(id)
 		} else if source == TraktScraper {
-			r = trakt.GetEpisode(id)
+			r = trakt.GetEpisodeByID(id)
 		}
 		if r != nil && r.IDs != nil {
 			ids = r.IDs

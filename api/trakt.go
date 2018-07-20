@@ -1036,73 +1036,120 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 	colorUnaired := config.Get().TraktProgressColorUnaired
 	dateFormat := getProgressDateFormat()
 
-	items := make(xbmc.ListItems, 0, len(shows))
+	items := make(xbmc.ListItems, len(shows))
 	now := util.UTCBod()
 
-	for _, showListing := range shows {
-		if showListing == nil {
-			continue
-		}
+	wg := sync.WaitGroup{}
+	wg.Add(len(shows))
+	for i, s := range shows {
+		go func(i int, showListing *trakt.ProgressShow) {
+			defer wg.Done()
+			if showListing == nil {
+				return
+			}
 
-		show := tmdb.GetShow(showListing.Show.IDs.TMDB, language)
-		epi := showListing.Episode
-		if show == nil || epi == nil || showListing.Show.IDs.TMDB == 0 {
-			continue
-		}
+			if showListing.Episode == nil || showListing.Show.IDs.TMDB == 0 {
+				return
+			}
 
-		episode := tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
-		season := tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language)
-		if episode == nil || season == nil {
-			continue
-		}
-		aired, errDate := time.Parse("2006-01-02", episode.AirDate)
-		if config.Get().TraktProgressUnaired && errDate != nil && (aired.After(now) || aired.Equal(now)) {
-			continue
-		}
+			epi := showListing.Episode
+			airDate := epi.FirstAired
+			seasonNumber := epi.Season
+			episodeNumber := epi.Number
+			episodeName := epi.Title
+			showName := showListing.Show.Title
 
-		localEpisodeColor := colorEpisode
-		if aired.After(now) || aired.Equal(now) {
-			localEpisodeColor = colorUnaired
+			var episode *tmdb.Episode
+			var season *tmdb.Season
+			var show *tmdb.Show
+
+			if !config.Get().ForceUseTrakt {
+				show = tmdb.GetShow(showListing.Show.IDs.TMDB, language)
+				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language)
+				episode = tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
+
+				if episode != nil {
+					airDate = episode.AirDate
+					seasonNumber = episode.SeasonNumber
+					episodeNumber = episode.EpisodeNumber
+					episodeName = episode.Name
+				}
+				if show != nil {
+					showName = show.Name
+				}
+			}
+			if airDate == "" {
+				episodes := trakt.GetSeasonEpisodes(showListing.Show.IDs.Trakt, seasonNumber)
+				for _, e := range episodes {
+					if e != nil && e.Number == epi.Number {
+						airDate = e.FirstAired[0:strings.Index(e.FirstAired, "T")]
+						break
+					}
+				}
+			}
+
+			aired, errDate := time.Parse("2006-01-02", airDate)
+			if config.Get().TraktProgressUnaired && errDate == nil && (aired.After(now) || aired.Equal(now)) {
+				return
+			}
+
+			localEpisodeColor := colorEpisode
+			if aired.After(now) || aired.Equal(now) {
+				localEpisodeColor = colorUnaired
+			}
+
+			var item *xbmc.ListItem
+			if show != nil && season != nil && episode != nil {
+				item = episode.ToListItem(show, season)
+			} else {
+				item = epi.ToListItem(showListing.Show)
+			}
+
+			episodeLabel := fmt.Sprintf(`[COLOR %s]%s[/COLOR] | [B][COLOR %s]%s[/COLOR][/B] - [I][COLOR %s]%dx%02d %s[/COLOR][/I]`,
+				colorDate, aired.Format(dateFormat), colorShow, showName, localEpisodeColor, seasonNumber, episodeNumber, episodeName)
+			item.Label = episodeLabel
+			item.Info.Title = episodeLabel
+
+			thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
+				showListing.Show.IDs.TMDB,
+				seasonNumber,
+				episodeNumber,
+			) + "%s"
+			markWatchedLabel := "LOCALIZE[30313]"
+			markWatchedURL := URLForXBMC("/show/%d/season/%d/episode/%d/trakt/watched",
+				showListing.Show.IDs.TMDB,
+				seasonNumber,
+				episodeNumber,
+			)
+
+			contextLabel := playLabel
+			contextURL := contextPlayOppositeURL(thisURL, false)
+			if config.Get().ChooseStreamAuto {
+				contextLabel = linksLabel
+			}
+
+			item.Path = contextPlayURL(thisURL, false)
+
+			item.ContextMenu = [][]string{
+				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+				[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
+				[]string{markWatchedLabel, fmt.Sprintf("XBMC.RunPlugin(%s)", markWatchedURL)},
+			}
+			if config.Get().Platform.Kodi < 17 {
+				item.ContextMenu = append(item.ContextMenu,
+					[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+					[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"})
+			}
+			item.IsPlayable = true
+			items[i] = item
+		}(i, s)
+	}
+	wg.Wait()
+
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i] == nil {
+			items = append(items[:i], items[i+1:]...)
 		}
-
-		item := episode.ToListItem(show, season)
-		episodeLabel := fmt.Sprintf(`[COLOR %s]%s[/COLOR] | [B][COLOR %s]%s[/COLOR][/B] - [I][COLOR %s]%dx%02d %s[/COLOR][/I]`,
-			colorDate, aired.Format(dateFormat), colorShow, show.Name, localEpisodeColor, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
-		item.Label = episodeLabel
-		item.Info.Title = episodeLabel
-
-		thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
-			showListing.Show.IDs.TMDB,
-			episode.SeasonNumber,
-			episode.EpisodeNumber,
-		) + "%s"
-		markWatchedLabel := "LOCALIZE[30313]"
-		markWatchedURL := URLForXBMC("/show/%d/season/%d/episode/%d/trakt/watched",
-			showListing.Show.IDs.TMDB,
-			episode.SeasonNumber,
-			episode.EpisodeNumber,
-		)
-
-		contextLabel := playLabel
-		contextURL := contextPlayOppositeURL(thisURL, false)
-		if config.Get().ChooseStreamAuto {
-			contextLabel = linksLabel
-		}
-
-		item.Path = contextPlayURL(thisURL, false)
-
-		item.ContextMenu = [][]string{
-			[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
-			[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
-			[]string{markWatchedLabel, fmt.Sprintf("XBMC.RunPlugin(%s)", markWatchedURL)},
-		}
-		if config.Get().Platform.Kodi < 17 {
-			item.ContextMenu = append(item.ContextMenu,
-				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
-				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"})
-		}
-		item.IsPlayable = true
-		items = append(items, item)
 	}
 
 	if config.Get().TraktProgressSort == trakt.ProgressSortShow {
