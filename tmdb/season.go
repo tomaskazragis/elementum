@@ -22,7 +22,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":            apiKey,
-				"append_to_response": "credits,images,videos,external_ids",
+				"append_to_response": "credits,images,videos,external_ids,alternative_titles,translations,trailers",
 				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
@@ -122,6 +122,9 @@ func (seasons SeasonList) Less(i, j int) bool { return seasons[i].Season < seaso
 // ToListItem ...
 func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	name := fmt.Sprintf("Season %d", season.Season)
+	if season.Name != "" {
+		name = season.Name
+	}
 	if season.Season == 0 {
 		name = "Specials"
 	}

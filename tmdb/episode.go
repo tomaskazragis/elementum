@@ -3,6 +3,7 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -22,7 +23,7 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 		rl.Call(func() error {
 			urlValues := napping.Params{
 				"api_key":            apiKey,
-				"append_to_response": "credits,images,videos,external_ids",
+				"append_to_response": "credits,images,videos,alternative_titles,translations,external_ids,trailers",
 				"language":           language,
 			}.AsUrlValues()
 			resp, err := napping.Get(
@@ -79,7 +80,7 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 			}
 		}
 
-		item := episode.ToListItem(show)
+		item := episode.ToListItem(show, season)
 
 		if item.Art.FanArt == "" && len(fanarts) > 0 {
 			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
@@ -93,7 +94,7 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 }
 
 // ToListItem ...
-func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
+func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
 	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
 
 	runtime := 1800
@@ -125,10 +126,67 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 		Art: &xbmc.ListItemArt{},
 	}
 
+	if show.PosterPath != "" {
+		item.Art.TvShowPoster = ImageURL(show.PosterPath, "w500")
+		item.Art.FanArt = ImageURL(show.BackdropPath, "w1280")
+		item.Art.Thumbnail = ImageURL(show.PosterPath, "w500")
+		item.Thumbnail = ImageURL(show.PosterPath, "w500")
+	} else if show.Images != nil {
+		fanarts := []string{}
+		for _, backdrop := range show.Images.Backdrops {
+			fanarts = append(fanarts, ImageURL(backdrop.FilePath, "w1280"))
+		}
+		if len(fanarts) > 0 {
+			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
+		}
+
+		fanarts = []string{}
+		for _, poster := range show.Images.Posters {
+			fanarts = append(fanarts, ImageURL(poster.FilePath, "w500"))
+		}
+		if len(fanarts) > 0 {
+			item.Art.TvShowPoster = fanarts[rand.Intn(len(fanarts))]
+		}
+	}
+
 	if episode.StillPath != "" {
 		item.Art.FanArt = ImageURL(episode.StillPath, "w1280")
 		item.Art.Thumbnail = ImageURL(episode.StillPath, "w500")
 		item.Thumbnail = ImageURL(episode.StillPath, "w500")
+	}
+
+	genres := make([]string, 0, len(show.Genres))
+	for _, genre := range show.Genres {
+		genres = append(genres, genre.Name)
+	}
+	item.Info.Genre = strings.Join(genres, " / ")
+
+	for _, company := range show.ProductionCompanies {
+		item.Info.Studio = company.Name
+		break
+	}
+
+	if season != nil && episode.Credits == nil && season.Credits != nil {
+		episode.Credits = season.Credits
+	}
+
+	if episode.Credits != nil {
+		item.Info.CastAndRole = make([][]string, 0)
+		for _, cast := range episode.Credits.Cast {
+			item.Info.CastAndRole = append(item.Info.CastAndRole, []string{cast.Name, cast.Character})
+		}
+		directors := make([]string, 0)
+		writers := make([]string, 0)
+		for _, crew := range episode.Credits.Crew {
+			switch crew.Job {
+			case "Director":
+				directors = append(directors, crew.Name)
+			case "Writer":
+				writers = append(writers, crew.Name)
+			}
+		}
+		item.Info.Director = strings.Join(directors, " / ")
+		item.Info.Writer = strings.Join(writers, " / ")
 	}
 
 	return item

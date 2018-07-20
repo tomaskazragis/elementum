@@ -68,11 +68,6 @@ func setShowFanart(show *Show) *Show {
 }
 
 func setShowsFanart(shows []*Shows) []*Shows {
-	// TODO: Remove when finish with debugging
-	if len(shows) > 30 {
-		return shows
-	}
-
 	wg := sync.WaitGroup{}
 	for i, show := range shows {
 		wg.Add(1)
@@ -88,8 +83,8 @@ func setShowsFanart(shows []*Shows) []*Shows {
 
 func setProgressShowsFanart(shows []*ProgressShow) []*ProgressShow {
 	wg := sync.WaitGroup{}
+	wg.Add(len(shows))
 	for i, show := range shows {
-		wg.Add(1)
 		go func(idx int, s *ProgressShow) {
 			defer wg.Done()
 			if s != nil && s.Show != nil {
@@ -102,11 +97,6 @@ func setProgressShowsFanart(shows []*ProgressShow) []*ProgressShow {
 }
 
 func setCalendarShowsFanart(shows []*CalendarShow) []*CalendarShow {
-	// TODO: Remove when finish with debugging
-	if len(shows) > 30 {
-		return shows
-	}
-
 	wg := sync.WaitGroup{}
 	for i, show := range shows {
 		wg.Add(1)
@@ -140,7 +130,7 @@ func GetShow(ID string) (show *Show) {
 		if err := resp.Unmarshal(&show); err != nil {
 			log.Warning(err)
 		}
-		show = setShowFanart(show)
+
 		cacheStore.Set(key, show, cacheExpiration)
 	}
 
@@ -273,7 +263,7 @@ func GetEpisodeByTVDB(tvdbID string) (episode *Episode) {
 }
 
 // SearchShows ...
-// TODO Actually use this somewhere
+// TODO: Actually use this somewhere
 func SearchShows(query string, page string) (shows []*Shows, err error) {
 	endPoint := "search"
 
@@ -296,7 +286,6 @@ func SearchShows(query string, page string) (shows []*Shows, err error) {
 	if err := resp.Unmarshal(&shows); err != nil {
 		log.Warning(err)
 	}
-	shows = setShowsFanart(shows)
 
 	return
 }
@@ -360,10 +349,6 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 			}
 		}
 
-		if page != "0" {
-			shows = setShowsFanart(shows)
-		}
-
 		pagination := getPagination(resp.HttpResponse().Header)
 		total = pagination.ItemCount
 		if err != nil {
@@ -420,8 +405,6 @@ func WatchlistShows() (shows []*Shows, err error) {
 		}
 		shows = showListing
 
-		shows = setShowsFanart(shows)
-
 		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
@@ -465,8 +448,6 @@ func CollectionShows() (shows []*Shows, err error) {
 		}
 		shows = showListing
 
-		shows = setShowsFanart(shows)
-
 		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
@@ -474,7 +455,7 @@ func CollectionShows() (shows []*Shows, err error) {
 }
 
 // ListItemsShows ...
-func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) {
+func ListItemsShows(listID string) (shows []*Shows, err error) {
 	endPoint := fmt.Sprintf("users/%s/lists/%s/items/shows", config.Get().TraktUsername, listID)
 
 	params := napping.Params{}.AsUrlValues()
@@ -482,11 +463,7 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 	var resp *napping.Response
 
 	cacheStore := cache.NewDBStore()
-	full := ""
-	if withImages {
-		full = ".full"
-	}
-	key := fmt.Sprintf("com.trakt.shows.list.%s%s", listID, full)
+	key := fmt.Sprintf("com.trakt.shows.list.%s", listID)
 	if errGet := cacheStore.Get(key, &shows); errGet != nil {
 		if config.Get().TraktToken == "" {
 			resp, errGet = Get(endPoint, params)
@@ -514,10 +491,6 @@ func ListItemsShows(listID string, withImages bool) (shows []*Shows, err error) 
 			showListing = append(showListing, &showItem)
 		}
 		shows = showListing
-
-		if withImages {
-			shows = setShowsFanart(shows)
-		}
 
 		cacheStore.Set(key, shows, 1*time.Minute)
 	}
@@ -557,10 +530,6 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 			log.Warning(errUnm)
 		}
 
-		if page != "0" {
-			shows = setCalendarShowsFanart(shows)
-		}
-
 		pagination := getPagination(resp.HttpResponse().Header)
 		total = pagination.ItemCount
 		if err != nil {
@@ -577,54 +546,6 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	}
 
 	return
-}
-
-// ToListItem ...
-func (show *Show) ToListItem() *xbmc.ListItem {
-	li := &xbmc.ListItem{
-		Label: show.Title,
-		Info: &xbmc.ListItemInfo{
-			Count:         rand.Int(),
-			Title:         show.Title,
-			OriginalTitle: show.Title,
-			Year:          show.Year,
-			Genre:         strings.Title(strings.Join(show.Genres, " / ")),
-			Plot:          show.Overview,
-			PlotOutline:   show.Overview,
-			Rating:        show.Rating,
-			Votes:         strconv.Itoa(show.Votes),
-			Duration:      show.Runtime * 60,
-			MPAA:          show.Certification,
-			Code:          show.IDs.IMDB,
-			IMDBNumber:    show.IDs.IMDB,
-			Trailer:       util.TrailerURL(show.Trailer),
-			PlayCount:     playcount.GetWatchedShowByTMDB(show.IDs.TMDB).Int(),
-			DBTYPE:        "tvshow",
-			Mediatype:     "tvshow",
-		},
-		Art: &xbmc.ListItemArt{},
-	}
-
-	if show.Images != nil {
-		if show.Images.Poster != nil {
-			li.Art.Poster = show.Images.Poster.Full
-			li.Art.TvShowPoster = show.Images.Poster.Full
-		}
-		if show.Images.FanArt != nil {
-			li.Art.FanArt = show.Images.FanArt.Full
-		}
-		if show.Images.Banner != nil {
-			li.Art.Banner = show.Images.Banner.Full
-		}
-		if show.Images.Thumbnail != nil {
-			li.Art.Thumbnail = show.Images.Thumbnail.Full
-		}
-		if show.Images.ClearArt != nil {
-			li.Art.ClearArt = show.Images.ClearArt.Full
-		}
-	}
-
-	return li
 }
 
 // GetLastActivities ...
@@ -728,22 +649,22 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 	var wg sync.WaitGroup
 	wg.Add(len(watchedShows))
 	for i, show := range watchedShows {
-		go func(i int, show *WatchedShow) {
+		go func(idx int, show *WatchedShow) {
 			var watchedProgressShow *WatchedProgressShow
 			var cachedWatchedAt time.Time
 
 			defer func() {
-				wg.Done()
 				cacheStore.Set(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), show.LastWatchedAt, activitiesExpiration)
 
-				watchedProgressShows[i] = watchedProgressShow
+				watchedProgressShows[idx] = watchedProgressShow
 
 				if watchedProgressShow != nil && watchedProgressShow.NextEpisode != nil && watchedProgressShow.NextEpisode.Number != 0 && watchedProgressShow.NextEpisode.Season != 0 {
-					showsList[i] = &ProgressShow{
+					showsList[idx] = &ProgressShow{
 						Show:    show.Show,
 						Episode: watchedProgressShow.NextEpisode,
 					}
 				}
+				wg.Done()
 			}()
 
 			if err := cacheStore.Get(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), &cachedWatchedAt); err == nil && !show.LastWatchedAt.After(cachedWatchedAt) {
@@ -777,63 +698,55 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 		}
 	}
 
-	shows = setProgressShowsFanart(shows)
-
 	return
 }
 
 // ToListItem ...
-func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
-	seasonLabel := fmt.Sprintf("Season %d", season.Number)
-	return &xbmc.ListItem{
-		Label: seasonLabel,
-		Info: &xbmc.ListItemInfo{
-			Count:         rand.Int(),
-			Title:         seasonLabel,
-			OriginalTitle: seasonLabel,
-			Season:        season.Number,
-			Rating:        season.Rating,
-			Votes:         strconv.Itoa(season.Votes),
-			Code:          show.IDs.IMDB,
-			IMDBNumber:    show.IDs.IMDB,
-			PlayCount:     playcount.GetWatchedSeasonByTMDB(show.IDs.TMDB, season.Number).Int(),
-			DBTYPE:        "season",
-			Mediatype:     "season",
-		},
-		Art: &xbmc.ListItemArt{
-			Poster:    season.Images.Poster.Full,
-			Thumbnail: season.Images.Thumbnail.Full,
-			// FanArt: season.Images.FanArt.Full,
-		},
+func (show *Show) ToListItem() (item *xbmc.ListItem) {
+	if !config.Get().ForceUseTrakt && show.IDs.TMDB != 0 {
+		tmdbID := strconv.Itoa(show.IDs.TMDB)
+		if tmdbShow := tmdb.GetShowByID(tmdbID, config.Get().Language); tmdbShow != nil {
+			item = tmdbShow.ToListItem()
+		}
 	}
-}
+	if item == nil {
+		show = setShowFanart(show)
+		item = &xbmc.ListItem{
+			Label: show.Title,
+			Info: &xbmc.ListItemInfo{
+				Count:         rand.Int(),
+				Title:         show.Title,
+				OriginalTitle: show.Title,
+				Year:          show.Year,
+				Genre:         strings.Title(strings.Join(show.Genres, " / ")),
+				Plot:          show.Overview,
+				PlotOutline:   show.Overview,
+				Rating:        show.Rating,
+				Votes:         strconv.Itoa(show.Votes),
+				Duration:      show.Runtime * 60,
+				MPAA:          show.Certification,
+				Code:          show.IDs.IMDB,
+				IMDBNumber:    show.IDs.IMDB,
+				Trailer:       util.TrailerURL(show.Trailer),
+				PlayCount:     playcount.GetWatchedShowByTMDB(show.IDs.TMDB).Int(),
+				DBTYPE:        "tvshow",
+				Mediatype:     "tvshow",
+			},
+			Art: &xbmc.ListItemArt{
+				TvShowPoster: show.Images.Poster.Full,
+				Poster:       show.Images.Poster.Full,
+				FanArt:       show.Images.FanArt.Full,
+				Banner:       show.Images.Banner.Full,
+				Thumbnail:    show.Images.Thumbnail.Full,
+				ClearArt:     show.Images.ClearArt.Full,
+			},
+			Thumbnail: show.Images.Poster.Full,
+		}
+	}
 
-// ToListItem ...
-func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
-	title := fmt.Sprintf("%dx%02d %s", episode.Season, episode.Number, episode.Title)
-	return &xbmc.ListItem{
-		Label:     title,
-		Thumbnail: episode.Images.ScreenShot.Full,
-		Info: &xbmc.ListItemInfo{
-			Count:         rand.Int(),
-			Title:         title,
-			OriginalTitle: episode.Title,
-			Plot:          episode.Overview,
-			PlotOutline:   episode.Overview,
-			Rating:        episode.Rating,
-			Votes:         strconv.Itoa(episode.Votes),
-			Episode:       episode.Number,
-			Season:        episode.Season,
-			Code:          show.IDs.IMDB,
-			IMDBNumber:    show.IDs.IMDB,
-			PlayCount:     playcount.GetWatchedEpisodeByTMDB(show.IDs.TMDB, episode.Season, episode.Number).Int(),
-			DBTYPE:        "episode",
-			Mediatype:     "episode",
-		},
-		Art: &xbmc.ListItemArt{
-			Thumbnail: episode.Images.ScreenShot.Full,
-			// FanArt:    episode.Season.Show.Images.FanArt.Full,
-			// Banner:    episode.Season.Show.Images.Banner.Full,
-		},
+	if len(item.Info.Trailer) == 0 {
+		item.Info.Trailer = util.TrailerURL(show.Trailer)
 	}
+
+	return
 }

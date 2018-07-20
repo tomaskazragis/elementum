@@ -65,6 +65,82 @@ func GetShowImages(showID int) *Images {
 	return images
 }
 
+// GetSeasonImages ...
+func GetSeasonImages(showID int, season int) *Images {
+	var images *Images
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.tmdb.show.%d.%d.images", showID, season)
+	if err := cacheStore.Get(key, &images); err != nil {
+		rl.Call(func() error {
+			urlValues := napping.Params{
+				"api_key":                apiKey,
+				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/season/"+strconv.Itoa(season)+"/images",
+				&urlValues,
+				&images,
+				nil,
+			)
+			if err != nil {
+				log.Error(err)
+				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warningf("Rate limit exceeded getting images for %d:%d, cooling down...", showID, season)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
+			} else if resp.Status() != 200 {
+				log.Warningf("Bad status getting images for %d:%d: %d", showID, season, resp.Status())
+				return util.ErrHTTP
+			}
+			if images != nil {
+				cacheStore.Set(key, images, imagesCacheExpiration)
+			}
+
+			return nil
+		})
+	}
+	return images
+}
+
+// GetEpisodeImages ...
+func GetEpisodeImages(showID, season, episode int) *Images {
+	var images *Images
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.tmdb.show.%d.%d.%d.images", showID, season, episode)
+	if err := cacheStore.Get(key, &images); err != nil {
+		rl.Call(func() error {
+			urlValues := napping.Params{
+				"api_key":                apiKey,
+				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
+			}.AsUrlValues()
+			resp, err := napping.Get(
+				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/season/"+strconv.Itoa(season)+"/episode/"+strconv.Itoa(episode)+"/images",
+				&urlValues,
+				&images,
+				nil,
+			)
+			if err != nil {
+				log.Error(err)
+				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
+			} else if resp.Status() == 429 {
+				log.Warningf("Rate limit exceeded getting images for %d/%d/%d, cooling down...", showID, season, episode)
+				rl.CoolDown(resp.HttpResponse().Header)
+				return util.ErrExceeded
+			} else if resp.Status() != 200 {
+				log.Warningf("Bad status getting images for %d/%d/%d: %d", showID, season, episode, resp.Status())
+				return util.ErrHTTP
+			}
+			if images != nil {
+				cacheStore.Set(key, images, imagesCacheExpiration)
+			}
+
+			return nil
+		})
+	}
+	return images
+}
+
 // GetShowByID ...
 func GetShowByID(tmdbID string, language string) *Show {
 	id, _ := strconv.Atoi(tmdbID)

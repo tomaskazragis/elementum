@@ -69,11 +69,6 @@ func setFanart(movie *Movie) *Movie {
 }
 
 func setFanarts(movies []*Movies) []*Movies {
-	// TODO: Remove when finish with debugging
-	if len(movies) > 30 {
-		return movies
-	}
-
 	wg := sync.WaitGroup{}
 	for i, movie := range movies {
 		wg.Add(1)
@@ -88,11 +83,6 @@ func setFanarts(movies []*Movies) []*Movies {
 }
 
 func setCalendarFanarts(movies []*CalendarMovie) []*CalendarMovie {
-	// TODO: Remove when finish with debugging
-	if len(movies) > 30 {
-		return movies
-	}
-
 	wg := sync.WaitGroup{}
 	for i, movie := range movies {
 		wg.Add(1)
@@ -127,8 +117,6 @@ func GetMovie(ID string) (movie *Movie) {
 		if err := resp.Unmarshal(&movie); err != nil {
 			log.Warning(err)
 		}
-
-		movie = setFanart(movie)
 
 		cacheStore.Set(key, movie, cacheExpiration)
 	}
@@ -189,10 +177,6 @@ func SearchMovies(query string, page string) (movies []*Movies, err error) {
 
 	if err := resp.Unmarshal(&movies); err != nil {
 		log.Warning(err)
-	}
-
-	if page != "0" {
-		movies = setFanarts(movies)
 	}
 
 	return
@@ -257,18 +241,6 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 			}
 		}
 
-		// moviesForPage := []*Movies{}
-		// pageFrom := (pageInt-1)*resultsPerPage - (pageGroup * limit)
-		// pageTo := (pageInt * resultsPerPage) - 1 - (pageGroup * limit)
-		// for p := pageFrom; p <= pageTo && p <= len(movies); p++ {
-		// 	moviesForPage = append(moviesForPage, movies[p])
-		// }
-		// movies = moviesForPage
-
-		if page != "0" {
-			movies = setFanarts(movies)
-		}
-
 		pagination := getPagination(resp.HttpResponse().Header)
 		total = pagination.ItemCount
 		if err != nil {
@@ -324,8 +296,6 @@ func WatchlistMovies() (movies []*Movies, err error) {
 		}
 		movies = movieListing
 
-		movies = setFanarts(movies)
-
 		cacheStore.Set(key, movies, userlistExpiration)
 	}
 
@@ -366,8 +336,6 @@ func CollectionMovies() (movies []*Movies, err error) {
 			movieListing = append(movieListing, &movieItem)
 		}
 		movies = movieListing
-
-		movies = setFanarts(movies)
 
 		cacheStore.Set(key, movies, userlistExpiration)
 	}
@@ -464,7 +432,7 @@ func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 }
 
 // ListItemsMovies ...
-func ListItemsMovies(user string, listID string, withImages bool) (movies []*Movies, err error) {
+func ListItemsMovies(user string, listID string) (movies []*Movies, err error) {
 	if user == "" || user == "id" {
 		user = config.Get().TraktUsername
 	}
@@ -476,11 +444,7 @@ func ListItemsMovies(user string, listID string, withImages bool) (movies []*Mov
 	var resp *napping.Response
 
 	cacheStore := cache.NewDBStore()
-	full := ""
-	if withImages {
-		full = ".full"
-	}
-	key := fmt.Sprintf("com.trakt.movies.list.%s%s", listID, full)
+	key := fmt.Sprintf("com.trakt.movies.list.%s", listID)
 	if errGet := cacheStore.Get(key, &movies); errGet != nil {
 		if config.Get().TraktToken == "" {
 			resp, errGet = Get(endPoint, params)
@@ -508,10 +472,6 @@ func ListItemsMovies(user string, listID string, withImages bool) (movies []*Mov
 			movieListing = append(movieListing, &movieItem)
 		}
 		movies = movieListing
-
-		if withImages {
-			movies = setFanarts(movies)
-		}
 
 		cacheStore.Set(key, movies, 1*time.Minute)
 	}
@@ -551,10 +511,6 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 
 		if errUnm := resp.Unmarshal(&movies); errUnm != nil {
 			log.Warning(errUnm)
-		}
-
-		if page != "0" {
-			movies = setCalendarFanarts(movies)
 		}
 
 		pagination := getPagination(resp.HttpResponse().Header)
@@ -610,49 +566,51 @@ func WatchedMovies() (movies []*WatchedMovie, err error) {
 }
 
 // ToListItem ...
-func (movie *Movie) ToListItem() *xbmc.ListItem {
-	li := &xbmc.ListItem{
-		Label: movie.Title,
-		Info: &xbmc.ListItemInfo{
-			Count:         rand.Int(),
-			Title:         movie.Title,
-			OriginalTitle: movie.Title,
-			Year:          movie.Year,
-			Genre:         strings.Title(strings.Join(movie.Genres, " / ")),
-			Plot:          movie.Overview,
-			PlotOutline:   movie.Overview,
-			TagLine:       movie.TagLine,
-			Rating:        movie.Rating,
-			Votes:         strconv.Itoa(movie.Votes),
-			Duration:      movie.Runtime * 60,
-			MPAA:          movie.Certification,
-			Code:          movie.IDs.IMDB,
-			IMDBNumber:    movie.IDs.IMDB,
-			Trailer:       util.TrailerURL(movie.Trailer),
-			PlayCount:     playcount.GetWatchedMovieByTMDB(movie.IDs.TMDB).Int(),
-			DBTYPE:        "movie",
-			Mediatype:     "movie",
-		},
-		Art: &xbmc.ListItemArt{},
-	}
-
-	if movie.Images != nil {
-		if movie.Images.Poster != nil {
-			li.Art.Poster = movie.Images.Poster.Full
-		}
-		if movie.Images.FanArt != nil {
-			li.Art.FanArt = movie.Images.FanArt.Full
-		}
-		if movie.Images.Banner != nil {
-			li.Art.Banner = movie.Images.Banner.Full
-		}
-		if movie.Images.Thumbnail != nil {
-			li.Art.Thumbnail = movie.Images.Thumbnail.Full
-		}
-		if movie.Images.ClearArt != nil {
-			li.Art.ClearArt = movie.Images.ClearArt.Full
+func (movie *Movie) ToListItem() (item *xbmc.ListItem) {
+	if !config.Get().ForceUseTrakt && movie.IDs.TMDB != 0 {
+		tmdbID := strconv.Itoa(movie.IDs.TMDB)
+		if tmdbMovie := tmdb.GetMovieByID(tmdbID, config.Get().Language); tmdbMovie != nil {
+			item = tmdbMovie.ToListItem()
 		}
 	}
+	if item == nil {
+		movie = setFanart(movie)
+		item = &xbmc.ListItem{
+			Label: movie.Title,
+			Info: &xbmc.ListItemInfo{
+				Count:         rand.Int(),
+				Title:         movie.Title,
+				OriginalTitle: movie.Title,
+				Year:          movie.Year,
+				Genre:         strings.Title(strings.Join(movie.Genres, " / ")),
+				Plot:          movie.Overview,
+				PlotOutline:   movie.Overview,
+				TagLine:       movie.TagLine,
+				Rating:        movie.Rating,
+				Votes:         strconv.Itoa(movie.Votes),
+				Duration:      movie.Runtime * 60,
+				MPAA:          movie.Certification,
+				Code:          movie.IDs.IMDB,
+				IMDBNumber:    movie.IDs.IMDB,
+				Trailer:       util.TrailerURL(movie.Trailer),
+				PlayCount:     playcount.GetWatchedMovieByTMDB(movie.IDs.TMDB).Int(),
+				DBTYPE:        "movie",
+				Mediatype:     "movie",
+			},
+			Art: &xbmc.ListItemArt{
+				Poster:    movie.Images.Poster.Full,
+				FanArt:    movie.Images.FanArt.Full,
+				Banner:    movie.Images.Banner.Full,
+				Thumbnail: movie.Images.Thumbnail.Full,
+				ClearArt:  movie.Images.ClearArt.Full,
+			},
+			Thumbnail: movie.Images.Poster.Full,
+		}
+	}
 
-	return li
+	if len(item.Info.Trailer) == 0 {
+		item.Info.Trailer = util.TrailerURL(movie.Trailer)
+	}
+
+	return
 }

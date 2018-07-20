@@ -90,7 +90,8 @@ type Show struct {
 	ProductionCompanies []*IDName    `json:"production_companies"`
 	Status              string       `json:"status"`
 	ExternalIDs         *ExternalIDs `json:"external_ids"`
-	Translations        *struct {
+
+	Translations *struct {
 		Translations []*Language `json:"translations"`
 	} `json:"translations"`
 	AlternativeTitles *struct {
@@ -113,6 +114,21 @@ type Season struct {
 	Poster       string       `json:"poster_path"`
 	ExternalIDs  *ExternalIDs `json:"external_ids"`
 
+	AlternativeTitles *struct {
+		Titles []*AlternativeTitle `json:"titles"`
+	} `json:"alternative_titles"`
+
+	Translations *struct {
+		Translations []*Language `json:"translations"`
+	} `json:"translations"`
+
+	Trailers *struct {
+		Youtube []*Trailer `json:"youtube"`
+	} `json:"trailers"`
+
+	Credits *Credits `json:"credits,omitempty"`
+	Images  *Images  `json:"images,omitempty"`
+
 	Episodes EpisodeList `json:"episodes"`
 }
 
@@ -127,6 +143,21 @@ type Episode struct {
 	VoteAverage   float32      `json:"vote_average"`
 	StillPath     string       `json:"still_path"`
 	ExternalIDs   *ExternalIDs `json:"external_ids"`
+
+	AlternativeTitles *struct {
+		Titles []*AlternativeTitle `json:"titles"`
+	} `json:"alternative_titles"`
+
+	Translations *struct {
+		Translations []*Language `json:"translations"`
+	} `json:"translations"`
+
+	Trailers *struct {
+		Youtube []*Trailer `json:"youtube"`
+	} `json:"trailers"`
+
+	Credits *Credits `json:"credits,omitempty"`
+	Images  *Images  `json:"images,omitempty"`
 }
 
 // Entity ...

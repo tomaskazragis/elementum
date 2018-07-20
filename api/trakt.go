@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -175,7 +174,7 @@ func UserlistMovies(ctx *gin.Context) {
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.ListItemsMovies(user, listID, true)
+	movies, err := trakt.ListItemsMovies(user, listID)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -187,7 +186,7 @@ func UserlistShows(ctx *gin.Context) {
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.ListItemsShows(listID, true)
+	shows, err := trakt.ListItemsShows(listID)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -400,26 +399,8 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 				return
 			}
 
-			var item *xbmc.ListItem
+			item := movieListing.Movie.ToListItem()
 			tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
-
-			if movieListing.Movie.IDs.TMDB != 0 {
-				if !config.Get().ForceUseTrakt {
-					movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-					if movie != nil {
-						item = movie.ToListItem()
-					}
-				} else {
-					rebuildImages(movieListing.Movie.Images, tmdb.GetImages(movieListing.Movie.IDs.TMDB))
-				}
-			}
-
-			if item == nil {
-				item = movieListing.Movie.ToListItem()
-			}
-			if len(item.Info.Trailer) == 0 {
-				item.Info.Trailer = util.TrailerURL(movieListing.Movie.Trailer)
-			}
 
 			thisURL := URLForXBMC("/movie/%d/", movieListing.Movie.IDs.TMDB) + "%s"
 
@@ -641,26 +622,8 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 			continue
 		}
 
-		var item *xbmc.ListItem
+		item := showListing.Show.ToListItem()
 		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
-
-		if showListing.Show.IDs.TMDB != 0 {
-			if !config.Get().ForceUseTrakt {
-				show := tmdb.GetShowByID(tmdbID, config.Get().Language)
-				if show != nil {
-					item = show.ToListItem()
-				}
-			} else {
-				rebuildImages(showListing.Show.Images, tmdb.GetShowImages(showListing.Show.IDs.TMDB))
-			}
-		}
-
-		if item == nil {
-			item = showListing.Show.ToListItem()
-		}
-		if len(item.Info.Trailer) == 0 {
-			item.Info.Trailer = util.TrailerURL(showListing.Show.Trailer)
-		}
 
 		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
 
@@ -922,31 +885,10 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 			continue
 		}
 
-		var item *xbmc.ListItem
+		item := movieListing.Movie.ToListItem()
 		tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
-		title := ""
 
-		if movieListing.Movie.IDs.TMDB != 0 {
-			if !config.Get().ForceUseTrakt {
-				movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-				if movie != nil {
-					title = movie.Title
-					item = movie.ToListItem()
-				}
-			} else {
-				rebuildImages(movieListing.Movie.Images, tmdb.GetImages(movieListing.Movie.IDs.TMDB))
-			}
-		}
-
-		if item == nil {
-			title = movieListing.Movie.Title
-			item = movieListing.Movie.ToListItem()
-		}
-		if len(item.Info.Trailer) == 0 {
-			item.Info.Trailer = util.TrailerURL(movieListing.Movie.Trailer)
-		}
-
-		label := fmt.Sprintf("%s - %s", movieListing.Released, title)
+		label := fmt.Sprintf("%s - %s", movieListing.Released, item.Info.Title)
 		item.Label = label
 		item.Info.Title = label
 
@@ -1030,38 +972,17 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			continue
 		}
 
-		var item *xbmc.ListItem
+		item := showListing.Show.ToListItem()
 		tmdbID := strconv.Itoa(showListing.Show.IDs.TMDB)
-		title := ""
-
-		if showListing.Show.IDs.TMDB != 0 {
-			if !config.Get().ForceUseTrakt {
-				show := tmdb.GetShowByID(tmdbID, config.Get().Language)
-				if show != nil {
-					title = show.Title
-					item = show.ToListItem()
-				}
-			} else {
-				rebuildImages(showListing.Show.Images, tmdb.GetShowImages(showListing.Show.IDs.TMDB))
-			}
-		}
-
-		if item == nil {
-			title = showListing.Show.Title
-			item = showListing.Show.ToListItem()
-		}
-		if len(item.Info.Trailer) == 0 {
-			item.Info.Trailer = util.TrailerURL(showListing.Show.Trailer)
-		}
 
 		episode := showListing.Episode
 		label := fmt.Sprintf("%s - %s | %dx%02d %s", []byte(showListing.FirstAired)[:10], item.Label, episode.Season, episode.Number, episode.Title)
 		item.Label = label
 		item.Info.Title = label
 
-		itemPath := URLQuery(URLForXBMC("/search"), "q", fmt.Sprintf("%s S%02dE%02d", title, episode.Season, episode.Number))
+		itemPath := URLQuery(URLForXBMC("/search"), "q", fmt.Sprintf("%s S%02dE%02d", item.Info.Title, episode.Season, episode.Number))
 		if episode.Season > 100 {
-			itemPath = URLQuery(URLForXBMC("/search"), "q", fmt.Sprintf("%s %d %d", title, episode.Number, episode.Season))
+			itemPath = URLQuery(URLForXBMC("/search"), "q", fmt.Sprintf("%s %d %d", item.Info.Title, episode.Number, episode.Season))
 		}
 		item.Path = itemPath
 
@@ -1108,31 +1029,14 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 
 func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total int, page int) {
 	language := config.Get().Language
-	hasNextPage := 0
-	if page > 0 {
-		resultsPerPage := config.Get().ResultsPerPage
-
-		if total == -1 {
-			total = len(shows)
-		}
-		if total > resultsPerPage {
-			if page*resultsPerPage < total {
-				hasNextPage = 1
-			}
-		}
-
-		if len(shows) >= resultsPerPage {
-			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
-			shows = shows[start : start+resultsPerPage]
-		}
-	}
 
 	colorDate := config.Get().TraktProgressColorDate
 	colorShow := config.Get().TraktProgressColorShow
 	colorEpisode := config.Get().TraktProgressColorEpisode
+	colorUnaired := config.Get().TraktProgressColorUnaired
 	dateFormat := getProgressDateFormat()
 
-	items := make(xbmc.ListItems, 0, len(shows)+hasNextPage)
+	items := make(xbmc.ListItems, 0, len(shows))
 	now := util.UTCBod()
 
 	for _, showListing := range shows {
@@ -1142,7 +1046,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 
 		show := tmdb.GetShow(showListing.Show.IDs.TMDB, language)
 		epi := showListing.Episode
-		if show == nil || epi == nil {
+		if show == nil || epi == nil || showListing.Show.IDs.TMDB == 0 {
 			continue
 		}
 
@@ -1156,26 +1060,16 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			continue
 		}
 
-		item := episode.ToListItem(show)
-		episodeLabel := fmt.Sprintf("[[COLOR %s]%s[/COLOR]] [COLOR %s][B]%s[/B][/COLOR] - [COLOR %s][I]%dx%02d %s[/I][/COLOR]",
-			colorDate, aired.Format(dateFormat), colorShow, show.Name, colorEpisode, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
-		item.Label = episodeLabel
-		item.Info.Title = episodeLabel
-
-		if episode.StillPath != "" {
-			item.Art.FanArt = tmdb.ImageURL(episode.StillPath, "w1280")
-			item.Art.Thumbnail = tmdb.ImageURL(episode.StillPath, "w500")
-		} else {
-			fanarts := make([]string, 0)
-			for _, backdrop := range show.Images.Backdrops {
-				fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
-			}
-			if len(fanarts) > 0 {
-				item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
-			}
+		localEpisodeColor := colorEpisode
+		if aired.After(now) || aired.Equal(now) {
+			localEpisodeColor = colorUnaired
 		}
 
-		item.Art.Poster = tmdb.ImageURL(season.Poster, "w500")
+		item := episode.ToListItem(show, season)
+		episodeLabel := fmt.Sprintf(`[COLOR %s]%s[/COLOR] | [B][COLOR %s]%s[/COLOR][/B] - [I][COLOR %s]%dx%02d %s[/COLOR][/I]`,
+			colorDate, aired.Format(dateFormat), colorShow, show.Name, localEpisodeColor, episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+		item.Label = episodeLabel
+		item.Info.Title = episodeLabel
 
 		thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
 			showListing.Show.IDs.TMDB,
@@ -1229,47 +1123,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 		})
 	}
 
-	if page >= 0 && hasNextPage > 0 {
-		path := ctx.Request.URL.Path
-		nextpage := &xbmc.ListItem{
-			Label:     "LOCALIZE[30415];;" + strconv.Itoa(page+1),
-			Path:      URLForXBMC(fmt.Sprintf("%s?page=%d", path, page+1)),
-			Thumbnail: config.AddonResource("img", "nextpage.png"),
-		}
-		items = append(items, nextpage)
-	}
 	ctx.JSON(200, xbmc.NewView("tvshows", items))
-}
-
-func rebuildImages(traktImages *trakt.Images, tmdbImages *tmdb.Images) {
-	if tmdbImages == nil {
-		return
-	}
-	if traktImages == nil {
-		traktImages = &trakt.Images{}
-	}
-
-	if len(tmdbImages.Posters) > 0 {
-		posterImage := tmdb.ImageURL(tmdbImages.Posters[0].FilePath, "w500")
-		for _, image := range tmdbImages.Posters {
-			if image.Iso639_1 == config.Get().Language {
-				posterImage = tmdb.ImageURL(image.FilePath, "w500")
-			}
-		}
-		traktImages.Poster.Full = posterImage
-		traktImages.Thumbnail.Full = posterImage
-	}
-
-	if len(tmdbImages.Backdrops) > 0 {
-		backdropImage := tmdb.ImageURL(tmdbImages.Backdrops[0].FilePath, "w1280")
-		for _, image := range tmdbImages.Backdrops {
-			if image.Iso639_1 == config.Get().Language {
-				backdropImage = tmdb.ImageURL(image.FilePath, "w1280")
-			}
-		}
-		traktImages.FanArt.Full = backdropImage
-		traktImages.Banner.Full = backdropImage
-	}
 }
 
 // SelectTraktUserList ...
@@ -1296,8 +1150,11 @@ func getProgressDateFormat() string {
 	f := strings.ToLower(config.Get().TraktProgressDateFormat)
 	f = strings.Replace(f, "yyyy", "2006", -1)
 	f = strings.Replace(f, "yy", "06", -1)
+	f = strings.Replace(f, "y", "6", -1)
 	f = strings.Replace(f, "mm", "01", -1)
+	f = strings.Replace(f, "m", "1", -1)
 	f = strings.Replace(f, "dd", "02", -1)
+	f = strings.Replace(f, "d", "2", -1)
 
 	return f
 }
