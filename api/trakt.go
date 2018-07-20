@@ -1129,6 +1129,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 // SelectTraktUserList ...
 func SelectTraktUserList(ctx *gin.Context) {
 	action := ctx.Params.ByName("action")
+	media := ctx.Params.ByName("media")
 
 	lists := trakt.Userlists()
 	items := make([]string, 0, len(lists))
@@ -1138,9 +1139,9 @@ func SelectTraktUserList(ctx *gin.Context) {
 	}
 	choice := xbmc.ListDialog("LOCALIZE[30438]", items...)
 	if choice >= 0 {
-		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_location", action), "2")
-		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_list_name", action), lists[choice].Name)
-		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_list", action), strconv.Itoa(lists[choice].IDs.Trakt))
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_location", action, media), "2")
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_list_name", action, media), lists[choice].Name)
+		xbmc.SetSetting(fmt.Sprintf("trakt_sync_%s_%s_list", action, media), strconv.Itoa(lists[choice].IDs.Trakt))
 	}
 
 	ctx.String(200, "")

@@ -947,12 +947,17 @@ func Authorized() error {
 
 // SyncAddedItem adds item (movie/show) to watchlist or collection
 func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+	list := config.Get().TraktSyncAddedMoviesList
+	if itemType == "shows" {
+		list = config.Get().TraktSyncAddedShowsList
+	}
+
 	if location == 0 {
 		return AddToCollection(itemType, tmdbID)
 	} else if location == 1 {
 		return AddToWatchlist(itemType, tmdbID)
-	} else if location == 2 && config.Get().TraktSyncAddedList != 0 {
-		return AddToUserlist(config.Get().TraktSyncAddedList, itemType, tmdbID)
+	} else if location == 2 && list != 0 {
+		return AddToUserlist(list, itemType, tmdbID)
 	}
 
 	return
@@ -960,12 +965,17 @@ func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.
 
 // SyncRemovedItem removes item (movie/show) from watchlist or collection
 func SyncRemovedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
+	list := config.Get().TraktSyncRemovedMoviesList
+	if itemType == "shows" {
+		list = config.Get().TraktSyncRemovedShowsList
+	}
+
 	if location == 0 {
 		return RemoveFromCollection(itemType, tmdbID)
 	} else if location == 1 {
 		return RemoveFromWatchlist(itemType, tmdbID)
-	} else if location == 2 && config.Get().TraktSyncRemovedList != 0 {
-		return RemoveFromUserlist(config.Get().TraktSyncRemovedList, itemType, tmdbID)
+	} else if location == 2 && list != 0 {
+		return RemoveFromUserlist(list, itemType, tmdbID)
 	}
 
 	return
