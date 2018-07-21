@@ -115,6 +115,11 @@ type Configuration struct {
 	TraktProgressColorShow         string
 	TraktProgressColorEpisode      string
 	TraktProgressColorUnaired      string
+	TraktCalendarsDateFormat       string
+	TraktCalendarsColorDate        string
+	TraktCalendarsColorShow        string
+	TraktCalendarsColorEpisode     string
+	TraktCalendarsColorUnaired     string
 
 	UpdateFrequency int
 	UpdateDelay     int
@@ -438,6 +443,11 @@ func Reload() *Configuration {
 		TraktProgressColorShow:         settings["trakt_progress_color_show"].(string),
 		TraktProgressColorEpisode:      settings["trakt_progress_color_episode"].(string),
 		TraktProgressColorUnaired:      settings["trakt_progress_color_unaired"].(string),
+		TraktCalendarsDateFormat:       settings["trakt_calendars_date_format"].(string),
+		TraktCalendarsColorDate:        settings["trakt_calendars_color_date"].(string),
+		TraktCalendarsColorShow:        settings["trakt_calendars_color_show"].(string),
+		TraktCalendarsColorEpisode:     settings["trakt_calendars_color_episode"].(string),
+		TraktCalendarsColorUnaired:     settings["trakt_calendars_color_unaired"].(string),
 
 		UpdateFrequency:  settings["library_update_frequency"].(int),
 		UpdateDelay:      settings["library_update_delay"].(int),
