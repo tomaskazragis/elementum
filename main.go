@@ -29,6 +29,7 @@ import (
 )
 
 var log = logging.MustGetLogger("main")
+var shuttingDown = false
 
 func init() {
 	sync.Enable()
@@ -107,6 +108,12 @@ func main() {
 	btService := bittorrent.NewBTService()
 
 	var shutdown = func(fromSignal bool) {
+		if shuttingDown {
+			return
+		}
+
+		shuttingDown = true
+		
 		log.Info("Shutting down...")
 		library.CloseLibrary()
 		btService.Close(true)

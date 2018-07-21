@@ -933,6 +933,10 @@ func URLQuery(route string, query ...string) string {
 
 // RefreshTrakt starts a trakt sync
 func RefreshTrakt() error {
+	if config.Get().TraktToken == "" {
+		return nil
+	}
+
 	if Scanning {
 		log.Debugf("TraktSync: already in scanning")
 		return nil
