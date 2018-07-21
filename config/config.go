@@ -1,8 +1,10 @@
 package config
 
 import (
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -62,6 +64,7 @@ type Configuration struct {
 	AutoMemorySizeStrategy    int
 	MemorySize                int
 	BufferSize                int
+	KodiBufferSize            int
 	UploadRateLimit           int
 	DownloadRateLimit         int
 	AutoloadTorrents          bool
@@ -555,6 +558,14 @@ func Reload() *Configuration {
 		newConfig.ConnectionsLimit = 50
 	}
 
+	// Reading Kodi's advancedsettings file for MemorySize variable to avoid waiting for playback
+	// after Elementum's buffer is finished.
+	newConfig.KodiBufferSize = getKodiBufferSize()
+	if newConfig.KodiBufferSize > newConfig.BufferSize {
+		newConfig.BufferSize = newConfig.KodiBufferSize
+		log.Debugf("Adjusting buffer size according to Kodi advancedsettings.xml configuration to %s", humanize.Bytes(uint64(newConfig.BufferSize)))
+	}
+
 	lock.Lock()
 	config = &newConfig
 	lock.Unlock()
@@ -683,4 +694,28 @@ func findExistingPath(paths []string, addon string) string {
 	}
 
 	return ""
+}
+
+func getKodiBufferSize() int {
+	xmlFile, err := os.Open(filepath.Join(xbmc.TranslatePath("special://userdata"), "advancedsettings.xml"))
+	if err != nil {
+		return 0
+	}
+
+	defer xmlFile.Close()
+
+	b, _ := ioutil.ReadAll(xmlFile)
+
+	var as *xbmc.AdvancedSettings
+	if err = xml.Unmarshal(b, &as); err != nil {
+		return 0
+	}
+
+	if as.Cache.MemorySizeLegacy > 0 {
+		return as.Cache.MemorySizeLegacy
+	} else if as.Cache.MemorySize > 0 {
+		return as.Cache.MemorySize
+	}
+
+	return 0
 }

@@ -267,6 +267,17 @@ type FileSources struct {
 	} `json:"sources"`
 }
 
+// AdvancedSettings describes advancedsettings.xml
+type AdvancedSettings struct {
+	LogLevel int `xml:"loglevel"`
+	Cache struct {
+		MemorySizeLegacy int `xml:"cachemembuffersize"`
+		MemorySize       int `xml:"memorysize"`
+		BufferMode       int `xml:"buffermode"`
+		ReadFactor       int `xml:"readfactor"`
+	} `xml:"cache"`
+}
+
 // NewView ...
 func NewView(contentType string, items ListItems) *View {
 	return &View{
