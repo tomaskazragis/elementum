@@ -14,6 +14,8 @@ import (
 	logging "github.com/op/go-logging"
 )
 
+//go:generate msgp -o msgp.go -io=false -tests=false
+
 const (
 	// APIURL ...
 	APIURL = "http://webservice.fanart.tv"
