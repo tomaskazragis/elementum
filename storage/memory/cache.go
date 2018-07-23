@@ -229,8 +229,8 @@ func (c *Cache) Start() {
 			// 	log.Debugf("Item: %#v -- %#v", k, c.items[k].Accessed.String())
 			// }
 
-			info := c.Info()
-			log.Debugf("Cap: %d | Size: %d | Items: %d | Capacity: %d \n", info.Capacity, info.Filled, info.Items, c.bufferSize)
+			// info := c.Info()
+			// log.Debugf("Cap: %d | Size: %d | Items: %d | Capacity: %d \n", info.Capacity, info.Filled, info.Items, c.bufferSize)
 
 			// if info.Filled == lastFilled {
 			// log.Debugf("Download stale. Storage lock: %#v. Cache lock: %#v", c.s.mu, c.mu)
@@ -305,7 +305,7 @@ func (c *Cache) remove(pi key) {
 		return
 	}
 
-	log.Debugf("Removing element: %#v", pi)
+	// log.Debugf("Removing element: %#v", pi)
 
 	if c.pieces[pi].Position != -1 {
 		c.positions[c.pieces[pi].Position].Used = false
@@ -334,7 +334,7 @@ func (c *Cache) updateItem(k key, u func(*ItemState, bool) bool) {
 		}
 		c.items[k] = ii
 	} else {
-		log.Debugf("Forgetting: %#v", k)
+		// log.Debugf("Forgetting: %#v", k)
 		c.policy.Forget(k)
 		delete(c.items, k)
 	}
@@ -356,7 +356,7 @@ func (c *Cache) trimToCapacity() {
 		// for k := range c.items {
 		// 	log.Debugf("Active: %#v -- %#v", k, c.items[k].Accessed.String())
 		// }
-		log.Debugf("Trimming: %#v to %#v, %#v to %#v", c.filled, c.capacity, len(c.items), c.bufferSize)
+		// log.Debugf("Trimming: %#v to %#v, %#v to %#v", c.filled, c.capacity, len(c.items), c.bufferSize)
 		c.remove(c.policy.Choose().(key))
 	}
 	// for c.filled+c.pieceLength > c.capacity {
