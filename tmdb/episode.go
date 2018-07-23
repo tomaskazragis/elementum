@@ -87,7 +87,9 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
 		}
 
-		item.Art.Poster = ImageURL(season.Poster, "w500")
+		if item.Art.FanArt == "" && season.Poster != "" {
+			item.Art.Poster = ImageURL(season.Poster, "w500")
+		}
 
 		items = append(items, item)
 	}
@@ -150,15 +152,15 @@ func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
 		}
 	}
 
+	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+		item.Art = fa.ToEpisodeListItemArt(season.Season, item.Art)
+	}
+
 	if episode.StillPath != "" {
 		item.Art.FanArt = ImageURL(episode.StillPath, "w1280")
 		item.Art.Thumbnail = ImageURL(episode.StillPath, "w500")
+		item.Art.Poster = ImageURL(episode.StillPath, "w500")
 		item.Thumbnail = ImageURL(episode.StillPath, "w500")
-	}
-
-	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
-		item.Art = fa.ToEpisodeListItemArt(season.Season, item.Art)
-		item.Thumbnail = item.Art.Thumbnail
 	}
 
 	genres := make([]string, 0, len(show.Genres))

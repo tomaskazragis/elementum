@@ -1085,6 +1085,11 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 				item = epi.ToListItem(showListing.Show)
 			}
 
+			item.Info.Aired = airDate
+			item.Info.DateAdded = airDate
+			item.Info.Premiered = airDate
+			item.Info.LastPlayed = airDate
+
 			episodeLabel := fmt.Sprintf(`[COLOR %s]%s[/COLOR] | [B][COLOR %s]%s[/COLOR][/B] - [I][COLOR %s]%dx%02d %s[/COLOR][/I]`,
 				colorDate, aired.Format(dateFormat), colorShow, showName, localEpisodeColor, seasonNumber, episodeNumber, episodeName)
 			item.Label = episodeLabel
@@ -1219,6 +1224,11 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 			} else {
 				item = epi.ToListItem(showListing.Show)
 			}
+
+			item.Info.Aired = airDate
+			item.Info.DateAdded = airDate
+			item.Info.Premiered = airDate
+			item.Info.LastPlayed = airDate
 
 			episodeLabel := fmt.Sprintf(`[COLOR %s]%s[/COLOR] | [B][COLOR %s]%s[/COLOR][/B] - [I][COLOR %s]%dx%02d %s[/COLOR][/I]`,
 				colorDate, aired.Format(dateFormat), colorShow, showName, localEpisodeColor, seasonNumber, episodeNumber, episodeName)

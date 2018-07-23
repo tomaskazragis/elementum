@@ -18,8 +18,6 @@ PLATFORMS = \
 	android-21/arm64 \
 	darwin-10.6/amd64 \
 	darwin-10.6/386 \
-	ios-8.1/arm64 \
-	ios-8.1/arm-7 \
 	linux/arm-6 \
 	linux/arm-7 \
 	linux/arm64 \
@@ -34,6 +32,9 @@ all:
 	for i in $(PLATFORMS); do \
 		$(MAKE) $$i; \
 	done
+
+client: 
+	mkdir -p $(BUILD_PATH)/client
 
 $(PLATFORMS):
 	$(MAKE) build TARGET_OS=$(firstword $(subst /, ,$@)) TARGET_ARCH=$(word 2, $(subst /, ,$@))
