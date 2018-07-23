@@ -7,6 +7,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -159,6 +160,11 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 	}
 	if len(fanarts) > 0 {
 		item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
+	}
+
+	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+		item.Art = fa.ToSeasonListItemArt(season.Season, item.Art)
+		item.Thumbnail = item.Art.Thumbnail
 	}
 
 	if len(show.Genres) > 0 {

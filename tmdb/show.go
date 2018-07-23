@@ -13,6 +13,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -572,6 +573,11 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 
 	item.Thumbnail = item.Art.Poster
 	item.Art.Thumbnail = item.Art.Poster
+
+	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+		item.Art = fa.ToListItemArt(item.Art)
+		item.Thumbnail = item.Art.Thumbnail
+	}
 
 	if show.InProduction {
 		item.Info.Status = "Continuing"

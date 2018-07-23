@@ -8,6 +8,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -153,6 +154,11 @@ func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
 		item.Art.FanArt = ImageURL(episode.StillPath, "w1280")
 		item.Art.Thumbnail = ImageURL(episode.StillPath, "w500")
 		item.Thumbnail = ImageURL(episode.StillPath, "w500")
+	}
+
+	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+		item.Art = fa.ToEpisodeListItemArt(season.Season, item.Art)
+		item.Thumbnail = item.Art.Thumbnail
 	}
 
 	genres := make([]string, 0, len(show.Genres))

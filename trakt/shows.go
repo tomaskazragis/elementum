@@ -216,7 +216,7 @@ func GetEpisode(showID, seasonNumber, episodeNumber int) (episode *Episode) {
 
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.episode.%d.%d.%d", showID, seasonNumber, episodeNumber)
-	if err := cacheStore.Get(key, &episode); err != nil || true {
+	if err := cacheStore.Get(key, &episode); err != nil {
 		resp, err := Get(endPoint, params)
 		if err != nil {
 			log.Error(err)

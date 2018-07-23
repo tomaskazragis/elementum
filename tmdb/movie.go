@@ -11,6 +11,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -522,6 +523,12 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 
 	item.Thumbnail = item.Art.Poster
 	item.Art.Thumbnail = item.Art.Poster
+
+	if fa := fanart.GetMovie(movie.ID); fa != nil {
+		item.Art = fa.ToListItemArt(item.Art)
+		item.Thumbnail = item.Art.Thumbnail
+	}
+
 	genres := make([]string, 0, len(movie.Genres))
 	for _, genre := range movie.Genres {
 		genres = append(genres, genre.Name)
