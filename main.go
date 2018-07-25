@@ -114,7 +114,7 @@ func main() {
 		}
 
 		shuttingDown = true
-		
+
 		log.Info("Shutting down...")
 		library.CloseLibrary()
 		btService.Close(true)
@@ -181,7 +181,7 @@ func main() {
 
 	go func() {
 		if checkRepository() {
-			log.Info("Updating Kodi add-on repositories...")
+			log.Info("Updating Kodi add-on repositories... ")
 			xbmc.UpdateAddonRepos()
 		}
 
