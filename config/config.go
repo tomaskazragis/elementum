@@ -641,43 +641,28 @@ func waitForSettingsClosed() {
 // CheckBurst ...
 func CheckBurst() {
 	// Check for enabled providers and Elementum Burst
-	hasBurst := false
-	enabledProviders := make([]Addon, 0)
 	for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
 		if strings.HasPrefix(addon.ID, "script.elementum.") {
 			if addon.Enabled == true {
-				hasBurst = true
+				return
 			}
-			enabledProviders = append(enabledProviders, Addon{
-				ID:      addon.ID,
-				Name:    addon.Name,
-				Version: addon.Version,
-				Enabled: addon.Enabled,
-			})
 		}
 	}
-	if !hasBurst {
-		log.Info("Updating Kodi add-on repositories for Burst...")
-		xbmc.UpdateLocalAddons()
-		xbmc.UpdateAddonRepos()
-		time.Sleep(10 * time.Second)
 
-		if xbmc.DialogConfirm("Elementum", "LOCALIZE[30271]") {
-			xbmc.PlayURL("plugin://script.elementum.burst/")
-			time.Sleep(4 * time.Second)
-			for _, addon := range xbmc.GetAddons("xbmc.python.script", "executable", "all", []string{"name", "version", "enabled"}).Addons {
-				if addon.ID == "script.elementum.burst" && addon.Enabled == true {
-					hasBurst = true
-				}
-			}
-			if hasBurst {
-				for _, addon := range enabledProviders {
-					xbmc.SetAddonEnabled(addon.ID, false)
-				}
-				xbmc.Notify("Elementum", "LOCALIZE[30272]", AddonIcon())
-			} else {
-				xbmc.Dialog("Elementum", "LOCALIZE[30273]")
-			}
+	time.Sleep(5 * time.Second)
+	log.Info("Updating Kodi add-on repositories for Burst...")
+	xbmc.UpdateLocalAddons()
+	xbmc.UpdateAddonRepos()
+
+	if xbmc.DialogConfirm("Elementum", "LOCALIZE[30271]") {
+		xbmc.PlayURL("plugin://script.elementum.burst/")
+		time.Sleep(5 * time.Second)
+
+		if xbmc.IsAddonInstalled("script.elementum.burst") {
+			xbmc.SetAddonEnabled("script.elementum.burst", true)
+			xbmc.Notify("Elementum", "LOCALIZE[30272]", AddonIcon())
+		} else {
+			xbmc.Dialog("Elementum", "LOCALIZE[30273]")
 		}
 	}
 }

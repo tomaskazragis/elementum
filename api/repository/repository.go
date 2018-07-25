@@ -146,6 +146,8 @@ func GetAddonFiles(ctx *gin.Context) {
 		return
 	case "fanart.jpg":
 		fallthrough
+	case "fanart.png":
+		fallthrough
 	case "icon.png":
 		ctx.Redirect(302, fmt.Sprintf(githubUserContentURL+"/"+filepath, user, repository, lastReleaseTag))
 		return

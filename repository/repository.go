@@ -75,7 +75,7 @@ func MakeElementumRepositoryAddon() error {
 		return err
 	}
 
-	if err := copyFile(filepath.Join(config.Get().Info.Path, "fanart.jpg"), filepath.Join(addonPath, "fanart.jpg")); err != nil {
+	if err := copyFile(filepath.Join(config.Get().Info.Path, "fanart.png"), filepath.Join(addonPath, "fanart.png")); err != nil {
 		return err
 	}
 

@@ -103,7 +103,8 @@ func main() {
 		return
 	}
 
-	wasFirstRun := Migrate()
+	// Do database migration if needed
+	migrateDB()
 
 	btService := bittorrent.NewBTService()
 
@@ -179,7 +180,7 @@ func main() {
 	}()
 
 	go func() {
-		if !wasFirstRun {
+		if checkRepository() {
 			log.Info("Updating Kodi add-on repositories...")
 			xbmc.UpdateAddonRepos()
 		}
@@ -196,14 +197,4 @@ func main() {
 	go cacheDb.MaintenanceRefreshHandler()
 
 	http.ListenAndServe(":"+strconv.Itoa(config.Args.LocalPort), nil)
-
-	// s := &http.Server{
-	// 	Addr:         ":" + strconv.Itoa(config.ListenPort),
-	// 	Handler:      nil,
-	// 	// ReadTimeout:  60 * time.Second,
-	// 	// WriteTimeout: 60 * time.Second,
-	//
-	// 	MaxHeaderBytes: 1 << 20,
-	// }
-	// s.ListenAndServe()
 }

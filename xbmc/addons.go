@@ -13,6 +13,18 @@ type AddonsList struct {
 	} `json:"addons"`
 }
 
+// AddonInfoDetails ...
+type AddonInfoDetails struct {
+	Addon struct {
+		ID        string `json:"addonid"`
+		Type      string `json:"type"`
+		Name      string `json:"name"`
+		Version   string `json:"version"`
+		Enabled   bool   `json:"enabled"`
+		Installed bool   `json:"installed"`
+	} `json:"addon"`
+}
+
 // GetAddons ...
 func GetAddons(args ...interface{}) *AddonsList {
 	addons := AddonsList{}
@@ -42,6 +54,32 @@ func SetAddonEnabled(addonID string, enabled bool) (retval string) {
 func ExecuteAddon(addonID string, args ...interface{}) {
 	var retVal string
 	executeJSONRPC("Addons.ExecuteAddon", &retVal, Args{addonID, args})
+}
+
+// GetAddonDetails ...
+func GetAddonDetails(addonID string) AddonInfoDetails {
+	params := map[string]interface{}{
+		"addonid": addonID,
+		"properties": []interface{}{
+			"enabled",
+			"installed",
+		}}
+
+	addon := AddonInfoDetails{}
+	executeJSONRPCO("Addons.GetAddonDetails", &addon, params)
+	return addon
+}
+
+// IsAddonInstalled ...
+func IsAddonInstalled(addonID string) bool {
+	addon := GetAddonDetails(addonID)
+	return addon.Addon.ID != "" && addon.Addon.Installed
+}
+
+// IsAddonEnabled ...
+func IsAddonEnabled(addonID string) bool {
+	addon := GetAddonDetails(addonID)
+	return addon.Addon.ID != "" && addon.Addon.Enabled
 }
 
 // Addon ...

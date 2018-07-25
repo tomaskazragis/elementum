@@ -46,7 +46,7 @@ func InitSqliteDB(conf *config.Configuration) (*SqliteDatabase, error) {
 		break
 	}
 	if newVersion > currentVersion {
-		log.Debugf("Updated database to version: %d", newVersion)
+		log.Debugf("Updated database to version %d from version %d", newVersion, currentVersion)
 		sqliteDatabase.setSchemaVersion(newVersion)
 	}
 
