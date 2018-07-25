@@ -57,7 +57,7 @@ func (p *Piece) MarkComplete() error {
 	// 	return errors.New("piece is not complete")
 	// }
 
-	log.Debugf("Complete: %#v", p.Index)
+	// log.Debugf("Complete: %#v", p.Index)
 	p.Completed = true
 	return nil
 }
@@ -67,7 +67,7 @@ func (p *Piece) MarkNotComplete() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	log.Debugf("NotComplete: %#v", p.Index)
+	// log.Debugf("NotComplete: %#v", p.Index)
 	p.Completed = false
 	return nil
 }
