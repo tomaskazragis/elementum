@@ -92,9 +92,9 @@ var (
 		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
 		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
 		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(hdrip|b[rd]rip)\W*`): Resolution720p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(fullhd|fhd|blu\W*ray)\W*`): Resolution1080p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2K\W*`): Resolution2K},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+4K\W*`): Resolution4k},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(fullhd|fhd)\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(2K)\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(4K|uhd|bd\W*remux|blu\W*ray)\W*`): Resolution4k},
 	}
 	// Resolutions ...
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "2K", "4K"}
