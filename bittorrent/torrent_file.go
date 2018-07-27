@@ -82,19 +82,19 @@ const (
 var (
 	// [pр] actually contains "p" from latin and "р" from cyrillic, which looks the same, but it's not.
 	resolutionTags = []map[*regexp.Regexp]int{
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+240[pр]\W*`): Resolution240p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+480[pр]\W*`): Resolution480p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+720[pр]\W*`): Resolution720p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1080[piр]\W*`): Resolution1080p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+1440[pр]\W*`): Resolution2K},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+2160[pр]\W*`): Resolution4k},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+240[pр]\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+480[pр]\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(720[pр]|1280x720)\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(1080[piр]|1920x1080)\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+1440[pр]\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(4k|2160[pр]|UHD)\W*`): Resolution4k},
 
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(hdrip|b[rd]rip)\W*`): Resolution720p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(fullhd|fhd)\W*`): Resolution1080p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(2K)\W*`): Resolution2K},
-		map[*regexp.Regexp]int{regexp.MustCompile(`\W+(4K|uhd|bd\W*remux|blu\W*ray)\W*`): Resolution4k},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(hd720p?|hdrip|b[rd]rip)\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(hd1080p?|fullhd|fhd|blu\W*ray|bd\W*remux)\W*`): Resolution1080p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(2k)\W*`): Resolution2K},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(4k|hd4k)\W*`): Resolution4k},
 	}
 	// Resolutions ...
 	Resolutions = []string{"", "240p", "480p", "720p", "1080p", "2K", "4K"}
@@ -129,15 +129,15 @@ const (
 
 var (
 	ripTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+(cam|camrip|hdcam)\W*`):   RipCam,
-		regexp.MustCompile(`\W+(ts|telesync)\W*`):        RipTS,
-		regexp.MustCompile(`\W+(tc|telecine)\W*`):        RipTC,
-		regexp.MustCompile(`\W+(scr|screener)\W*`):       RipScr,
-		regexp.MustCompile(`\W+dvd\W*scr\W*`):            RipDVDScr,
-		regexp.MustCompile(`\W+dvd\W*rip\W*`):            RipDVD,
-		regexp.MustCompile(`\W+hd(tv|rip)\W*`):           RipHDTV,
-		regexp.MustCompile(`\W+(web\W*dl|web\W*rip)\W*`): RipWeb,
-		regexp.MustCompile(`\W+(bluray|b[rd]rip)\W*`):    RipBluRay,
+		regexp.MustCompile(`(?i)\W+(cam|camrip|hdcam)\W*`):   RipCam,
+		regexp.MustCompile(`(?i)\W+(ts|telesync)\W*`):        RipTS,
+		regexp.MustCompile(`(?i)\W+(tc|telecine)\W*`):        RipTC,
+		regexp.MustCompile(`(?i)\W+(scr|screener)\W*`):       RipScr,
+		regexp.MustCompile(`(?i)\W+dvd\W*scr\W*`):            RipDVDScr,
+		regexp.MustCompile(`(?i)\W+dvd\W*rip\W*`):            RipDVD,
+		regexp.MustCompile(`(?i)\W+hd(tv|rip)\W*`):           RipHDTV,
+		regexp.MustCompile(`(?i)\W+(web\W*dl|web\W*rip)\W*`): RipWeb,
+		regexp.MustCompile(`(?i)\W+(bluray|b[rd]rip)\W*`):    RipBluRay,
 	}
 	// Rips ...
 	Rips = []string{"", "Cam", "TeleSync", "TeleCine", "Screener", "DVD Screener", "DVDRip", "HDTV", "WebDL", "Blu-Ray"}
@@ -154,8 +154,8 @@ const (
 
 var (
 	sceneTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+nuked\W*`):  RatingNuked,
-		regexp.MustCompile(`\W+proper\W*`): RatingProper,
+		regexp.MustCompile(`(?i)\W+nuked\W*`):  RatingNuked,
+		regexp.MustCompile(`(?i)\W+proper\W*`): RatingProper,
 	}
 )
 
@@ -186,17 +186,17 @@ const (
 
 var (
 	videoTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+xvid\W*`):           CodecXVid,
-		regexp.MustCompile(`\W+([hx]264)\W*`):      CodecH264,
-		regexp.MustCompile(`\W+([hx]265|hevc)\W*`): CodecH265,
+		regexp.MustCompile(`(?i)\W+xvid\W*`):           CodecXVid,
+		regexp.MustCompile(`(?i)\W+([hx]264)\W*`):      CodecH264,
+		regexp.MustCompile(`(?i)\W+([hx]265|hevc)\W*`): CodecH265,
 	}
 	audioTags = map[*regexp.Regexp]int{
-		regexp.MustCompile(`\W+mp3\W*`):              CodecMp3,
-		regexp.MustCompile(`\W+aac\W*`):              CodecAAC,
-		regexp.MustCompile(`\W+(ac3|[Dd]*5\W+1)\W*`): CodecAC3,
-		regexp.MustCompile(`\W+dts\W*`):              CodecDTS,
-		regexp.MustCompile(`\W+dts\W+hd\W*`):         CodecDTSHD,
-		regexp.MustCompile(`\W+dts\W+hd\W+ma\W*`):    CodecDTSHDMA,
+		regexp.MustCompile(`(?i)\W+mp3\W*`):              CodecMp3,
+		regexp.MustCompile(`(?i)\W+aac\W*`):              CodecAAC,
+		regexp.MustCompile(`(?i)\W+(ac3|[Dd]*5\W+1)\W*`): CodecAC3,
+		regexp.MustCompile(`(?i)\W+dts\W*`):              CodecDTS,
+		regexp.MustCompile(`(?i)\W+dts\W+hd\W*`):         CodecDTSHD,
+		regexp.MustCompile(`(?i)\W+dts\W+hd\W+ma\W*`):    CodecDTSHDMA,
 	}
 	// Codecs ...
 	Codecs = []string{"", "Xvid", "H.264", "H.265", "MP3", "AAC", "AC3", "DTS", "DTS HD", "DTS HD MA"}
@@ -221,7 +221,6 @@ func (t *TorrentFile) UnmarshalJSON(b []byte) error {
 // MarshalJSON ...
 func (t *TorrentFile) MarshalJSON() ([]byte, error) {
 	tmp := torrent(*t)
-	log.Debugf("Marshalling: %#v", tmp)
 	b, err := json.Marshal(tmp)
 	if err != nil {
 		return nil, err
