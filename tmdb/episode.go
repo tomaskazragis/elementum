@@ -40,6 +40,11 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 				log.Warningf("Rate limit exceeded getting S%02dE%02d of %d, cooling down...", seasonNumber, episodeNumber, showID)
 				rl.CoolDown(resp.HttpResponse().Header)
 				return util.ErrExceeded
+			} else if resp.Status() == 404 {
+				cacheStore.Set(key, episode, cacheHalfExpiration)
+				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
+				log.Error(message)
+				return util.ErrHTTP
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
 				log.Error(message)

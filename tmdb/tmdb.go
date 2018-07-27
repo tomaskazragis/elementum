@@ -339,6 +339,7 @@ const (
 	burstTime               = 10 * time.Second
 	simultaneousConnections = 20
 	cacheExpiration         = 6 * 24 * time.Hour
+	cacheHalfExpiration     = 3 * 24 * time.Hour
 	recentExpiration        = 15 * time.Minute
 	imagesCacheExpiration   = 14 * 24 * time.Hour
 	resolveCacheExpiration  = 14 * 24 * time.Hour

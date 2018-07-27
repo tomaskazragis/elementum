@@ -39,6 +39,11 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showID)
 				rl.CoolDown(resp.HttpResponse().Header)
 				return util.ErrExceeded
+			} else if resp.Status() == 404 {
+				cacheStore.Set(key, season, cacheHalfExpiration)
+				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
+				log.Error(message)
+				return util.ErrHTTP
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
 				log.Error(message)

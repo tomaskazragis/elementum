@@ -10,6 +10,7 @@ import (
 
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
@@ -786,6 +787,14 @@ func (show *Show) ToListItem() (item *xbmc.ListItem) {
 		}
 	}
 
+	item.Thumbnail = item.Art.Poster
+	// item.Art.Thumbnail = item.Art.Poster
+
+	// if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
+	// 	item.Art = fa.ToListItemArt(item.Art)
+	// 	item.Thumbnail = item.Art.Thumbnail
+	// }
+
 	if len(item.Info.Trailer) == 0 {
 		item.Info.Trailer = util.TrailerURL(show.Trailer)
 	}
@@ -836,6 +845,22 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 	}
 
 	item.Info.Genre = strings.Join(show.Genres, " / ")
+
+	if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
+		item.Art = fa.ToEpisodeListItemArt(episode.Season, item.Art)
+	}
+
+	if episode.Images != nil && episode.Images.ScreenShot.Full != "" {
+		item.Art.FanArt = episode.Images.ScreenShot.Full
+		item.Art.Thumbnail = episode.Images.ScreenShot.Full
+		item.Art.Poster = episode.Images.ScreenShot.Full
+		item.Thumbnail = episode.Images.ScreenShot.Full
+	} else if epi := tmdb.GetEpisode(show.IDs.TMDB, episode.Season, episode.Number, config.Get().Language); epi != nil && epi.StillPath != "" {
+		item.Art.FanArt = tmdb.ImageURL(epi.StillPath, "w1280")
+		item.Art.Thumbnail = tmdb.ImageURL(epi.StillPath, "w500")
+		item.Art.Poster = tmdb.ImageURL(epi.StillPath, "w500")
+		item.Thumbnail = tmdb.ImageURL(epi.StillPath, "w500")
+	}
 
 	return item
 }

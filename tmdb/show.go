@@ -183,6 +183,11 @@ func GetShow(showID int, language string) (show *Show) {
 				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showID)
 				rl.CoolDown(resp.HttpResponse().Header)
 				return util.ErrExceeded
+			} else if resp.Status() == 404 {
+				cacheStore.Set(key, show, cacheHalfExpiration)
+				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
+				log.Error(message)
+				return util.ErrHTTP
 			} else if resp.Status() != 200 {
 				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
 				log.Warning(message)
