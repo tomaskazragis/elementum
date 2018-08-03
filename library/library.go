@@ -500,7 +500,7 @@ func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
 
 	playLink := URLForXBMC("/library/movie/play/%s", tmdbID)
 	if _, err := os.Stat(movieStrmPath); err == nil {
-		log.Debugf("Movie strm file already exists at %s", movieStrmPath)
+		// log.Debugf("Movie strm file already exists at %s", movieStrmPath)
 		return movie, fmt.Errorf("LOCALIZE[30287];;%s", movie.Title)
 	}
 	if err := ioutil.WriteFile(movieStrmPath, []byte(playLink), 0644); err != nil {
