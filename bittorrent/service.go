@@ -355,7 +355,7 @@ func (s *BTService) CheckAvailableSpace(torrent *Torrent) bool {
 func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	log.Infof("Adding torrent from %s", uri)
 
-	if s.config.DownloadPath == "." {
+	if s.config.DownloadStorage != estorage.StorageMemory && s.config.DownloadPath == "." {
 		xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
 		return nil, fmt.Errorf("Download path empty")
 	}

@@ -55,6 +55,13 @@ func ResetClearances(ctx *gin.Context) {
 	xbmc.Notify("Elementum", "LOCALIZE[30264]", config.AddonIcon())
 }
 
+// ResetPath ...
+func ResetPath(ctx *gin.Context) {
+	xbmc.SetSetting("download_path", "")
+	xbmc.SetSetting("library_path", "special://temp/elementum_library/")
+	xbmc.SetSetting("torrents_path", "special://temp/elementum_torrents/")
+}
+
 // SetViewMode ...
 func SetViewMode(ctx *gin.Context) {
 	contentType := ctx.Params.ByName("content_type")

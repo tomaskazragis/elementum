@@ -296,31 +296,54 @@ func Reload() *Configuration {
 	}
 
 	downloadPath := TranslatePath(xbmc.GetSettingString("download_path"))
-	if downloadPath == "." {
-		// xbmc.AddonSettings("plugin.video.elementum")
-		// xbmc.Dialog("Elementum", "LOCALIZE[30113]")
-		settingsWarning = "LOCALIZE[30113]"
-		panic(settingsWarning)
-	} else if err := IsWritablePath(downloadPath); err != nil {
-		log.Errorf("Cannot write to location '%s': %#v", downloadPath, err)
-		// xbmc.AddonSettings("plugin.video.elementum")
-		// xbmc.Dialog("Elementum", err.Error())
-		settingsWarning = err.Error()
-		panic(settingsWarning)
+	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
+	torrentsPath := TranslatePath(xbmc.GetSettingString("torrents_path"))
+	downloadStorage := xbmc.GetSettingInt("download_storage")
+
+	if downloadStorage != 1 {
+		if downloadPath == "." {
+			settingsWarning = "LOCALIZE[30113]"
+			panic(settingsWarning)
+		} else if err := IsWritablePath(downloadPath); err != nil {
+			log.Errorf("Cannot write to download location '%s': %#v", downloadPath, err)
+			settingsWarning = err.Error()
+			panic(settingsWarning)
+		}
 	}
 	log.Infof("Using download path: %s", downloadPath)
 
-	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
 	if libraryPath == "." {
-		libraryPath = downloadPath
-	} else if err := IsWritablePath(libraryPath); err != nil {
-		log.Error(err)
-		// xbmc.Dialog("Elementum", err.Error())
-		// xbmc.AddonSettings("plugin.video.elementum")
+		settingsWarning = "LOCALIZE[30220]"
+		panic(settingsWarning)
+	} else if strings.Contains(libraryPath, "elementum_library") {
+		if err := os.MkdirAll(libraryPath, 0777); err != nil {
+			log.Errorf("Could not create temporary library directory: %#v", err)
+			settingsWarning = err.Error()
+			panic(settingsWarning)
+		}
+	}
+	if err := IsWritablePath(libraryPath); err != nil {
+		log.Errorf("Cannot write to library location '%s': %#v", libraryPath, err)
 		settingsWarning = err.Error()
 		panic(settingsWarning)
 	}
 	log.Infof("Using library path: %s", libraryPath)
+
+	if torrentsPath == "." {
+		torrentsPath = filepath.Join(downloadPath, "Torrents")
+	} else if strings.Contains(torrentsPath, "elementum_torrents") {
+		if err := os.MkdirAll(torrentsPath, 0777); err != nil {
+			log.Errorf("Could not create temporary torrents directory: %#v", err)
+			settingsWarning = err.Error()
+			panic(settingsWarning)
+		}
+	}
+	if err := IsWritablePath(torrentsPath); err != nil {
+		log.Errorf("Cannot write to location '%s': %#v", torrentsPath, err)
+		settingsWarning = err.Error()
+		panic(settingsWarning)
+	}
+	log.Infof("Using torrents path: %s", torrentsPath)
 
 	xbmcSettings := xbmc.GetAllSettings()
 	settings := make(map[string]interface{})
@@ -359,7 +382,7 @@ func Reload() *Configuration {
 	newConfig := Configuration{
 		DownloadPath:              downloadPath,
 		LibraryPath:               libraryPath,
-		TorrentsPath:              filepath.Join(downloadPath, "Torrents"),
+		TorrentsPath:              torrentsPath,
 		Info:                      info,
 		Platform:                  platform,
 		Language:                  xbmc.GetLanguageISO639_1(),

@@ -329,12 +329,6 @@ func AddTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 		torrentsLog.Infof("Adding torrent from %s", uri)
 
-		if config.Get().DownloadPath == "." {
-			xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
-			ctx.String(404, "Download path empty")
-			return
-		}
-
 		_, err := btService.AddTorrent(uri)
 		if err != nil {
 			ctx.String(404, err.Error())
