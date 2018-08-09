@@ -2,6 +2,7 @@ package bittorrent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/hex"
@@ -458,12 +459,25 @@ func (t *TorrentFile) Resolve() error {
 	resp, err := util.HTTPClient.Do(req)
 	if err != nil {
 		return err
+	} else if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Request %s failed with code: %d", uri, resp.StatusCode)
 	}
-	var buf bytes.Buffer
-	tee := io.TeeReader(resp.Body, &buf)
-	dec := bencode.NewDecoder(tee)
+	defer resp.Body.Close()
 
+	var reader io.ReadCloser
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		defer reader.Close()
+	default:
+		reader = resp.Body
+	}
+
+	var buf bytes.Buffer
 	var torrentFile *TorrentFileRaw
+
+	tee := io.TeeReader(reader, &buf)
+	dec := bencode.NewDecoder(tee)
 
 	if errDec := dec.Decode(&torrentFile); errDec != nil {
 		return errDec
@@ -481,7 +495,6 @@ func (t *TorrentFile) Resolve() error {
 
 	if torrentFile.Info["private"] != nil {
 		if torrentFile.Info["private"].(int64) == 1 {
-			torrentFileLog.Noticef("%s marked as private", t.Name)
 			t.IsPrivate = true
 		}
 	}

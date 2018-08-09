@@ -27,7 +27,9 @@ var (
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}
-	tr = &http.Transport{
+
+	// Transport reflects transporting routines for default http.client
+	Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if config.Get().UsePublicDNS {
@@ -50,7 +52,7 @@ var (
 
 	// HTTPClient used to override default http.client
 	HTTPClient = &http.Client{
-		Transport: tr,
+		Transport: Transport,
 		Timeout:   10 * time.Second,
 	}
 )

@@ -217,6 +217,8 @@ func (s *BTService) configure() {
 	s.ClientConfig.ProxyURL = s.config.ProxyURL
 	if s.config.ProxyURL != "" {
 		s.setHTTPProxyURL()
+	} else {
+		util.Transport.Proxy = nil
 	}
 
 	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
@@ -1017,4 +1019,6 @@ func (s *BTService) setHTTPProxyURL() {
 		TLSHandshakeTimeout: 15 * time.Second,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 	}
+
+	util.Transport.Proxy = http.ProxyURL(fixedURL)
 }
