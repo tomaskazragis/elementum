@@ -5,5 +5,5 @@ package providers
 import "time"
 
 func providerTimeout() time.Duration {
-	return 15 * time.Second
+	return 30 * time.Second
 }
