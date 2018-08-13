@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/anacrolix/missinggo"
 	"github.com/op/go-logging"
+	"github.com/zeebo/bencode"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
@@ -250,6 +253,13 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 			if torrent.SceneRating > existingTorrent.SceneRating {
 				existingTorrent.SceneRating = torrent.SceneRating
 			}
+			if existingTorrent.Title == "" && torrent.Title != "" {
+				existingTorrent.Title = torrent.Title
+			}
+			if existingTorrent.IsMagnet() && !torrent.IsMagnet() {
+				existingTorrent.URI = torrent.URI
+			}
+
 			existingTorrent.Multi = true
 		} else {
 			torrentsMap[torrentKey] = torrent
@@ -382,6 +392,54 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	}
 	log.Notice("Finished comparing seeds/peers of results to trackers...")
 
+	for _, t := range torrents {
+		if _, err := os.Stat(t.URI); err != nil {
+			continue
+		}
+
+		in, err := ioutil.ReadFile(t.URI)
+		if err != nil {
+			log.Debugf("Cannot read torrent file: %s", err)
+			continue
+		}
+
+		var torrentFile *bittorrent.TorrentFileRaw
+		err = bencode.DecodeBytes(in, &torrentFile)
+		if err != nil {
+			log.Debugf("Cannot decode torrent file: %s", err)
+			continue
+		}
+
+		torrentFile.Title = t.Name
+		torrentFile.Announce = ""
+		torrentFile.AnnounceList = [][]string{}
+		uniqueTrackers := map[string]struct{}{}
+		for _, tr := range t.Trackers {
+			if len(tr) == 0 {
+				continue
+			}
+
+			uniqueTrackers[tr] = struct{}{}
+		}
+		for tr := range uniqueTrackers {
+			torrentFile.AnnounceList = append(torrentFile.AnnounceList, []string{tr})
+		}
+
+		out, err := bencode.EncodeBytes(torrentFile)
+		if err != nil {
+			log.Debugf("Cannot encode torrent file: %s", err)
+			continue
+		}
+
+		err = ioutil.WriteFile(t.URI, out, 0666)
+		if err != nil {
+			log.Debugf("Cannot write torrent file: %s", err)
+			continue
+		}
+
+	}
+
+	// Sorting resulting list of torrents
 	conf := config.Get()
 	sortMode := conf.SortingModeMovies
 	resolutionPreference := conf.ResolutionPreferenceMovies
@@ -437,7 +495,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 		}
 	}
 
-	log.Info("Sorted torrent candidates.")
+	// log.Info("Sorted torrent candidates.")
 	// for _, torrent := range torrents {
 	// 	log.Infof("S:%d P:%d %s - %s - %s", torrent.Seeds, torrent.Peers, torrent.Name, torrent.Provider, torrent.URI)
 	// }

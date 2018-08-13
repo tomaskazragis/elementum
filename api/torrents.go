@@ -74,7 +74,7 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 		torrent := &bittorrent.TorrentFile{}
 		torrent.LoadFromBytes(b)
 
-		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR B8B8B800]%s[/COLOR]", torrent.Name), xbmc.DialogExpiration.InTorrents)) {
+		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR gold]%s[/COLOR]", torrent.Title), xbmc.DialogExpiration.InTorrents)) {
 			return torrent
 		}
 
@@ -144,14 +144,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 			if status == "Paused" {
 				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume"))}
 			} else if status != "Finished" {
-				if progress >= 100 {
-					status = "Finished"
-				} else {
-					status = "Downloading"
-				}
 				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume/%s", i))}
-			} else if status == statusFinished || progress >= 100 {
-				status = statusSeeding
 			}
 
 			color := "white"

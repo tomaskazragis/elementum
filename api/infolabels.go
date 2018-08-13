@@ -14,6 +14,7 @@ import (
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/xbmc"
+	"github.com/sanity-io/litter"
 
 	"github.com/gin-gonic/gin"
 )
@@ -121,7 +122,7 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := episode.ToListItem(show, season)
 		if ls, err := library.GetShowByTMDB(show.ID); ls != nil && err == nil {
-			log.Debugf("Found show in library: %+v", ls)
+			log.Debugf("Found show in library: %s", litter.Sdump(ls))
 			if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
 				item.Info.DBID = le.UIDs.Kodi
 			}
@@ -156,7 +157,7 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := movie.ToListItem()
 		if lm, err := library.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
-			log.Debugf("Found movie in library: %+v", lm)
+			log.Debugf("Found movie in library: %s", litter.Sdump(lm))
 			item.Info.DBID = lm.UIDs.Kodi
 		}
 

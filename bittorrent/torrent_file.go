@@ -32,6 +32,7 @@ var torrentFileLog = logging.MustGetLogger("torrentFile")
 type TorrentFile struct {
 	URI        string   `json:"uri"`
 	InfoHash   string   `json:"info_hash"`
+	Title      string   `json:"title"`
 	Name       string   `json:"name"`
 	Trackers   []string `json:"trackers"`
 	Size       string   `json:"size"`
@@ -58,6 +59,7 @@ type torrent TorrentFile
 
 // TorrentFileRaw ...
 type TorrentFileRaw struct {
+	Title        string                 `bencode:"title"`
 	Announce     string                 `bencode:"announce"`
 	AnnounceList [][]string             `bencode:"announce-list"`
 	Info         map[string]interface{} `bencode:"info"`
@@ -330,6 +332,9 @@ func (t *TorrentFile) initializeFromMagnet() {
 	if t.Name == "" {
 		t.Name = vals.Get("dn")
 	}
+	if t.Title == "" {
+		t.Title = t.Name
+	}
 
 	if len(t.Trackers) == 0 {
 		t.Trackers = make([]string, 0)
@@ -383,10 +388,17 @@ func (t *TorrentFile) LoadFromBytes(in []byte) error {
 	if t.Name == "" {
 		t.Name = torrentFile.Info["name"].(string)
 	}
+	if t.Title == "" {
+		if len(torrentFile.Title) > 0 {
+			t.Title = torrentFile.Title
+		} else {
+			t.Title = t.Name
+		}
+	}
 
 	if torrentFile.Info["private"] != nil {
 		if torrentFile.Info["private"].(int64) == 1 {
-			torrentFileLog.Noticef("%s marked as private", t.Name)
+			// torrentFileLog.Noticef("%s marked as private", t.Name)
 			t.IsPrivate = true
 		}
 	}
@@ -491,6 +503,13 @@ func (t *TorrentFile) Resolve() error {
 
 	if t.Name == "" {
 		t.Name = torrentFile.Info["name"].(string)
+	}
+	if t.Title == "" {
+		if len(torrentFile.Title) > 0 {
+			t.Title = torrentFile.Title
+		} else {
+			t.Title = t.Name
+		}
 	}
 
 	if torrentFile.Info["private"] != nil {
@@ -610,6 +629,10 @@ func (t *TorrentFile) beautifySize() {
 }
 
 func (t *TorrentFile) parseSize() {
+	if len(t.Size) == 0 {
+		return
+	}
+
 	if v, err := humanize.ParseBytes(t.Size); err == nil {
 		t.SizeParsed = v
 	} else {
