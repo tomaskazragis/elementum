@@ -278,8 +278,10 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		cmd.GET("/clear_page_cache", ClearPageCache)
 		cmd.GET("/clear_trakt_cache", ClearTraktCache)
 		cmd.GET("/clear_tmdb_cache", ClearTmdbCache)
+
 		cmd.GET("/reset_clearances", ResetClearances)
 		cmd.GET("/reset_path", ResetPath)
+
 		cmd.GET("/paste/:type", Pastebin)
 
 		cmd.GET("/database/clear_movies", ClearDatabaseMovies)
@@ -291,6 +293,8 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		cmd.GET("/cache/clear_tmdb", ClearCacheTMDB)
 		cmd.GET("/cache/clear_trakt", ClearCacheTrakt)
 		cmd.GET("/cache/clear_cache", ClearCache)
+
+		cmd.GET("/select_network_interface", SelectNetworkInterface)
 	}
 
 	return r

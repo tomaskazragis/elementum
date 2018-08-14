@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -116,4 +117,54 @@ func fileSize(path string) string {
 	}
 
 	return humanize.Bytes(uint64(fi.Size()))
+}
+
+// SelectNetworkInterface ...
+func SelectNetworkInterface(ctx *gin.Context) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		ctx.String(404, err.Error())
+		return
+	}
+
+	items := make([]string, 0, len(ifaces))
+
+	for _, i := range ifaces {
+		name := i.Name
+		address := ""
+
+		addrs, err := i.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			v4 := ip.To4()
+			if v4 != nil {
+				address = v4.String()
+			}
+		}
+
+		if address != "" {
+			name = fmt.Sprintf("[B]%s[/B] (%s)", i.Name, address)
+		} else {
+			name = fmt.Sprintf("[B]%s[/B]", i.Name)
+		}
+
+		items = append(items, name)
+	}
+
+	choice := xbmc.ListDialog("LOCALIZE[30474]", items...)
+	if choice >= 0 {
+		xbmc.SetSetting("listen_autodetect_ip", "false")
+		xbmc.SetSetting("listen_interfaces", ifaces[choice].Name)
+	}
+
+	ctx.String(200, "")
 }
