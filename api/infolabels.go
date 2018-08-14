@@ -122,7 +122,7 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		item := episode.ToListItem(show, season)
 		if ls, err := library.GetShowByTMDB(show.ID); ls != nil && err == nil {
-			log.Debugf("Found show in library: %s", litter.Sdump(ls))
+			log.Debugf("Found show in library: %s", litter.Sdump(ls.UIDs))
 			if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
 				item.Info.DBID = le.UIDs.Kodi
 			}

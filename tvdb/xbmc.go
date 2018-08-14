@@ -115,7 +115,8 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 
 // ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
-	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.EpisodeName)
+	// episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.EpisodeName)
+	episodeLabel := episode.EpisodeName
 
 	item := &xbmc.ListItem{
 		Label: episodeLabel,
