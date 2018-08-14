@@ -3,6 +3,7 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"sort"
 	"time"
 
@@ -332,8 +333,17 @@ type DiscoverFilters struct {
 	Language string
 }
 
+// APIRequest ...
+type APIRequest struct {
+	URL         string
+	Params      url.Values
+	Result      interface{}
+	ErrMsg      interface{}
+	Description string
+}
+
 const (
-	tmdbEndpoint            = "https://api.themoviedb.org/3/"
+	tmdbEndpoint            = "https://api.themoviedb.org/3"
 	imageEndpoint           = "http://image.tmdb.org/t/p/"
 	burstRate               = 40
 	burstTime               = 10 * time.Second
@@ -401,7 +411,7 @@ func tmdbCheck(key string) bool {
 	}.AsUrlValues()
 
 	resp, err := napping.Get(
-		tmdbEndpoint+"movie/550",
+		tmdbEndpoint+"/movie/550",
 		&urlValues,
 		&result,
 		nil,
@@ -479,34 +489,19 @@ func Find(externalID string, externalSource string) *FindResult {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.find.%s.%s", externalSource, externalID)
 	if err := cacheStore.Get(key, &result); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/find/%s", tmdbEndpoint, externalID),
+			Params: napping.Params{
 				"api_key":         apiKey,
 				"external_source": externalSource,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"find/"+externalID,
-				&urlValues,
-				&result,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed Find call, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded finding tmdb item, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				log.Warningf("Bad status finding tmdb item: %d", resp.Status())
-			}
-
-			if result != nil {
-				cacheStore.Set(key, result, findCacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &result,
+			Description: "find",
 		})
+
+		if result != nil {
+			cacheStore.Set(key, result, findCacheExpiration)
+		}
 	}
 
 	return result
@@ -519,33 +514,15 @@ func GetCountries(language string) []*Country {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.countries.%s", language)
 	if err := cacheStore.Get(key, &countries); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/configuration/countries", tmdbEndpoint),
+			Params: napping.Params{
 				"api_key": apiKey,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"configuration/countries",
-				&urlValues,
-				&countries,
-				nil,
-			)
-
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting countries, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded getting countries, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting countries: %d", resp.Status())
-				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &countries,
+			Description: "countries",
 		})
+
 		sort.Slice(countries, func(i, j int) bool {
 			return countries[i].EnglishName < countries[j].EnglishName
 		})
@@ -561,33 +538,15 @@ func GetLanguages(language string) []*Language {
 
 	key := fmt.Sprintf("com.tmdb.languages.%s", language)
 	if err := cacheStore.Get(key, &languages); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/configuration/languages", tmdbEndpoint),
+			Params: napping.Params{
 				"api_key": apiKey,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"configuration/languages",
-				&urlValues,
-				&languages,
-				nil,
-			)
-
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting languages, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded getting languages, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting languages: %d", resp.Status())
-				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &languages,
+			Description: "languages",
 		})
+
 		for _, l := range languages {
 			if l.Name == "" {
 				l.Name = l.EnglishName
@@ -600,4 +559,39 @@ func GetLanguages(language string) []*Language {
 		cacheStore.Set(key, languages, cacheExpiration)
 	}
 	return languages
+}
+
+// MakeRequest used to proxy requests with proper RateLimiter usage and HTTP error processing
+func MakeRequest(r APIRequest) (ret error) {
+	rl.Call(func() error {
+		resp, err := napping.Get(
+			r.URL,
+			&r.Params,
+			r.Result,
+			r.ErrMsg,
+		)
+		if err != nil {
+			log.Error("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
+			ret = err
+		} else if resp.Status() == 429 {
+			log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
+			rl.CoolDown(resp.HttpResponse().Header)
+			ret = util.ErrExceeded
+			return util.ErrExceeded
+		} else if resp.Status() == 404 {
+			log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
+			rl.CoolDown(resp.HttpResponse().Header)
+			ret = util.ErrNotFound
+			return util.ErrNotFound
+		} else if resp.Status() != 200 {
+			log.Error(fmt.Sprintf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status()))
+			ret = util.ErrHTTP
+			return util.ErrHTTP
+		}
+
+		ret = nil
+		return nil
+	})
+
+	return
 }

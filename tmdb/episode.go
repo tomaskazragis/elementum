@@ -21,38 +21,15 @@ func GetEpisode(showID int, seasonNumber int, episodeNumber int, language string
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.episode.%d.%d.%d.%s", showID, seasonNumber, episodeNumber, language)
 	if err := cacheStore.Get(key, &episode); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d/season/%d/episode/%d", tmdbEndpoint, showID, seasonNumber, episodeNumber),
+			Params: napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,videos,alternative_titles,translations,external_ids,trailers",
 				"language":           language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				fmt.Sprintf("%stv/%d/season/%d/episode/%d", tmdbEndpoint, showID, seasonNumber, episodeNumber),
-				&urlValues,
-				&episode,
-				nil,
-			)
-			if err != nil {
-				log.Error(err.Error())
-				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting S%02dE%02d of %d, check your logs.", seasonNumber, episodeNumber, showID), config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting S%02dE%02d of %d, cooling down...", seasonNumber, episodeNumber, showID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() == 404 {
-				cacheStore.Set(key, episode, cacheHalfExpiration)
-				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
-				log.Error(message)
-				return util.ErrHTTP
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting S%02dE%02d of %d: %d", seasonNumber, episodeNumber, showID, resp.Status())
-				log.Error(message)
-				// xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &episode,
+			Description: "episode",
 		})
 
 		if episode != nil {
@@ -103,7 +80,8 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 
 // ToListItem ...
 func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
-	episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+	// episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+	episodeLabel := episode.Name
 
 	runtime := 1800
 	if len(show.EpisodeRunTime) > 0 {

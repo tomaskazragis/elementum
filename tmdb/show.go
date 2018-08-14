@@ -1,7 +1,6 @@
 package tmdb
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -34,34 +33,19 @@ func GetShowImages(showID int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.images", showID)
 	if err := cacheStore.Get(key, &images); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d/images", tmdbEndpoint, showID),
+			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/images",
-				&urlValues,
-				&images,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", showID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				log.Warningf("Bad status getting images for %d: %d", showID, resp.Status())
-				return util.ErrHTTP
-			}
-			if images != nil {
-				cacheStore.Set(key, images, imagesCacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &images,
+			Description: "show images",
 		})
+
+		if images != nil {
+			cacheStore.Set(key, images, imagesCacheExpiration)
+		}
 	}
 	return images
 }
@@ -72,34 +56,19 @@ func GetSeasonImages(showID int, season int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.%d.images", showID, season)
 	if err := cacheStore.Get(key, &images); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d/season/%d/images", tmdbEndpoint, showID, season),
+			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/season/"+strconv.Itoa(season)+"/images",
-				&urlValues,
-				&images,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting images for %d:%d, cooling down...", showID, season)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				log.Warningf("Bad status getting images for %d:%d: %d", showID, season, resp.Status())
-				return util.ErrHTTP
-			}
-			if images != nil {
-				cacheStore.Set(key, images, imagesCacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &images,
+			Description: "season images",
 		})
+
+		if images != nil {
+			cacheStore.Set(key, images, imagesCacheExpiration)
+		}
 	}
 	return images
 }
@@ -110,34 +79,19 @@ func GetEpisodeImages(showID, season, episode int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.%d.%d.images", showID, season, episode)
 	if err := cacheStore.Get(key, &images); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d/season/%d/episode/%d/images", tmdbEndpoint, showID, season, episode),
+			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showID)+"/season/"+strconv.Itoa(season)+"/episode/"+strconv.Itoa(episode)+"/images",
-				&urlValues,
-				&images,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				// xbmc.Notify("Elementum", "Failed getting images, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting images for %d/%d/%d, cooling down...", showID, season, episode)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				log.Warningf("Bad status getting images for %d/%d/%d: %d", showID, season, episode, resp.Status())
-				return util.ErrHTTP
-			}
-			if images != nil {
-				cacheStore.Set(key, images, imagesCacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &images,
+			Description: "season images",
 		})
+
+		if images != nil {
+			cacheStore.Set(key, images, imagesCacheExpiration)
+		}
 	}
 	return images
 }
@@ -156,51 +110,25 @@ func GetShow(showID int, language string) (show *Show) {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.show.%d.%s", showID, language)
 	if err := cacheStore.Get(key, &show); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d", tmdbEndpoint, showID),
+			Params: napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,alternative_titles,translations,external_ids",
 				"language":           language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"tv/"+strconv.Itoa(showID),
-				&urlValues,
-				&show,
-				nil,
-			)
-			if err != nil {
-				switch e := err.(type) {
-				case *json.UnmarshalTypeError:
-					log.Errorf("UnmarshalTypeError: Value[%s] Type[%v] Offset[%d] for %d", e.Value, e.Type, e.Offset, showID)
-				case *json.InvalidUnmarshalError:
-					log.Errorf("InvalidUnmarshalError: Type[%v]", e.Type)
-				default:
-					log.Error(err)
-				}
-				LogError(err)
-				// xbmc.Notify("Elementum", "Failed getting show, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting show %d, cooling down...", showID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() == 404 {
-				cacheStore.Set(key, show, cacheHalfExpiration)
-				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
-				log.Error(message)
-				return util.ErrHTTP
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting show for %d: %d", showID, resp.Status())
-				log.Warning(message)
-				// xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			if show != nil {
-				cacheStore.Set(key, show, cacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &show,
+			Description: "show",
 		})
+
+		if show == nil && err != nil && err == util.ErrNotFound {
+			cacheStore.Set(key, show, cacheHalfExpiration)
+		}
+		if show == nil {
+			return nil
+		}
+
+		cacheStore.Set(key, show, cacheExpiration)
 	}
 	if show == nil {
 		return nil
@@ -236,34 +164,21 @@ func GetShows(showIds []int, language string) Shows {
 // SearchShows ...
 func SearchShows(query string, language string, page int) (Shows, int) {
 	var results EntityList
-	rl.Call(func() error {
-		urlValues := napping.Params{
+	MakeRequest(APIRequest{
+		URL: fmt.Sprintf("%s/search/tv", tmdbEndpoint),
+		Params: napping.Params{
 			"api_key": apiKey,
 			"query":   query,
 			"page":    strconv.Itoa(page),
-		}.AsUrlValues()
-		resp, err := napping.Get(
-			tmdbEndpoint+"search/tv",
-			&urlValues,
-			&results,
-			nil,
-		)
-		if err != nil {
-			log.Error(err)
-			// xbmc.Notify("Elementum", "Failed searching shows check your logs.", config.AddonIcon())
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded searching shows for %s, cooling down...", query)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("Bad status searching shows: %d", resp.Status())
-			log.Error(message)
-			// xbmc.Notify("Elementum", message, config.AddonIcon())
-			return util.ErrHTTP
-		}
-
-		return nil
+		}.AsUrlValues(),
+		Result:      &results,
+		Description: "search show",
 	})
+
+	if results.Results != nil && len(results.Results) == 0 {
+		return nil, 0
+	}
+
 	tmdbIds := make([]int, 0, len(results.Results))
 	for _, entity := range results.Results {
 		tmdbIds = append(tmdbIds, entity.ID)
@@ -313,52 +228,38 @@ func listShows(endpoint string, cacheKey string, params napping.Params, page int
 				for k, v := range params {
 					pageParams[k] = v
 				}
-				urlParams := pageParams.AsUrlValues()
-				rl.Call(func() error {
-					resp, err := napping.Get(
-						tmdbEndpoint+endpoint,
-						&urlParams,
-						&results,
-						nil,
-					)
-					if err != nil {
-						log.Error(err)
-						// xbmc.Notify("Elementum", "Failed while listing shows, check your logs.", config.AddonIcon())
-					} else if resp.Status() == 429 {
-						log.Warningf("Rate limit exceeded while listing shows from %s, cooling down...", endpoint)
-						rl.CoolDown(resp.HttpResponse().Header)
-						return util.ErrExceeded
-					} else if resp.Status() != 200 {
-						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
-						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
-						// xbmc.Notify("Elementum", message, config.AddonIcon())
-						return util.ErrHTTP
-					}
 
-					return nil
+				err = MakeRequest(APIRequest{
+					URL:         fmt.Sprintf("%s/%s", tmdbEndpoint, endpoint),
+					Params:      pageParams.AsUrlValues(),
+					Result:      &results,
+					Description: "list shows",
 				})
-				if results != nil {
-					if totalResults == -1 {
-						totalResults = results.TotalResults
-						cacheStore.Set(totalKey, totalResults, recentExpiration)
-					}
 
-					var wgItems sync.WaitGroup
-					wgItems.Add(len(results.Results))
-					for s, show := range results.Results {
-						rindex := currentPage*TMDBResultsPerPage - requestLimitStart + s
-						if show == nil || rindex >= len(shows) || rindex < 0 {
-							wgItems.Done()
-							continue
-						}
-
-						go func(rindex int, tmdbId int) {
-							defer wgItems.Done()
-							shows[rindex] = GetShow(tmdbId, params["language"])
-						}(rindex, show.ID)
-					}
-					wgItems.Wait()
+				if results == nil {
+					return
 				}
+
+				if totalResults == -1 {
+					totalResults = results.TotalResults
+					cacheStore.Set(totalKey, totalResults, recentExpiration)
+				}
+
+				var wgItems sync.WaitGroup
+				wgItems.Add(len(results.Results))
+				for s, show := range results.Results {
+					rindex := currentPage*TMDBResultsPerPage - requestLimitStart + s
+					if show == nil || rindex >= len(shows) || rindex < 0 {
+						wgItems.Done()
+						continue
+					}
+
+					go func(rindex int, tmdbId int) {
+						defer wgItems.Done()
+						shows[rindex] = GetShow(tmdbId, params["language"])
+					}(rindex, show.ID)
+				}
+				wgItems.Wait()
 			}(p)
 		}
 		wg.Wait()
@@ -499,33 +400,30 @@ func GetTVGenres(language string) []*Genre {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.genres.shows.%s", language)
 	if err := cacheStore.Get(key, &genres); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/search/movie", tmdbEndpoint),
+			Params: napping.Params{
 				"api_key":  apiKey,
 				"language": language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"genre/tv/list",
-				&urlValues,
-				&genres,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting TV genres, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded getting TV genres, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting TV genres: %d", resp.Status())
-				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &genres,
+			Description: "show genres",
 		})
+
+		// That is a special case, when language in on TMDB, but it results empty names.
+		//   example of this: Catalan language.
+		if genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
+			err = MakeRequest(APIRequest{
+				URL: fmt.Sprintf("%s/genre/tv/list", tmdbEndpoint),
+				Params: napping.Params{
+					"api_key":  apiKey,
+					"language": "en-US",
+				}.AsUrlValues(),
+				Result:      &genres,
+				Description: "show genres",
+			})
+		}
+
 		if genres.Genres != nil && len(genres.Genres) > 0 {
 			for _, i := range genres.Genres {
 				i.Name = strings.Title(i.Name)

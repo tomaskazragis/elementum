@@ -32,34 +32,19 @@ func GetImages(movieID int) *Images {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.movie.%d.images", movieID)
 	if err := cacheStore.Get(key, &images); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/movie/%d/images", tmdbEndpoint, movieID),
+			Params: napping.Params{
 				"api_key":                apiKey,
 				"include_image_language": fmt.Sprintf("%s,en,null", config.Get().Language),
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"movie/"+strconv.Itoa(movieID)+"/images",
-				&urlValues,
-				&images,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting images for movie %d, check your logs.", movieID), config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting images for %d, cooling down...", movieID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				log.Warningf("Bad status getting images for %d: %d", movieID, resp.Status())
-				return util.ErrHTTP
-			}
-			if images != nil {
-				cacheStore.Set(key, images, imagesCacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &images,
+			Description: "movie images",
 		})
+
+		if images != nil {
+			cacheStore.Set(key, images, imagesCacheExpiration)
+		}
 	}
 	return images
 }
@@ -75,37 +60,20 @@ func GetMovieByID(movieID string, language string) *Movie {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.movie.%s.%s", movieID, language)
 	if err := cacheStore.Get(key, &movie); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/movie/%s", tmdbEndpoint, movieID),
+			Params: napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,alternative_titles,translations,external_ids,trailers,release_dates",
 				"language":           language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"movie/"+movieID,
-				&urlValues,
-				&movie,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				// xbmc.Notify("Elementum", fmt.Sprintf("Failed getting movie %s, check your logs.", movieID), config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting movie %s, cooling down...", movieID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting movie %s: %d", movieID, resp.Status())
-				log.Error(message)
-				// xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-			if movie != nil {
-				cacheStore.Set(key, movie, cacheExpiration)
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &movie,
+			Description: "movie",
 		})
+
+		if movie != nil {
+			cacheStore.Set(key, movie, cacheExpiration)
+		}
 	}
 	if movie == nil {
 		return nil
@@ -141,35 +109,31 @@ func GetMovieGenres(language string) []*Genre {
 
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.genres.movies.%s", language)
-	if err := cacheStore.Get(key, &genres); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+	if err := cacheStore.Get(key, &genres); err != nil || true {
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/genre/movie/list", tmdbEndpoint),
+			Params: napping.Params{
 				"api_key":  apiKey,
 				"language": language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"genre/movie/list",
-				&urlValues,
-				&genres,
-				nil,
-			)
-
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting movie genres, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded getting genres, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting movie genres: %d", resp.Status())
-				log.Error(message)
-				xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &genres,
+			Description: "movie genres",
 		})
+
+		// That is a special case, when language in on TMDB, but it results empty names.
+		//   example of this: Catalan language.
+		if genres.Genres != nil && len(genres.Genres) > 0 && genres.Genres[0].Name == "" {
+			err = MakeRequest(APIRequest{
+				URL: fmt.Sprintf("%s/genre/movie/list", tmdbEndpoint),
+				Params: napping.Params{
+					"api_key":  apiKey,
+					"language": "en-US",
+				}.AsUrlValues(),
+				Result:      &genres,
+				Description: "movie genres",
+			})
+		}
+
 		if genres.Genres != nil && len(genres.Genres) > 0 {
 			for _, i := range genres.Genres {
 				i.Name = strings.Title(i.Name)
@@ -189,34 +153,21 @@ func GetMovieGenres(language string) []*Genre {
 func SearchMovies(query string, language string, page int) (Movies, int) {
 	var results EntityList
 
-	rl.Call(func() error {
-		urlValues := napping.Params{
+	MakeRequest(APIRequest{
+		URL: fmt.Sprintf("%s/search/movie", tmdbEndpoint),
+		Params: napping.Params{
 			"api_key": apiKey,
 			"query":   query,
 			"page":    strconv.Itoa(page),
-		}.AsUrlValues()
-		resp, err := napping.Get(
-			tmdbEndpoint+"search/movie",
-			&urlValues,
-			&results,
-			nil,
-		)
-		if err != nil {
-			log.Error(err)
-			xbmc.Notify("Elementum", "Failed searching movies, check your logs.", config.AddonIcon())
-		} else if resp.Status() == 429 {
-			log.Warningf("Rate limit exceeded searching movies with %s", query)
-			rl.CoolDown(resp.HttpResponse().Header)
-			return util.ErrExceeded
-		} else if resp.Status() != 200 {
-			message := fmt.Sprintf("Bad status searching movies: %d", resp.Status())
-			log.Error(message)
-			xbmc.Notify("Elementum", message, config.AddonIcon())
-			return util.ErrHTTP
-		}
-
-		return nil
+		}.AsUrlValues(),
+		Result:      &results,
+		Description: "search movie",
 	})
+
+	if results.Results != nil && len(results.Results) == 0 {
+		return nil, 0
+	}
+
 	tmdbIds := make([]int, 0, len(results.Results))
 	for _, movie := range results.Results {
 		tmdbIds = append(tmdbIds, movie.ID)
@@ -237,32 +188,19 @@ func GetIMDBList(listID string, language string, page int) (movies Movies, total
 	key := fmt.Sprintf("com.imdb.list.%s.%d.%d", listID, requestPerPage, page)
 	totalKey := fmt.Sprintf("com.imdb.list.%s.total", listID)
 	if err := cacheStore.Get(key, &movies); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/list/%s", tmdbEndpoint, listID),
+			Params: napping.Params{
 				"api_key": apiKey,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				tmdbEndpoint+"list/"+listID,
-				&urlValues,
-				&results,
-				nil,
-			)
-			if err != nil {
-				log.Error(err)
-				xbmc.Notify("Elementum", "Failed getting IMDb list, check your logs.", config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warning("Rate limit exceeded getting IMDb list, cooling down...")
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting IMDb list: %d", resp.Status())
-				log.Error(message + fmt.Sprintf(" (%s)", listID))
-				xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &results,
+			Description: "IMDB list",
 		})
+
+		if err != nil || results == nil {
+			return
+		}
+
 		tmdbIds := make([]int, 0)
 		for i := requestLimitStart; i <= requestLimitEnd; i++ {
 			if i >= len(results.Items) || results.Items[i] == nil {
@@ -327,52 +265,38 @@ func listMovies(endpoint string, cacheKey string, params napping.Params, page in
 				for k, v := range params {
 					pageParams[k] = v
 				}
-				urlParams := pageParams.AsUrlValues()
-				rl.Call(func() error {
-					resp, err := napping.Get(
-						tmdbEndpoint+endpoint,
-						&urlParams,
-						&results,
-						nil,
-					)
-					if err != nil {
-						log.Error(err)
-						// xbmc.Notify("Elementum", "Failed while listing movies, check your logs.", config.AddonIcon())
-					} else if resp.Status() == 429 {
-						log.Warningf("Rate limit exceeded while listing movies from %s, cooling down...", endpoint)
-						rl.CoolDown(resp.HttpResponse().Header)
-						return util.ErrExceeded
-					} else if resp.Status() != 200 {
-						message := fmt.Sprintf("Bad status while listing movies from %s: %d", endpoint, resp.Status())
-						log.Error(message + fmt.Sprintf(" (%s)", endpoint))
-						// xbmc.Notify("Elementum", message, config.AddonIcon())
-						return util.ErrHTTP
-					}
 
-					return nil
+				err = MakeRequest(APIRequest{
+					URL:         fmt.Sprintf("%s/%s", tmdbEndpoint, endpoint),
+					Params:      pageParams.AsUrlValues(),
+					Result:      &results,
+					Description: "list movies",
 				})
-				if results != nil {
-					if totalResults == -1 {
-						totalResults = results.TotalResults
-						cacheStore.Set(totalKey, totalResults, recentExpiration)
-					}
 
-					var wgItems sync.WaitGroup
-					wgItems.Add(len(results.Results))
-					for m, movie := range results.Results {
-						rindex := currentPage*TMDBResultsPerPage - requestLimitStart + m
-						if movie == nil || rindex >= len(movies) || rindex < 0 {
-							wgItems.Done()
-							continue
-						}
-
-						go func(rindex int, tmdbId int) {
-							defer wgItems.Done()
-							movies[rindex] = GetMovie(tmdbId, params["language"])
-						}(rindex, movie.ID)
-					}
-					wgItems.Wait()
+				if results == nil {
+					return
 				}
+
+				if totalResults == -1 {
+					totalResults = results.TotalResults
+					cacheStore.Set(totalKey, totalResults, recentExpiration)
+				}
+
+				var wgItems sync.WaitGroup
+				wgItems.Add(len(results.Results))
+				for m, movie := range results.Results {
+					rindex := currentPage*TMDBResultsPerPage - requestLimitStart + m
+					if movie == nil || rindex >= len(movies) || rindex < 0 {
+						wgItems.Done()
+						continue
+					}
+
+					go func(rindex int, tmdbId int) {
+						defer wgItems.Done()
+						movies[rindex] = GetMovie(tmdbId, params["language"])
+					}(rindex, movie.ID)
+				}
+				wgItems.Wait()
 			}(p)
 		}
 		wg.Wait()

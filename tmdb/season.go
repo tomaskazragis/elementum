@@ -20,40 +20,20 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.tmdb.season.%d.%d.%s", showID, seasonNumber, language)
 	if err := cacheStore.Get(key, &season); err != nil {
-		rl.Call(func() error {
-			urlValues := napping.Params{
+		err = MakeRequest(APIRequest{
+			URL: fmt.Sprintf("%s/tv/%d/season/%d", tmdbEndpoint, showID, seasonNumber),
+			Params: napping.Params{
 				"api_key":            apiKey,
 				"append_to_response": "credits,images,videos,external_ids,alternative_titles,translations,trailers",
 				"language":           language,
-			}.AsUrlValues()
-			resp, err := napping.Get(
-				fmt.Sprintf("%stv/%d/season/%d", tmdbEndpoint, showID, seasonNumber),
-				&urlValues,
-				&season,
-				nil,
-			)
-			if err != nil {
-				log.Error(err.Error())
-				// xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			} else if resp.Status() == 429 {
-				log.Warningf("Rate limit exceeded getting season %d of show %d, cooling down...", seasonNumber, showID)
-				rl.CoolDown(resp.HttpResponse().Header)
-				return util.ErrExceeded
-			} else if resp.Status() == 404 {
-				cacheStore.Set(key, season, cacheHalfExpiration)
-				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
-				log.Error(message)
-				return util.ErrHTTP
-			} else if resp.Status() != 200 {
-				message := fmt.Sprintf("Bad status getting season %d of show %d: %d", seasonNumber, showID, resp.Status())
-				log.Error(message)
-				// xbmc.Notify("Elementum", message, config.AddonIcon())
-				return util.ErrHTTP
-			}
-
-			return nil
+			}.AsUrlValues(),
+			Result:      &season,
+			Description: "season",
 		})
 
+		if season == nil && err != nil && err == util.ErrNotFound {
+			cacheStore.Set(key, season, cacheHalfExpiration)
+		}
 		if season == nil {
 			return nil
 		}
@@ -73,18 +53,16 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 			}
 		}
 
-		if season != nil {
-			updateFrequency := config.Get().UpdateFrequency * 60
-			traktFrequency := config.Get().TraktSyncFrequency * 60
-			if updateFrequency == 0 && traktFrequency == 0 {
-				updateFrequency = 1440
-			} else if updateFrequency > traktFrequency && traktFrequency != 0 {
-				updateFrequency = traktFrequency - 1
-			} else {
-				updateFrequency = updateFrequency - 1
-			}
-			cacheStore.Set(key, season, time.Duration(updateFrequency)*time.Minute)
+		updateFrequency := config.Get().UpdateFrequency * 60
+		traktFrequency := config.Get().TraktSyncFrequency * 60
+		if updateFrequency == 0 && traktFrequency == 0 {
+			updateFrequency = 1440
+		} else if updateFrequency > traktFrequency && traktFrequency != 0 {
+			updateFrequency = traktFrequency - 1
+		} else {
+			updateFrequency = updateFrequency - 1
 		}
+		cacheStore.Set(key, season, time.Duration(updateFrequency)*time.Minute)
 	}
 	return season
 }
