@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/library"
 
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
@@ -57,23 +58,33 @@ func Status(ctx *gin.Context) {
 
     [B]LOCALIZE[30404]:[/B] %d
     [B]LOCALIZE[30405]:[/B] %d
+    [B]LOCALIZE[30458]:[/B] %d
+    [B]LOCALIZE[30459]:[/B] %d
 `
 
-	ip, _ := util.LocalIP()
+	ip := "127.0.0.1"
+	if localIP, err := util.LocalIP(); err == nil {
+		ip = localIP.String()
+	}
+
 	port := config.Args.LocalPort
-	webAddress := fmt.Sprintf("http://%s:%d/web", ip.String(), port)
-	debugAllAddress := fmt.Sprintf("http://%s:%d/debug/all", ip.String(), port)
-	debugBundleAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip.String(), port)
-	infoAddress := fmt.Sprintf("http://%s:%d/info", ip.String(), port)
+	webAddress := fmt.Sprintf("http://%s:%d/web", ip, port)
+	debugAllAddress := fmt.Sprintf("http://%s:%d/debug/all", ip, port)
+	debugBundleAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip, port)
+	infoAddress := fmt.Sprintf("http://%s:%d/info", ip, port)
 
 	appSize := fileSize(filepath.Join(config.Get().Info.Profile, database.Get().GetFilename()))
 	cacheSize := fileSize(filepath.Join(config.Get().Info.Profile, database.GetCache().GetFilename()))
 
 	torrentsCount := 0
-	database.Get().QueryRow("SELECT COUNT(1) FROM thistory_metainfo").Scan(&torrentsCount)
-
 	queriesCount := 0
+	deletedMoviesCount := 0
+	deletedShowsCount := 0
+
+	database.Get().QueryRow("SELECT COUNT(1) FROM thistory_metainfo").Scan(&torrentsCount)
 	database.Get().QueryRow("SELECT COUNT(1) FROM history_queries").Scan(&queriesCount)
+	database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType).Scan(&deletedMoviesCount)
+	database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType).Scan(&deletedShowsCount)
 
 	text = fmt.Sprintf(text,
 		util.GetVersion(),
@@ -90,6 +101,8 @@ func Status(ctx *gin.Context) {
 
 		torrentsCount,
 		queriesCount,
+		deletedMoviesCount,
+		deletedShowsCount,
 	)
 
 	xbmc.DialogText(title, string(text))

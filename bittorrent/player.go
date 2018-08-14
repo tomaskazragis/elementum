@@ -18,6 +18,7 @@ import (
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
+	"github.com/sanity-io/litter"
 
 	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
@@ -727,7 +728,7 @@ func (btp *BTPlayer) Params() *PlayerParams {
 
 // UpdateWatched is updating watched progress is Kodi
 func (btp *BTPlayer) UpdateWatched() {
-	btp.log.Debugf("Updating Watched state: %#v", btp.p)
+	btp.log.Debugf("Updating Watched state: %s", litter.Sdump(btp.p))
 
 	if btp.p.VideoDuration == 0 || btp.p.WatchedTime == 0 {
 		return

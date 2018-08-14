@@ -150,42 +150,55 @@ func (d *BoltDatabase) GetFilename() string {
 }
 
 // Close ...
-func (database *BoltDatabase) Close() {
+func (d *BoltDatabase) Close() {
 	log.Debug("Closing Database")
-	database.quit <- struct{}{}
-	database.db.Close()
+	d.quit <- struct{}{}
+	d.db.Close()
 }
 
 // CheckBucket ...
-func (database *BoltDatabase) CheckBucket(bucket []byte) error {
-	return database.db.Update(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) CheckBucket(bucket []byte) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucket)
 		return err
 	})
 }
 
-// MaintenanceRefreshHandler ...
-func (database *BoltDatabase) MaintenanceRefreshHandler() {
-	backupPath := filepath.Join(config.Get().Info.Profile, database.backupFileName)
+// RecreateBucket ...
+func (d *BoltDatabase) RecreateBucket(bucket []byte) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
+		errDrop := tx.DeleteBucket(bucket)
+		if errDrop != nil {
+			return errDrop
+		}
 
-	database.CreateBackup(backupPath)
+		_, errCreate := tx.CreateBucketIfNotExists(bucket)
+		return errCreate
+	})
+}
+
+// MaintenanceRefreshHandler ...
+func (d *BoltDatabase) MaintenanceRefreshHandler() {
+	backupPath := filepath.Join(config.Get().Info.Profile, d.backupFileName)
+
+	d.CreateBackup(backupPath)
 
 	// database.CacheCleanup()
 
 	tickerBackup := time.NewTicker(2 * time.Hour)
 
 	defer tickerBackup.Stop()
-	defer close(database.quit)
+	defer close(d.quit)
 
 	for {
 		select {
 		case <-tickerBackup.C:
 			go func() {
-				database.CreateBackup(backupPath)
+				d.CreateBackup(backupPath)
 			}()
 			// case <-tickerCache.C:
-			// 	go database.CacheCleanup()
-		case <-database.quit:
+			// 	go d.CacheCleanup()
+		case <-d.quit:
 			return
 		}
 	}
@@ -236,12 +249,12 @@ func RestoreBackup(databasePath string, backupPath string) {
 }
 
 // CreateBackup ...
-func (database *BoltDatabase) CreateBackup(backupPath string) {
-	if err := database.CheckBucket(LibraryBucket); err != nil {
+func (d *BoltDatabase) CreateBackup(backupPath string) {
+	if err := d.CheckBucket(LibraryBucket); err != nil {
 		return
 	}
 
-	database.db.View(func(tx *bolt.Tx) error {
+	d.db.View(func(tx *bolt.Tx) error {
 		tx.CopyFile(backupPath, 0600)
 		log.Debugf("Database backup saved at: %s", backupPath)
 		return nil
@@ -249,7 +262,7 @@ func (database *BoltDatabase) CreateBackup(backupPath string) {
 }
 
 // CacheCleanup ...
-func (database *BoltDatabase) CacheCleanup() {
+func (d *BoltDatabase) CacheCleanup() {
 	now := util.NowInt()
 	for _, bucket := range Buckets {
 		if !strings.Contains(string(bucket), "Cache") {
@@ -257,7 +270,7 @@ func (database *BoltDatabase) CacheCleanup() {
 		}
 
 		toRemove := []string{}
-		database.ForEach(bucket, func(key []byte, value []byte) error {
+		d.ForEach(bucket, func(key []byte, value []byte) error {
 			expire, _ := ParseCacheItem(value)
 			if expire > 0 && expire < now {
 				toRemove = append(toRemove, string(key))
@@ -267,15 +280,15 @@ func (database *BoltDatabase) CacheCleanup() {
 		})
 
 		if len(toRemove) > 0 {
-			database.BatchDelete(bucket, toRemove)
+			d.BatchDelete(bucket, toRemove)
 		}
 	}
 }
 
 // DeleteWithPrefix ...
-func (database *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
+func (d *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
 	toRemove := []string{}
-	database.ForEach(bucket, func(key []byte, v []byte) error {
+	d.ForEach(bucket, func(key []byte, v []byte) error {
 		if bytes.HasPrefix(key, prefix) {
 			toRemove = append(toRemove, string(key))
 		}
@@ -284,7 +297,8 @@ func (database *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
 	})
 
 	if len(toRemove) > 0 {
-		database.BatchDelete(bucket, toRemove)
+		log.Debugf("Deleting %d items from cache", len(toRemove))
+		d.BatchDelete(bucket, toRemove)
 	}
 }
 
@@ -293,8 +307,8 @@ func (database *BoltDatabase) DeleteWithPrefix(bucket []byte, prefix []byte) {
 //
 
 // Seek ...
-func (database *BoltDatabase) Seek(bucket []byte, prefix string, callback callBack) error {
-	return database.db.View(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) Seek(bucket []byte, prefix string, callback callBack) error {
+	return d.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(bucket).Cursor()
 		bytePrefix := []byte(prefix)
 		for k, v := c.Seek(bytePrefix); k != nil && bytes.HasPrefix(k, bytePrefix); k, v = c.Next() {
@@ -305,8 +319,8 @@ func (database *BoltDatabase) Seek(bucket []byte, prefix string, callback callBa
 }
 
 // ForEach ...
-func (database *BoltDatabase) ForEach(bucket []byte, callback callBackWithError) error {
-	return database.db.View(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) ForEach(bucket []byte, callback callBackWithError) error {
+	return d.db.View(func(tx *bolt.Tx) error {
 		tx.Bucket(bucket).ForEach(callback)
 		return nil
 	})

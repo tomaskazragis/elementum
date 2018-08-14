@@ -11,6 +11,7 @@ import (
 
 	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -20,14 +21,42 @@ var cmdLog = logging.MustGetLogger("cmd")
 // ClearCache ...
 func ClearCache(ctx *gin.Context) {
 	key := ctx.Params.ByName("key")
-	if ctx != nil {
-		ctx.Abort()
-	}
 	if key != "" {
+		if ctx != nil {
+			ctx.Abort()
+		}
+
 		library.ClearCacheKey(key)
+
 	} else {
-		library.ClearPageCache()
+		log.Debug("Removing all the cache")
+
+		if !xbmc.DialogConfirm("Elementum", "LOCALIZE[30471]") {
+			ctx.String(200, "")
+			return
+		}
+
+		database.GetCache().RecreateBucket(database.CommonBucket)
 	}
+
+	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
+}
+
+// ClearCacheTMDB ...
+func ClearCacheTMDB(ctx *gin.Context) {
+	log.Debug("Removing TMDB cache")
+
+	library.ClearTmdbCache()
+
+	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
+}
+
+// ClearCacheTrakt ...
+func ClearCacheTrakt(ctx *gin.Context) {
+	log.Debug("Removing Trakt cache")
+
+	library.ClearTraktCache()
+
 	xbmc.Notify("Elementum", "LOCALIZE[30200]", config.AddonIcon())
 }
 
@@ -128,4 +157,80 @@ func SetViewMode(ctx *gin.Context) {
 		xbmc.SetSetting("viewmode_"+contentType, viewMode)
 	}
 	ctx.String(200, "")
+}
+
+// ClearDatabaseMovies ...
+func ClearDatabaseMovies(ctx *gin.Context) {
+	log.Debug("Removing deleted movies from database")
+
+	database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType)
+
+	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
+
+	ctx.String(200, "")
+	return
+
+}
+
+// ClearDatabaseShows ...
+func ClearDatabaseShows(ctx *gin.Context) {
+	log.Debug("Removing deleted shows from database")
+
+	database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType)
+
+	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
+
+	ctx.String(200, "")
+	return
+
+}
+
+// ClearDatabaseTorrentHistory ...
+func ClearDatabaseTorrentHistory(ctx *gin.Context) {
+	log.Debug("Removing torrent history from database")
+
+	database.Get().Exec("DELETE FROM thistory_assign")
+	database.Get().Exec("DELETE FROM thistory_metainfo")
+	database.Get().Exec("DELETE FROM tinfo")
+
+	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
+
+	ctx.String(200, "")
+	return
+
+}
+
+// ClearDatabaseSearchHistory ...
+func ClearDatabaseSearchHistory(ctx *gin.Context) {
+	log.Debug("Removing search history from database")
+
+	database.Get().Exec("DELETE FROM history_queries")
+
+	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
+
+	ctx.String(200, "")
+	return
+
+}
+
+// ClearDatabase ...
+func ClearDatabase(ctx *gin.Context) {
+	log.Debug("Removing all the database")
+
+	if !xbmc.DialogConfirm("Elementum", "LOCALIZE[30471]") {
+		ctx.String(200, "")
+		return
+	}
+
+	database.Get().Exec("DELETE FROM history_queries")
+	database.Get().Exec("DELETE FROM library_items")
+	database.Get().Exec("DELETE FROM library_uids")
+	database.Get().Exec("DELETE FROM thistory_assign")
+	database.Get().Exec("DELETE FROM thistory_metainfo")
+	database.Get().Exec("DELETE FROM tinfo")
+
+	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
+
+	ctx.String(200, "")
+	return
 }
