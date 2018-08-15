@@ -1,5 +1,7 @@
 package xbmc
 
+//go:generate msgp -o msgp.go -io=false -tests=false
+
 // View ...
 type View struct {
 	ContentType string    `json:"content_type"`
@@ -236,6 +238,7 @@ type UniqueIDs struct {
 	IMDB       string `json:"imdb"`
 	TheMovieDB string `json:"themoviedb"`
 	Trakt      string `json:"trakt"`
+	Elementum  string `json:"elementum"`
 	Kodi       int
 }
 
@@ -270,7 +273,7 @@ type FileSources struct {
 // AdvancedSettings describes advancedsettings.xml
 type AdvancedSettings struct {
 	LogLevel int `xml:"loglevel"`
-	Cache struct {
+	Cache    struct {
 		MemorySizeLegacy int `xml:"cachemembuffersize"`
 		MemorySize       int `xml:"memorysize"`
 		BufferMode       int `xml:"buffermode"`

@@ -416,7 +416,7 @@ func doUpdateLibrary() error {
 	rows.Close()
 
 	for _, item := range items {
-		if _, err := writeShowStrm(item.ID, false); err != nil {
+		if _, err := writeShowStrm(item.ID, false, false); err != nil {
 			log.Errorf("Error updating show: %s", err)
 		}
 	}
@@ -483,7 +483,7 @@ func checkShowsPath() error {
 // Writers
 //
 
-func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
+func writeMovieStrm(tmdbID string, force bool) (*tmdb.Movie, error) {
 	movie := tmdb.GetMovieByID(tmdbID, config.Get().StrmLanguage)
 	if movie == nil {
 		return nil, errors.New("Can't find the movie")
@@ -501,24 +501,60 @@ func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
 			log.Error(err)
 			return movie, err
 		}
+	} else if force {
+		os.Chtimes(moviePath, time.Now().Local(), time.Now().Local())
 	}
 
 	movieStrmPath := filepath.Join(moviePath, fmt.Sprintf("%s.strm", movieStrm))
+	writeMovieNFO(movie, filepath.Join(moviePath, fmt.Sprintf("%s.nfo", movieStrm)))
 
 	playLink := URLForXBMC("/library/movie/play/%s", tmdbID)
-	if _, err := os.Stat(movieStrmPath); err == nil {
+	if _, err := os.Stat(movieStrmPath); !force && err == nil {
 		// log.Debugf("Movie strm file already exists at %s", movieStrmPath)
-		return movie, fmt.Errorf("LOCALIZE[30287];;%s", movie.Title)
+		// return movie, fmt.Errorf("LOCALIZE[30287];;%s", movie.Title)
+		return movie, nil
 	}
 	if err := ioutil.WriteFile(movieStrmPath, []byte(playLink), 0644); err != nil {
-		log.Error(err)
+		log.Errorf("Could not write strm file: %s", err)
 		return movie, err
 	}
 
 	return movie, nil
 }
 
-func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
+func writeMovieNFO(m *tmdb.Movie, p string) error {
+	out := `<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<movie>
+	<uniqueid type="unknown" default="false">%v</uniqueid>
+	<uniqueid type="elementum" default="false">%v</uniqueid>
+	<uniqueid type="tmdb" default="true">%v</uniqueid>
+	<uniqueid type="imdb" default="false">%v</uniqueid>
+	<uniqueid type="tvdb" default="false">%v</uniqueid>
+</movie>
+https://www.themoviedb.org/movie/%v
+`
+	out = fmt.Sprintf(out,
+		m.ID,
+		m.ID,
+		m.ID,
+		m.ExternalIDs.IMDBId,
+		m.ExternalIDs.TVDBID,
+		m.ID,
+	)
+
+	if m.ExternalIDs.IMDBId != "" {
+		out += fmt.Sprintf("https://www.imdb.com/title/%s/\n", m.ExternalIDs.IMDBId)
+	}
+
+	if err := ioutil.WriteFile(p, []byte(out), 0644); err != nil {
+		log.Errorf("Could not write NFO file: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 	show := tmdb.GetShow(showID, config.Get().StrmLanguage)
 	if show == nil {
 		return nil, fmt.Errorf("Unable to get show (%d)", showID)
@@ -537,7 +573,11 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 			log.Error(err)
 			return show, err
 		}
+	} else if force {
+		os.Chtimes(showPath, time.Now().Local(), time.Now().Local())
 	}
+
+	writeShowNFO(show, filepath.Join(showPath, "tvshow.nfo"))
 
 	now := util.UTCBod()
 	addSpecials := config.Get().AddSpecials
@@ -593,13 +633,13 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 				}
 			}
 
-			if err := IsDuplicateEpisode(showID, season.Season, episode.EpisodeNumber); err != nil {
+			if err := IsDuplicateEpisode(showID, season.Season, episode.EpisodeNumber); !force && err != nil {
 				continue
 			}
 
 			episodeStrmPath := filepath.Join(showPath, fmt.Sprintf("%s S%02dE%02d.strm", showStrm, season.Season, episode.EpisodeNumber))
 			playLink := URLForXBMC("/library/show/play/%d/%d/%d", showID, season.Season, episode.EpisodeNumber)
-			if _, err := os.Stat(episodeStrmPath); err == nil {
+			if _, err := os.Stat(episodeStrmPath); !force && err == nil {
 				continue
 			}
 
@@ -616,6 +656,41 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 	}
 
 	return show, nil
+}
+
+func writeShowNFO(s *tmdb.Show, p string) error {
+	out := `<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<tvshow>
+	<uniqueid type="unknown" default="false">%v</uniqueid>
+	<uniqueid type="elementum" default="false">%v</uniqueid>
+	<uniqueid type="tmdb" default="true">%v</uniqueid>
+	<uniqueid type="imdb" default="false">%v</uniqueid>
+	<uniqueid type="tvdb" default="false">%v</uniqueid>
+</tvshow>
+https://www.themoviedb.org/tv/%v
+`
+	out = fmt.Sprintf(out,
+		s.ID,
+		s.ID,
+		s.ID,
+		s.ExternalIDs.IMDBId,
+		s.ExternalIDs.TVDBID,
+		s.ID,
+	)
+
+	if s.ExternalIDs.IMDBId != "" {
+		out += fmt.Sprintf("https://www.imdb.com/title/%v/\n", s.ExternalIDs.IMDBId)
+	}
+	if s.ExternalIDs.TVDBID != "" {
+		out += fmt.Sprintf("https://www.thetvdb.com/dereferrer/series/%v\n", s.ExternalIDs.TVDBID)
+	}
+
+	if err := ioutil.WriteFile(p, []byte(out), 0644); err != nil {
+		log.Errorf("Could not write NFO file: %s", err)
+		return err
+	}
+
+	return nil
 }
 
 //
@@ -1274,7 +1349,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 			continue
 		}
 
-		if _, err := writeMovieStrm(tmdbID); err != nil {
+		if _, err := writeMovieStrm(tmdbID, false); err != nil {
 			continue
 		}
 
@@ -1360,7 +1435,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 			}
 		}
 
-		if _, err := writeShowStrm(show.Show.IDs.TMDB, false); err != nil {
+		if _, err := writeShowStrm(show.Show.IDs.TMDB, false, false); err != nil {
 			continue
 		}
 
@@ -1396,13 +1471,13 @@ func AddMovie(tmdbID string, force bool) (*tmdb.Movie, error) {
 	}
 
 	ID, _ := strconv.Atoi(tmdbID)
-	if errGet := IsDuplicateMovie(tmdbID); errGet != nil {
-		log.Warningf(errGet.Error())
+	if err := IsDuplicateMovie(tmdbID); !force && err != nil {
+		log.Warningf("Error from duplicate movie: %s", err)
 		xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", movie.Title), config.AddonIcon())
-		return nil, errGet
+		return nil, err
 	}
 
-	if _, err := writeMovieStrm(tmdbID); err != nil {
+	if _, err := writeMovieStrm(tmdbID, force); err != nil {
 		return movie, err
 	}
 
@@ -1429,7 +1504,7 @@ func AddShow(tmdbID string, force bool) (*tmdb.Show, error) {
 		return show, err
 	}
 
-	if _, err := writeShowStrm(ID, true); err != nil {
+	if _, err := writeShowStrm(ID, true, force); err != nil {
 		log.Error(err)
 		return show, err
 	}
