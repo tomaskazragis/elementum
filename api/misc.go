@@ -9,6 +9,7 @@ import (
 
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
+	"github.com/elgatito/elementum/tmdb"
 
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
@@ -164,6 +165,26 @@ func SelectNetworkInterface(ctx *gin.Context) {
 	if choice >= 0 {
 		xbmc.SetSetting("listen_autodetect_ip", "false")
 		xbmc.SetSetting("listen_interfaces", ifaces[choice].Name)
+	}
+
+	ctx.String(200, "")
+}
+
+// SelectStrmLanguage ...
+func SelectStrmLanguage(ctx *gin.Context) {
+	items := make([]string, 0)
+	items = append(items, xbmc.GetLocalizedString(30477))
+
+	languages := tmdb.GetLanguages(config.Get().Language)
+	for _, l := range languages {
+		items = append(items, l.Name)
+	}
+
+	choice := xbmc.ListDialog("LOCALIZE[30373]", items...)
+	if choice >= 1 {
+		xbmc.SetSetting("strm_language", languages[choice-1].Name+" | "+languages[choice-1].Iso639_1)
+	} else if choice == 0 {
+		xbmc.SetSetting("strm_language", "Original")
 	}
 
 	ctx.String(200, "")

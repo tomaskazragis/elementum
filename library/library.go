@@ -481,12 +481,16 @@ func checkShowsPath() error {
 //
 
 func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
-	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+	movie := tmdb.GetMovieByID(tmdbID, config.Get().StrmLanguage)
 	if movie == nil {
 		return nil, errors.New("Can't find the movie")
 	}
 
-	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0]))
+	movieName := movie.OriginalTitle
+	if config.Get().StrmLanguage != config.Get().Language {
+		movieName = movie.Title
+	}
+	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movieName, strings.Split(movie.ReleaseDate, "-")[0]))
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); os.IsNotExist(err) {
@@ -512,11 +516,17 @@ func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
 }
 
 func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
-	show := tmdb.GetShow(showID, config.Get().Language)
+	show := tmdb.GetShow(showID, config.Get().StrmLanguage)
 	if show == nil {
 		return nil, fmt.Errorf("Unable to get show (%d)", showID)
 	}
-	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.OriginalName, strings.Split(show.FirstAirDate, "-")[0]))
+
+	showName := show.OriginalName
+	if config.Get().StrmLanguage != config.Get().Language {
+		showName = show.Name
+	}
+
+	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
@@ -619,12 +629,17 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 	}()
 
 	ID := strconv.Itoa(tmdbID)
-	movie := tmdb.GetMovieByID(ID, config.Get().Language)
+	movie := tmdb.GetMovieByID(ID, config.Get().StrmLanguage)
 	if movie == nil {
 		return nil, errors.New("Can't resolve movie")
 	}
 
-	movieName := fmt.Sprintf("%s (%s)", movie.OriginalTitle, strings.Split(movie.ReleaseDate, "-")[0])
+	movieTitle := movie.OriginalTitle
+	if config.Get().StrmLanguage != config.Get().Language {
+		movieTitle = movie.Title
+	}
+
+	movieName := fmt.Sprintf("%s (%s)", movieTitle, strings.Split(movie.ReleaseDate, "-")[0])
 	movieStrm := util.ToFileName(movieName)
 	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
 
@@ -649,13 +664,18 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 		deleteDBItem(ID, ShowType)
 	}()
 
-	show := tmdb.GetShow(ID, config.Get().Language)
+	show := tmdb.GetShow(ID, config.Get().StrmLanguage)
 
 	if show == nil {
 		return nil, errors.New("Unable to find show to remove")
 	}
 
-	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", show.OriginalName, strings.Split(show.FirstAirDate, "-")[0]))
+	showName := show.OriginalName
+	if config.Get().StrmLanguage != config.Get().Language {
+		showName = show.Name
+	}
+
+	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
 	showPath := filepath.Join(showsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); err != nil {
@@ -677,13 +697,18 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 	if err := checkShowsPath(); err != nil {
 		return err
 	}
-	show := tmdb.GetShow(showID, config.Get().Language)
+	show := tmdb.GetShow(showID, config.Get().StrmLanguage)
 
 	if show == nil {
 		return errors.New("Unable to find show to remove episode")
 	}
 
-	showPath := util.ToFileName(fmt.Sprintf("%s (%s)", show.OriginalName, strings.Split(show.FirstAirDate, "-")[0]))
+	showName := show.OriginalName
+	if config.Get().StrmLanguage != config.Get().Language {
+		showName = show.Name
+	}
+
+	showPath := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
 	episodeStrm := fmt.Sprintf("%s S%02dE%02d.strm", showPath, seasonNumber, episodeNumber)
 	episodePath := filepath.Join(showsLibraryPath, showPath, episodeStrm)
 

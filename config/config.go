@@ -58,6 +58,7 @@ type Configuration struct {
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
 	SmartEpisodeMatch         bool
+	StrmLanguage              string
 	PlaybackPercent           int
 	DownloadStorage           int
 	AutoMemorySize            bool
@@ -420,6 +421,7 @@ func Reload() *Configuration {
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
 		PlaybackPercent:           settings["playback_percent"].(int),
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
+		StrmLanguage:              settings["strm_language"].(string),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit:        settings["seed_time_limit"].(int),
@@ -587,6 +589,18 @@ func Reload() *Configuration {
 	if newConfig.KodiBufferSize > newConfig.BufferSize {
 		newConfig.BufferSize = newConfig.KodiBufferSize
 		log.Debugf("Adjusting buffer size according to Kodi advancedsettings.xml configuration to %s", humanize.Bytes(uint64(newConfig.BufferSize)))
+	}
+
+	// Read Strm Language settings and cut-off ISO value
+	if strings.Contains(newConfig.StrmLanguage, " | ") {
+		tokens := strings.Split(newConfig.StrmLanguage, " | ")
+		if len(tokens) == 2 {
+			newConfig.StrmLanguage = tokens[1]
+		} else {
+			newConfig.StrmLanguage = newConfig.Language
+		}
+	} else {
+		newConfig.StrmLanguage = newConfig.Language
 	}
 
 	lock.Lock()

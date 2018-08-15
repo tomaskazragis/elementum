@@ -283,7 +283,9 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		cmd.GET("/reset_path", ResetPath)
 
 		cmd.GET("/paste/:type", Pastebin)
+
 		cmd.GET("/select_network_interface", SelectNetworkInterface)
+		cmd.GET("/select_strm_language", SelectStrmLanguage)
 
 		database := cmd.Group("/database")
 		{
