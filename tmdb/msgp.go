@@ -9,16 +9,10 @@ import (
 // MarshalMsg implements msgp.Marshaler
 func (z *APIRequest) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 5
+	// map header, size 4
 	// string "URL"
-	o = append(o, 0x85, 0xa3, 0x55, 0x52, 0x4c)
+	o = append(o, 0x84, 0xa3, 0x55, 0x52, 0x4c)
 	o = msgp.AppendString(o, z.URL)
-	// string "Params"
-	o = append(o, 0xa6, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73)
-	o, err = z.Params.MarshalMsg(o)
-	if err != nil {
-		return
-	}
 	// string "Result"
 	o = append(o, 0xa6, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74)
 	o, err = msgp.AppendIntf(o, z.Result)
@@ -58,11 +52,6 @@ func (z *APIRequest) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
-		case "Params":
-			bts, err = z.Params.UnmarshalMsg(bts)
-			if err != nil {
-				return
-			}
 		case "Result":
 			z.Result, bts, err = msgp.ReadIntfBytes(bts)
 			if err != nil {
@@ -91,7 +80,7 @@ func (z *APIRequest) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *APIRequest) Msgsize() (s int) {
-	s = 1 + 4 + msgp.StringPrefixSize + len(z.URL) + 7 + z.Params.Msgsize() + 7 + msgp.GuessSize(z.Result) + 7 + msgp.GuessSize(z.ErrMsg) + 12 + msgp.StringPrefixSize + len(z.Description)
+	s = 1 + 4 + msgp.StringPrefixSize + len(z.URL) + 7 + msgp.GuessSize(z.Result) + 7 + msgp.GuessSize(z.ErrMsg) + 12 + msgp.StringPrefixSize + len(z.Description)
 	return
 }
 

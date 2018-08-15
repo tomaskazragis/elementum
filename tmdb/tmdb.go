@@ -336,7 +336,7 @@ type DiscoverFilters struct {
 // APIRequest ...
 type APIRequest struct {
 	URL         string
-	Params      url.Values
+	Params      url.Values `msg:"-"`
 	Result      interface{}
 	ErrMsg      interface{}
 	Description string
