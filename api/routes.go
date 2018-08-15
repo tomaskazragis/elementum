@@ -298,9 +298,9 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 		cache := cmd.Group("/cache")
 		{
-			cache.GET("/cache/clear_tmdb", ClearCacheTMDB)
-			cache.GET("/cache/clear_trakt", ClearCacheTrakt)
-			cache.GET("/cache/clear_cache", ClearCache)
+			cache.GET("/clear_tmdb", ClearCacheTMDB)
+			cache.GET("/clear_trakt", ClearCacheTrakt)
+			cache.GET("/clear_cache", ClearCache)
 		}
 	}
 

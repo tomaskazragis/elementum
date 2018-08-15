@@ -193,7 +193,7 @@ func UpdateLibrary(ctx *gin.Context) {
 // UpdateTrakt ...
 func UpdateTrakt(ctx *gin.Context) {
 	xbmc.Notify("Elementum", "LOCALIZE[30358]", config.AddonIcon())
-	ctx.String(200, "LOCALIZE[30358]")
+	ctx.String(200, "")
 	go func() {
 		library.RefreshTrakt()
 		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
