@@ -571,7 +571,7 @@ func MakeRequest(r APIRequest) (ret error) {
 			r.ErrMsg,
 		)
 		if err != nil {
-			log.Error("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
+			log.Errorf("Failed to make request to %s for %s with %+v: %s", r.URL, r.Description, r.Params, err)
 			ret = err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting %s with %+v on %s, cooling down...", r.Description, r.Params, r.URL)
@@ -584,7 +584,7 @@ func MakeRequest(r APIRequest) (ret error) {
 			ret = util.ErrNotFound
 			return util.ErrNotFound
 		} else if resp.Status() != 200 {
-			log.Error(fmt.Sprintf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status()))
+			log.Errorf("Bad status getting %s with %+v on %s: %d", r.Description, r.Params, r.URL, resp.Status())
 			ret = util.ErrHTTP
 			return util.ErrHTTP
 		}

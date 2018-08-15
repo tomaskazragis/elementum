@@ -47,7 +47,9 @@ var (
 // AddMovie ...
 func AddMovie(ctx *gin.Context) {
 	tmdbID := ctx.Params.ByName("tmdbId")
-	movie, err := library.AddMovie(tmdbID)
+	force := ctx.DefaultQuery("force", falseType) == trueType
+
+	movie, err := library.AddMovie(tmdbID, force)
 	if err != nil {
 		ctx.String(200, err.Error())
 		return
@@ -56,8 +58,16 @@ func AddMovie(ctx *gin.Context) {
 		go trakt.SyncAddedItem("movies", tmdbID, config.Get().TraktSyncAddedMoviesLocation)
 	}
 
-	if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", movie.Title)) {
-		xbmc.VideoLibraryScan()
+	label := "LOCALIZE[30277]"
+	logMsg := "%s (%s) added to library"
+	if force {
+		label = "LOCALIZE[30286]"
+		logMsg = "%s (%s) merged to library"
+	}
+
+	log.Noticef(logMsg, movie.Title, tmdbID)
+	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, movie.Title)) {
+		xbmc.VideoLibraryScanDirectory(library.MoviesLibraryPath, true)
 	} else {
 		if ctx != nil {
 			ctx.Abort()
@@ -109,9 +119,9 @@ func RemoveMovie(ctx *gin.Context) {
 // AddShow ...
 func AddShow(ctx *gin.Context) {
 	tmdbID := ctx.Params.ByName("tmdbId")
-	merge := ctx.DefaultQuery("merge", falseType)
+	force := ctx.DefaultQuery("force", falseType) == trueType
 
-	show, err := library.AddShow(tmdbID, merge)
+	show, err := library.AddShow(tmdbID, force)
 	if err != nil {
 		ctx.String(200, err.Error())
 		return
@@ -122,14 +132,14 @@ func AddShow(ctx *gin.Context) {
 
 	label := "LOCALIZE[30277]"
 	logMsg := "%s (%s) added to library"
-	if merge == trueType {
+	if force {
 		label = "LOCALIZE[30286]"
 		logMsg = "%s (%s) merged to library"
 	}
 
 	log.Noticef(logMsg, show.Name, tmdbID)
-	if xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, show.Name)) {
-		xbmc.VideoLibraryScan()
+	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, show.Name)) {
+		xbmc.VideoLibraryScanDirectory(library.ShowsLibraryPath, true)
 	} else {
 		library.ClearPageCache()
 	}
@@ -175,7 +185,7 @@ func UpdateLibrary(ctx *gin.Context) {
 	if err := library.Refresh(); err != nil {
 		ctx.String(200, err.Error())
 	}
-	if xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
 		xbmc.VideoLibraryScan()
 	}
 }
@@ -186,7 +196,7 @@ func UpdateTrakt(ctx *gin.Context) {
 	ctx.String(200, "LOCALIZE[30358]")
 	go func() {
 		library.RefreshTrakt()
-		if xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
 			xbmc.VideoLibraryScan()
 		}
 	}()

@@ -627,11 +627,13 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 
 		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
 
-		libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))}
-		if _, err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
-			libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))}
+		libraryActions := [][]string{}
+		if err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
+			libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
+			libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
+		} else {
+			libraryActions = append(libraryActions, []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))})
 		}
-		mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?merge=true", showListing.Show.IDs.TMDB))}
 
 		watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/add", showListing.Show.IDs.TMDB))}
 		if inShowsWatchlist(showListing.Show.IDs.TMDB) {
@@ -644,14 +646,17 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		}
 
 		item.ContextMenu = [][]string{
-			libraryAction,
-			mergeAction,
 			watchlistAction,
 			collectionAction,
 			[]string{"LOCALIZE[30035]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/tvshows"))},
 		}
+		item.ContextMenu = append(libraryActions, item.ContextMenu...)
+
 		if config.Get().Platform.Kodi < 17 {
-			item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30203]", "XBMC.Action(Info)"})
+			item.ContextMenu = append(item.ContextMenu,
+				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+			)
 		}
 		items = append(items, item)
 	}
@@ -1101,11 +1106,13 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			}
 			item.Path = itemPath
 
-			libraryAction := []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))}
-			if _, err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
-				libraryAction = []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))}
+			libraryActions := [][]string{}
+			if err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
+			} else {
+				libraryActions = append(libraryActions, []string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d", showListing.Show.IDs.TMDB))})
 			}
-			mergeAction := []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?merge=true", showListing.Show.IDs.TMDB))}
 
 			watchlistAction := []string{"LOCALIZE[30255]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/show/%d/watchlist/add", showListing.Show.IDs.TMDB))}
 			if inShowsWatchlist(showListing.Show.IDs.TMDB) {
@@ -1118,14 +1125,19 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			}
 
 			item.ContextMenu = [][]string{
-				libraryAction,
-				mergeAction,
 				watchlistAction,
 				collectionAction,
-				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
-				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
 				[]string{"LOCALIZE[30035]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/tvshows"))},
 			}
+			item.ContextMenu = append(libraryActions, item.ContextMenu...)
+
+			if config.Get().Platform.Kodi < 17 {
+				item.ContextMenu = append(item.ContextMenu,
+					[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+					[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+				)
+			}
+			
 			item.IsPlayable = true
 
 			items[i] = item

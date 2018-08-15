@@ -99,9 +99,12 @@ var (
 
 	log = logging.MustGetLogger("library")
 
-	libraryPath       string
-	moviesLibraryPath string
-	showsLibraryPath  string
+	libraryPath string
+
+	// MoviesLibraryPath contains calculated path for saving Movies strm files
+	MoviesLibraryPath string
+	// ShowsLibraryPath contains calculated path for saving Shows strm files
+	ShowsLibraryPath string
 
 	cacheStore *cache.DBStore
 
@@ -448,11 +451,11 @@ func checkMoviesPath() error {
 	if err := checkLibraryPath(); err != nil {
 		return err
 	}
-	if moviesLibraryPath == "" {
-		moviesLibraryPath = filepath.Join(libraryPath, "Movies")
+	if MoviesLibraryPath == "" {
+		MoviesLibraryPath = filepath.Join(libraryPath, "Movies")
 	}
-	if _, err := os.Stat(moviesLibraryPath); os.IsNotExist(err) {
-		if err := os.Mkdir(moviesLibraryPath, 0755); err != nil {
+	if _, err := os.Stat(MoviesLibraryPath); os.IsNotExist(err) {
+		if err := os.Mkdir(MoviesLibraryPath, 0755); err != nil {
 			log.Error(err)
 			return err
 		}
@@ -464,11 +467,11 @@ func checkShowsPath() error {
 	if err := checkLibraryPath(); err != nil {
 		return err
 	}
-	if showsLibraryPath == "" {
-		showsLibraryPath = filepath.Join(libraryPath, "Shows")
+	if ShowsLibraryPath == "" {
+		ShowsLibraryPath = filepath.Join(libraryPath, "Shows")
 	}
-	if _, err := os.Stat(showsLibraryPath); os.IsNotExist(err) {
-		if err := os.Mkdir(showsLibraryPath, 0755); err != nil {
+	if _, err := os.Stat(ShowsLibraryPath); os.IsNotExist(err) {
+		if err := os.Mkdir(ShowsLibraryPath, 0755); err != nil {
 			log.Error(err)
 			return err
 		}
@@ -491,7 +494,7 @@ func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
 		movieName = movie.Title
 	}
 	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movieName, strings.Split(movie.ReleaseDate, "-")[0]))
-	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
+	moviePath := filepath.Join(MoviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); os.IsNotExist(err) {
 		if err := os.Mkdir(moviePath, 0755); err != nil {
@@ -527,7 +530,7 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 	}
 
 	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(showsLibraryPath, showStrm)
+	showPath := filepath.Join(ShowsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
 		if err := os.Mkdir(showPath, 0755); err != nil {
@@ -641,7 +644,7 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 
 	movieName := fmt.Sprintf("%s (%s)", movieTitle, strings.Split(movie.ReleaseDate, "-")[0])
 	movieStrm := util.ToFileName(movieName)
-	moviePath := filepath.Join(moviesLibraryPath, movieStrm)
+	moviePath := filepath.Join(MoviesLibraryPath, movieStrm)
 
 	if _, err := os.Stat(moviePath); err != nil {
 		return movie, errors.New("LOCALIZE[30282]")
@@ -676,7 +679,7 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 	}
 
 	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(showsLibraryPath, showStrm)
+	showPath := filepath.Join(ShowsLibraryPath, showStrm)
 
 	if _, err := os.Stat(showPath); err != nil {
 		log.Warning(err)
@@ -710,7 +713,7 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 
 	showPath := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
 	episodeStrm := fmt.Sprintf("%s S%02dE%02d.strm", showPath, seasonNumber, episodeNumber)
-	episodePath := filepath.Join(showsLibraryPath, showPath, episodeStrm)
+	episodePath := filepath.Join(ShowsLibraryPath, showPath, episodeStrm)
 
 	alreadyRemoved := false
 	if _, err := os.Stat(episodePath); err != nil {
@@ -759,10 +762,10 @@ func IsDuplicateMovie(tmdbID string) error {
 }
 
 // IsDuplicateShow checks if show exists in the library
-func IsDuplicateShow(tmdbID string) (*tmdb.Show, error) {
+func IsDuplicateShow(tmdbID string) error {
 	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
 	if show == nil {
-		return nil, errors.New("Can't resolve show")
+		return errors.New("Can't resolve show")
 	}
 
 	l.mu.UIDs.Lock()
@@ -771,11 +774,11 @@ func IsDuplicateShow(tmdbID string) (*tmdb.Show, error) {
 	query, _ := strconv.Atoi(tmdbID)
 	for _, u := range l.UIDs {
 		if u.TMDB != 0 && u.MediaType == ShowType && u.TMDB == query {
-			return show, fmt.Errorf("%s already in library", show.Title)
+			return fmt.Errorf("%s already in library", show.Title)
 		}
 	}
 
-	return show, nil
+	return nil
 }
 
 // IsDuplicateEpisode checks if episode exists in the library
@@ -1284,7 +1287,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Movies list (%s) added", listID)
-		if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
+		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
 			xbmc.VideoLibraryScan()
 		}
 	}
@@ -1352,7 +1355,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 		}
 
 		if !updating {
-			if _, err := IsDuplicateShow(tmdbID); err != nil {
+			if err := IsDuplicateShow(tmdbID); err != nil {
 				continue
 			}
 		}
@@ -1370,7 +1373,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Shows list (%s) added", listID)
-		if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
+		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
 			xbmc.VideoLibraryScan()
 		}
 	}
@@ -1382,7 +1385,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 //
 
 // AddMovie is adding movie to the library
-func AddMovie(tmdbID string) (*tmdb.Movie, error) {
+func AddMovie(tmdbID string, force bool) (*tmdb.Movie, error) {
 	if err := checkMoviesPath(); err != nil {
 		return nil, err
 	}
@@ -1412,17 +1415,18 @@ func AddMovie(tmdbID string) (*tmdb.Movie, error) {
 }
 
 // AddShow is adding show to the library
-func AddShow(tmdbID string, merge string) (*tmdb.Show, error) {
+func AddShow(tmdbID string, force bool) (*tmdb.Show, error) {
 	if err := checkShowsPath(); err != nil {
 		return nil, err
 	}
 
 	ID, _ := strconv.Atoi(tmdbID)
-	show, errGet := IsDuplicateShow(tmdbID)
-	if merge == falseType && errGet != nil {
-		log.Warning(errGet)
+	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
+
+	if err := IsDuplicateShow(tmdbID); !force && err != nil {
+		log.Warning(err)
 		xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
-		return show, errGet
+		return show, err
 	}
 
 	if _, err := writeShowStrm(ID, true); err != nil {

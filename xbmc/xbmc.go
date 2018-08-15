@@ -29,6 +29,12 @@ func VideoLibraryScan() (retVal string) {
 	return
 }
 
+// VideoLibraryScanDirectory ...
+func VideoLibraryScanDirectory(directory string, showDialogs bool) (retVal string) {
+	executeJSONRPC("VideoLibrary.Scan", &retVal, Args{directory, showDialogs})
+	return
+}
+
 // VideoLibraryClean ...
 func VideoLibraryClean() (retVal string) {
 	executeJSONRPC("VideoLibrary.Clean", &retVal, nil)
