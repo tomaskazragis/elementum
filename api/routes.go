@@ -283,18 +283,23 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		cmd.GET("/reset_path", ResetPath)
 
 		cmd.GET("/paste/:type", Pastebin)
-
-		cmd.GET("/database/clear_movies", ClearDatabaseMovies)
-		cmd.GET("/database/clear_shows", ClearDatabaseShows)
-		cmd.GET("/database/clear_torrent_history", ClearDatabaseTorrentHistory)
-		cmd.GET("/database/clear_search_history", ClearDatabaseSearchHistory)
-		cmd.GET("/database/clear_database", ClearDatabase)
-
-		cmd.GET("/cache/clear_tmdb", ClearCacheTMDB)
-		cmd.GET("/cache/clear_trakt", ClearCacheTrakt)
-		cmd.GET("/cache/clear_cache", ClearCache)
-
 		cmd.GET("/select_network_interface", SelectNetworkInterface)
+
+		database := cmd.Group("/database")
+		{
+			database.GET("/clear_movies", ClearDatabaseMovies)
+			database.GET("/clear_shows", ClearDatabaseShows)
+			database.GET("/clear_torrent_history", ClearDatabaseTorrentHistory)
+			database.GET("/clear_search_history", ClearDatabaseSearchHistory)
+			database.GET("/clear_database", ClearDatabase)
+		}
+
+		cache := cmd.Group("/cache")
+		{
+			cache.GET("/cache/clear_tmdb", ClearCacheTMDB)
+			cache.GET("/cache/clear_trakt", ClearCacheTrakt)
+			cache.GET("/cache/clear_cache", ClearCache)
+		}
 	}
 
 	return r
