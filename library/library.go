@@ -487,7 +487,7 @@ func writeMovieStrm(tmdbID string) (*tmdb.Movie, error) {
 	}
 
 	movieName := movie.OriginalTitle
-	if config.Get().StrmLanguage != config.Get().Language {
+	if config.Get().StrmLanguage != config.Get().Language && movie.Title != "" {
 		movieName = movie.Title
 	}
 	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movieName, strings.Split(movie.ReleaseDate, "-")[0]))
@@ -522,7 +522,7 @@ func writeShowStrm(showID int, adding bool) (*tmdb.Show, error) {
 	}
 
 	showName := show.OriginalName
-	if config.Get().StrmLanguage != config.Get().Language {
+	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
 		showName = show.Name
 	}
 
@@ -635,7 +635,7 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 	}
 
 	movieTitle := movie.OriginalTitle
-	if config.Get().StrmLanguage != config.Get().Language {
+	if config.Get().StrmLanguage != config.Get().Language && movie.Title != "" {
 		movieTitle = movie.Title
 	}
 
@@ -671,7 +671,7 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 	}
 
 	showName := show.OriginalName
-	if config.Get().StrmLanguage != config.Get().Language {
+	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
 		showName = show.Name
 	}
 
@@ -704,7 +704,7 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 	}
 
 	showName := show.OriginalName
-	if config.Get().StrmLanguage != config.Get().Language {
+	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
 		showName = show.Name
 	}
 
