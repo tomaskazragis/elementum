@@ -2,7 +2,7 @@ PROJECT = elgatito
 NAME = elementum
 GO_PKG = github.com/elgatito/elementum
 XGO_LOCAL =
-XGO_VERSION = 1.10.3
+XGO_VERSION = 1.11.2
 GO = go
 GIT = git
 GIT_VERSION = $(shell $(GIT) describe --tags)
@@ -95,4 +95,4 @@ binaries:
 
 pull:
 	docker pull elgatito/xgo-latest
-	docker pull elgatito/xgo-1.10.3
+	docker pull elgatito/xgo-1.11.1

@@ -92,9 +92,9 @@ var (
 		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+1440[pр]\W*`): Resolution2K},
 		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(4k|2160[pр]|UHD)\W*`): Resolution4k},
 
-		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(tvrip|satrip|vhsrip)\W*`): Resolution240p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
-		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(hd720p?|hdrip|b[rd]rip)\W*`): Resolution720p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(vhs\-?rip)\W*`): Resolution240p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(tv\-?rip|sat\-?rip|iptv\-?rip|xvid|dvd|hdtv|web\-(dl)?rip)\W*`): Resolution480p},
+		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(hd720p?|hd\-?rip|b[rd]rip)\W*`): Resolution720p},
 		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(hd1080p?|fullhd|fhd|blu\W*ray|bd\W*remux)\W*`): Resolution1080p},
 		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(2k)\W*`): Resolution2K},
 		map[*regexp.Regexp]int{regexp.MustCompile(`(?i)\W+(4k|hd4k)\W*`): Resolution4k},
