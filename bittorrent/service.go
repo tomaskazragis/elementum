@@ -1,7 +1,6 @@
 package bittorrent
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -1012,12 +1011,6 @@ func (s *BTService) setHTTPProxyURL() {
 	fixedURL, err := url.Parse(s.config.ProxyURL)
 	if err != nil {
 		return
-	}
-
-	s.ClientConfig.TrackerHttpClient.Transport = &http.Transport{
-		Proxy:               http.ProxyURL(fixedURL),
-		TLSHandshakeTimeout: 15 * time.Second,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 	}
 
 	util.Transport.Proxy = http.ProxyURL(fixedURL)
