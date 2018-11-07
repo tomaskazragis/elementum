@@ -35,6 +35,9 @@ func setShowFanart(show *Show) *Show {
 	if show.Images.Banner == nil {
 		show.Images.Banner = &Sizes{}
 	}
+	if show.Images.ClearArt == nil {
+		show.Images.ClearArt = &Sizes{}
+	}
 
 	if show.IDs == nil || show.IDs.TMDB == 0 {
 		return show
