@@ -66,7 +66,7 @@ func AddMovie(ctx *gin.Context) {
 	}
 
 	log.Noticef(logMsg, movie.Title, tmdbID)
-	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, movie.Title)) {
+	if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, movie.Title))) {
 		xbmc.VideoLibraryScanDirectory(library.MoviesLibraryPath, true)
 	} else {
 		if ctx != nil {
@@ -138,7 +138,7 @@ func AddShow(ctx *gin.Context) {
 	}
 
 	log.Noticef(logMsg, show.Name, tmdbID)
-	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, show.Name)) {
+	if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, show.Name))) {
 		xbmc.VideoLibraryScanDirectory(library.ShowsLibraryPath, true)
 	} else {
 		library.ClearPageCache()
@@ -185,7 +185,7 @@ func UpdateLibrary(ctx *gin.Context) {
 	if err := library.Refresh(); err != nil {
 		ctx.String(200, err.Error())
 	}
-	if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+	if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]")) {
 		xbmc.VideoLibraryScan()
 	}
 }
@@ -196,7 +196,7 @@ func UpdateTrakt(ctx *gin.Context) {
 	ctx.String(200, "")
 	go func() {
 		library.RefreshTrakt()
-		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]") {
+		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", "LOCALIZE[30288]")) {
 			xbmc.VideoLibraryScan()
 		}
 	}()

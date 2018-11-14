@@ -1362,7 +1362,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Movies list (%s) added", listID)
-		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
+		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
 		}
 	}
@@ -1448,7 +1448,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Shows list (%s) added", listID)
-		if config.Get().AutoLibraryUpdate || xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label)) {
+		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
 		}
 	}

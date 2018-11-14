@@ -58,7 +58,7 @@ type Configuration struct {
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
 	SmartEpisodeMatch         bool
-	AutoLibraryUpdate         bool
+	LibraryUpdate             int
 	StrmLanguage              string
 	PlaybackPercent           int
 	DownloadStorage           int
@@ -422,7 +422,7 @@ func Reload() *Configuration {
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
 		PlaybackPercent:           settings["playback_percent"].(int),
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
-		AutoLibraryUpdate:         settings["auto_library_update"].(bool),
+		LibraryUpdate:             settings["library_update"].(int),
 		StrmLanguage:              settings["strm_language"].(string),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
