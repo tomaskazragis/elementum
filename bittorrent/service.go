@@ -215,6 +215,8 @@ func (s *BTService) configure() {
 
 	s.ClientConfig.ProxyURL = s.config.ProxyURL
 	if s.config.ProxyURL != "" {
+		s.ClientConfig.DisableUTP = true
+		log.Info("Disabling UTP because of enabled proxy and not working UDP proxying")
 		s.setHTTPProxyURL()
 	} else {
 		util.Transport.Proxy = nil
