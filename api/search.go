@@ -42,11 +42,13 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
 		existingTorrent := btService.HasTorrentByQuery(query)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
-			xbmc.PlayURL(URLQuery(URLForXBMC("/play"),
+			rURL := URLQuery(URLForXBMC("/play"),
 				"resume", existingTorrent,
 				"query", query,
 				"tmdb", fakeTmdbID,
-				"type", "search"))
+				"type", "search")
+			go xbmc.PlayURLWithTimeout(rURL)
+			ctx.String(200, "")
 			return
 		}
 
@@ -56,7 +58,8 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"query", query,
 				"tmdb", fakeTmdbID,
 				"type", "search")
-			xbmc.PlayURL(rURL)
+			go xbmc.PlayURLWithTimeout(rURL)
+			ctx.String(200, "")
 			return
 		}
 
@@ -122,11 +125,14 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		if choice >= 0 {
 			AddToTorrentsMap(fakeTmdbID, torrents[choice])
 
-			xbmc.PlayURL(URLQuery(URLForXBMC("/play"),
+			rURL := URLQuery(URLForXBMC("/play"),
 				"uri", torrents[choice].URI,
 				"query", query,
 				"tmdb", fakeTmdbID,
-				"type", "search"))
+				"type", "search")
+			go xbmc.PlayURLWithTimeout(rURL)
+			ctx.String(200, "")
+			return
 		}
 	}
 }

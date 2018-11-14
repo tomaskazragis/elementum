@@ -306,6 +306,12 @@ func PlayURL(url string) {
 	executeJSONRPCEx("Player_Open", &retVal, Args{url})
 }
 
+// PlayURLWithTimeout ...
+func PlayURLWithTimeout(url string) {
+	retVal := ""
+	executeJSONRPCEx("Player_Open_With_Timeout", &retVal, Args{url, 1})
+}
+
 const (
 	// Iso639_1 ...
 	Iso639_1 = iota

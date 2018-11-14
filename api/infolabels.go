@@ -197,8 +197,8 @@ func InfoLabelsSearch(btService *bittorrent.BTService) gin.HandlerFunc {
 				Title:         torrent.DBItem.Query,
 				OriginalTitle: torrent.DBItem.Query,
 				TVShowTitle:   subtitle,
-				DBTYPE:        "episode",
-				Mediatype:     "episode",
+				DBTYPE:        "video",
+				Mediatype:     "video",
 			},
 			Art: &xbmc.ListItemArt{},
 		}
