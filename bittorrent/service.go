@@ -242,8 +242,8 @@ func (s *BTService) configure() {
 	s.ClientConfig.HTTPUserAgent = s.UserAgent
 
 	s.ClientConfig.EstablishedConnsPerTorrent = s.config.ConnectionsLimit
-	s.ClientConfig.TorrentPeersHighWater = 3000
-	s.ClientConfig.HalfOpenConnsPerTorrent = 50
+	s.ClientConfig.TorrentPeersHighWater = s.config.ConnectionsLimit * 10
+	s.ClientConfig.HalfOpenConnsPerTorrent = int(s.config.ConnectionsLimit / 2)
 
 	if !s.config.LimitAfterBuffering {
 		s.RestoreLimits()
