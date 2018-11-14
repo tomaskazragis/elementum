@@ -197,6 +197,21 @@ func SetMovieWatched(movieID int, playcount int, position int, total int) (ret s
 	return
 }
 
+// SetMovieWatchedWithDate ...
+func SetMovieWatchedWithDate(movieID int, playcount int, position int, total int, dt time.Time) (ret string) {
+	params := map[string]interface{}{
+		"movieid":   movieID,
+		"playcount": playcount,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total":    total,
+		},
+		"lastplayed": dt.Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetMovieDetails", &ret, params)
+	return
+}
+
 // SetMovieProgress ...
 func SetMovieProgress(movieID int, position int, total int) (ret string) {
 	params := map[string]interface{}{
@@ -232,6 +247,17 @@ func SetShowWatched(showID int, playcount int) (ret string) {
 	return
 }
 
+// SetShowWatchedWithDate ...
+func SetShowWatchedWithDate(showID int, playcount int, dt time.Time) (ret string) {
+	params := map[string]interface{}{
+		"tvshowid":   showID,
+		"playcount":  playcount,
+		"lastplayed": dt.Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetTVShowDetails", &ret, params)
+	return
+}
+
 // SetEpisodeWatched ...
 func SetEpisodeWatched(episodeID int, playcount int, position int, total int) (ret string) {
 	params := map[string]interface{}{
@@ -242,6 +268,21 @@ func SetEpisodeWatched(episodeID int, playcount int, position int, total int) (r
 			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetEpisodeDetails", &ret, params)
+	return
+}
+
+// SetEpisodeWatchedWithDate ...
+func SetEpisodeWatchedWithDate(episodeID int, playcount int, position int, total int, dt time.Time) (ret string) {
+	params := map[string]interface{}{
+		"episodeid": episodeID,
+		"playcount": playcount,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total":    total,
+		},
+		"lastplayed": dt.Format("2006-01-02 15:04:05"),
 	}
 	executeJSONRPCO("VideoLibrary.SetEpisodeDetails", &ret, params)
 	return

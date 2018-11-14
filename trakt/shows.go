@@ -631,8 +631,8 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 
 	cacheStore := cache.NewDBStore()
 
-	key := "com.trakt.episodes.watched"
-	watchedKey := "com.trakt.progress.episodes.watched"
+	key := "com.trakt.show.episodes.watched"
+	watchedKey := "com.trakt.progress.show.episodes.watched"
 
 	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
 
@@ -646,7 +646,7 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 
 	endPoint := "sync/watched/shows"
 	params := napping.Params{
-		"extended": "full,images,noseasons",
+		"extended": "full,images",
 	}.AsUrlValues()
 
 	resp, err := GetWithAuth(endPoint, params)

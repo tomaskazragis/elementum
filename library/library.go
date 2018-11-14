@@ -1150,7 +1150,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 			if r.UIDs.Playcount == 0 {
 				haveChanges = true
-				xbmc.SetMovieWatched(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total))
+				xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total), m.LastWatchedAt)
 			}
 		}
 	}
@@ -1203,7 +1203,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		} else if r != nil {
 			if s.Watched {
 				watchedShows[r.UIDs.Kodi] = true
-				xbmc.SetShowWatched(r.UIDs.Kodi, 1)
+				xbmc.SetShowWatchedWithDate(r.UIDs.Kodi, 1, s.LastWatchedAt)
 			}
 
 			for _, season := range s.Seasons {
@@ -1214,7 +1214,7 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 
 						if e.UIDs.Playcount == 0 {
 							haveChanges = true
-							xbmc.SetEpisodeWatched(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total))
+							xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total), episode.LastWatchedAt)
 						}
 					}
 				}
