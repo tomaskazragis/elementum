@@ -24,6 +24,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		query := ctx.Query("q")
 		keyboard := ctx.Query("keyboard")
+		external := ctx.Query("external")
 
 		if len(query) == 0 {
 			historyType := ""
@@ -47,8 +48,11 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"query", query,
 				"tmdb", fakeTmdbID,
 				"type", "search")
-			go xbmc.PlayURLWithTimeout(rURL)
-			ctx.String(200, "")
+			if external != "" {
+				xbmc.PlayURL(rURL)
+			} else {
+				ctx.Redirect(302, rURL)
+			}
 			return
 		}
 
@@ -58,8 +62,11 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"query", query,
 				"tmdb", fakeTmdbID,
 				"type", "search")
-			go xbmc.PlayURLWithTimeout(rURL)
-			ctx.String(200, "")
+			if external != "" {
+				xbmc.PlayURL(rURL)
+			} else {
+				ctx.Redirect(302, rURL)
+			}
 			return
 		}
 
@@ -130,8 +137,11 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"query", query,
 				"tmdb", fakeTmdbID,
 				"type", "search")
-			go xbmc.PlayURLWithTimeout(rURL)
-			ctx.String(200, "")
+			if external != "" {
+				xbmc.PlayURL(rURL)
+			} else {
+				ctx.Redirect(302, rURL)
+			}
 			return
 		}
 	}
@@ -182,8 +192,12 @@ func searchHistoryList(ctx *gin.Context, historyType string) {
 
 	for _, query := range historyList {
 		item := &xbmc.ListItem{
-			Label: query,
-			Path:  searchHistoryGetXbmcURL(historyType, query),
+			Label:      query,
+			Path:       searchHistoryGetXbmcURL(historyType, query),
+			IsPlayable: true,
+			Info: &xbmc.ListItemInfo{
+				Mediatype: "video",
+			},
 			ContextMenu: [][]string{
 				[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
 					URLQuery(URLForXBMC("/search/remove"),
