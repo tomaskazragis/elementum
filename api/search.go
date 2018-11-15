@@ -33,11 +33,15 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				if len(query) == 0 {
 					return
 				}
+				external = query
 				searchHistoryAppend(ctx, historyType, query)
 			} else if !searchHistoryEmpty(historyType) {
 				searchHistoryList(ctx, historyType)
 			}
-			return
+
+			if len(query) == 0 {
+				return
+			}
 		}
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
@@ -49,7 +53,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"tmdb", fakeTmdbID,
 				"type", "search")
 			if external != "" {
-				xbmc.PlayURL(rURL)
+				go xbmc.PlayURLWithTimeout(rURL)
 			} else {
 				ctx.Redirect(302, rURL)
 			}
@@ -63,7 +67,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"tmdb", fakeTmdbID,
 				"type", "search")
 			if external != "" {
-				xbmc.PlayURL(rURL)
+				go xbmc.PlayURLWithTimeout(rURL)
 			} else {
 				ctx.Redirect(302, rURL)
 			}
@@ -138,7 +142,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				"tmdb", fakeTmdbID,
 				"type", "search")
 			if external != "" {
-				xbmc.PlayURL(rURL)
+				go xbmc.PlayURLWithTimeout(rURL)
 			} else {
 				ctx.Redirect(302, rURL)
 			}
