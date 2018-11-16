@@ -287,6 +287,7 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 	biggestFile := 0
 	maxSize := int64(0)
 	files := btp.Torrent.Files()
+	isBluRay := false
 	var candidateFiles []int
 
 	for i, f := range files {
@@ -297,6 +298,10 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 		}
 		if size > minCandidateSize {
 			candidateFiles = append(candidateFiles, i)
+		}
+		if strings.Contains(f.Path(), "BDMV/STREAM/") {
+			isBluRay = true
+			continue
 		}
 
 		fileName := filepath.Base(f.Path())
@@ -309,6 +314,10 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 			}
 			return f, nil
 		}
+	}
+	if isBluRay {
+		log.Info("Skipping file choose, as this is a BluRay stream.")
+		return files[biggestFile], nil
 	}
 
 	if len(candidateFiles) > 1 {
@@ -345,6 +354,13 @@ func (btp *BTPlayer) chooseFile() (*gotorrent.File, error) {
 				}
 			} else {
 				break
+			}
+		}
+
+		// Adding sizes to file names
+		for _, c := range choices {
+			if btp.p.Episode == 0 {
+				c.DisplayName += " [" + humanize.Bytes(uint64(files[c.Index].Length())) + "]"
 			}
 		}
 
