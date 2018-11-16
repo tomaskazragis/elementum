@@ -15,7 +15,8 @@ func ContextPlaySelector(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
-		kodiID, _ := strconv.Atoi(ctx.Params.ByName("kodiID"))
+		id := ctx.Params.ByName("kodiID")
+		kodiID, _ := strconv.Atoi(id)
 		media := ctx.Params.ByName("media")
 
 		action := "forcelinks"
@@ -23,7 +24,10 @@ func ContextPlaySelector(btService *bittorrent.BTService) gin.HandlerFunc {
 			action = "forceplay"
 		}
 
-		if media == "movie" {
+		if kodiID == 0 {
+			ctx.Redirect(302, URLQuery(URLForXBMC("/search"), "q", id))
+			return
+		} else if media == "movie" {
 			if m := library.GetLibraryMovie(kodiID); m != nil && m.UIDs.TMDB != 0 {
 				ctx.Redirect(302, URLQuery(URLForXBMC("/movie/%d/%s", m.UIDs.TMDB, action)))
 				return
