@@ -506,7 +506,9 @@ func writeMovieStrm(tmdbID string, force bool) (*tmdb.Movie, error) {
 	}
 
 	movieStrmPath := filepath.Join(moviePath, fmt.Sprintf("%s.strm", movieStrm))
-	writeMovieNFO(movie, filepath.Join(moviePath, fmt.Sprintf("%s.nfo", movieStrm)))
+	if config.Get().LibraryNFOMovies {
+		writeMovieNFO(movie, filepath.Join(moviePath, fmt.Sprintf("%s.nfo", movieStrm)))
+	}
 
 	playLink := URLForXBMC("/library/movie/play/%s", tmdbID)
 	if _, err := os.Stat(movieStrmPath); !force && err == nil {
@@ -577,7 +579,9 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 		os.Chtimes(showPath, time.Now().Local(), time.Now().Local())
 	}
 
-	writeShowNFO(show, filepath.Join(showPath, "tvshow.nfo"))
+	if config.Get().LibraryNFOShows {
+		writeShowNFO(show, filepath.Join(showPath, "tvshow.nfo"))
+	}
 
 	now := util.UTCBod()
 	addSpecials := config.Get().AddSpecials

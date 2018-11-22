@@ -60,6 +60,8 @@ type Configuration struct {
 	SmartEpisodeMatch         bool
 	LibraryUpdate             int
 	StrmLanguage              string
+	LibraryNFOMovies          bool
+	LibraryNFOShows           bool
 	PlaybackPercent           int
 	DownloadStorage           int
 	AutoMemorySize            bool
@@ -424,6 +426,8 @@ func Reload() *Configuration {
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
 		LibraryUpdate:             settings["library_update"].(int),
 		StrmLanguage:              settings["strm_language"].(string),
+		LibraryNFOMovies:          settings["library_nfo_movies"].(bool),
+		LibraryNFOShows:           settings["library_nfo_shows"].(bool),
 		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
 		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
 		SeedTimeLimit:        settings["seed_time_limit"].(int),
