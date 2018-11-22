@@ -493,10 +493,10 @@ func (btp *BTPlayer) Close() {
 		btp.log.Infof("Removed %s from database", btp.Torrent.Name())
 
 		if btp.deleteAfter || deleteAnswer == true || btp.notEnoughSpace {
-			btp.log.Info("Removing the torrent and deleting files...")
+			btp.log.Info("Removing the torrent and deleting files after playing ...")
 			btp.s.RemoveTorrent(btp.Torrent, true)
 		} else {
-			btp.log.Info("Removing the torrent without deleting files...")
+			btp.log.Info("Removing the torrent without deleting files after playing ...")
 			btp.s.RemoveTorrent(btp.Torrent, false)
 		}
 	}

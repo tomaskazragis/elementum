@@ -421,10 +421,10 @@ func RemoveTorrent(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		if deleteAnswer == true || deleteFiles == trueType {
-			torrentsLog.Info("Removing the torrent and deleting files...")
+			torrentsLog.Info("Removing the torrent and deleting files from the web ...")
 			btService.RemoveTorrent(torrent, true)
 		} else {
-			torrentsLog.Info("Removing the torrent without deleting files...")
+			torrentsLog.Info("Removing the torrent without deleting files from the web ...")
 			btService.RemoveTorrent(torrent, false)
 		}
 
