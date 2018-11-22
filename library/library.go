@@ -1108,6 +1108,8 @@ func RefreshTrakt() error {
 	}
 
 	log.Debugf("TraktSync: Finished")
+	util.FreeMemory()
+
 	return nil
 }
 

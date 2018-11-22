@@ -20,6 +20,7 @@ import (
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -116,6 +117,8 @@ func Refresh() error {
 	}
 
 	log.Debug("Library refresh finished")
+	util.FreeMemory()
+
 	return nil
 }
 
