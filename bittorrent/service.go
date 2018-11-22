@@ -159,7 +159,13 @@ func (s *BTService) configure() {
 		s.PieceCompletion = storage.NewMapPieceCompletion()
 	}
 
-	s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6 = util.GetListenAddr(s.config.ListenAutoDetectIP, s.config.ListenAutoDetectPort, s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+	var err error
+	s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6, err = util.GetListenAddr(s.config.ListenAutoDetectIP, s.config.ListenAutoDetectPort, s.config.ListenInterfaces, s.config.ListenPortMin, s.config.ListenPortMax)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
 	// if s.ListenIP != "" && s.ListenIPv6 == "" {
 	// 	s.DisableIPv6 = true
 	// }
@@ -244,8 +250,8 @@ func (s *BTService) configure() {
 	s.ClientConfig.HTTPUserAgent = s.UserAgent
 
 	s.ClientConfig.EstablishedConnsPerTorrent = s.config.ConnectionsLimit
-	s.ClientConfig.TorrentPeersHighWater = s.config.ConnectionsLimit * 10
-	s.ClientConfig.HalfOpenConnsPerTorrent = int(s.config.ConnectionsLimit / 2)
+	s.ClientConfig.TorrentPeersHighWater = max(s.config.ConnectionsLimit*10, 3000)
+	s.ClientConfig.HalfOpenConnsPerTorrent = max(int(s.config.ConnectionsLimit/2), 50)
 
 	if !s.config.LimitAfterBuffering {
 		s.RestoreLimits()
@@ -256,7 +262,6 @@ func (s *BTService) configure() {
 	s.ClientConfig.IPBlocklist = blocklist
 	s.ClientConfig.DefaultStorage = s.DefaultStorage
 
-	var err error
 	if s.Client, err = gotorrent.NewClient(s.ClientConfig); err != nil {
 		// If client can't be created - we should panic
 		log.Errorf("Error creating bit client: %#v", err)
@@ -577,7 +582,7 @@ func (s *BTService) downloadProgress() {
 						}
 					}
 
-					log.Info("Removing the torrent without deleting files...")
+					log.Info("Removing the torrent without deleting files after Completed move ...")
 					s.RemoveTorrent(torrentHandle, false)
 
 					// Delete torrent file
@@ -1016,4 +1021,18 @@ func (s *BTService) setHTTPProxyURL() {
 	}
 
 	util.Transport.Proxy = http.ProxyURL(fixedURL)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -71,7 +71,7 @@ func GetContextHTTPHost(ctx *gin.Context) string {
 
 // GetListenAddr parsing configuration setted for interfaces and port range
 // and returning IP, IPv6, and port
-func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, confPortMin int, confPortMax int) (listenIP, listenIPv6 string, listenPort int, disableIPv6 bool) {
+func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, confPortMin int, confPortMax int) (listenIP, listenIPv6 string, listenPort int, disableIPv6 bool, err error) {
 	if confAutoIP {
 		confInterfaces = ""
 	}
@@ -82,6 +82,7 @@ func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, co
 
 	listenIPs := []string{}
 	listenIPv6s := []string{}
+
 	if strings.TrimSpace(confInterfaces) != "" {
 		for _, iName := range strings.Split(strings.Replace(strings.TrimSpace(confInterfaces), " ", "", -1), ",") {
 			// Check whether value in interfaces string is already an IP value
@@ -90,35 +91,55 @@ func GetListenAddr(confAutoIP bool, confAutoPort bool, confInterfaces string, co
 				continue
 			}
 
-			i, err := net.InterfaceByName(iName)
-			// Maybe we need to raise an error that interface not available?
-			if err != nil {
-				continue
-			}
+		ifaces:
+			for iter := 0; iter < 5; iter++ {
+				if iter > 0 {
+					log.Infof("Could not get IP for interface %#v, sleeping %#v seconds till the next attempt (%#v out of %#v).", iName, iter*2, iter, 5)
+					time.Sleep(time.Duration(iter*2) * time.Second)
+				}
 
-			if addrs, aErr := i.Addrs(); aErr == nil && len(addrs) > 0 {
-				for _, addr := range addrs {
-					var ip net.IP
-					switch v := addr.(type) {
-					case *net.IPNet:
-						ip = v.IP
-					case *net.IPAddr:
-						ip = v.IP
-					}
+				done := false
+				i, err := net.InterfaceByName(iName)
+				// Maybe we need to raise an error that interface not available?
+				if err != nil {
+					continue
+				}
 
-					v6 := ip.To16()
-					v4 := ip.To4()
+				if addrs, aErr := i.Addrs(); aErr == nil && len(addrs) > 0 {
+					for _, addr := range addrs {
+						var ip net.IP
+						switch v := addr.(type) {
+						case *net.IPNet:
+							ip = v.IP
+						case *net.IPAddr:
+							ip = v.IP
+						}
 
-					if v6 != nil && v4 == nil {
-						listenIPv6s = append(listenIPv6s, v6.String()+"%"+iName)
+						v6 := ip.To16()
+						v4 := ip.To4()
+
+						if v6 != nil && v4 == nil {
+							listenIPv6s = append(listenIPv6s, v6.String()+"%"+iName)
+						}
+						if v4 != nil {
+							done = true
+							listenIPs = append(listenIPs, v4.String())
+						}
 					}
-					if v4 != nil {
-						listenIPs = append(listenIPs, v4.String())
-					}
+				}
+
+				if done {
+					break ifaces
 				}
 			}
 		}
+
+		if len(listenIPs) == 0 {
+			err = fmt.Errorf("Could not find IP for specified interfaces(IPs) %#v", confInterfaces)
+			return
+		}
 	}
+
 	if len(listenIPs) == 0 {
 		listenIPs = append(listenIPs, "")
 	}
