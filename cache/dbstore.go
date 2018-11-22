@@ -2,10 +2,11 @@ package cache
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
+	"sync"
 	"time"
 
-	"github.com/klauspost/compress/gzip"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/elgatito/elementum/database"
@@ -24,6 +25,12 @@ type dbStoreItem struct {
 	Expires time.Time   `json:"expires"`
 }
 
+var buf = bytes.NewBuffer(nil)
+var zippers = sync.Pool{
+	New: func() interface{} {
+		return gzip.NewWriter(buf)
+	}}
+
 // NewDBStore Returns instance of BoltDB backed cache store
 func NewDBStore() *DBStore {
 	return &DBStore{database.GetCache()}
@@ -31,22 +38,18 @@ func NewDBStore() *DBStore {
 
 // Set ...
 func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err error) {
-	// begin := time.Now()
-	// defer func() {
-	// 	log.Debugf("%s set at %s\n", key, time.Now().Sub(begin))
-	// }()
-
 	item := dbStoreItem{
 		Key:     key,
 		Value:   value,
 		Expires: time.Now().UTC().Add(expires),
 	}
 
-	buf := bytes.NewBuffer(nil)
-	gzWriter, _ := gzip.NewWriterLevel(buf, 1)
+	gzWriter := zippers.Get().(*gzip.Writer)
 
 	// Recover from marshal errors
 	defer func() {
+		zippers.Put(gzWriter)
+
 		if r := recover(); r != nil {
 			err = errors.New("Can't encode the value")
 		}
