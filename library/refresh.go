@@ -108,6 +108,7 @@ func Refresh() error {
 	if TraktScanning {
 		return nil
 	}
+	defer util.FreeMemoryGC()
 
 	if err := RefreshMovies(); err != nil {
 		log.Debugf("RefreshMovies got an error: %v", err)
@@ -117,7 +118,6 @@ func Refresh() error {
 	}
 
 	log.Debug("Library refresh finished")
-	util.FreeMemory()
 
 	return nil
 }

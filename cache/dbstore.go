@@ -2,11 +2,11 @@ package cache
 
 import (
 	"bytes"
-	"compress/gzip"
 	"errors"
 	"sync"
 	"time"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/elgatito/elementum/database"
@@ -25,11 +25,22 @@ type dbStoreItem struct {
 	Expires time.Time   `json:"expires"`
 }
 
-var buf = bytes.NewBuffer(nil)
-var zippers = sync.Pool{
-	New: func() interface{} {
-		return gzip.NewWriter(buf)
-	}}
+var (
+	bufferPool = &sync.Pool{
+		New: func() interface{} {
+			return &bytes.Buffer{}
+		},
+	}
+
+	zipWriters = sync.Pool{
+		New: func() interface{} {
+			return &gzip.Writer{}
+		}}
+	zipReaders = sync.Pool{
+		New: func() interface{} {
+			return &gzip.Reader{}
+		}}
+)
 
 // NewDBStore Returns instance of BoltDB backed cache store
 func NewDBStore() *DBStore {
@@ -44,12 +55,16 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 		Expires: time.Now().UTC().Add(expires),
 	}
 
-	gzWriter := zippers.Get().(*gzip.Writer)
+	buf := bufferPool.Get().(*bytes.Buffer)
+	defer bufferPool.Put(buf)
+	buf.Reset()
+
+	gzWriter := zipWriters.Get().(*gzip.Writer)
+	defer zipWriters.Put(gzWriter)
+	gzWriter.Reset(buf)
 
 	// Recover from marshal errors
 	defer func() {
-		zippers.Put(gzWriter)
-
 		if r := recover(); r != nil {
 			err = errors.New("Can't encode the value")
 		}
@@ -91,11 +106,18 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 		}
 	}()
 
-	gzReader, err := gzip.NewReader(bytes.NewBuffer(data))
+	buf := bufferPool.Get().(*bytes.Buffer)
+	defer bufferPool.Put(buf)
+	buf.Reset()
+	buf.Write(data)
+
+	gzReader := zipReaders.Get().(*gzip.Reader)
+	defer zipReaders.Put(gzReader)
+	gzReader.Reset(buf)
+
 	if err != nil {
 		return err
 	}
-	defer gzReader.Close()
 
 	item := dbStoreItem{
 		Value: value,

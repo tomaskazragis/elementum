@@ -35,8 +35,13 @@ func (c *FileStore) Set(key string, value interface{}, expires time.Duration) er
 	}
 	defer file.Close()
 
-	gzWriter := gzip.NewWriter(file)
-	defer gzWriter.Close()
+	gzWriter := zipWriters.Get().(*gzip.Writer)
+	gzWriter.Reset(file)
+
+	defer func() {
+		gzWriter.Close()
+		zipWriters.Put(gzWriter)
+	}()
 
 	item := fileStoreItem{
 		Key:     key,
@@ -71,11 +76,13 @@ func (c *FileStore) Get(key string, value interface{}) error {
 	}
 	defer file.Close()
 
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return err
-	}
-	defer gzReader.Close()
+	gzReader := zipReaders.Get().(*gzip.Reader)
+	gzReader.Reset(file)
+
+	defer func() {
+		gzReader.Close()
+		zipReaders.Put(gzReader)
+	}()
 
 	item := fileStoreItem{
 		Value: value,

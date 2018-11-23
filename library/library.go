@@ -1051,6 +1051,7 @@ func RefreshTrakt() error {
 
 	Scanning = true
 	defer func() {
+		util.FreeMemoryGC()
 		Scanning = false
 	}()
 
@@ -1108,7 +1109,6 @@ func RefreshTrakt() error {
 	}
 
 	log.Debugf("TraktSync: Finished")
-	util.FreeMemory()
 
 	return nil
 }
