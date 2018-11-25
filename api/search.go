@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
@@ -39,9 +40,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				searchHistoryList(ctx, historyType)
 			}
 
-			if len(query) == 0 {
-				return
-			}
+			return
 		}
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
@@ -161,7 +160,12 @@ func searchHistoryEmpty(historyType string) bool {
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 	database.Get().AddSearchHistory(historyType, query)
 
-	xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
+	// Kodi 18 is not allowing to do Container.Update() until current request is returned.
+	go func() {
+		time.Sleep(time.Second)
+		xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
+	}()
+
 	ctx.String(200, "")
 	return
 }
