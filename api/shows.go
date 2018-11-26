@@ -276,16 +276,18 @@ func SearchShows(ctx *gin.Context) {
 
 	if len(query) == 0 {
 		historyType := "shows"
-		if len(keyboard) > 0 || searchHistoryEmpty(historyType) {
-			query = xbmc.Keyboard("", "LOCALIZE[30206]")
-			if len(query) == 0 {
+		if len(keyboard) > 0 {
+			if query = xbmc.Keyboard("", "LOCALIZE[30206]"); len(query) == 0 {
 				return
 			}
 			searchHistoryAppend(ctx, historyType, query)
-		} else if !searchHistoryEmpty(historyType) {
+		} else {
 			searchHistoryList(ctx, historyType)
 		}
-		return
+
+		if len(query) == 0 {
+			return
+		}
 	}
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
