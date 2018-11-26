@@ -686,7 +686,7 @@ https://www.themoviedb.org/tv/%v
 		out += fmt.Sprintf("https://www.imdb.com/title/%v/\n", s.ExternalIDs.IMDBId)
 	}
 	if s.ExternalIDs.TVDBID != "" {
-		out += fmt.Sprintf("https://www.thetvdb.com/dereferrer/series/%v\n", s.ExternalIDs.TVDBID)
+		out += fmt.Sprintf("https://www.thetvdb.com/?tab=series&id=%v&lid=7\n", s.ExternalIDs.TVDBID)
 	}
 
 	if err := ioutil.WriteFile(p, []byte(out), 0644); err != nil {
