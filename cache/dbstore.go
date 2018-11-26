@@ -55,14 +55,6 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 		Expires: time.Now().UTC().Add(expires),
 	}
 
-	buf := bufferPool.Get().(*bytes.Buffer)
-	defer bufferPool.Put(buf)
-	buf.Reset()
-
-	gzWriter := zipWriters.Get().(*gzip.Writer)
-	defer zipWriters.Put(gzWriter)
-	gzWriter.Reset(buf)
-
 	// Recover from marshal errors
 	defer func() {
 		if r := recover(); r != nil {
@@ -70,14 +62,12 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 		}
 	}()
 
-	if err := msgpack.NewEncoder(gzWriter).Encode(item); err != nil {
-		return err
-	}
-	if err := gzWriter.Close(); err != nil {
+	b, err := msgpack.Marshal(item)
+	if err != nil {
 		return err
 	}
 
-	return c.db.SetBytes(database.CommonBucket, key, buf.Bytes())
+	return c.db.SetBytes(database.CommonBucket, key, b)
 }
 
 // Add ...
@@ -106,15 +96,6 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 		}
 	}()
 
-	buf := bufferPool.Get().(*bytes.Buffer)
-	defer bufferPool.Put(buf)
-	buf.Reset()
-	buf.Write(data)
-
-	gzReader := zipReaders.Get().(*gzip.Reader)
-	defer zipReaders.Put(gzReader)
-	gzReader.Reset(buf)
-
 	if err != nil {
 		return err
 	}
@@ -123,7 +104,7 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 		Value: value,
 	}
 
-	if errDecode := msgpack.NewDecoder(gzReader).Decode(&item); errDecode != nil {
+	if errDecode := msgpack.Unmarshal(data, &item); errDecode != nil {
 		return errDecode
 	}
 
