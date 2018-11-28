@@ -21,6 +21,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/anacrolix/dht"
+	"github.com/anacrolix/missinggo/conntrack"
 	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/storage"
@@ -249,9 +250,21 @@ func (s *BTService) configure() {
 
 	s.ClientConfig.HTTPUserAgent = s.UserAgent
 
+	// Modify default Connections settings
 	s.ClientConfig.EstablishedConnsPerTorrent = s.config.ConnectionsLimit
 	s.ClientConfig.TorrentPeersHighWater = max(s.config.ConnectionsLimit*10, 3000)
 	s.ClientConfig.HalfOpenConnsPerTorrent = max(int(s.config.ConnectionsLimit/2), 50)
+
+	// Modify ConnTracker default values
+	if s.config.ConnTrackerLimitAuto || s.config.ConnTrackerLimit == 0 {
+		s.ClientConfig.ConnTracker.SetMaxEntries(s.config.ConnectionsLimit * 15)
+	} else {
+		s.ClientConfig.ConnTracker.SetMaxEntries(max(s.config.ConnTrackerLimit, 10))
+	}
+
+	s.ClientConfig.ConnTracker.Timeout = func(e conntrack.Entry) time.Duration {
+		return 10 * time.Second
+	}
 
 	if !s.config.LimitAfterBuffering {
 		s.RestoreLimits()
@@ -820,6 +833,7 @@ func (s *BTService) PlayerSeek() {
 // ClientInfo ...
 func (s *BTService) ClientInfo(w io.Writer) {
 	s.Client.WriteStatus(w)
+	s.ClientConfig.ConnTracker.PrintStatus(w)
 }
 
 // AttachPlayer adds Player instance to service

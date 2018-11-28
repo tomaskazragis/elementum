@@ -74,6 +74,8 @@ type Configuration struct {
 	AutoloadTorrents          bool
 	LimitAfterBuffering       bool
 	ConnectionsLimit          int
+	ConnTrackerLimit          int
+	ConnTrackerLimitAuto      bool
 	// SessionSave         int
 	// ShareRatioLimit     int
 	// SeedTimeRatioLimit  int
@@ -444,7 +446,9 @@ func Reload() *Configuration {
 		ListenAutoDetectPort: settings["listen_autodetect_port"].(bool),
 		// OutgoingInterfaces: settings["outgoing_interfaces"].(string),
 		// TunedStorage:        settings["tuned_storage"].(bool),
-		ConnectionsLimit: settings["connections_limit"].(int),
+		ConnectionsLimit:     settings["connections_limit"].(int),
+		ConnTrackerLimit:     settings["conntracker_limit"].(int),
+		ConnTrackerLimitAuto: settings["conntracker_limit_auto"].(bool),
 		// SessionSave:         settings["session_save"].(int),
 		Scrobble: settings["trakt_scrobble"].(bool),
 
