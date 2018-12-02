@@ -285,9 +285,7 @@ func SearchShows(ctx *gin.Context) {
 			searchHistoryList(ctx, historyType)
 		}
 
-		if len(query) == 0 {
-			return
-		}
+		return
 	}
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))

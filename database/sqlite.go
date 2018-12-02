@@ -168,7 +168,7 @@ func (d *SqliteDatabase) AddSearchHistory(historyType, query string) {
 	d.QueryRow(`SELECT rowid FROM history_queries WHERE type = ? AND query = ?`, historyType, query).Scan(&rowid)
 
 	if rowid > 0 {
-		d.Exec(`UPDATE history_queries SET dt = ?`, time.Now().Unix())
+		d.Exec(`UPDATE history_queries SET dt = ? WHERE rowid = ?`, time.Now().Unix(), rowid)
 		return
 	}
 

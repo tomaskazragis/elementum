@@ -350,7 +350,7 @@ func PlayURL(url string) {
 // PlayURLWithTimeout ...
 func PlayURLWithTimeout(url string) {
 	retVal := ""
-	executeJSONRPCEx("Player_Open_With_Timeout", &retVal, Args{url, 4})
+	go executeJSONRPCEx("Player_Open_With_Timeout", &retVal, Args{url})
 }
 
 const (

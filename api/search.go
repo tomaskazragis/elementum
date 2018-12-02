@@ -24,7 +24,6 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		query := ctx.Query("q")
 		keyboard := ctx.Query("keyboard")
-		external := ctx.Query("external")
 
 		if len(query) == 0 {
 			historyType := ""
@@ -37,38 +36,27 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 				searchHistoryList(ctx, historyType)
 			}
 
-			if len(query) == 0 {
-				return
-			}
+			return
 		}
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
 		existingTorrent := btService.HasTorrentByQuery(query)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
-			rURL := URLQuery(URLForXBMC("/play"),
+			xbmc.PlayURLWithTimeout(URLQuery(
+				URLForXBMC("/play"),
 				"resume", existingTorrent,
 				"query", query,
 				"tmdb", fakeTmdbID,
-				"type", "search")
-			if external != "" {
-				xbmc.PlayURL(rURL)
-			} else {
-				ctx.Redirect(302, rURL)
-			}
+				"type", "search"))
 			return
 		}
 
 		if torrent := InTorrentsMap(fakeTmdbID); torrent != nil {
-			rURL := URLQuery(
+			xbmc.PlayURLWithTimeout(URLQuery(
 				URLForXBMC("/play"), "uri", torrent.URI,
 				"query", query,
 				"tmdb", fakeTmdbID,
-				"type", "search")
-			if external != "" {
-				xbmc.PlayURL(rURL)
-			} else {
-				ctx.Redirect(302, rURL)
-			}
+				"type", "search"))
 			return
 		}
 
@@ -134,16 +122,12 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		if choice >= 0 {
 			AddToTorrentsMap(fakeTmdbID, torrents[choice])
 
-			rURL := URLQuery(URLForXBMC("/play"),
+			xbmc.PlayURLWithTimeout(URLQuery(
+				URLForXBMC("/play"),
 				"uri", torrents[choice].URI,
 				"query", query,
 				"tmdb", fakeTmdbID,
-				"type", "search")
-			if external != "" {
-				xbmc.PlayURL(rURL)
-			} else {
-				ctx.Redirect(302, rURL)
-			}
+				"type", "search"))
 			return
 		}
 	}
@@ -159,6 +143,8 @@ func searchHistoryEmpty(historyType string) bool {
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 	database.Get().AddSearchHistory(historyType, query)
 
+	go xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
+	ctx.String(200, "")
 	return
 }
 
@@ -183,57 +169,25 @@ func searchHistoryList(ctx *gin.Context, historyType string) {
 	}
 
 	items := make(xbmc.ListItems, 0, len(historyList)+1)
-
-	if historyType == "" {
-		items = append(items, &xbmc.ListItem{
-			Label:      "LOCALIZE[30323]",
-			Path:       URLQuery(URLForXBMC(urlPrefix+"/search"), "keyboard", "1"),
-			IsPlayable: true,
-			Info: &xbmc.ListItemInfo{
-				Mediatype: "video",
-			},
-			Thumbnail: config.AddonResource("img", "search.png"),
-			Icon:      config.AddonResource("img", "search.png"),
-		})
-	} else {
-		items = append(items, &xbmc.ListItem{
-			Label:     "LOCALIZE[30323]",
-			Path:      URLQuery(URLForXBMC(urlPrefix+"/search"), "keyboard", "1"),
-			Thumbnail: config.AddonResource("img", "search.png"),
-			Icon:      config.AddonResource("img", "search.png"),
-		})
-	}
+	items = append(items, &xbmc.ListItem{
+		Label:     "LOCALIZE[30323]",
+		Path:      URLQuery(URLForXBMC(urlPrefix+"/search"), "keyboard", "1"),
+		Thumbnail: config.AddonResource("img", "search.png"),
+		Icon:      config.AddonResource("img", "search.png"),
+	})
 
 	for _, query := range historyList {
-		if historyType == "" {
-			items = append(items, &xbmc.ListItem{
-				Label:      query,
-				Path:       searchHistoryGetXbmcURL(historyType, query),
-				IsPlayable: true,
-				Info: &xbmc.ListItemInfo{
-					Mediatype: "video",
-				},
-				ContextMenu: [][]string{
-					[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
-						URLQuery(URLForXBMC("/search/remove"),
-							"query", query,
-							"type", historyType,
-						))},
-				},
-			})
-		} else {
-			items = append(items, &xbmc.ListItem{
-				Label: query,
-				Path:  searchHistoryGetXbmcURL(historyType, query),
-				ContextMenu: [][]string{
-					[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
-						URLQuery(URLForXBMC("/search/remove"),
-							"query", query,
-							"type", historyType,
-						))},
-				},
-			})
-		}
+		items = append(items, &xbmc.ListItem{
+			Label: query,
+			Path:  searchHistoryGetXbmcURL(historyType, query),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
+					URLQuery(URLForXBMC("/search/remove"),
+						"query", query,
+						"type", historyType,
+					))},
+			},
+		})
 	}
 
 	ctx.JSON(200, xbmc.NewView("", items))
