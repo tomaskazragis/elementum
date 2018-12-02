@@ -106,7 +106,10 @@ func PlayTorrent(ctx *gin.Context) {
 	if retval["path"] == "" {
 		return
 	}
-	xbmc.PlayURL(URLQuery(URLForXBMC("/play"), "uri", retval["path"]))
+	go xbmc.PlayURLWithTimeout(URLQuery(URLForXBMC("/play"), "uri", retval["path"]))
+
+	ctx.String(200, "")
+	return
 }
 
 // PlayURI ...
