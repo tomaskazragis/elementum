@@ -8,8 +8,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/elgatito/elementum/tmdb"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/osdb"
@@ -82,8 +85,20 @@ func SubtitlesIndex(ctx *gin.Context) {
 	q := ctx.Request.URL.Query()
 	searchString := q.Get("searchstring")
 	languages := strings.Split(q.Get("languages"), ",")
+	preferredLanguage := q.Get("preferredlanguage")
+
+	// First of all, we get Subtitles language settings from Kodi
+	// (there is a separate setting for that) in Player settings.
 	if !config.Get().OSDBAutoLanguage && config.Get().OSDBLanguage != "" {
 		languages = []string{config.Get().OSDBLanguage}
+	}
+
+	// If there is preferred language - we should use it
+	if preferredLanguage != "" && preferredLanguage != "Unknown" && !contains(languages, preferredLanguage) {
+		languages = append([]string{preferredLanguage}, languages...)
+		preferredLanguage = strings.ToLower(preferredLanguage)
+	} else {
+		preferredLanguage = ""
 	}
 
 	labels := xbmc.InfoLabels(
@@ -93,6 +108,7 @@ func SubtitlesIndex(ctx *gin.Context) {
 		"VideoPlayer.TVshowtitle",
 		"VideoPlayer.Season",
 		"VideoPlayer.Episode",
+		"VideoPlayer.IMDBNumber",
 	)
 	playingFile := xbmc.PlayerGetPlayingFile()
 
@@ -121,6 +137,22 @@ func SubtitlesIndex(ctx *gin.Context) {
 			Languages: strings.Join(languages, ","),
 		})
 	} else {
+		// If player ListItem has IMDBNumber specified - we try to get TMDB item from it.
+		// If not - we can use localized show/movie name - which is not always found on OSDB.
+		if strings.HasPrefix(labels["VideoPlayer.IMDBNumber"], "tt") {
+			if labels["VideoPlayer.TVshowtitle"] != "" {
+				r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
+				if r != nil && len(r.TVResults) > 0 {
+					labels["VideoPlayer.TVshowtitle"] = r.TVResults[0].OriginalName
+				}
+			} else {
+				r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
+				if r != nil && len(r.MovieResults) > 0 {
+					labels["VideoPlayer.OriginalTitle"] = r.MovieResults[0].OriginalTitle
+				}
+			}
+		}
+
 		if strings.HasPrefix(playingFile, "http://") == false && strings.HasPrefix(playingFile, "https://") == false {
 			appendLocalFilePayloads(playingFile, &payloads)
 		}
@@ -153,6 +185,15 @@ func SubtitlesIndex(ctx *gin.Context) {
 
 	items := make(xbmc.ListItems, 0)
 	results, _ := client.SearchSubtitles(payloads)
+
+	// If needed - try to manually sort items
+	if preferredLanguage != "" {
+		sort.Slice(results, func(i, j int) bool {
+			id := strings.ToLower(results[i].LanguageName) == preferredLanguage
+			return id
+		})
+	}
+
 	for _, sub := range results {
 		rating, _ := strconv.ParseFloat(sub.SubRating, 64)
 		subLang := sub.LanguageName
@@ -225,4 +266,13 @@ func SubtitleGet(ctx *gin.Context) {
 	ctx.JSON(200, xbmc.NewView("", xbmc.ListItems{
 		{Label: file, Path: outFile.Name()},
 	}))
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
