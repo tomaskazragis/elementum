@@ -568,8 +568,13 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 	if err != nil && err != sql.ErrNoRows {
 		log.Debugf("Error getting UIDs from database: %s", err)
 		return
-	} else if err == nil && i.TMDB != 0 {
-		return
+	} else if err == nil && i.Kodi != 0 {
+		tid := &UniqueIDs{}
+		convertKodiIDsToLibrary(tid, xbmcIDs)
+
+		if tid.TMDB != 0 && tid.TMDB == i.TMDB {
+			return
+		}
 	}
 
 	defer func() {
@@ -577,22 +582,9 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 	}()
 
 	i.MediaType = entityType
-	i.Kodi = xbmcIDs.Kodi
-	i.IMDB = xbmcIDs.IMDB
-	i.TMDB, _ = strconv.Atoi(xbmcIDs.TMDB)
-	i.TVDB, _ = strconv.Atoi(xbmcIDs.TVDB)
-	i.Trakt, _ = strconv.Atoi(xbmcIDs.Trakt)
 
-	// Checking alternative fields
-	// 		TheMovieDB
-	if i.TMDB == 0 && len(xbmcIDs.TheMovieDB) > 0 {
-		i.TMDB, _ = strconv.Atoi(xbmcIDs.TheMovieDB)
-	}
+	convertKodiIDsToLibrary(i, xbmcIDs)
 
-	// 		IMDB
-	if len(xbmcIDs.Unknown) > 0 && strings.HasPrefix(xbmcIDs.Unknown, "tt") {
-		i.IMDB = xbmcIDs.Unknown
-	}
 	if i.TMDB != 0 {
 		return
 	}
@@ -665,6 +657,29 @@ func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileNa
 	}
 
 	return
+}
+
+func convertKodiIDsToLibrary(i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs) {
+	if i == nil || xbmcIDs == nil {
+		return
+	}
+
+	i.Kodi = xbmcIDs.Kodi
+	i.IMDB = xbmcIDs.IMDB
+	i.TMDB, _ = strconv.Atoi(xbmcIDs.TMDB)
+	i.TVDB, _ = strconv.Atoi(xbmcIDs.TVDB)
+	i.Trakt, _ = strconv.Atoi(xbmcIDs.Trakt)
+
+	// Checking alternative fields
+	// 		TheMovieDB
+	if i.TMDB == 0 && len(xbmcIDs.TheMovieDB) > 0 {
+		i.TMDB, _ = strconv.Atoi(xbmcIDs.TheMovieDB)
+	}
+
+	// 		IMDB
+	if len(xbmcIDs.Unknown) > 0 && strings.HasPrefix(xbmcIDs.Unknown, "tt") {
+		i.IMDB = xbmcIDs.Unknown
+	}
 }
 
 func findTMDBInFile(fileName string, pattern string) (id int, err error) {
