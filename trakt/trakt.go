@@ -371,10 +371,7 @@ type User struct {
 
 // UserSettings ...
 type UserSettings struct {
-	User struct {
-		Username string `json:"username"`
-		Name     string `json:"name"`
-	} `json:"user"`
+	User    User     `json:"user"`
 	Account struct{} `json:"account"`
 }
 
@@ -925,8 +922,9 @@ func Authorize(fromSettings bool) error {
 			return errJSON
 		}
 
-		if user.User.Username != "" {
-			xbmc.SetSetting("trakt_username", user.User.Username)
+		if user != nil && user.User.Ids.Slug != "" {
+			log.Debugf("Setting Trakt Username as %s", user.User.Ids.Slug)
+			xbmc.SetSetting("trakt_username", user.User.Ids.Slug)
 		}
 	}
 
