@@ -48,7 +48,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 		if season.EpisodeCount > 0 {
 			for index := 0; index < season.EpisodeCount && index < len(season.Episodes); index++ {
 				if season.Episodes[index] != nil && season.Episodes[index].Name == "" {
-					season.Episodes[index] = GetEpisode(showID, seasonNumber, index+1, "")
+					season.Episodes[index] = GetEpisode(showID, seasonNumber, index+1, language)
 				}
 			}
 		}

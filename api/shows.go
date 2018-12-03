@@ -425,7 +425,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		season := tmdb.GetSeason(showID, seasonNumber, "")
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -551,7 +551,7 @@ func ShowSeasonPlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		season := tmdb.GetSeason(showID, seasonNumber, "")
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -686,7 +686,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, "")
+		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
 		if episode == nil {
 			ctx.Error(errors.New("Unable to find episode"))
 			return
@@ -825,7 +825,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, "")
+		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
 		if episode == nil {
 			ctx.Error(errors.New("Unable to find episode"))
 			return
