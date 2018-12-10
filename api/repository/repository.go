@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
@@ -38,7 +38,7 @@ func getGithubClient() *github.Client {
 }
 
 func getLastRelease(user string, repository string) string {
-	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/release")
+	resp, err := scrape.GetClient().Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/release")
 	if err != nil || resp == nil {
 		return ""
 	} else if err == nil && resp.StatusCode != 200 {
@@ -66,7 +66,7 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 }
 
 func getAddonXML(user string, repository string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/addon.xml")
+	resp, err := scrape.GetClient().Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/addon.xml")
 	if resp == nil {
 		return "", errors.New("Not found")
 	} else if err == nil && resp.StatusCode != 200 {

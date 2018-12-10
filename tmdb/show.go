@@ -477,9 +477,11 @@ func (show *Show) ToListItem() *xbmc.ListItem {
 	item.Thumbnail = item.Art.Poster
 	item.Art.Thumbnail = item.Art.Poster
 
-	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
-		item.Art = fa.ToListItemArt(item.Art)
-		item.Thumbnail = item.Art.Thumbnail
+	if config.Get().UseFanartTv {
+		if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+			item.Art = fa.ToListItemArt(item.Art)
+			item.Thumbnail = item.Art.Thumbnail
+		}
 	}
 
 	if show.InProduction {

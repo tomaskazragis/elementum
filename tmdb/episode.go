@@ -135,8 +135,10 @@ func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
 		}
 	}
 
-	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
-		item.Art = fa.ToEpisodeListItemArt(season.Season, item.Art)
+	if config.Get().UseFanartTv {
+		if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+			item.Art = fa.ToEpisodeListItemArt(season.Season, item.Art)
+		}
 	}
 
 	if episode.StillPath != "" {

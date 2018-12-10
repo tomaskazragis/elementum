@@ -6,11 +6,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/elgatito/elementum/scrape"
 )
 
 // A Subtitle with its many OSDB attributes...
@@ -83,7 +84,7 @@ func (subs Subtitles) Best() *Subtitle {
 
 // NewSubtitleReader ...
 func NewSubtitleReader(s *Subtitle) (io.Reader, error) {
-	resp, err := http.Get(s.SubDownloadLink)
+	resp, err := scrape.GetClient().Get(s.SubDownloadLink)
 	if err != nil {
 		return nil, err
 	}

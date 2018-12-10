@@ -6,12 +6,12 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
+	"github.com/elgatito/elementum/scrape"
 )
 
 //go:generate msgp -o msgp.go -io=false -tests=false
@@ -133,7 +133,7 @@ func getShow(tvdbID int, language string) (*Show, error) {
 		Actors []*Actor `xml:"Actor"`
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
+	resp, err := scrape.GetClient().Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
 	if err != nil {
 		return nil, err
 	}

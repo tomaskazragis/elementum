@@ -41,6 +41,7 @@ type Configuration struct {
 	KeepDownloading           int
 	KeepFilesPlaying          int
 	KeepFilesFinished         int
+	UseFanartTv               bool
 	DisableBgProgress         bool
 	DisableBgProgressPlayback bool
 	ForceUseTrakt             bool
@@ -152,13 +153,16 @@ type Configuration struct {
 	InternalProxyEnabled bool
 	InternalProxyLogging bool
 
-	ProxyURL      string
-	ProxyType     int
-	ProxyEnabled  bool
-	ProxyHost     string
-	ProxyPort     int
-	ProxyLogin    string
-	ProxyPassword string
+	ProxyURL         string
+	ProxyType        int
+	ProxyEnabled     bool
+	ProxyHost        string
+	ProxyPort        int
+	ProxyLogin       string
+	ProxyPassword    string
+	ProxyUseHTTP     bool
+	ProxyUseTracker  bool
+	ProxyUseDownload bool
 
 	CompletedMove       bool
 	CompletedMoviesPath string
@@ -400,6 +404,7 @@ func Reload() *Configuration {
 		KeepDownloading:           settings["keep_downloading"].(int),
 		KeepFilesPlaying:          settings["keep_files_playing"].(int),
 		KeepFilesFinished:         settings["keep_files_finished"].(int),
+		UseFanartTv:               settings["use_fanart_tv"].(bool),
 		DisableBgProgress:         settings["disable_bg_progress"].(bool),
 		DisableBgProgressPlayback: settings["disable_bg_progress_playback"].(bool),
 		ForceUseTrakt:             settings["force_use_trakt"].(bool),
@@ -500,12 +505,15 @@ func Reload() *Configuration {
 		InternalProxyEnabled: settings["internal_proxy_enabled"].(bool),
 		InternalProxyLogging: settings["internal_proxy_logging"].(bool),
 
-		ProxyType:     settings["proxy_type"].(int),
-		ProxyEnabled:  settings["proxy_enabled"].(bool),
-		ProxyHost:     settings["proxy_host"].(string),
-		ProxyPort:     settings["proxy_port"].(int),
-		ProxyLogin:    settings["proxy_login"].(string),
-		ProxyPassword: settings["proxy_password"].(string),
+		ProxyType:        settings["proxy_type"].(int),
+		ProxyEnabled:     settings["proxy_enabled"].(bool),
+		ProxyHost:        settings["proxy_host"].(string),
+		ProxyPort:        settings["proxy_port"].(int),
+		ProxyLogin:       settings["proxy_login"].(string),
+		ProxyPassword:    settings["proxy_password"].(string),
+		ProxyUseHTTP:     settings["use_proxy_http"].(bool),
+		ProxyUseTracker:  settings["use_proxy_tracker"].(bool),
+		ProxyUseDownload: settings["use_proxy_download"].(bool),
 
 		CompletedMove:       settings["completed_move"].(bool),
 		CompletedMoviesPath: settings["completed_movies_path"].(string),

@@ -850,8 +850,10 @@ func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
 
 	item.Info.Genre = strings.Join(show.Genres, " / ")
 
-	if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
-		item.Art = fa.ToEpisodeListItemArt(episode.Season, item.Art)
+	if config.Get().UseFanartTv {
+		if fa := fanart.GetShow(util.StrInterfaceToInt(show.IDs.TVDB)); fa != nil {
+			item.Art = fa.ToEpisodeListItemArt(episode.Season, item.Art)
+		}
 	}
 
 	if episode.Images != nil && episode.Images.ScreenShot.Full != "" {

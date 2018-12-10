@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/tmdb"
 
 	"github.com/elgatito/elementum/config"
@@ -230,7 +230,7 @@ func SubtitleGet(ctx *gin.Context) {
 	file := q.Get("file")
 	dl := q.Get("dl")
 
-	resp, err := http.Get(dl)
+	resp, err := scrape.GetClient().Get(dl)
 	if err != nil {
 		subLog.Error(err)
 		ctx.String(200, err.Error())

@@ -145,9 +145,11 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 		item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
 	}
 
-	if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
-		item.Art = fa.ToSeasonListItemArt(season.Season, item.Art)
-		item.Thumbnail = item.Art.Thumbnail
+	if config.Get().UseFanartTv {
+		if fa := fanart.GetShow(util.StrInterfaceToInt(show.ExternalIDs.TVDBID)); fa != nil {
+			item.Art = fa.ToSeasonListItemArt(season.Season, item.Art)
+			item.Thumbnail = item.Art.Thumbnail
+		}
 	}
 
 	if len(show.Genres) > 0 {

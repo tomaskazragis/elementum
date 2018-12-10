@@ -104,8 +104,8 @@ func newResolver(serverName string, addrs ...string) *net.Resolver {
 }
 
 func resolve(addr string) ([]string, error) {
-	now := time.Now()
-	defer log.Debugf("Resolved %s in %s", addr, time.Since(now))
+	// now := time.Now()
+	// defer log.Debugf("Resolved %s in %s", addr, time.Since(now))
 
 	if isOpennicDomain(getZone(addr)) {
 		if ips, err := opennicResolver.LookupHost(context.TODO(), addr); err == nil {
