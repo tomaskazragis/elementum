@@ -15,7 +15,6 @@ import (
 
 	"github.com/elgatito/elementum/xbmc"
 
-	"github.com/bogdanovich/dns_resolver"
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
 	"github.com/pbnjay/memory"
@@ -134,8 +133,6 @@ type Configuration struct {
 	UpdateDelay     int
 	UpdateAutoScan  bool
 	PlayResume      bool
-	UseCloudHole    bool
-	CloudHoleKey    string
 	TMDBApiKey      string
 
 	OSDBUser         string
@@ -149,11 +146,11 @@ type Configuration struct {
 	ResolutionPreferenceShows   int
 	PercentageAdditionalSeeders int
 
-	UsePublicDNS                 bool
-	PublicDNSList                string
-	OpennicDNSList               string
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
+
+	InternalProxyEnabled bool
+	InternalProxyLogging bool
 
 	ProxyURL      string
 	ProxyType     int
@@ -193,12 +190,6 @@ var (
 )
 
 var (
-	// ResolverPublic ...
-	ResolverPublic = dns_resolver.New([]string{"8.8.8.8", "8.8.4.4", "9.9.9.9"})
-
-	// ResolverOpennic ...
-	ResolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
-
 	// Args for cli arguments parsing
 	Args = struct {
 		RemoteHost string `help:"remote host, default is '127.0.0.1'"`
@@ -491,8 +482,6 @@ func Reload() *Configuration {
 		UpdateDelay:      settings["library_update_delay"].(int),
 		UpdateAutoScan:   settings["library_auto_scan"].(bool),
 		PlayResume:       settings["play_resume"].(bool),
-		UseCloudHole:     settings["use_cloudhole"].(bool),
-		CloudHoleKey:     settings["cloudhole_key"].(string),
 		TMDBApiKey:       settings["tmdb_api_key"].(string),
 		OSDBUser:         settings["osdb_user"].(string),
 		OSDBPass:         settings["osdb_pass"].(string),
@@ -505,11 +494,11 @@ func Reload() *Configuration {
 		ResolutionPreferenceShows:   settings["resolution_preference_shows"].(int),
 		PercentageAdditionalSeeders: settings["percentage_additional_seeders"].(int),
 
-		UsePublicDNS:                 settings["use_public_dns"].(bool),
-		PublicDNSList:                settings["public_dns_list"].(string),
-		OpennicDNSList:               settings["opennic_dns_list"].(string),
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
+
+		InternalProxyEnabled: settings["internal_proxy_enabled"].(bool),
+		InternalProxyLogging: settings["internal_proxy_logging"].(bool),
 
 		ProxyType:     settings["proxy_type"].(int),
 		ProxyEnabled:  settings["proxy_enabled"].(bool),
@@ -574,17 +563,6 @@ func Reload() *Configuration {
 		}
 
 		newConfig.ProxyURL += newConfig.ProxyHost + ":" + strconv.Itoa(newConfig.ProxyPort)
-	}
-
-	// Reloading DNS resolvers
-	newConfig.PublicDNSList = strings.Replace(newConfig.PublicDNSList, " ", "", -1)
-	if newConfig.PublicDNSList != "" {
-		ResolverPublic = dns_resolver.New(strings.Split(newConfig.PublicDNSList, ","))
-	}
-
-	newConfig.OpennicDNSList = strings.Replace(newConfig.OpennicDNSList, " ", "", -1)
-	if newConfig.OpennicDNSList != "" {
-		ResolverOpennic = dns_resolver.New(strings.Split(newConfig.OpennicDNSList, ","))
 	}
 
 	// Setting default connection limit per torrent.

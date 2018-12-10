@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/elgatito/elementum/cache"
-	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -36,9 +35,13 @@ const (
 var log = logging.MustGetLogger("trakt")
 
 var (
+	Cookies   = ""
+	UserAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.21 Safari/537.36"
+)
+
+var (
 	// PagesAtOnce ...
 	PagesAtOnce             = 5
-	clearance, _            = cloudhole.GetClearance()
 	retriesLeft             = 3
 	burstRate               = 50
 	burstTime               = 10 * time.Second
@@ -483,11 +486,6 @@ type ListItemsPayload struct {
 	Shows  []*Show  `json:"shows,omitempty"`
 }
 
-// GetClearance updates clearance after config reload
-func GetClearance() {
-	clearance, _ = cloudhole.GetClearance()
-}
-
 func totalFromHeaders(headers http.Header) (total int, err error) {
 	if len(headers) > 0 {
 		if itemCount, exists := headers["X-Pagination-Item-Count"]; exists {
@@ -526,32 +524,14 @@ func getIntFromHeader(headers http.Header, key string) (res int) {
 	return -1
 }
 
-func newClearance() (err error) {
-	retriesLeft--
-	log.Warningf("CloudFlared! User-Agent: %s - Cookies: %s", clearance.UserAgent, clearance.Cookies)
-
-	if config.Get().UseCloudHole == false {
-		retriesLeft = 0
-		return errors.New("CloudFlared! Enable CloudHole in the add-on's settings")
-	}
-
-	clearance, err = cloudhole.GetClearance()
-	if err == nil {
-		log.Noticef("New clearance: %s - %s", clearance.UserAgent, clearance.Cookies)
-	} else {
-		retriesLeft = 0
-	}
-	return err
-}
-
 // Get ...
 func Get(endPoint string, params url.Values) (resp *napping.Response, err error) {
 	header := http.Header{
 		"Content-type":      []string{"application/json"},
 		"trakt-api-key":     []string{ClientID},
 		"trakt-api-version": []string{APIVersion},
-		"User-Agent":        []string{clearance.UserAgent},
-		"Cookie":            []string{clearance.Cookies},
+		"User-Agent":        []string{UserAgent},
+		"Cookie":            []string{Cookies},
 	}
 
 	req := napping.Request{
@@ -570,10 +550,8 @@ func Get(endPoint string, params url.Values) (resp *napping.Response, err error)
 			rl.CoolDown(resp.HttpResponse().Header)
 			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
-			err = newClearance()
-			if err == nil {
-				resp, err = Get(endPoint, params)
-			}
+			retriesLeft--
+			resp, err = Get(endPoint, params)
 		}
 
 		return nil
@@ -588,8 +566,8 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
 		"trakt-api-key":     []string{ClientID},
 		"trakt-api-version": []string{APIVersion},
-		"User-Agent":        []string{clearance.UserAgent},
-		"Cookie":            []string{clearance.Cookies},
+		"User-Agent":        []string{UserAgent},
+		"Cookie":            []string{Cookies},
 	}
 
 	req := napping.Request{
@@ -609,10 +587,8 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 			rl.CoolDown(resp.HttpResponse().Header)
 			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
-			err = newClearance()
-			if err == nil {
-				resp, err = GetWithAuth(endPoint, params)
-			}
+			retriesLeft--
+			resp, err = GetWithAuth(endPoint, params)
 		}
 
 		return nil
@@ -638,8 +614,8 @@ func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err e
 		"Authorization":     []string{fmt.Sprintf("Bearer %s", config.Get().TraktToken)},
 		"trakt-api-key":     []string{ClientID},
 		"trakt-api-version": []string{APIVersion},
-		"User-Agent":        []string{clearance.UserAgent},
-		"Cookie":            []string{clearance.Cookies},
+		"User-Agent":        []string{UserAgent},
+		"Cookie":            []string{Cookies},
 	}
 
 	req := napping.Request{
@@ -659,10 +635,8 @@ func Post(endPoint string, payload *bytes.Buffer) (resp *napping.Response, err e
 			rl.CoolDown(resp.HttpResponse().Header)
 			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
-			err = newClearance()
-			if err == nil {
-				resp, err = Post(endPoint, payload)
-			}
+			retriesLeft--
+			resp, err = Post(endPoint, payload)
 		}
 
 		return nil
@@ -675,8 +649,8 @@ func GetCode() (code *Code, err error) {
 	endPoint := "oauth/device/code"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{clearance.UserAgent},
-		"Cookie":       []string{clearance.Cookies},
+		"User-Agent":   []string{UserAgent},
+		"Cookie":       []string{Cookies},
 	}
 	params := napping.Params{
 		"client_id": ClientID,
@@ -700,10 +674,8 @@ func GetCode() (code *Code, err error) {
 			rl.CoolDown(resp.HttpResponse().Header)
 			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
-			err = newClearance()
-			if err == nil {
-				code, err = GetCode()
-			}
+			retriesLeft--
+			code, err = GetCode()
 		} else {
 			resp.Unmarshal(&code)
 		}
@@ -721,8 +693,8 @@ func GetToken(code string) (resp *napping.Response, err error) {
 	endPoint := "oauth/device/token"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{clearance.UserAgent},
-		"Cookie":       []string{clearance.Cookies},
+		"User-Agent":   []string{UserAgent},
+		"Cookie":       []string{Cookies},
 	}
 	params := napping.Params{
 		"code":          code,
@@ -746,10 +718,8 @@ func GetToken(code string) (resp *napping.Response, err error) {
 			rl.CoolDown(resp.HttpResponse().Header)
 			return util.ErrExceeded
 		} else if resp.Status() == 403 && retriesLeft > 0 {
-			err = newClearance()
-			if err == nil {
-				resp, err = GetToken(code)
-			}
+			retriesLeft--
+			resp, err = GetToken(code)
 		}
 
 		return nil
@@ -808,8 +778,8 @@ func RefreshToken() (resp *napping.Response, err error) {
 	endPoint := "oauth/token"
 	header := http.Header{
 		"Content-type": []string{"application/json"},
-		"User-Agent":   []string{clearance.UserAgent},
-		"Cookie":       []string{clearance.Cookies},
+		"User-Agent":   []string{UserAgent},
+		"Cookie":       []string{Cookies},
 	}
 	params := napping.Params{
 		"refresh_token": config.Get().TraktRefreshToken,
@@ -830,10 +800,8 @@ func RefreshToken() (resp *napping.Response, err error) {
 	if err != nil {
 		return
 	} else if resp.Status() == 403 && retriesLeft > 0 {
-		err = newClearance()
-		if err == nil {
-			resp, err = RefreshToken()
-		}
+		retriesLeft--
+		resp, err = RefreshToken()
 	}
 	return
 }

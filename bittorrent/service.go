@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,6 +28,7 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
+	"github.com/elgatito/elementum/scrape"
 	estorage "github.com/elgatito/elementum/storage"
 	memory "github.com/elgatito/elementum/storage/memory"
 	"github.com/elgatito/elementum/tmdb"
@@ -40,6 +40,8 @@ import (
 type BTService struct {
 	config *config.Configuration
 	mu     sync.Mutex
+
+	InternalProxy *http.Server
 
 	Client       *gotorrent.Client
 	ClientConfig *gotorrent.ClientConfig
@@ -87,22 +89,6 @@ func NewBTService() *BTService {
 		// TODO: cleanup when limiting is finished
 		DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
 		UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<16),
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<16),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<16),
-
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2<<18),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2<<17),
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 0),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
-
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 2 << 19),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 2 << 19),
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1<<20),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 256<<10),
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 1),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 1),
-		// DownloadLimiter: rate.NewLimiter(rate.Inf, 0),
-		// UploadLimiter:   rate.NewLimiter(rate.Inf, 0),
 	}
 
 	s.configure()
@@ -137,6 +123,7 @@ func (s *BTService) Reconfigure() {
 	s.stopServices()
 
 	config.Reload()
+	scrape.Reload()
 
 	s.config = config.Get()
 	s.configure()
@@ -146,6 +133,11 @@ func (s *BTService) Reconfigure() {
 
 func (s *BTService) configure() {
 	log.Info("Configuring client...")
+
+	if s.config.InternalProxyEnabled {
+		log.Infof("Starting internal proxy")
+		s.InternalProxy = scrape.StartProxy()
+	}
 
 	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {
 		if err := os.Mkdir(s.config.TorrentsPath, 0755); err != nil {
@@ -167,9 +159,6 @@ func (s *BTService) configure() {
 		os.Exit(1)
 	}
 
-	// if s.ListenIP != "" && s.ListenIPv6 == "" {
-	// 	s.DisableIPv6 = true
-	// }
 	log.Infof("ListenIP=%s, ListenIPv6=%s, ListenPort=%d, DisableIPv6=%v", s.ListenIP, s.ListenIPv6, s.ListenPort, s.DisableIPv6)
 
 	blocklist, _ := iplist.MMapPackedFile(filepath.Join(config.Get().Info.Path, "resources", "misc", "pack-iplist"))
@@ -224,9 +213,6 @@ func (s *BTService) configure() {
 	if s.config.ProxyURL != "" {
 		s.ClientConfig.DisableUTP = true
 		log.Info("Disabling UTP because of enabled proxy and not working UDP proxying")
-		s.setHTTPProxyURL()
-	} else {
-		util.Transport.Proxy = nil
 	}
 
 	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
@@ -295,6 +281,11 @@ func (s *BTService) configure() {
 }
 
 func (s *BTService) stopServices() {
+	if s.InternalProxy != nil {
+		log.Infof("Stopping internal proxy")
+		s.InternalProxy.Shutdown(nil)
+	}
+
 	// TODO: cleanup these messages after windows hang is fixed
 	// Don't need to execute RPC calls when Kodi is closing
 	if s.dialogProgressBG != nil {
@@ -402,8 +393,6 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 		}
 
 		log.Debugf("Adding torrent: %#v", uri)
-		// log.Debugf("Service: %#v", s)
-		// log.Debugf("Client: %#v", s.Client)
 		if torrentHandle, err = s.Client.AddTorrentFromFile(uri); err != nil {
 			log.Warningf("Could not add torrent %s: %#v", uri, err)
 			return nil, err
@@ -740,10 +729,8 @@ func (s *BTService) downloadProgress() {
 // SetDownloadLimit ...
 func (s *BTService) SetDownloadLimit(i int) {
 	if i == 0 {
-		// s.DownloadLimiter = rate.NewLimiter(rate.Inf, 0)
 		s.DownloadLimiter.SetLimit(rate.Inf)
 	} else {
-		// s.DownloadLimiter = rate.NewLimiter(rate.Limit(i), 2<<13)
 		s.DownloadLimiter.SetLimit(rate.Limit(i))
 	}
 }
@@ -751,10 +738,8 @@ func (s *BTService) SetDownloadLimit(i int) {
 // SetUploadLimit ...
 func (s *BTService) SetUploadLimit(i int) {
 	if i == 0 {
-		// s.UploadLimiter = rate.NewLimiter(rate.Inf, 0)
 		s.UploadLimiter.SetLimit(rate.Inf)
 	} else {
-		// s.UploadLimiter = rate.NewLimiter(rate.Limit(i), 2<<17)
 		s.UploadLimiter.SetLimit(rate.Limit(i))
 	}
 }
@@ -1032,15 +1017,6 @@ func (s *BTService) GetListenIP(network string) string {
 		return s.ListenIPv6
 	}
 	return s.ListenIP
-}
-
-func (s *BTService) setHTTPProxyURL() {
-	fixedURL, err := url.Parse(s.config.ProxyURL)
-	if err != nil {
-		return
-	}
-
-	util.Transport.Proxy = http.ProxyURL(fixedURL)
 }
 
 func min(a, b int) int {

@@ -48,7 +48,7 @@ const (
 )
 
 var (
-	trackerTimeout = 3100 * time.Millisecond
+	trackerTimeout = 6000 * time.Millisecond
 	log            = logging.MustGetLogger("linkssearch")
 )
 

@@ -16,13 +16,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/anacrolix/torrent/bencode"
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
-	"github.com/zeebo/bencode"
 
-	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -375,7 +374,7 @@ func (t *TorrentFile) Magnet() {
 func (t *TorrentFile) LoadFromBytes(in []byte) error {
 
 	var torrentFile *TorrentFileRaw
-	if err := bencode.DecodeBytes(in, &torrentFile); err != nil {
+	if err := bencode.Unmarshal(in, &torrentFile); err != nil {
 		return err
 	}
 
@@ -455,20 +454,7 @@ func (t *TorrentFile) Resolve() error {
 		}
 	}
 
-	// Use CloudHole if enabled and if we have a clearance
-	if config.Get().UseCloudHole == true {
-		clearance, _ := cloudhole.GetClearance()
-		if clearance.Cookies != "" {
-			req.Header.Set("User-Agent", clearance.UserAgent)
-			if cookies := req.Header.Get("Cookie"); cookies != "" {
-				req.Header.Set("Cookie", cookies+"; "+clearance.Cookies)
-			} else {
-				req.Header.Add("Cookie", clearance.Cookies)
-			}
-		}
-	}
-
-	resp, err := util.HTTPClient.Do(req)
+	resp, err := scrape.GetClient().Do(req)
 	if err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
@@ -492,7 +478,7 @@ func (t *TorrentFile) Resolve() error {
 	dec := bencode.NewDecoder(tee)
 
 	if errDec := dec.Decode(&torrentFile); errDec != nil {
-		return errDec
+		return fmt.Errorf("Decode error: %s", errDec)
 	}
 
 	if t.InfoHash == "" {
@@ -620,6 +606,8 @@ func (t *TorrentFile) beautifySize() {
 	t.Size = strings.Replace(t.Size, "МБ", "MB", -1)
 	t.Size = strings.Replace(t.Size, "ГБ", "GB", -1)
 	t.Size = strings.Replace(t.Size, "ТБ", "TB", -1)
+	t.Size = strings.Replace(t.Size, "MO", "MB", -1)
+	t.Size = strings.Replace(t.Size, "GO", "GB", -1)
 
 	// Replacing "," with "."
 	t.Size = strings.Replace(t.Size, ",", ".", -1)

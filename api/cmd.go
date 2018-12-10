@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	"github.com/elgatito/elementum/cloudhole"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
@@ -77,12 +76,6 @@ func ClearTmdbCache(ctx *gin.Context) {
 		ctx.Abort()
 	}
 	library.ClearTmdbCache()
-}
-
-// ResetClearances ...
-func ResetClearances(ctx *gin.Context) {
-	cloudhole.ResetClearances()
-	xbmc.Notify("Elementum", "LOCALIZE[30264]", config.AddonIcon())
 }
 
 // ResetPath ...

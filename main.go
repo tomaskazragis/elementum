@@ -189,8 +189,6 @@ func main() {
 		xbmc.ResetRPC()
 	}()
 
-	trakt.GetClearance()
-
 	go library.Init()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
+	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/tmdb"
 
 	"github.com/dustin/go-humanize"
@@ -47,6 +48,7 @@ func Status(ctx *gin.Context) {
 
 [B]LOCALIZE[30395]:[/B] %s
 [B]LOCALIZE[30396]:[/B] %d
+[B]LOCALIZE[30488]:[/B] %d
 
 [COLOR pink][B]LOCALIZE[30399]:[/B][/COLOR]
     [B]LOCALIZE[30397]:[/B] %s
@@ -92,6 +94,7 @@ func Status(ctx *gin.Context) {
 		util.GetVersion(),
 		ip,
 		port,
+		scrape.ProxyPort,
 
 		webAddress,
 		infoAddress,
