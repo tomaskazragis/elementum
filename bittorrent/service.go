@@ -495,18 +495,12 @@ func (s *BTService) downloadProgress() {
 	rotateTicker := time.NewTicker(5 * time.Second)
 	defer rotateTicker.Stop()
 
-	memoryTicker := time.NewTicker(30 * time.Second)
-	defer memoryTicker.Stop()
-
 	pathChecked := make(map[string]bool)
 	warnedMissing := make(map[string]bool)
 
 	showNext := 0
 	for {
 		select {
-		case <-memoryTicker.C:
-			util.FreeMemory()
-
 		case <-rotateTicker.C:
 			// TODO: there should be a check whether service is in Pause state
 			// if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
