@@ -102,45 +102,12 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 
-		show := tmdb.GetShow(showID, config.Get().Language)
-		if show == nil {
-			ctx.Error(errors.New("Unable to find show"))
-			return
+		if item, err := GetEpisodeLabels(showID, seasonNumber, episodeNumber); err == nil {
+			saveEncoded(encodeItem(item))
+			ctx.JSON(200, item)
+		} else {
+			ctx.Error(err)
 		}
-
-		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
-		if season == nil {
-			ctx.Error(errors.New("Unable to find season"))
-			return
-		}
-
-		episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
-		if episode == nil {
-			ctx.Error(errors.New("Unable to find episode"))
-			return
-		}
-
-		item := episode.ToListItem(show, season)
-		if ls, err := library.GetShowByTMDB(show.ID); ls != nil && err == nil {
-			log.Debugf("Found show in library: %s", litter.Sdump(ls.UIDs))
-			if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
-				item.Info.DBID = le.UIDs.Kodi
-			}
-		}
-		if item.Art.FanArt == "" {
-			fanarts := make([]string, 0)
-			for _, backdrop := range show.Images.Backdrops {
-				fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
-			}
-			if len(fanarts) > 0 {
-				item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
-			}
-		}
-		item.Art.Poster = tmdb.ImageURL(season.Poster, "w500")
-
-		saveEncoded(encodeItem(item))
-
-		ctx.JSON(200, item)
 	}
 }
 
@@ -149,21 +116,12 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tmdbID := ctx.Params.ByName("tmdbId")
 
-		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
-		if movie == nil {
-			ctx.Error(errors.New("Unable to find movie"))
-			return
+		if item, err := GetMovieLabels(tmdbID); err == nil {
+			saveEncoded(encodeItem(item))
+			ctx.JSON(200, item)
+		} else {
+			ctx.Error(err)
 		}
-
-		item := movie.ToListItem()
-		if lm, err := library.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
-			log.Debugf("Found movie in library: %s", litter.Sdump(lm))
-			item.Info.DBID = lm.UIDs.Kodi
-		}
-
-		saveEncoded(encodeItem(item))
-
-		ctx.JSON(200, item)
 	}
 }
 
@@ -172,39 +130,100 @@ func InfoLabelsSearch(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tmdbID := ctx.Params.ByName("tmdbId")
 
-		torrent := btService.GetTorrentByFakeID(tmdbID)
-		if torrent == nil || torrent.DBItem == nil {
-			ctx.Error(errors.New("Unable to find the torrent"))
-			return
+		if item, err := GetSearchLabels(btService, tmdbID); err == nil {
+			saveEncoded(encodeItem(item))
+			ctx.JSON(200, item)
+		} else {
+			ctx.Error(err)
 		}
-
-		// Collecting downloaded file names into string to show in a subtitle
-		chosenFiles := map[string]bool{}
-		for _, f := range torrent.ChosenFiles {
-			chosenFiles[filepath.Base(f.DisplayPath())] = true
-		}
-		chosenFileNames := []string{}
-		for k := range chosenFiles {
-			chosenFileNames = append(chosenFileNames, k)
-		}
-		sort.Sort(sort.StringSlice(chosenFileNames))
-		subtitle := strings.Join(chosenFileNames, ", ")
-
-		item := &xbmc.ListItem{
-			Label:  torrent.DBItem.Query,
-			Label2: subtitle,
-			Info: &xbmc.ListItemInfo{
-				Title:         torrent.DBItem.Query,
-				OriginalTitle: torrent.DBItem.Query,
-				TVShowTitle:   subtitle,
-				DBTYPE:        "episode",
-				Mediatype:     "episode",
-			},
-			Art: &xbmc.ListItemArt{},
-		}
-
-		saveEncoded(encodeItem(item))
-
-		ctx.JSON(200, item)
 	}
+}
+
+// GetEpisodeLabels returnes listitem for an episode
+func GetEpisodeLabels(showID, seasonNumber, episodeNumber int) (item *xbmc.ListItem, err error) {
+	show := tmdb.GetShow(showID, config.Get().Language)
+	if show == nil {
+		return nil, errors.New("Unable to find show")
+	}
+
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+	if season == nil {
+		return nil, errors.New("Unable to find season")
+	}
+
+	episode := tmdb.GetEpisode(showID, seasonNumber, episodeNumber, config.Get().Language)
+	if episode == nil {
+		return nil, errors.New("Unable to find episode")
+	}
+
+	item = episode.ToListItem(show, season)
+	if ls, err := library.GetShowByTMDB(show.ID); ls != nil && err == nil {
+		log.Debugf("Found show in library: %s", litter.Sdump(ls.UIDs))
+		if le := ls.GetEpisode(episode.SeasonNumber, episodeNumber); le != nil {
+			item.Info.DBID = le.UIDs.Kodi
+		}
+	}
+	if item.Art.FanArt == "" {
+		fanarts := make([]string, 0)
+		for _, backdrop := range show.Images.Backdrops {
+			fanarts = append(fanarts, tmdb.ImageURL(backdrop.FilePath, "w1280"))
+		}
+		if len(fanarts) > 0 {
+			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
+		}
+	}
+	item.Art.Poster = tmdb.ImageURL(season.Poster, "w500")
+
+	return
+}
+
+// GetMovieLabels returnes listitem for a movie
+func GetMovieLabels(tmdbID string) (item *xbmc.ListItem, err error) {
+	movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
+	if movie == nil {
+		return nil, errors.New("Unable to find movie")
+	}
+
+	item = movie.ToListItem()
+	if lm, err := library.GetMovieByTMDB(movie.ID); lm != nil && err == nil {
+		log.Debugf("Found movie in library: %s", litter.Sdump(lm))
+		item.Info.DBID = lm.UIDs.Kodi
+	}
+
+	return
+}
+
+// GetSearchLabels returnes listitem for a search query
+func GetSearchLabels(btService *bittorrent.BTService, tmdbID string) (item *xbmc.ListItem, err error) {
+	torrent := btService.GetTorrentByFakeID(tmdbID)
+	if torrent == nil || torrent.DBItem == nil {
+		return nil, errors.New("Unable to find the torrent")
+	}
+
+	// Collecting downloaded file names into string to show in a subtitle
+	chosenFiles := map[string]bool{}
+	for _, f := range torrent.ChosenFiles {
+		chosenFiles[filepath.Base(f.DisplayPath())] = true
+	}
+	chosenFileNames := []string{}
+	for k := range chosenFiles {
+		chosenFileNames = append(chosenFileNames, k)
+	}
+	sort.Sort(sort.StringSlice(chosenFileNames))
+	subtitle := strings.Join(chosenFileNames, ", ")
+
+	item = &xbmc.ListItem{
+		Label:  torrent.DBItem.Query,
+		Label2: subtitle,
+		Info: &xbmc.ListItemInfo{
+			Title:         torrent.DBItem.Query,
+			OriginalTitle: torrent.DBItem.Query,
+			TVShowTitle:   subtitle,
+			DBTYPE:        "episode",
+			Mediatype:     "episode",
+		},
+		Art: &xbmc.ListItemArt{},
+	}
+
+	return
 }
