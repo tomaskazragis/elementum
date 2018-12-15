@@ -347,6 +347,12 @@ func PlayURL(url string) {
 	executeJSONRPCEx("Player_Open", &retVal, Args{url})
 }
 
+// PlayURLWithLabels ...
+func PlayURLWithLabels(url string, listItem *ListItem) {
+	retVal := ""
+	go executeJSONRPCEx("Player_Open_With_Labels", &retVal, Args{url, listItem.Info})
+}
+
 // PlayURLWithTimeout ...
 func PlayURLWithTimeout(url string) {
 	retVal := ""
