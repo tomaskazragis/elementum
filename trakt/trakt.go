@@ -50,6 +50,7 @@ var (
 	recentExpiration        = 15 * time.Minute
 	userlistExpiration      = 1 * time.Minute
 	watchedExpiration       = 10 * time.Minute
+	watchedLongExpiration   = 7 * 24 * time.Hour
 	activitiesExpiration    = 7 * 24 * time.Hour
 	progressExpiration      = 7 * 24 * time.Hour
 )
@@ -400,17 +401,23 @@ type WatchedMovie struct {
 type WatchedShow struct {
 	Plays         int `json:"plays"`
 	Watched       bool
+	LastWatchedAt time.Time        `json:"last_watched_at"`
+	Show          *Show            `json:"show"`
+	Seasons       []*WatchedSeason `json:"seasons"`
+}
+
+// WatchedSeason ...
+type WatchedSeason struct {
+	Plays    int               `json:"plays"`
+	Number   int               `json:"number"`
+	Episodes []*WatchedEpisode `json:"episodes"`
+}
+
+// WatchedEpisode ...
+type WatchedEpisode struct {
+	Number        int       `json:"number"`
+	Plays         int       `json:"plays"`
 	LastWatchedAt time.Time `json:"last_watched_at"`
-	Show          *Show     `json:"show"`
-	Seasons       []struct {
-		Plays    int `json:"plays"`
-		Number   int `json:"number"`
-		Episodes []struct {
-			Number        int       `json:"number"`
-			Plays         int       `json:"plays"`
-			LastWatchedAt time.Time `json:"last_watched_at"`
-		} `json:"episodes"`
-	} `json:"seasons"`
 }
 
 // WatchedProgressShow ...

@@ -1127,9 +1127,31 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 		RefreshUIDs()
 	}()
 
+	previousMovies, _ := trakt.PreviousWatchedMovies()
 	movies, errMovies := trakt.WatchedMovies()
 	if errMovies != nil {
 		return false, errMovies
+	}
+
+	diffMovies, _ := getUnwatchedMovies(movies, previousMovies)
+	if len(diffMovies) > 0 {
+		log.Infof("Unwatching %v movies", len(diffMovies))
+	}
+
+	for _, m := range diffMovies {
+		var r *Movie
+		if r == nil && m.Movie.IDs.TMDB != 0 {
+			r, _ = GetMovieByTMDB(m.Movie.IDs.TMDB)
+		}
+		if r == nil && m.Movie.IDs.IMDB != "" {
+			r, _ = GetMovieByIMDB(m.Movie.IDs.IMDB)
+		}
+
+		if r == nil {
+			continue
+		} else if r != nil && r.UIDs.Playcount > 0 {
+			xbmc.SetMovieWatched(r.UIDs.Kodi, 0, 0, 0)
+		}
 	}
 
 	l.mu.Trakt.Lock()
@@ -1162,9 +1184,37 @@ func SyncTraktWatched() (haveChanges bool, err error) {
 	}
 	l.mu.Trakt.Unlock()
 
+	previousShows, _ := trakt.PreviousWatchedShows()
 	shows, errShows := trakt.WatchedShows()
 	if errShows != nil {
 		return false, errShows
+	}
+
+	diffShows, _ := getUnwatchedShows(shows, previousShows)
+	if len(diffShows) > 0 {
+		log.Infof("Unwatching %v shows", len(diffShows))
+	}
+
+	for _, s := range diffShows {
+		var r *Show
+		if r == nil && s.Show.IDs.TMDB != 0 {
+			r, _ = GetShowByTMDB(s.Show.IDs.TMDB)
+		}
+		if r == nil && s.Show.IDs.IMDB != "" {
+			r, _ = GetShowByIMDB(s.Show.IDs.IMDB)
+		}
+
+		if r == nil {
+			continue
+		} else if r != nil {
+			for _, season := range s.Seasons {
+				for _, episode := range season.Episodes {
+					if e := r.GetEpisode(season.Number, episode.Number); e != nil && e.UIDs.Playcount > 0 {
+						xbmc.SetEpisodeWatched(e.UIDs.Kodi, 0, 0, 0)
+					}
+				}
+			}
+		}
 	}
 
 	l.mu.Trakt.Lock()
@@ -1588,4 +1638,104 @@ func GetShowForEpisode(kodiID int) (*Show, *Episode) {
 	}
 
 	return nil, nil
+}
+
+func getUnwatchedMovies(current, previous []*trakt.WatchedMovie) (diff []*trakt.WatchedMovie, err error) {
+	if current == nil || previous == nil || len(previous) == 0 || len(current) == 0 {
+		return
+	}
+
+	found := false
+	for _, previousMovie := range previous {
+		found = false
+		for _, currentMovie := range current {
+			if currentMovie.Movie.IDs.Trakt == previousMovie.Movie.IDs.Trakt {
+				found = true
+			}
+		}
+
+		if !found {
+			diff = append(diff, previousMovie)
+		}
+	}
+
+	return
+}
+
+func getUnwatchedShows(current, previous []*trakt.WatchedShow) (diff []*trakt.WatchedShow, err error) {
+	if current == nil || previous == nil || len(previous) == 0 || len(current) == 0 {
+		return
+	}
+
+	foundShow := false
+	foundSeason := false
+	foundEpisode := false
+
+	var show *trakt.WatchedShow
+	var season *trakt.WatchedSeason
+
+	for _, previousShow := range previous {
+		foundShow = false
+		foundSeason = false
+		foundEpisode = false
+
+		show = nil
+
+		for _, currentShow := range current {
+			season = nil
+
+			if previousShow.Show.IDs.Trakt == currentShow.Show.IDs.Trakt {
+				foundShow = true
+
+				for _, previousSeason := range previousShow.Seasons {
+					foundSeason = false
+					foundEpisode = false
+
+					for _, currentSeason := range currentShow.Seasons {
+						if previousSeason.Number == currentSeason.Number {
+							foundSeason = true
+
+							for _, previousEpisode := range previousSeason.Episodes {
+								foundEpisode = false
+
+								for _, currentEpisode := range currentSeason.Episodes {
+									if previousEpisode.Number == currentEpisode.Number {
+										foundEpisode = true
+									}
+								}
+
+								if !foundEpisode {
+									if season == nil {
+										season = &trakt.WatchedSeason{Number: previousSeason.Number}
+									}
+
+									season.Episodes = append(season.Episodes, previousEpisode)
+								}
+							}
+						}
+					}
+
+					if !foundSeason {
+						season = previousSeason
+					}
+					if season != nil {
+						if show == nil {
+							show = &trakt.WatchedShow{Show: previousShow.Show}
+						}
+
+						show.Seasons = append(show.Seasons, season)
+					}
+				}
+			}
+		}
+
+		if !foundShow {
+			diff = append(diff, previousShow)
+		}
+		if show != nil {
+			diff = append(diff, show)
+		}
+	}
+
+	return
 }

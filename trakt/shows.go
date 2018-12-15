@@ -632,6 +632,7 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 	cacheStore := cache.NewDBStore()
 
 	key := "com.trakt.show.episodes.watched"
+	keyLong := "com.trakt.show.episodes.watched.previous"
 	watchedKey := "com.trakt.progress.show.episodes.watched"
 
 	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
@@ -662,6 +663,16 @@ func WatchedShows() (shows []*WatchedShow, err error) {
 	}
 
 	cacheStore.Set(key, shows, progressExpiration)
+	cacheStore.Set(keyLong, shows, watchedLongExpiration)
+
+	return
+}
+
+// PreviousWatchedShows ...
+func PreviousWatchedShows() (shows []*WatchedShow, err error) {
+	cacheStore := cache.NewDBStore()
+	keyLong := "com.trakt.show.episodes.watched.previous"
+	err = cacheStore.Get(keyLong, &shows)
 
 	return
 }

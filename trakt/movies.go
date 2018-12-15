@@ -537,31 +537,56 @@ func WatchedMovies() (movies []*WatchedMovie, err error) {
 		return movies, nil
 	}
 
-	endPoint := "sync/watched/movies"
-
-	params := napping.Params{}.AsUrlValues()
+	lastActivities, errAct := GetLastActivities()
+	if errAct != nil {
+		return movies, errAct
+	}
 
 	cacheStore := cache.NewDBStore()
 	key := "com.trakt.movies.watched"
-	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
+	keyLong := "com.trakt.movies.watched.previous"
+	watchedKey := "com.trakt.progress.movies.watched"
 
-		if err != nil {
-			return movies, err
-		} else if resp.Status() != 200 {
-			return movies, fmt.Errorf("Bad status getting Trakt watched for movies: %d", resp.Status())
+	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
+
+	var cachedWatchedAt time.Time
+	cacheStore.Get(watchedKey, &cachedWatchedAt)
+	if err := cacheStore.Get(watchedKey, &cachedWatchedAt); err == nil && !lastActivities.Movies.WatchedAt.After(cachedWatchedAt) {
+		if err := cacheStore.Get(key, &movies); err == nil {
+			return movies, nil
 		}
-
-		if err := resp.Unmarshal(&movies); err != nil {
-			log.Warning(err)
-		}
-
-		sort.Slice(movies, func(i int, j int) bool {
-			return movies[i].LastWatchedAt.Unix() > movies[j].LastWatchedAt.Unix()
-		})
-		cacheStore.Set(key, movies, watchedExpiration)
 	}
 
+	endPoint := "sync/watched/movies"
+	params := napping.Params{}.AsUrlValues()
+
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return movies, err
+	} else if resp.Status() != 200 {
+		return movies, fmt.Errorf("Bad status getting Trakt watched for movies: %d", resp.Status())
+	}
+
+	if err := resp.Unmarshal(&movies); err != nil {
+		log.Warning(err)
+	}
+
+	sort.Slice(movies, func(i int, j int) bool {
+		return movies[i].LastWatchedAt.Unix() > movies[j].LastWatchedAt.Unix()
+	})
+
+	cacheStore.Set(key, movies, progressExpiration)
+	cacheStore.Set(keyLong, movies, watchedLongExpiration)
+
+	return
+}
+
+// PreviousWatchedMovies ...
+func PreviousWatchedMovies() (movies []*WatchedMovie, err error) {
+	cacheStore := cache.NewDBStore()
+	keyLong := "com.trakt.movies.watched.previous"
+	err = cacheStore.Get(keyLong, &movies)
 	return
 }
 
