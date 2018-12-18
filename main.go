@@ -77,7 +77,7 @@ func main() {
 	logging.SetBackend(logging.NewLogBackend(ioutil.Discard, "", 0), logging.NewLogBackend(os.Stdout, "", 0))
 
 	log.Infof("Starting Elementum daemon")
-	log.Infof("Version: %s GoTorrent: %s Go: %s", util.GetVersion(), util.GetTorrentVersion(), runtime.Version())
+	log.Infof("Version: %s GoTorrent: %s Go: %s, Threads: %d", util.GetVersion(), util.GetTorrentVersion(), runtime.Version(), runtime.GOMAXPROCS(0))
 
 	conf := config.Reload()
 	xbmc.KodiVersion = conf.Platform.Kodi

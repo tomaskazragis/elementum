@@ -2,6 +2,7 @@ package scrape
 
 import (
 	"bytes"
+	"crypto/tls"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
@@ -30,6 +31,25 @@ var (
 
 	hostMatch = "^.*$"
 )
+
+// AlwaysHTTPMitm ...
+var AlwaysHTTPMitm goproxy.FuncHttpsHandler = func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+	return &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: CustomTLS(&goproxy.GoproxyCa)}, host
+}
+
+var goproxySignerVersion = ":goroxy1"
+
+// CustomTLS ...
+func CustomTLS(ca *tls.Certificate) func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
+	return func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
+		config := &tls.Config{
+			PreferServerCipherSuites: true,
+			Certificates:             []tls.Certificate{*ca},
+		}
+
+		return config, nil
+	}
+}
 
 func handleRequest(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 	// Removing these headers to ensure cloudflare is not taking these headers into account.
@@ -293,7 +313,7 @@ func cloneRequest(r *http.Request) *http.Request {
 // StartProxy starts HTTP/HTTPS proxy for debugging
 func StartProxy() *http.Server {
 	Proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile(hostMatch))).
-		HandleConnect(goproxy.AlwaysMitm)
+		HandleConnect(AlwaysHTTPMitm)
 
 	Proxy.OnRequest().DoFunc(handleRequest)
 	Proxy.OnResponse().DoFunc(handleResponse)
