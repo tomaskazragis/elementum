@@ -64,6 +64,10 @@ func GetClient() *http.Client {
 
 // CustomDial ...
 func CustomDial(network, addr string) (net.Conn, error) {
+	if !config.Get().InternalDNSEnabled {
+		return dialer.Dial(network, addr)
+	}
+
 	addrs := strings.Split(addr, ":")
 	if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
 		if ipTest := net.ParseIP(addrs[0]); ipTest == nil {
@@ -78,11 +82,14 @@ func CustomDial(network, addr string) (net.Conn, error) {
 
 // CustomDialContext ...
 func CustomDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	if !config.Get().InternalDNSEnabled {
+		return dialer.DialContext(ctx, network, addr)
+	}
+
 	addrs := strings.Split(addr, ":")
 	if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
 		if ipTest := net.ParseIP(addrs[0]); ipTest == nil {
-			ip, err := cloudflareResolver.LookupHost(context.TODO(), addrs[0])
-			if err == nil && len(ip) > 0 {
+			if ip, err := resolve(addrs[0]); err == nil && len(ip) > 0 {
 				addr = ip[0] + ":" + addrs[1]
 			}
 		}

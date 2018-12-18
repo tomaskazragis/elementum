@@ -329,7 +329,9 @@ func StartProxy() *http.Server {
 		Proxy.Tr.Proxy = nil
 	}
 
-	Proxy.Tr.Dial = CustomDial
+	if config.Get().InternalDNSEnabled {
+		Proxy.Tr.Dial = CustomDial
+	}
 
 	srv := &http.Server{
 		Addr:    ":" + strconv.Itoa(ProxyPort),
