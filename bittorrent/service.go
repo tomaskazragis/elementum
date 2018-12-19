@@ -210,18 +210,18 @@ func (s *BTService) configure() {
 	s.ClientConfig.DisableTCP = s.config.DisableTCP
 	s.ClientConfig.DisableUTP = s.config.DisableUTP
 
-	if config.Get().ProxyUseDownload {
-		s.ClientConfig.ProxyURL = s.config.ProxyURL
-	}
-	if config.Get().ProxyUseTracker {
-		if fixedURL, err := url.Parse(s.config.ProxyURL); err == nil {
-			s.ClientConfig.HTTPProxy = http.ProxyURL(fixedURL)
-		}
-	}
-
 	if s.config.ProxyURL != "" {
-		s.ClientConfig.DisableUTP = true
-		log.Info("Disabling UTP because of enabled proxy and not working UDP proxying")
+		if config.Get().ProxyUseDownload {
+			s.ClientConfig.ProxyURL = s.config.ProxyURL
+
+			s.ClientConfig.DisableUTP = true
+			log.Info("Disabling UTP because of enabled proxy and not working UDP proxying")
+		}
+		if config.Get().ProxyUseTracker {
+			if fixedURL, err := url.Parse(s.config.ProxyURL); err == nil {
+				s.ClientConfig.HTTPProxy = http.ProxyURL(fixedURL)
+			}
+		}
 	}
 
 	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
