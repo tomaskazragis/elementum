@@ -6,7 +6,10 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/bogdanovich/dns_resolver"
 )
 
 var (
@@ -44,6 +47,11 @@ var (
 	cloudflareResolver = CloudflareResolver()
 	googleResolver     = GoogleResolver()
 	opennicResolver    = OpennicResolver()
+
+	resolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
+
+	dnsCacheResults sync.Map
+	dnsCacheLocks   sync.Map
 )
 
 // CloudflareResolver returns Resolver that uses Cloudflare service on 1.1.1.1 and
@@ -111,6 +119,9 @@ func resolve(addr string) ([]string, error) {
 		if ips, err := opennicResolver.LookupHost(context.TODO(), addr); err == nil {
 			return ips, err
 		}
+		if ip := resolveAddr(addr); ip != "" {
+			return []string{ip}, nil
+		}
 	}
 
 	if ips, err := cloudflareResolver.LookupHost(context.TODO(), addr); err == nil {
@@ -133,4 +144,50 @@ func isOpennicDomain(zone string) bool {
 	}
 
 	return false
+}
+
+// This is very dump solution.
+// We have a sync.Map with results for resolving IPs
+// and a sync.Map with mutexes for each map.
+// Mutexes are needed because torrent files are resolved concurrently and so
+// DNS queries run concurrently as well, thus DNS hosts can ban for
+// doing so many queries. So we wait until first one is finished.
+// Possibly need to cleanup saved IPs after some time.
+// Each request is going through this workflow:
+// Check saved -> Query Google/Quad9 -> Check saved -> Query Opennic -> Save
+func resolveAddr(host string) (ip string) {
+	if cached, ok := dnsCacheResults.Load(host); ok {
+		return cached.(string)
+	}
+
+	var mu *sync.Mutex
+	if m, ok := dnsCacheLocks.Load(host); ok {
+		mu = m.(*sync.Mutex)
+	} else {
+		mu = &sync.Mutex{}
+		dnsCacheLocks.Store(host, mu)
+	}
+
+	mu.Lock()
+
+	defer func() {
+		mu.Unlock()
+		if strings.HasPrefix(ip, "127.") {
+			return
+		}
+
+		dnsCacheResults.Store(host, ip)
+	}()
+
+	if cached, ok := dnsCacheResults.Load(host); ok {
+		return cached.(string)
+	}
+
+	ips, err := resolverOpennic.LookupHost(host)
+	if err == nil && len(ips) > 0 {
+		ip = ips[0].String()
+		return
+	}
+
+	return
 }
