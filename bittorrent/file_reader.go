@@ -6,6 +6,7 @@ import (
 	"time"
 
 	gotorrent "github.com/anacrolix/torrent"
+	humanize "github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -41,7 +42,7 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 		t.readers[fr.id] = fr
 		log.Debugf("Active readers: %#v", len(t.readers))
 
-		log.Infof("Setting readahead for reader %d as %d", fr.id, t.Storage().GetReadaheadSize())
+		log.Infof("Setting readahead for reader %d as %s", fr.id, humanize.Bytes(uint64(t.Storage().GetReadaheadSize())))
 		fr.SetReadahead(t.Storage().GetReadaheadSize())
 	}
 

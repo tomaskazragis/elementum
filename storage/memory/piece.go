@@ -5,9 +5,9 @@ import (
 	"io"
 	"sync"
 	"time"
-	// "math"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/anacrolix/torrent/storage"
 )
 
@@ -74,6 +74,8 @@ func (p *Piece) MarkNotComplete() error {
 
 // GetBuffer ...
 func (p *Piece) GetBuffer(iswrite bool) bool {
+	defer perf.ScopeTimer()()
+
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
 
@@ -139,6 +141,8 @@ func (p *Piece) Write(b []byte) (n int, err error) {
 
 // WriteAt File-like implementation
 func (p *Piece) WriteAt(b []byte, off int64) (n int, err error) {
+	defer perf.ScopeTimer()()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -166,6 +170,8 @@ func (p *Piece) Read(b []byte) (n int, err error) {
 
 // ReadAt File-like implementation
 func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
+	defer perf.ScopeTimer()()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -218,6 +224,8 @@ func (p *Piece) GetState() ItemState {
 }
 
 func (p *Piece) onRead() {
+	defer perf.ScopeTimer()()
+
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
 
@@ -228,6 +236,8 @@ func (p *Piece) onRead() {
 }
 
 func (p *Piece) onWrite() {
+	defer perf.ScopeTimer()()
+
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
 

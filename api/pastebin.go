@@ -81,10 +81,10 @@ func Pastebin(ctx *gin.Context) {
 
 	rurl := fmt.Sprintf("http://%s:%d%s%s", config.Args.LocalHost, config.Args.LocalPort, "/debug/", ctx.Params.ByName("type"))
 
-	log.Debugf("Requesting %s before uploading to pastebin", rurl)
+	log.Infof("Requesting %s before uploading to pastebin", rurl)
 	resp, err := http.Get(rurl)
 	if err != nil {
-		log.Debugf("Could not get %s: %#v", rurl, err)
+		log.Infof("Could not get %s: %#v", rurl, err)
 		return
 	}
 	defer resp.Body.Close()
@@ -142,10 +142,11 @@ func Pastebin(ctx *gin.Context) {
 
 			var respData map[string]*json.RawMessage
 			if err := json.Unmarshal(content, &respData); err != nil {
-				log.Debugf("Could not unmarshal response: %s", err)
+				log.Warningf("Could not unmarshal response: %s", err)
 				continue
 			}
 
+			log.Infof("Got response: %#v", respData)
 			if _, ok := respData["url"]; ok {
 				json.Unmarshal(*respData["url"], &pasteURL)
 			}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	humanize "github.com/dustin/go-humanize"
 
 	"github.com/RoaringBitmap/roaring"
 
@@ -77,7 +78,7 @@ func (c *Cache) SetCapacity(capacity int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	log.Debugf("Setting max memory size to %#v bytes", capacity)
+	log.Infof("Setting max memory size to %#v bytes", capacity)
 	c.capacity = capacity
 }
 
@@ -88,6 +89,8 @@ func (c *Cache) GetReadaheadSize() int64 {
 
 // SetReadaheadSize ...
 func (c *Cache) SetReadaheadSize(size int64) {
+	log.Debugf("Setting readahead size to: %s", humanize.Bytes(uint64(size)))
+
 	c.readahead = size
 }
 
@@ -135,6 +138,8 @@ func (c *Cache) Init(info *metainfo.Info) {
 	c.buffers = make([][]byte, c.bufferSize)
 	c.positions = make([]*BufferPosition, c.bufferSize)
 	c.pieces = map[key]*Piece{}
+
+	log.Infof("Init memory for torrent. Buffers: %d, Piece length: %s, Capacity: %s", c.bufferSize, humanize.Bytes(uint64(c.pieceLength)), humanize.Bytes(uint64(c.capacity)))
 
 	for i := 0; i < c.pieceCount; i++ {
 		c.pieces[key(i)] = &Piece{

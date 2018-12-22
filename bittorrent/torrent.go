@@ -290,7 +290,7 @@ func (t *Torrent) bufferFinishedEvent() {
 
 	t.bufferTicker.Stop()
 	t.Service.RestoreLimits()
-
+	
 	for _, r := range t.bufferReaders {
 		if r != nil {
 			r.Close()

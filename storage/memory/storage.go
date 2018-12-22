@@ -17,10 +17,12 @@ import (
 
 const (
 	chunkSize      = 1024 * 16
-	readaheadRatio = 0.33
+	readaheadRatio = 0.80
 )
 
-var log = logging.MustGetLogger("memory")
+var (
+	log = logging.MustGetLogger("memory")
+)
 
 // Storage main object
 type Storage struct {
@@ -32,7 +34,7 @@ type Storage struct {
 
 // NewMemoryStorage initializer function
 func NewMemoryStorage(maxMemorySize int64) *Storage {
-	log.Debugf("Initializing memory storage of size: %s", humanize.Bytes(uint64(maxMemorySize)))
+	log.Infof("Initializing memory storage of size: %s", humanize.Bytes(uint64(maxMemorySize)))
 	s := &Storage{
 		mu:       &sync.Mutex{},
 		capacity: maxMemorySize,

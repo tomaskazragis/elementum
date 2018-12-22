@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"time"
@@ -61,6 +62,10 @@ func GetTorrentForPath(s *BTService, upath string, url string, r *http.Request) 
 	}
 
 	tfsLog.Infof("Opening %s", url)
+	
+	req, _ := httputil.DumpRequest(r, false)
+	tfsLog.Debugf("Incoming filereader: %s", req)
+	
 	for _, torrent := range s.Torrents {
 		for _, f := range torrent.Files() {
 			if url[1:] == f.Path() {
