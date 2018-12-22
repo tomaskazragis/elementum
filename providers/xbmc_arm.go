@@ -9,7 +9,7 @@ import (
 
 func providerTimeout() time.Duration {
 	if runtime.NumCPU() == 1 {
-		return 40 * time.Second
+		return 50 * time.Second
 	}
-	return 30 * time.Second
+	return 40 * time.Second
 }
