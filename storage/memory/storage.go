@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	chunkSize      = 1024 * 16
-	readaheadRatio = 0.80
+	chunkSize = 1024 * 16
+	// readaheadRatio = 0.33
 )
 
 var (
@@ -60,7 +60,7 @@ func (s *Storage) Close() error {
 
 // GetReadaheadSize ...
 func (s *Storage) GetReadaheadSize() int64 {
-	return 0
+	return s.capacity
 }
 
 // SetReadaheadSize ...

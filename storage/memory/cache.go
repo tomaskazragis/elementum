@@ -133,7 +133,8 @@ func (c *Cache) Init(info *metainfo.Info) {
 	if c.bufferSize > c.pieceCount {
 		c.bufferSize = c.pieceCount
 	}
-	c.readahead = int64(float64(c.capacity) * readaheadRatio)
+	// c.readahead = int64(float64(c.capacity) * readaheadRatio)
+	c.readahead = c.capacity
 
 	c.buffers = make([][]byte, c.bufferSize)
 	c.positions = make([]*BufferPosition, c.bufferSize)

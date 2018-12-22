@@ -290,7 +290,7 @@ func (t *Torrent) bufferFinishedEvent() {
 
 	t.bufferTicker.Stop()
 	t.Service.RestoreLimits()
-	
+
 	for _, r := range t.bufferReaders {
 		if r != nil {
 			r.Close()
@@ -637,6 +637,24 @@ func (t *Torrent) SaveMetainfo(path string) error {
 	}
 
 	return nil
+}
+
+// GetReadaheadSize ...
+func (t *Torrent) GetReadaheadSize() int64 {
+	if t.Service.config.DownloadStorage != estorage.StorageMemory {
+		return 50 * 1024 * 1024
+	}
+
+	return int64(float64(t.Storage().GetReadaheadSize()) * (1/float64(len(t.readers)) - 0.05))
+}
+
+// ResetReaders ...
+func (t *Torrent) ResetReaders() {
+	perReaderSize := t.GetReadaheadSize()
+	for _, r := range t.readers {
+		log.Infof("Setting readahead for reader %d as %s", r.id, humanize.Bytes(uint64(perReaderSize)))
+		r.SetReadahead(perReaderSize)
+	}
 }
 
 func average(xs []int64) float64 {

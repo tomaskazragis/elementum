@@ -3,14 +3,12 @@ package bittorrent
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/op/go-logging"
 
@@ -22,7 +20,6 @@ var tfsLog = logging.MustGetLogger("torrentfs")
 // ServeTorrent ...
 func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 	return http.StripPrefix("/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Connection", "close")
 		r.Close = true
 		url := r.URL.Path
 
@@ -31,21 +28,25 @@ func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 			http.Error(w, "file not found", http.StatusNotFound)
 			return
 		}
+
+		w.Header().Set("Connection", "close")
 		w.Header().Set("ETag", httptoo.EncodeQuotedString(fmt.Sprintf("%s/%s", fr.Torrent.infoHash, url[1:])))
 
-		rs := missinggo.NewSectionReadSeeker(struct {
-			io.Reader
-			io.Seeker
-		}{
-			Reader: missinggo.ContextedReader{
-				R:   fr.Reader,
-				Ctx: r.Context(),
-			},
-			Seeker: fr.Reader,
-		}, 0, fr.File.Length())
+		// rs := missinggo.NewSectionReadSeeker(struct {
+		// 	io.Reader
+		// 	io.Seeker
+		// }{
+		// 	Reader: missinggo.ContextedReader{
+		// 		R:   fr.Reader,
+		// 		Ctx: r.Context(),
+		// 	},
+		// 	Seeker: fr.Reader,
+		// }, 0, fr.File.Length())
 
 		defer fr.Close()
-		http.ServeContent(w, r, url, time.Time{}, rs)
+		http.ServeContent(w, r, url, time.Time{}, fr)
+
+		// http.ServeContent(w, r, url, time.Time{}, rs)
 	}))
 }
 
@@ -62,10 +63,10 @@ func GetTorrentForPath(s *BTService, upath string, url string, r *http.Request) 
 	}
 
 	tfsLog.Infof("Opening %s", url)
-	
+
 	req, _ := httputil.DumpRequest(r, false)
 	tfsLog.Debugf("Incoming filereader: %s", req)
-	
+
 	for _, torrent := range s.Torrents {
 		for _, f := range torrent.Files() {
 			if url[1:] == f.Path() {

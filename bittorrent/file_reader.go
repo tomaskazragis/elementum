@@ -6,7 +6,6 @@ import (
 	"time"
 
 	gotorrent "github.com/anacrolix/torrent"
-	humanize "github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -39,11 +38,18 @@ func NewFileReader(t *Torrent, f *gotorrent.File, rmethod string) (*FileReader, 
 		t.muReaders.Lock()
 		defer t.muReaders.Unlock()
 
-		t.readers[fr.id] = fr
-		log.Debugf("Active readers: %#v", len(t.readers))
+		// for _, r := range t.readers {
+		// 	log.Debugf("Closing active reader: %d", r.id)
+		// 	go r.Close()
+		// }
 
-		log.Infof("Setting readahead for reader %d as %s", fr.id, humanize.Bytes(uint64(t.Storage().GetReadaheadSize())))
-		fr.SetReadahead(t.Storage().GetReadaheadSize())
+		t.readers[fr.id] = fr
+		log.Debugf("Active readers now: %#v", len(t.readers))
+
+		// log.Infof("Setting readahead for reader %d as %s", fr.id, humanize.Bytes(uint64(t.GetReadaheadSize())))
+		// fr.SetReadahead(t.GetReadaheadSize())
+
+		t.ResetReaders()
 	}
 
 	fr.setSubtitles()
@@ -62,8 +68,9 @@ func (fr *FileReader) Close() error {
 	defer fr.Torrent.muReaders.Unlock()
 
 	delete(fr.Torrent.readers, fr.id)
-	log.Debugf("Active readers: %#v", len(fr.Torrent.readers))
+	log.Debugf("Active readers left: %#v", len(fr.Torrent.readers))
 
+	fr.Torrent.ResetReaders()
 	return fr.Reader.Close()
 }
 
