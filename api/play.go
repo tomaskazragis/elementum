@@ -19,7 +19,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
-		doresume := ctx.DefaultQuery("doresume", "false")
+		doresume := ctx.DefaultQuery("doresume", "true")
 		query := ctx.Query("query")
 		contentType := ctx.Query("type")
 		tmdb := ctx.Query("tmdb")

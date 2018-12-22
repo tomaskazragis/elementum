@@ -35,6 +35,9 @@ func setFanart(movie *Movie) *Movie {
 	if movie.Images.Banner == nil {
 		movie.Images.Banner = &Sizes{}
 	}
+	if movie.Images.ClearArt == nil {
+		movie.Images.ClearArt = &Sizes{}
+	}
 
 	if movie.IDs == nil || movie.IDs.TMDB == 0 {
 		return movie

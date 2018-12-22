@@ -679,7 +679,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 		external := ctx.Query("external")
-		doresume := ctx.DefaultQuery("resume", "false")
+		doresume := ctx.DefaultQuery("resume", "true")
 
 		show := tmdb.GetShow(showID, "")
 		if show == nil {
@@ -822,7 +822,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 		external := ctx.Query("external")
-		doresume := ctx.DefaultQuery("resume", "false")
+		doresume := ctx.DefaultQuery("resume", "true")
 
 		show := tmdb.GetShow(showID, "")
 		if show == nil {
