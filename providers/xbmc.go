@@ -132,7 +132,11 @@ func (as *AddonSearcher) GetQuerySearchObject(query string) *QuerySearchObject {
 	sObject := &QuerySearchObject{
 		Query: query,
 	}
+
 	sObject.ProxyURL = config.Get().ProxyURL
+	sObject.ElementumURL = util.ElementumURL()
+	sObject.InternalProxyURL = util.InternalProxyURL()
+
 	return sObject
 }
 
@@ -162,6 +166,8 @@ func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObj
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(movie.Title)
 
 	sObject.ProxyURL = config.Get().ProxyURL
+	sObject.ElementumURL = util.ElementumURL()
+	sObject.InternalProxyURL = util.InternalProxyURL()
 
 	return sObject
 }
@@ -191,6 +197,8 @@ func (as *AddonSearcher) GetSeasonSearchObject(show *tmdb.Show, season *tmdb.Sea
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
 
 	sObject.ProxyURL = config.Get().ProxyURL
+	sObject.ElementumURL = util.ElementumURL()
+	sObject.InternalProxyURL = util.InternalProxyURL()
 
 	return sObject
 }
@@ -256,6 +264,8 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 	sObject.Titles[strings.ToLower(config.Get().Language)] = NormalizeTitle(show.Name)
 
 	sObject.ProxyURL = config.Get().ProxyURL
+	sObject.ElementumURL = util.ElementumURL()
+	sObject.InternalProxyURL = util.InternalProxyURL()
 
 	return sObject
 }

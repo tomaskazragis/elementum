@@ -209,3 +209,18 @@ func isUDPPortUsed(network string, addr string) bool {
 
 	return true
 }
+
+// ElementumURL returns elementum url for external calls
+func ElementumURL() string {
+	return GetHTTPHost()
+}
+
+// InternalProxyURL returns internal proxy url
+func InternalProxyURL() string {
+	ip := "127.0.0.1"
+	if localIP, err := LocalIP(); err == nil {
+		ip = localIP.String()
+	}
+
+	return "http://" + ip + ":65222"
+}

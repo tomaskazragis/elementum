@@ -12,20 +12,24 @@ type SearchPayload struct {
 	SearchObject interface{} `json:"search_object"`
 }
 
-// ProxySearchObject ...
-type ProxySearchObject struct {
-	ProxyURL string `json:"proxy_url"`
+// GeneralSearchObject ...
+type GeneralSearchObject struct {
+	ProxyURL         string `json:"proxy_url"`
+	InternalProxyURL string `json:"internal_proxy_url"`
+	ElementumURL     string `json:"elementum_url"`
+
+	Silent bool `json:"silent"`
 }
 
 // QuerySearchObject ...
 type QuerySearchObject struct {
-	ProxySearchObject
+	GeneralSearchObject
 	Query string `json:"query"`
 }
 
 // MovieSearchObject ...
 type MovieSearchObject struct {
-	ProxySearchObject
+	GeneralSearchObject
 	IMDBId string            `json:"imdb_id"`
 	Title  string            `json:"title"`
 	Year   int               `json:"year"`
@@ -34,7 +38,7 @@ type MovieSearchObject struct {
 
 // SeasonSearchObject ...
 type SeasonSearchObject struct {
-	ProxySearchObject
+	GeneralSearchObject
 	IMDBId string            `json:"imdb_id"`
 	TVDBId int               `json:"tvdb_id"`
 	Title  string            `json:"title"`
@@ -45,7 +49,7 @@ type SeasonSearchObject struct {
 
 // EpisodeSearchObject ...
 type EpisodeSearchObject struct {
-	ProxySearchObject
+	GeneralSearchObject
 	IMDBId         string            `json:"imdb_id"`
 	TVDBId         int               `json:"tvdb_id"`
 	Title          string            `json:"title"`
