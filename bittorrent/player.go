@@ -79,6 +79,7 @@ type PlayerParams struct {
 	URI           string
 	FileIndex     int
 	ResumeIndex   int
+	SkipResume    bool
 	ContentType   string
 	KodiID        int
 	TMDBId        int

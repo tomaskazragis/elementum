@@ -19,6 +19,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
 		resume := ctx.Query("resume")
+		doresume := ctx.DefaultQuery("doresume", "false")
 		query := ctx.Query("query")
 		contentType := ctx.Query("type")
 		tmdb := ctx.Query("tmdb")
@@ -76,6 +77,7 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			URI:          uri,
 			FileIndex:    fileIndex,
 			ResumeIndex:  resumeIndex,
+			SkipResume:   doresume == "false",
 			KodiPosition: -1,
 			ContentType:  contentType,
 			TMDBId:       tmdbID,

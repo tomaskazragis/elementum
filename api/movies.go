@@ -396,6 +396,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
+		doresume := ctx.DefaultQuery("resume", "false")
 
 		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {
@@ -405,6 +406,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		existingTorrent := btService.HasTorrentByID(movie.ID)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
 				"resume", existingTorrent,
 				"tmdb", tmdbID,
 				"type", "movie")
@@ -417,8 +419,9 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		if torrent := InTorrentsMap(tmdbID); torrent != nil {
-			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrent.URI,
+			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
+				"uri", torrent.URI,
 				"tmdb", tmdbID,
 				"type", "movie")
 			if external != "" {
@@ -488,8 +491,9 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		if choice >= 0 {
 			AddToTorrentsMap(tmdbID, torrents[choice])
 
-			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[choice].URI,
+			rURL := URLQuery(URLForXBMC("/play"),
+				"uri", torrents[choice].URI,
+				"doresume", doresume,
 				"tmdb", tmdbID,
 				"type", "movie")
 			if external != "" {
@@ -508,6 +512,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
+		doresume := ctx.DefaultQuery("resume", "false")
 
 		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {
@@ -517,6 +522,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		existingTorrent := btService.HasTorrentByID(movie.ID)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
 				"resume", existingTorrent,
 				"tmdb", tmdbID,
 				"type", "movie")
@@ -530,6 +536,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		if torrent := InTorrentsMap(tmdbID); torrent != nil {
 			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
 				"uri", torrent.URI,
 				"tmdb", tmdbID,
 				"type", "movie")
@@ -559,8 +566,9 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		AddToTorrentsMap(tmdbID, torrents[0])
 
-		rURL := URLQuery(
-			URLForXBMC("/play"), "uri", torrents[0].URI,
+		rURL := URLQuery(URLForXBMC("/play"),
+			"uri", torrents[0].URI,
+			"doresume", doresume,
 			"tmdb", tmdbID,
 			"type", "movie")
 		if external != "" {

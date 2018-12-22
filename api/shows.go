@@ -679,6 +679,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 		external := ctx.Query("external")
+		doresume := ctx.DefaultQuery("resume", "false")
 
 		show := tmdb.GetShow(showID, "")
 		if show == nil {
@@ -697,6 +698,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
 				"resume", existingTorrent,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
@@ -712,8 +714,9 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		if torrent := InTorrentsMap(strconv.Itoa(episode.ID)); torrent != nil {
-			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrent.URI,
+			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
+				"uri", torrent.URI,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),
@@ -792,8 +795,9 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 		if choice >= 0 {
 			AddToTorrentsMap(strconv.Itoa(episode.ID), torrents[choice])
 
-			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrents[choice].URI,
+			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
+				"uri", torrents[choice].URI,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),
@@ -818,6 +822,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		episodeNumber, _ := strconv.Atoi(ctx.Params.ByName("episode"))
 		external := ctx.Query("external")
+		doresume := ctx.DefaultQuery("resume", "false")
 
 		show := tmdb.GetShow(showID, "")
 		if show == nil {
@@ -834,6 +839,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
 		if existingTorrent != "" && xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing) {
 			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
 				"resume", existingTorrent,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
@@ -849,8 +855,9 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		if torrent := InTorrentsMap(strconv.Itoa(episode.ID)); torrent != nil {
-			rURL := URLQuery(
-				URLForXBMC("/play"), "uri", torrent.URI,
+			rURL := URLQuery(URLForXBMC("/play"),
+				"doresume", doresume,
+				"uri", torrent.URI,
 				"tmdb", strconv.Itoa(episode.ID),
 				"show", tmdbID,
 				"season", ctx.Params.ByName("season"),
@@ -881,8 +888,9 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		AddToTorrentsMap(strconv.Itoa(episode.ID), torrents[0])
 
-		rURL := URLQuery(
-			URLForXBMC("/play"), "uri", torrents[0].URI,
+		rURL := URLQuery(URLForXBMC("/play"),
+			"doresume", doresume,
+			"uri", torrents[0].URI,
 			"tmdb", strconv.Itoa(episode.ID),
 			"show", tmdbID,
 			"season", ctx.Params.ByName("season"),

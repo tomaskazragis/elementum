@@ -106,7 +106,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTServic
 			return
 		}
 
-		if p.Params().Resume.Position > 0 {
+		if p.Params().Resume.Position > 0 && !p.Params().SkipResume {
 			xbmc.PlayerSeek(p.Params().Resume.Position)
 		}
 
