@@ -385,7 +385,12 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 
 		if len(movies) > resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
-			movies = movies[start : start+resultsPerPage]
+			end := start + resultsPerPage
+			if len(movies) <= end {
+				movies = movies[start:]
+			} else {
+				movies = movies[start:end]
+			}
 		}
 	}
 
@@ -617,7 +622,12 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 
 		if len(shows) >= resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
-			shows = shows[start : start+resultsPerPage]
+			end := start + resultsPerPage
+			if len(shows) <= end {
+				shows = shows[start:]
+			} else {
+				shows = shows[start:end]
+			}
 		}
 	}
 
@@ -886,7 +896,12 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 
 		if len(movies) > resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
-			movies = movies[start : start+resultsPerPage]
+			end := start + resultsPerPage
+			if len(movies) <= end {
+				movies = movies[start:]
+			} else {
+				movies = movies[start:end]
+			}
 		}
 	}
 
@@ -1021,7 +1036,12 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 
 		if len(shows) >= resultsPerPage {
 			start := (page - 1) % trakt.PagesAtOnce * resultsPerPage
-			shows = shows[start : start+resultsPerPage]
+			end := start + resultsPerPage
+			if len(shows) <= end {
+				shows = shows[start:]
+			} else {
+				shows = shows[start:end]
+			}
 		}
 	}
 
