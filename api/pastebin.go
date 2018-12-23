@@ -119,6 +119,7 @@ func Pastebin(ctx *gin.Context) {
 		var resp *http.Response
 		var err error
 
+		log.Infof("Doing upload to %s", p.URL)
 		if !p.IsJSON {
 			resp, err = http.PostForm(p.URL, values)
 		} else {
