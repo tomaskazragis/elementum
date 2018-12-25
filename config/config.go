@@ -155,6 +155,8 @@ type Configuration struct {
 	InternalProxyEnabled bool
 	InternalProxyLogging bool
 
+	AntizapretEnabled bool
+
 	ProxyURL         string
 	ProxyType        int
 	ProxyEnabled     bool
@@ -508,6 +510,8 @@ func Reload() *Configuration {
 
 		InternalProxyEnabled: settings["internal_proxy_enabled"].(bool),
 		InternalProxyLogging: settings["internal_proxy_logging"].(bool),
+
+		AntizapretEnabled: settings["antizapret_enabled"].(bool),
 
 		ProxyType:        settings["proxy_type"].(int),
 		ProxyEnabled:     settings["proxy_enabled"].(bool),

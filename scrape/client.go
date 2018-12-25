@@ -47,7 +47,7 @@ func Reload() {
 		directTransport.Proxy = nil
 	} else {
 		proxyURL, _ := url.Parse(config.Get().ProxyURL)
-		directTransport.Proxy = http.ProxyURL(proxyURL)
+		directTransport.Proxy = GetProxyURL(proxyURL)
 
 		log.Debugf("Setting up proxy for direct client: %s", config.Get().ProxyURL)
 	}
@@ -96,4 +96,19 @@ func CustomDialContext(ctx context.Context, network, addr string) (net.Conn, err
 	}
 
 	return dialer.DialContext(ctx, network, addr)
+}
+
+// GetProxyURL ...
+func GetProxyURL(fixedURL *url.URL) func(*http.Request) (*url.URL, error) {
+	return func(r *http.Request) (*url.URL, error) {
+		if config.Get().AntizapretEnabled {
+			if proxy, err := PacParser.FindProxy(r.URL.String()); err == nil && proxy != "" {
+				if u, err := url.Parse(proxy); err == nil && u != nil {
+					return u, nil
+				}
+			}
+		}
+
+		return fixedURL, nil
+	}
 }

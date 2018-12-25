@@ -45,6 +45,7 @@ func CustomTLS(ca *tls.Certificate) func(host string, ctx *goproxy.ProxyCtx) (*t
 		config := &tls.Config{
 			PreferServerCipherSuites: true,
 			Certificates:             []tls.Certificate{*ca},
+			InsecureSkipVerify:       true,
 		}
 
 		return config, nil
@@ -323,10 +324,10 @@ func StartProxy() *http.Server {
 
 	if config.Get().ProxyURL != "" {
 		proxyURL, _ := url.Parse(config.Get().ProxyURL)
-		Proxy.Tr.Proxy = http.ProxyURL(proxyURL)
+		Proxy.Tr.Proxy = GetProxyURL(proxyURL)
 		log.Debugf("Setting up proxy for internal proxy: %s", config.Get().ProxyURL)
 	} else {
-		Proxy.Tr.Proxy = nil
+		Proxy.Tr.Proxy = GetProxyURL(nil)
 	}
 
 	if config.Get().InternalDNSEnabled {

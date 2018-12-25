@@ -129,6 +129,10 @@ func (s *BTService) Reconfigure() {
 	s.config = config.Get()
 	s.configure()
 
+	if config.Get().AntizapretEnabled {
+		go scrape.PacParser.Update()
+	}
+
 	go s.loadTorrentFiles()
 }
 
@@ -219,9 +223,11 @@ func (s *BTService) configure() {
 		}
 		if config.Get().ProxyUseTracker {
 			if fixedURL, err := url.Parse(s.config.ProxyURL); err == nil {
-				s.ClientConfig.HTTPProxy = http.ProxyURL(fixedURL)
+				s.ClientConfig.HTTPProxy = scrape.GetProxyURL(fixedURL)
 			}
 		}
+	} else {
+		s.ClientConfig.HTTPProxy = scrape.GetProxyURL(nil)
 	}
 
 	s.ClientConfig.NoDefaultPortForwarding = s.config.DisableUPNP
