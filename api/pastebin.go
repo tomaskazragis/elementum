@@ -103,6 +103,7 @@ func Pastebin(ctx *gin.Context) {
 	}
 
 	for _, p := range pasteProjects {
+		log.Infof("Uploading to %#v", p)
 		values := url.Values{}
 
 		if p.Fields.Poster != "" {

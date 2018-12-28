@@ -247,6 +247,9 @@ func SubtitleGet(ctx *gin.Context) {
 	defer reader.Close()
 
 	subtitlesPath := filepath.Join(config.Get().DownloadPath, "Subtitles")
+	if config.Get().DownloadPath == "." {
+		subtitlesPath = filepath.Join(config.Get().TemporaryPath, "Subtitles")
+	}
 	if _, errStat := os.Stat(subtitlesPath); os.IsNotExist(errStat) {
 		if errMk := os.Mkdir(subtitlesPath, 0755); errMk != nil {
 			subLog.Error("Unable to create Subtitles folder")
