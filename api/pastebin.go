@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os/user"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -103,7 +104,7 @@ func Pastebin(ctx *gin.Context) {
 	}
 
 	for _, p := range pasteProjects {
-		log.Infof("Uploading to %#v", p)
+		log.Infof("Uploading to %#v, %s bytes", p, humanize.Bytes(uint64(len(content))))
 		values := url.Values{}
 
 		if p.Fields.Poster != "" {

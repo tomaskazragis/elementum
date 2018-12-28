@@ -49,13 +49,21 @@ type TorrentsWeb struct {
 
 // AddToTorrentsMap ...
 func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
+	if strings.HasPrefix(torrent.URI, "magnet") {
+		torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
+		if b, err := torrent.MarshalJSON(); err == nil {
+			database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
+		}
+		
+		return
+	}
+
 	b, err := ioutil.ReadFile(torrent.URI)
 	if err != nil {
 		return
 	}
 
 	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
-
 	database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
 }
 
@@ -72,7 +80,11 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 
 	if len(infohash) > 0 && len(b) > 0 {
 		torrent := &bittorrent.TorrentFile{}
-		torrent.LoadFromBytes(b)
+		if b[0] == '{' {
+			torrent.UnmarshalJSON(b)
+		} else {
+			torrent.LoadFromBytes(b)
+		}
 
 		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR gold]%s[/COLOR]", torrent.Title), xbmc.DialogExpiration.InTorrents)) {
 			return torrent
