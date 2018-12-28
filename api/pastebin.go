@@ -90,12 +90,16 @@ func Pastebin(ctx *gin.Context) {
 	defer resp.Body.Close()
 	content, _ := ioutil.ReadAll(resp.Body)
 
-	u, err := user.Current()
-	if err != nil {
-		u = &user.User{
-			Name:     "Elementum Uploader",
-			Username: "Elementum Uploader",
-		}
+	// u, err := user.Current()
+	// if err != nil {
+	// 	u = &user.User{
+	// 		Name:     "Elementum Uploader",
+	// 		Username: "Elementum Uploader",
+	// 	}
+	// }
+	u := &user.User{
+		Name:     "Elementum Uploader",
+		Username: "Elementum Uploader",
 	}
 
 	for _, p := range pasteProjects {

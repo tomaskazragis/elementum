@@ -95,4 +95,3 @@ binaries:
 
 pull:
 	docker pull elgatito/xgo-latest
-	docker pull elgatito/xgo-1.11.1
