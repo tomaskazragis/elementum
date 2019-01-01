@@ -9,22 +9,27 @@ import (
 	// "fmt"
 	"math"
 	"runtime/debug"
-	"sync"
 	"time"
 
+	"github.com/anacrolix/missinggo/perf"
+	"github.com/anacrolix/sync"
+	gotorrent "github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
 	humanize "github.com/dustin/go-humanize"
 
 	"github.com/RoaringBitmap/roaring"
 
+	"github.com/elgatito/elementum/bittorrent/reader"
 	estorage "github.com/elgatito/elementum/storage"
 )
 
 // Cache ...
 type Cache struct {
-	s  *Storage
-	mu *sync.Mutex
+	s   *Storage
+	t   *gotorrent.Torrent
+	mu  sync.Mutex
+	rmu sync.Mutex
 
 	id        string
 	running   bool
@@ -42,9 +47,13 @@ type Cache struct {
 
 	closing chan struct{}
 
-	bufferSize int
-	buffers    [][]byte
-	positions  []*BufferPosition
+	bufferSize  int
+	bufferLimit int
+	buffers     [][]byte
+	positions   []*BufferPosition
+
+	readers      []*reader.PositionReader
+	readerPieces *roaring.Bitmap
 }
 
 // BufferItem ...
@@ -69,8 +78,9 @@ type CacheInfo struct {
 
 // ItemState ...
 type ItemState struct {
-	Accessed time.Time
-	Size     int64
+	Accessed  time.Time
+	Size      int64
+	Completed bool
 }
 
 // SetCapacity ...
@@ -92,6 +102,11 @@ func (c *Cache) SetReadaheadSize(size int64) {
 	log.Debugf("Setting readahead size to: %s", humanize.Bytes(uint64(size)))
 
 	c.readahead = size
+}
+
+// SetReaders ...
+func (c *Cache) SetReaders(readers []*reader.PositionReader) {
+	c.readers = readers
 }
 
 // GetTorrentStorage ...
@@ -123,6 +138,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 
 	c.items = make(map[key]ItemState)
 	c.policy = new(lru)
+	c.readerPieces = roaring.NewBitmap()
 
 	c.pieceCount = info.NumPieces()
 	c.pieceLength = info.PieceLength
@@ -133,6 +149,7 @@ func (c *Cache) Init(info *metainfo.Info) {
 	if c.bufferSize > c.pieceCount {
 		c.bufferSize = c.pieceCount
 	}
+	c.bufferLimit = c.bufferSize - 1
 	// c.readahead = int64(float64(c.capacity) * readaheadRatio)
 	c.readahead = c.capacity
 
@@ -331,12 +348,14 @@ func (c *Cache) remove(pi key) {
 }
 
 func (c *Cache) updateItem(k key, u func(*ItemState, bool) bool) {
+	defer perf.ScopeTimer()()
+
 	ii, ok := c.items[k]
 	c.filled -= ii.Size
 	if u(&ii, ok) {
 		c.filled += ii.Size
 		if int(k) != 0 {
-			c.policy.Used(k, ii.Accessed)
+			c.policy.Used(k, ii.Accessed, ii.Completed)
 		}
 		c.items[k] = ii
 	} else {
@@ -344,6 +363,7 @@ func (c *Cache) updateItem(k key, u func(*ItemState, bool) bool) {
 		c.policy.Forget(k)
 		delete(c.items, k)
 	}
+
 	c.trimToCapacity()
 }
 
@@ -355,18 +375,52 @@ func (c *Cache) TrimToCapacity() {
 }
 
 func (c *Cache) trimToCapacity() {
-	if c.capacity < 0 {
+	if c.capacity < 0 || len(c.items) < c.bufferLimit {
 		return
 	}
-	for len(c.items) >= c.bufferSize {
-		// for k := range c.items {
-		// 	log.Debugf("Active: %#v -- %#v", k, c.items[k].Accessed.String())
+
+	defer perf.ScopeTimer()()
+
+	if c.readers != nil {
+		c.rmu.Lock()
+		c.readerPieces.Clear()
+		for _, r := range c.readers {
+			pr := r.PiecesRange()
+			if pr.Begin < pr.End {
+				c.readerPieces.AddRange(uint64(pr.Begin), uint64(pr.End))
+			} else {
+				c.readerPieces.AddInt(pr.Begin)
+			}
+		}
+		c.rmu.Unlock()
+	}
+
+	for len(c.items) >= c.bufferLimit {
+		// log.Debugf("Trimming: %#v to %#v, %#v to %#v", c.filled, c.capacity, len(c.items), c.bufferLimit)
+		if !c.readerPieces.IsEmpty() {
+			var minState ItemState
+			var minIndex key
+			for i, is := range c.items {
+				if i > 0 && !c.readerPieces.ContainsInt(int(i)) && (minIndex == 0 || is.Accessed.Before(minState.Accessed)) {
+					// log.Debugf("Not contains %v -- %#v", i, is)
+					minIndex = i
+					minState = is
+				}
+			}
+			if minIndex > 0 {
+				// log.Debugf("Not contains min %v --- %s", minIndex, minState.Accessed.String())
+				c.remove(minIndex)
+				continue
+			}
+		}
+
+		// l := c.policy.GetCompleted()
+		// if l != nil {
+		// 	// log.Debugf("Remove by completed: %v", l.(key))
+		// 	c.remove(l.(key))
+		// 	continue
 		// }
-		// log.Debugf("Trimming: %#v to %#v, %#v to %#v", c.filled, c.capacity, len(c.items), c.bufferSize)
+
 		c.remove(c.policy.Choose().(key))
 	}
-	// for c.filled+c.pieceLength > c.capacity {
-	// 	log.Debugf("Trimming: %#v to %#v", c.filled, c.capacity)
-	// 	c.remove(c.policy.Choose().(key))
-	// }
 }

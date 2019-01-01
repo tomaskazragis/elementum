@@ -109,11 +109,11 @@ func main() {
 	btService := bittorrent.NewBTService()
 
 	var shutdown = func(fromSignal bool) {
-		if shuttingDown {
+		if btService == nil || btService.ShuttingDown {
 			return
 		}
 
-		shuttingDown = true
+		btService.ShuttingDown = true
 
 		log.Info("Shutting down...")
 		library.CloseLibrary()

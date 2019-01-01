@@ -18,7 +18,6 @@ import (
 
 const (
 	chunkSize = 1024 * 16
-	// readaheadRatio = 0.33
 )
 
 var (
@@ -27,15 +26,18 @@ var (
 
 // Storage main object
 type Storage struct {
-	Type     int
-	mu       *sync.Mutex
-	items    map[string]*Cache
+	Type int
+
+	mu    *sync.Mutex
+	items map[string]*Cache
+
 	capacity int64
 }
 
 // NewMemoryStorage initializer function
 func NewMemoryStorage(maxMemorySize int64) *Storage {
 	log.Infof("Initializing memory storage of size: %s", humanize.Bytes(uint64(maxMemorySize)))
+
 	s := &Storage{
 		mu:       &sync.Mutex{},
 		capacity: maxMemorySize,
@@ -68,8 +70,7 @@ func (s *Storage) GetReadaheadSize() int64 {
 func (s *Storage) SetReadaheadSize(size int64) {}
 
 // SetReaders ...
-func (s *Storage) SetReaders(readers []*reader.PositionReader) {
-}
+func (s *Storage) SetReaders(readers []*reader.PositionReader) {}
 
 // OpenTorrent ...
 func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (storage.TorrentImpl, error) {
@@ -78,13 +79,24 @@ func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (stor
 		return nil, errors.New("Not enough free memory")
 	}
 
+	reservedPieces := []int{}
+	for _, f := range info.UpvertedFiles() {
+		reservedPieces = append(reservedPieces, bytePiece(f.Offset(info), info.PieceLength))
+	}
+
 	c := &Cache{
-		s:        s,
+		s: s,
+
+		mu:  &sync.Mutex{},
+		bmu: &sync.Mutex{},
+		rmu: &sync.Mutex{},
+
 		capacity: s.capacity,
 		id:       infoHash.HexString(),
+		reserved: reservedPieces,
 	}
+
 	c.Init(info)
-	go c.Start()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -97,4 +109,9 @@ func (s *Storage) OpenTorrent(info *metainfo.Info, infoHash metainfo.Hash) (stor
 // Use physical free memory or try to detect free to allocate?
 func (s *Storage) haveAvailableMemory() bool {
 	return true
+}
+
+func bytePiece(off, pieceLength int64) (ret int) {
+	ret = int(off / pieceLength)
+	return
 }

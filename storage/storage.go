@@ -3,6 +3,7 @@ package storage
 import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"github.com/elgatito/elementum/bittorrent/reader"
 
 	fat32storage "github.com/iamacarpet/go-torrent-storage-fat32"
 )
@@ -37,6 +38,7 @@ type ElementumStorage interface {
 	GetTorrentStorage(string) TorrentStorage
 	GetReadaheadSize() int64
 	SetReadaheadSize(int64)
+	SetReaders([]*reader.PositionReader)
 }
 
 // TorrentStorage ...
@@ -93,4 +95,8 @@ func (me *DummyStorage) GetReadaheadSize() int64 {
 // SetReadaheadSize ...
 func (me *DummyStorage) SetReadaheadSize(size int64) {
 	me.readahead = size
+}
+
+// SetReaders ...
+func (me *DummyStorage) SetReaders(readers []*reader.PositionReader) {
 }

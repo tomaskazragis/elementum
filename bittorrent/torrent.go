@@ -14,6 +14,7 @@ import (
 	"github.com/anacrolix/torrent/peer_protocol"
 	"github.com/dustin/go-humanize"
 
+	"github.com/elgatito/elementum/bittorrent/reader"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	estorage "github.com/elgatito/elementum/storage"
@@ -24,7 +25,7 @@ type Torrent struct {
 	*gotorrent.Torrent
 
 	infoHash      string
-	readers       map[int]*FileReader
+	readers       map[int64]*FileReader
 	bufferReaders map[string]*FileReader
 
 	ChosenFiles []*gotorrent.File
@@ -86,7 +87,7 @@ func NewTorrent(service *BTService, handle *gotorrent.Torrent, path string) *Tor
 		TorrentPath: path,
 
 		bufferReaders:        map[string]*FileReader{},
-		readers:              map[int]*FileReader{},
+		readers:              map[int64]*FileReader{},
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
 		BufferEndPieces:      []int{},
@@ -344,7 +345,7 @@ func (t *Torrent) Buffer(file *gotorrent.File) {
 		file.DisplayPath(), humanize.Bytes(uint64(file.Length())), humanize.Bytes(uint64(file.Torrent().Length())),
 		humanize.Bytes(uint64(t.Service.GetBufferSize())),
 		preBufferStart, preBufferEnd, postBufferStart, postBufferEnd,
-		humanize.Bytes(uint64(file.Torrent().Info().PieceLength)), humanize.Bytes(uint64(preBufferSize)), humanize.Bytes(uint64(postBufferSize)),
+		humanize.Bytes(uint64(t.pieceLength)), humanize.Bytes(uint64(preBufferSize)), humanize.Bytes(uint64(postBufferSize)),
 		preBufferOffset, postBufferOffset, file.Offset())
 
 	t.Service.SetBufferingLimits()
@@ -363,7 +364,7 @@ func (t *Torrent) getBufferSize(f *gotorrent.File, off, length int64) (startPiec
 		off = 0
 	}
 
-	pieceLength := int64(t.Info().PieceLength)
+	pieceLength := t.Info().PieceLength
 
 	offsetStart := f.Offset() + off
 	startPiece = int(offsetStart / pieceLength)
@@ -641,15 +642,48 @@ func (t *Torrent) SaveMetainfo(path string) error {
 
 // GetReadaheadSize ...
 func (t *Torrent) GetReadaheadSize() int64 {
+	defaultRA := int64(50 * 1024 * 1024)
 	if t.Service.config.DownloadStorage != estorage.StorageMemory {
-		return 50 * 1024 * 1024
+		return defaultRA
 	}
 
-	return int64(float64(t.Storage().GetReadaheadSize()) * (1/float64(len(t.readers)) - 0.05))
+	if t.Storage() == nil || len(t.readers) == 0 {
+		return defaultRA
+	}
+
+	return int64(float64(t.Storage().GetReadaheadSize()-int64(3*t.pieceLength)) * (1 / float64(len(t.readers))))
+}
+
+// SetReaders ...
+func (t *Torrent) SetReaders() {
+	t.muReaders.Lock()
+	defer t.muReaders.Unlock()
+
+	readers := make([]*reader.PositionReader, 0, len(t.readers))
+	for _, r := range t.readers {
+		readers = append(readers, r.PositionReader)
+	}
+
+	t.Storage().SetReaders(readers)
+}
+
+// CloseReaders ...
+func (t *Torrent) CloseReaders() {
+	t.muReaders.Lock()
+	defer t.muReaders.Unlock()
+
+	for k, r := range t.readers {
+		log.Debugf("Closing active reader: %d", r.id)
+		r.Close()
+		delete(t.readers, k)
+	}
 }
 
 // ResetReaders ...
 func (t *Torrent) ResetReaders() {
+	t.muReaders.Lock()
+	defer t.muReaders.Unlock()
+
 	perReaderSize := t.GetReadaheadSize()
 	for _, r := range t.readers {
 		log.Infof("Setting readahead for reader %d as %s", r.id, humanize.Bytes(uint64(perReaderSize)))

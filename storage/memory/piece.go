@@ -3,11 +3,11 @@ package memory
 import (
 	"errors"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/missinggo/perf"
+	"github.com/anacrolix/sync"
 	"github.com/anacrolix/torrent/storage"
 )
 
@@ -24,6 +24,7 @@ type Piece struct {
 	Active    bool
 	Completed bool
 	Size      int64
+	IsRead    bool
 	Accessed  time.Time
 
 	Chunks *roaring.Bitmap
@@ -42,6 +43,8 @@ func (p *Piece) Completion() storage.Completion {
 
 // MarkComplete ...
 func (p *Piece) MarkComplete() error {
+	defer perf.ScopeTimer()()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -68,7 +71,10 @@ func (p *Piece) MarkNotComplete() error {
 	defer p.mu.Unlock()
 
 	// log.Debugf("NotComplete: %#v", p.Index)
+
 	p.Completed = false
+	p.IsRead = false
+
 	return nil
 }
 
@@ -106,6 +112,8 @@ func (p *Piece) GetBuffer(iswrite bool) bool {
 					*i = p.GetState()
 				}
 				i.Accessed = time.Now()
+				i.Completed = p.IsRead
+
 				return ok
 			})
 
@@ -124,7 +132,10 @@ func (p *Piece) GetBuffer(iswrite bool) bool {
 // Reset is cleaning stats to 0's
 func (p *Piece) Reset() {
 	p.Chunks.Clear()
+
 	p.Size = 0
+	p.IsRead = false
+	p.Completed = false
 }
 
 // Seek File-like implementation
@@ -202,6 +213,10 @@ func (p *Piece) ReadAt(b []byte, off int64) (n int, err error) {
 		return 0, io.EOF
 	}
 
+	if p.Completed && off+int64(n) >= p.Size {
+		p.IsRead = true
+	}
+
 	p.onRead()
 
 	return n, nil
@@ -231,6 +246,8 @@ func (p *Piece) onRead() {
 
 	p.c.updateItem(p.Key, func(i *ItemState, ok bool) bool {
 		i.Accessed = time.Now()
+		i.Completed = p.IsRead
+
 		return ok
 	})
 }
@@ -244,6 +261,8 @@ func (p *Piece) onWrite() {
 	p.c.updateItem(p.Key, func(i *ItemState, ok bool) bool {
 		i.Accessed = time.Now()
 		i.Size = p.Size
+		i.Completed = p.IsRead
+
 		return ok
 	})
 }

@@ -45,7 +45,7 @@ func ServeTorrent(s *BTService, downloadPath string) http.Handler {
 
 		defer fr.Close()
 		http.ServeContent(w, r, url, time.Time{}, fr)
-
+		
 		// http.ServeContent(w, r, url, time.Time{}, rs)
 	}))
 }

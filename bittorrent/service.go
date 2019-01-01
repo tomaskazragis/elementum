@@ -31,7 +31,7 @@ import (
 	"github.com/elgatito/elementum/diskusage"
 	"github.com/elgatito/elementum/scrape"
 	estorage "github.com/elgatito/elementum/storage"
-	memory "github.com/elgatito/elementum/storage/memory"
+	memory "github.com/elgatito/elementum/storage/memory_v2"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -67,6 +67,8 @@ type BTService struct {
 
 	SpaceChecked map[string]bool
 	MarkedToMove string
+
+	ShuttingDown bool
 }
 
 type activeTorrent struct {
