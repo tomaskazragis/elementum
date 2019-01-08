@@ -385,6 +385,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	log.Infof("Adding torrent from %s", uri)
 
 	if s.config.DownloadStorage != estorage.StorageMemory && s.config.DownloadPath == "." {
+		log.Warningf("Cannot add torrent since download path is not set")
 		xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
 		return nil, fmt.Errorf("Download path empty")
 	}

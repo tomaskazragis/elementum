@@ -85,6 +85,15 @@ func ResetPath(ctx *gin.Context) {
 	xbmc.SetSetting("torrents_path", "special://temp/elementum_torrents/")
 }
 
+// ResetCustomPath ...
+func ResetCustomPath(ctx *gin.Context) {
+	path := ctx.Params.ByName("path")
+
+	if path != "" {
+		xbmc.SetSetting(path + "_path", "/")
+	}
+}
+
 // SetViewMode ...
 func SetViewMode(ctx *gin.Context) {
 	contentType := ctx.Params.ByName("content_type")

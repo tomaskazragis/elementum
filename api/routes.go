@@ -280,6 +280,7 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		cmd.GET("/clear_tmdb_cache", ClearTmdbCache)
 
 		cmd.GET("/reset_path", ResetPath)
+		cmd.GET("/reset_path/:path", ResetCustomPath)
 
 		cmd.GET("/paste/:type", Pastebin)
 

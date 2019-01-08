@@ -251,6 +251,7 @@ func Reload() *Configuration {
 
 	info := xbmc.GetAddonInfo()
 	if info == nil || info.ID == "" {
+		log.Warningf("Can't continue because addon info is empty")
 		settingsWarning = "LOCALIZE[30113]"
 		panic(settingsWarning)
 	}
@@ -305,8 +306,11 @@ func Reload() *Configuration {
 	torrentsPath := TranslatePath(xbmc.GetSettingString("torrents_path"))
 	downloadStorage := xbmc.GetSettingInt("download_storage")
 
+	log.Debugf("Paths translated by Kodi: Download = %s , Library = %s , Torrents = %s , Storage = %d", downloadPath, libraryPath, torrentsPath, downloadStorage)
+
 	if downloadStorage != 1 {
 		if downloadPath == "." {
+			log.Warningf("Can't continue because download path is empty")
 			settingsWarning = "LOCALIZE[30113]"
 			panic(settingsWarning)
 		} else if err := IsWritablePath(downloadPath); err != nil {
@@ -318,6 +322,7 @@ func Reload() *Configuration {
 	log.Infof("Using download path: %s", downloadPath)
 
 	if libraryPath == "." {
+		log.Errorf("Cannot use library location '%s'", libraryPath)
 		settingsWarning = "LOCALIZE[30220]"
 		panic(settingsWarning)
 	} else if strings.Contains(libraryPath, "elementum_library") {
