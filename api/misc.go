@@ -125,6 +125,8 @@ func fileSize(path string) string {
 
 // SelectNetworkInterface ...
 func SelectNetworkInterface(ctx *gin.Context) {
+	typeName := ctx.Params.ByName("type")
+
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		ctx.String(404, err.Error())
@@ -167,7 +169,11 @@ func SelectNetworkInterface(ctx *gin.Context) {
 	choice := xbmc.ListDialog("LOCALIZE[30474]", items...)
 	if choice >= 0 {
 		xbmc.SetSetting("listen_autodetect_ip", "false")
-		xbmc.SetSetting("listen_interfaces", ifaces[choice].Name)
+		if typeName == "listen" {
+			xbmc.SetSetting("listen_interfaces", ifaces[choice].Name)
+		} else {
+			xbmc.SetSetting("outgoing_interfaces", ifaces[choice].Name)
+		}
 	}
 
 	ctx.String(200, "")
