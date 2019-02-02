@@ -88,9 +88,9 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		player := bittorrent.NewBTPlayer(btService, params)
-		log.Debugf("Playing item: %#v", resume)
+		log.Debugf("Playing item: %#v", params)
 		if t, ok := btService.Torrents[resume]; resume != "" && ok {
-			player.Torrent = t
+			player.SetTorrent(t)
 		}
 		if player.Buffer() != nil || !player.HasChosenFile() {
 			player.Close()
@@ -145,10 +145,10 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				query       string
 				contentType string
 			)
-			torrentHandle := btService.Torrents[resume]
+			t := btService.Torrents[resume]
 
-			if torrentHandle != nil {
-				infoHash := torrentHandle.Torrent.InfoHash().AsString()
+			if t != nil {
+				infoHash := t.InfoHash()
 				dbItem := database.Get().GetBTItem(infoHash)
 				if dbItem != nil && dbItem.Type != "" {
 					contentType = dbItem.Type

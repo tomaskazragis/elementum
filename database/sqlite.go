@@ -12,8 +12,6 @@ import (
 	// Importing sqlite driver
 	_ "github.com/mattn/go-sqlite3"
 
-	gotorrent "github.com/anacrolix/torrent"
-
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 )
@@ -252,17 +250,18 @@ func (d *SqliteDatabase) UpdateStatusBTItem(infoHash string, status int) error {
 }
 
 // UpdateBTItem ...
-func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []*gotorrent.File, query string, infos ...int) error {
+func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType string, files []string, query string, infos ...int) error {
 	fileStr := ""
 	for _, f := range files {
-		if f != nil {
+		if f != "" {
 			if len(fileStr) > 0 {
 				fileStr += "|"
 			}
 
-			fileStr += f.Path()
+			fileStr += f
 		}
 	}
+
 	infoStr := ""
 	for _, f := range infos {
 		if len(infoStr) > 0 {

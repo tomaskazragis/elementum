@@ -203,7 +203,7 @@ func GetSearchLabels(btService *bittorrent.BTService, tmdbID string) (item *xbmc
 	// Collecting downloaded file names into string to show in a subtitle
 	chosenFiles := map[string]bool{}
 	for _, f := range torrent.ChosenFiles {
-		chosenFiles[filepath.Base(f.DisplayPath())] = true
+		chosenFiles[filepath.Base(f.Path)] = true
 	}
 	chosenFileNames := []string{}
 	for k := range chosenFiles {

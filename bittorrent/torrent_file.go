@@ -16,9 +16,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/anacrolix/torrent/bencode"
 	"github.com/dustin/go-humanize"
 	"github.com/op/go-logging"
+	"github.com/zeebo/bencode"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/scrape"
@@ -374,7 +374,8 @@ func (t *TorrentFile) Magnet() {
 func (t *TorrentFile) LoadFromBytes(in []byte) error {
 
 	var torrentFile *TorrentFileRaw
-	if err := bencode.Unmarshal(in, &torrentFile); err != nil {
+
+	if err := bencode.DecodeBytes(in, &torrentFile); err != nil {
 		return err
 	}
 

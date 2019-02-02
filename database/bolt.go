@@ -337,9 +337,9 @@ func ParseCacheItem(item []byte) (int, []byte) {
 }
 
 // GetCachedBytes ...
-func (database *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
+func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []byte, err error) {
 	var value []byte
-	err = database.db.View(func(tx *bolt.Tx) error {
+	err = d.db.View(func(tx *bolt.Tx) error {
 		value = tx.Bucket(bucket).Get([]byte(key))
 		return nil
 	})
@@ -350,7 +350,7 @@ func (database *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheVa
 
 	expire, v := ParseCacheItem(value)
 	if expire > 0 && expire < util.NowInt() {
-		database.Delete(bucket, key)
+		d.Delete(bucket, key)
 		return nil, errors.New("Key Expired")
 	}
 
@@ -358,14 +358,14 @@ func (database *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheVa
 }
 
 // GetCached ...
-func (database *BoltDatabase) GetCached(bucket []byte, key string) (string, error) {
-	value, err := database.GetCachedBytes(bucket, key)
+func (d *BoltDatabase) GetCached(bucket []byte, key string) (string, error) {
+	value, err := d.GetCachedBytes(bucket, key)
 	return string(value), err
 }
 
 // GetCachedObject ...
-func (database *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
-	v, err := database.GetCachedBytes(bucket, key)
+func (d *BoltDatabase) GetCachedObject(bucket []byte, key string, item interface{}) (err error) {
+	v, err := d.GetCachedBytes(bucket, key)
 	if err != nil || len(v) == 0 {
 		return err
 	}
@@ -383,8 +383,8 @@ func (database *BoltDatabase) GetCachedObject(bucket []byte, key string, item in
 //
 
 // Has checks for existence of a key
-func (database *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
-	database.db.View(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
+	d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		ret = len(b.Get([]byte(key))) > 0
 		return nil
@@ -394,8 +394,8 @@ func (database *BoltDatabase) Has(bucket []byte, key string) (ret bool) {
 }
 
 // GetBytes ...
-func (database *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte, err error) {
-	err = database.db.View(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte, err error) {
+	err = d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		value = b.Get([]byte(key))
 		return nil
@@ -405,14 +405,14 @@ func (database *BoltDatabase) GetBytes(bucket []byte, key string) (value []byte,
 }
 
 // Get ...
-func (database *BoltDatabase) Get(bucket []byte, key string) (string, error) {
-	value, err := database.GetBytes(bucket, key)
+func (d *BoltDatabase) Get(bucket []byte, key string) (string, error) {
+	value, err := d.GetBytes(bucket, key)
 	return string(value), err
 }
 
 // GetObject ...
-func (database *BoltDatabase) GetObject(bucket []byte, key string, item interface{}) (err error) {
-	v, err := database.GetBytes(bucket, key)
+func (d *BoltDatabase) GetObject(bucket []byte, key string, item interface{}) (err error) {
+	v, err := d.GetBytes(bucket, key)
 	if err != nil {
 		return err
 	}
@@ -430,23 +430,23 @@ func (database *BoltDatabase) GetObject(bucket []byte, key string, item interfac
 }
 
 // SetCachedBytes ...
-func (database *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
-	return database.db.Update(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, value []byte) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
 		value = append([]byte(strconv.Itoa(util.NowPlusSecondsInt(seconds))+"|"), value...)
 		return tx.Bucket(bucket).Put([]byte(key), value)
 	})
 }
 
 // SetCached ...
-func (database *BoltDatabase) SetCached(bucket []byte, seconds int, key string, value string) error {
-	return database.SetCachedBytes(bucket, seconds, key, []byte(value))
+func (d *BoltDatabase) SetCached(bucket []byte, seconds int, key string, value string) error {
+	return d.SetCachedBytes(bucket, seconds, key, []byte(value))
 }
 
 // SetCachedObject ...
-func (database *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
+func (d *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
-	} else if err := database.SetCachedBytes(bucket, seconds, key, buf); err != nil {
+	} else if err := d.SetCachedBytes(bucket, seconds, key, buf); err != nil {
 		return err
 	}
 
@@ -454,22 +454,22 @@ func (database *BoltDatabase) SetCachedObject(bucket []byte, seconds int, key st
 }
 
 // SetBytes ...
-func (database *BoltDatabase) SetBytes(bucket []byte, key string, value []byte) error {
-	return database.db.Update(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) SetBytes(bucket []byte, key string, value []byte) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Put([]byte(key), value)
 	})
 }
 
 // Set ...
-func (database *BoltDatabase) Set(bucket []byte, key string, value string) error {
-	return database.SetBytes(bucket, key, []byte(value))
+func (d *BoltDatabase) Set(bucket []byte, key string, value string) error {
+	return d.SetBytes(bucket, key, []byte(value))
 }
 
 // SetObject ...
-func (database *BoltDatabase) SetObject(bucket []byte, key string, item interface{}) error {
+func (d *BoltDatabase) SetObject(bucket []byte, key string, item interface{}) error {
 	if buf, err := json.Marshal(item); err != nil {
 		return err
-	} else if err := database.SetBytes(bucket, key, buf); err != nil {
+	} else if err := d.SetBytes(bucket, key, buf); err != nil {
 		return err
 	}
 
@@ -477,8 +477,8 @@ func (database *BoltDatabase) SetObject(bucket []byte, key string, item interfac
 }
 
 // BatchSet ...
-func (database *BoltDatabase) BatchSet(bucket []byte, objects map[string]string) error {
-	return database.db.Batch(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) BatchSet(bucket []byte, objects map[string]string) error {
+	return d.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for key, value := range objects {
 			if err := b.Put([]byte(key), []byte(value)); err != nil {
@@ -490,8 +490,8 @@ func (database *BoltDatabase) BatchSet(bucket []byte, objects map[string]string)
 }
 
 // BatchSetBytes ...
-func (database *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
-	return database.db.Batch(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]byte) error {
+	return d.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for key, value := range objects {
 			if err := b.Put([]byte(key), value); err != nil {
@@ -503,7 +503,7 @@ func (database *BoltDatabase) BatchSetBytes(bucket []byte, objects map[string][]
 }
 
 // BatchSetObject ...
-func (database *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
+func (d *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]interface{}) error {
 	serialized := map[string][]byte{}
 	for k, item := range objects {
 		buf, err := json.Marshal(item)
@@ -513,19 +513,19 @@ func (database *BoltDatabase) BatchSetObject(bucket []byte, objects map[string]i
 		serialized[k] = buf
 	}
 
-	return database.BatchSetBytes(bucket, serialized)
+	return d.BatchSetBytes(bucket, serialized)
 }
 
 // Delete ...
-func (database *BoltDatabase) Delete(bucket []byte, key string) error {
-	return database.db.Update(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) Delete(bucket []byte, key string) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucket).Delete([]byte(key))
 	})
 }
 
 // BatchDelete ...
-func (database *BoltDatabase) BatchDelete(bucket []byte, keys []string) error {
-	return database.db.Batch(func(tx *bolt.Tx) error {
+func (d *BoltDatabase) BatchDelete(bucket []byte, keys []string) error {
+	return d.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		for _, key := range keys {
 			b.Delete([]byte(key))
@@ -535,9 +535,9 @@ func (database *BoltDatabase) BatchDelete(bucket []byte, keys []string) error {
 }
 
 // AsWriter ...
-func (database *BoltDatabase) AsWriter(bucket []byte, key string) *DBWriter {
+func (d *BoltDatabase) AsWriter(bucket []byte, key string) *DBWriter {
 	return &DBWriter{
-		database: database,
+		database: d,
 		bucket:   bucket,
 		key:      []byte(key),
 	}

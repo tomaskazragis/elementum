@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
@@ -54,7 +56,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 		if b, err := torrent.MarshalJSON(); err == nil {
 			database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
 		}
-		
+
 		return
 	}
 
@@ -236,52 +238,91 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 // ListTorrentsWeb ...
 func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		torrents := make([]*TorrentsWeb, 0, len(btService.Torrents))
+		btService.Session.GetHandle().GetTorrents()
+		torrentsVector := btService.Session.GetHandle().GetTorrents()
+		torrentsVectorSize := int(torrentsVector.Size())
+		torrents := make([]*TorrentsWeb, 0, torrentsVectorSize)
+		seedTimeLimit := config.Get().SeedTimeLimit
 
-		if len(btService.Torrents) == 0 {
+		if torrentsVectorSize == 0 {
 			ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 			ctx.JSON(200, torrents)
 			return
 		}
 
-		// torrentsLog.Debugf("Currently downloading:")
-		for _, torrent := range btService.Torrents {
-			if torrent == nil {
+		for i := 0; i < torrentsVectorSize; i++ {
+			torrentHandle := torrentsVector.Get(i)
+			if !torrentHandle.IsValid() {
 				continue
 			}
 
-			torrentName := torrent.Name()
-			progress := torrent.GetProgress()
-			status := torrent.GetStateString()
+			torrentStatus := torrentHandle.Status()
 
-			// if status != statusFinished {
-			// 	if progress >= 100 {
-			// 		status = statusFinished
-			// 	} else {
-			// 		status = statusDownloading
-			// 	}
-			// } else if status == statusFinished || progress >= 100 {
-			// 	status = statusSeeding
-			// }
+			torrentName := torrentStatus.GetName()
+			progress := float64(torrentStatus.GetProgress()) * 100
 
-			size := humanize.Bytes(uint64(torrent.Length()))
-			downloadRate := float64(torrent.DownloadRate) / 1024
-			uploadRate := float64(torrent.UploadRate) / 1024
+			status := bittorrent.StatusStrings[int(torrentStatus.GetState())]
+			if btService.Session.GetHandle().IsPaused() {
+				status = "Paused"
+			} else if torrentStatus.GetPaused() && status != "Finished" {
+				if progress == 100 {
+					status = "Finished"
+				} else {
+					status = "Paused"
+				}
+			} else if !torrentStatus.GetPaused() && (status == "Finished" || progress == 100) {
+				status = "Seeding"
+			}
 
-			stats := torrent.Stats()
-			peers := stats.ActivePeers
-			peersTotal := stats.TotalPeers
+			ratio := float64(0)
+			allTimeDownload := float64(torrentStatus.GetAllTimeDownload())
+			if allTimeDownload > 0 {
+				ratio = float64(torrentStatus.GetAllTimeUpload()) / allTimeDownload
+			}
+
+			timeRatio := float64(0)
+			finishedTime := float64(torrentStatus.GetFinishedTime())
+			downloadTime := float64(torrentStatus.GetActiveTime()) - finishedTime
+			if downloadTime > 1 {
+				timeRatio = finishedTime / downloadTime
+			}
+			seedingTime := time.Duration(torrentStatus.GetSeedingTime()) * time.Second
+			if progress == 100 && seedingTime == 0 {
+				seedingTime = time.Duration(finishedTime) * time.Second
+			}
+
+			torrentInfo := torrentHandle.TorrentFile()
+			size := ""
+			if torrentInfo != nil && torrentInfo.Swigcptr() != 0 {
+				size = humanize.Bytes(uint64(torrentInfo.TotalSize()))
+			}
+			downloadRate := float64(torrentStatus.GetDownloadRate()) / 1024
+			uploadRate := float64(torrentStatus.GetUploadRate()) / 1024
+			seeders := torrentStatus.GetNumSeeds()
+			seedersTotal := torrentStatus.GetNumComplete()
+			peers := torrentStatus.GetNumPeers() - seeders
+			peersTotal := torrentStatus.GetNumIncomplete()
+
+			shaHash := torrentHandle.Status().GetInfoHash().ToString()
+			infoHash := hex.EncodeToString([]byte(shaHash))
 
 			t := TorrentsWeb{
-				ID:           torrent.InfoHash(),
-				Name:         torrentName,
-				Size:         size,
-				Status:       status,
-				Progress:     progress,
-				DownloadRate: downloadRate,
-				UploadRate:   uploadRate,
-				Peers:        peers,
-				PeersTotal:   peersTotal,
+				ID:            infoHash,
+				Name:          torrentName,
+				Size:          size,
+				Status:        status,
+				Progress:      progress,
+				Ratio:         ratio,
+				TimeRatio:     timeRatio,
+				SeedingTime:   seedingTime.String(),
+				SeedTime:      seedingTime.Seconds(),
+				SeedTimeLimit: seedTimeLimit,
+				DownloadRate:  downloadRate,
+				UploadRate:    uploadRate,
+				Seeders:       seeders,
+				SeedersTotal:  seedersTotal,
+				Peers:         peers,
+				PeersTotal:    peersTotal,
 			}
 			torrents = append(torrents, &t)
 
@@ -481,7 +522,7 @@ func saveTorrentFile(file multipart.File, header *multipart.FileHeader) (string,
 	}
 
 	var err error
-	path := filepath.Join(config.Get().TemporaryPath, filepath.Base(header.Filename))
+	path := filepath.Join(config.Get().TorrentsPath, filepath.Base(header.Filename))
 	log.Debugf("Saving incoming torrent file to: %s", path)
 
 	if _, err = os.Stat(path); err != nil && !os.IsNotExist(err) {

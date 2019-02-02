@@ -77,7 +77,7 @@ func main() {
 	logging.SetBackend(logging.NewLogBackend(ioutil.Discard, "", 0), logging.NewLogBackend(os.Stdout, "", 0))
 
 	log.Infof("Starting Elementum daemon")
-	log.Infof("Version: %s GoTorrent: %s Go: %s, Threads: %d", util.GetVersion(), util.GetTorrentVersion(), runtime.Version(), runtime.GOMAXPROCS(0))
+	log.Infof("Version: %s LibTorrent: %s Go: %s, Threads: %d", util.GetVersion(), util.GetTorrentVersion(), runtime.Version(), runtime.GOMAXPROCS(0))
 
 	conf := config.Reload()
 	xbmc.KodiVersion = conf.Platform.Kodi
@@ -154,7 +154,11 @@ func main() {
 	http.Handle("/debug/all", bittorrent.DebugAll(btService))
 	http.Handle("/debug/bundle", bittorrent.DebugBundle(btService))
 
-	http.Handle("/files/", bittorrent.ServeTorrent(btService, config.Get().DownloadPath))
+	http.Handle("/files/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
+		handler := http.StripPrefix("/files/", http.FileServer(bittorrent.NewTorrentFS(btService)))
+		handler.ServeHTTP(w, r)
+	}))
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		btService.Reconfigure()
 	}))

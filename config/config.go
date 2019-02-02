@@ -76,24 +76,24 @@ type Configuration struct {
 	ConnectionsLimit          int
 	ConnTrackerLimit          int
 	ConnTrackerLimitAuto      bool
-	// SessionSave         int
-	// ShareRatioLimit     int
-	// SeedTimeRatioLimit  int
-	SeedTimeLimit        int
-	DisableUpload        bool
-	DisableDHT           bool
-	DisableTCP           bool
-	DisableUTP           bool
-	DisableUPNP          bool
-	EncryptionPolicy     int
-	ListenPortMin        int
-	ListenPortMax        int
-	ListenInterfaces     string
-	ListenAutoDetectIP   bool
-	ListenAutoDetectPort bool
-	// OutgoingInterfaces string
-	// TunedStorage        bool
-	Scrobble bool
+	SessionSave               int
+	ShareRatioLimit           int
+	SeedTimeRatioLimit        int
+	SeedTimeLimit             int
+	DisableUpload             bool
+	DisableDHT                bool
+	DisableTCP                bool
+	DisableUTP                bool
+	DisableUPNP               bool
+	EncryptionPolicy          int
+	ListenPortMin             int
+	ListenPortMax             int
+	ListenInterfaces          string
+	ListenAutoDetectIP        bool
+	ListenAutoDetectPort      bool
+	OutgoingInterfaces        string
+	TunedStorage              bool
+	Scrobble                  bool
 
 	TraktUsername                  string
 	TraktToken                     string
@@ -435,27 +435,27 @@ func Reload() *Configuration {
 		StrmLanguage:              settings["strm_language"].(string),
 		LibraryNFOMovies:          settings["library_nfo_movies"].(bool),
 		LibraryNFOShows:           settings["library_nfo_shows"].(bool),
-		// ShareRatioLimit:     settings["share_ratio_limit"].(int),
-		// SeedTimeRatioLimit:  settings["seed_time_ratio_limit"].(int),
-		SeedTimeLimit:        settings["seed_time_limit"].(int),
-		DisableUpload:        settings["disable_upload"].(bool),
-		DisableDHT:           settings["disable_dht"].(bool),
-		DisableTCP:           settings["disable_tcp"].(bool),
-		DisableUTP:           settings["disable_utp"].(bool),
-		DisableUPNP:          settings["disable_upnp"].(bool),
-		EncryptionPolicy:     settings["encryption_policy"].(int),
-		ListenPortMin:        settings["listen_port_min"].(int),
-		ListenPortMax:        settings["listen_port_max"].(int),
-		ListenInterfaces:     settings["listen_interfaces"].(string),
-		ListenAutoDetectIP:   settings["listen_autodetect_ip"].(bool),
-		ListenAutoDetectPort: settings["listen_autodetect_port"].(bool),
-		// OutgoingInterfaces: settings["outgoing_interfaces"].(string),
-		// TunedStorage:        settings["tuned_storage"].(bool),
-		ConnectionsLimit:     settings["connections_limit"].(int),
-		ConnTrackerLimit:     settings["conntracker_limit"].(int),
-		ConnTrackerLimitAuto: settings["conntracker_limit_auto"].(bool),
-		// SessionSave:         settings["session_save"].(int),
-		Scrobble: settings["trakt_scrobble"].(bool),
+		ShareRatioLimit:           settings["share_ratio_limit"].(int),
+		SeedTimeRatioLimit:        settings["seed_time_ratio_limit"].(int),
+		SeedTimeLimit:             settings["seed_time_limit"].(int) * 3600,
+		DisableUpload:             settings["disable_upload"].(bool),
+		DisableDHT:                settings["disable_dht"].(bool),
+		DisableTCP:                settings["disable_tcp"].(bool),
+		DisableUTP:                settings["disable_utp"].(bool),
+		DisableUPNP:               settings["disable_upnp"].(bool),
+		EncryptionPolicy:          settings["encryption_policy"].(int),
+		ListenPortMin:             settings["listen_port_min"].(int),
+		ListenPortMax:             settings["listen_port_max"].(int),
+		ListenInterfaces:          settings["listen_interfaces"].(string),
+		ListenAutoDetectIP:        settings["listen_autodetect_ip"].(bool),
+		ListenAutoDetectPort:      settings["listen_autodetect_port"].(bool),
+		OutgoingInterfaces:        settings["outgoing_interfaces"].(string),
+		TunedStorage:              settings["tuned_storage"].(bool),
+		ConnectionsLimit:          settings["connections_limit"].(int),
+		ConnTrackerLimit:          settings["conntracker_limit"].(int),
+		ConnTrackerLimitAuto:      settings["conntracker_limit_auto"].(bool),
+		SessionSave:               settings["session_save"].(int),
+		Scrobble:                  settings["trakt_scrobble"].(bool),
 
 		TraktUsername:                  settings["trakt_username"].(string),
 		TraktToken:                     settings["trakt_token"].(string),
@@ -610,6 +610,10 @@ func Reload() *Configuration {
 		}
 	} else {
 		newConfig.StrmLanguage = newConfig.Language
+	}
+
+	if newConfig.SessionSave == 0 {
+		newConfig.SessionSave = 10
 	}
 
 	lock.Lock()

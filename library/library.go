@@ -433,15 +433,20 @@ func checkLibraryPath() error {
 		libraryPath = config.Get().LibraryPath
 	}
 	if libraryPath == "" || libraryPath == "." {
+		log.Warningf("Library path is not initialized")
 		return errors.New("LOCALIZE[30220]")
 	}
 	if fileInfo, err := os.Stat(libraryPath); err != nil {
 		if fileInfo == nil {
+			log.Warningf("Library path is invalid")
 			return errors.New("Invalid library path")
 		}
 		if !fileInfo.IsDir() {
+			log.Warningf("Library path is not a directory")
 			return errors.New("Library path is not a directory")
 		}
+
+		log.Warningf("Error getting Library path: %v", err)
 		return err
 	}
 	return nil

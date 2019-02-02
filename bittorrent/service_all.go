@@ -1,7 +1,9 @@
+// +build !arm
+
 package bittorrent
 
-import "github.com/elgatito/elementum/config"
+import "github.com/ElementumOrg/libtorrent-go"
 
 // Nothing to do on regular devices
-func setPlatformSpecificSettings(c *config.Configuration) {
+func setPlatformSpecificSettings(settings libtorrent.SettingsPack) {
 }
