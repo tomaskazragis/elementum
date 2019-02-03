@@ -37,7 +37,7 @@ ifeq ($(TARGET_OS), windows)
 	# TODO Remove for golang 1.8
 	# https://github.com/golang/go/issues/8756
 	# GO_LDFLAGS = -extldflags=-Wl,--allow-multiple-definition -v
-	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-lm"
+	# GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-static-libgcc -static-libstdc++ -Wl,--allow-multiple-definition -v"
 else ifeq ($(TARGET_OS), darwin)
 	EXT =
 	GOOS = darwin
