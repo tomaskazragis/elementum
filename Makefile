@@ -37,17 +37,18 @@ ifeq ($(TARGET_OS), windows)
 	# TODO Remove for golang 1.8
 	# https://github.com/golang/go/issues/8756
 	# GO_LDFLAGS = -extldflags=-Wl,--allow-multiple-definition -v
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-lm"
 else ifeq ($(TARGET_OS), darwin)
 	EXT =
 	GOOS = darwin
 	# Needs this or cgo will try to link with libgcc, which will fail
 	CC := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang
 	CXX := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang++
-	# GO_LDFLAGS += -linkmode=external -extld=$(CC)
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-lm"
 else ifeq ($(TARGET_OS), linux)
 	EXT =
 	GOOS = linux
-	# GO_LDFLAGS += -linkmode=external -extld=$(CC)
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-lm"
 else ifeq ($(TARGET_OS), android)
 	EXT =
 	GOOS = android
@@ -56,8 +57,9 @@ else ifeq ($(TARGET_OS), android)
 	else
 		GOARM =
 	endif
-	GO_LDFLAGS += -extldflags=-pie
-	# GO_LDFLAGS += -linkmode=external -extldflags=-pie -extld=$(CC)
+	# GO_LDFLAGS += -extldflags=-pie
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-pie -lm" 
+	# GO_LDFLAGS += -linkmode=external -extldflags "-pie"
 	CC := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang
 	CXX := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang++
 endif
@@ -138,13 +140,13 @@ vendor_windows:
 	find $(shell go env GOPATH)/pkg/$(GOOS)_$(GOARCH) -name *.dll -exec cp -f {} $(BUILD_PATH) \;
 
 vendor_android:
-	# cp $(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so $(BUILD_PATH)
-	# chmod +rx $(BUILD_PATH)/libgnustl_shared.so
+	cp $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so $(BUILD_PATH)
+	chmod +rx $(BUILD_PATH)/libc++_shared.so
 
 vendor_libs_windows:
 
 vendor_libs_android:
-	# $(CROSS_ROOT)/arm-linux-androideabi/lib/libgnustl_shared.so
+	$(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
 
 elementum: $(BUILD_PATH)/$(OUTPUT_NAME)
 

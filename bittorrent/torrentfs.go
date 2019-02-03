@@ -348,6 +348,13 @@ func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
 	}
 
 	ret.Begin, ret.End = tf.byteRegionPieces(tf.torrentOffset(pos), ra)
+	if ret.Begin < 0 {
+		ret.Begin = 0 
+	}
+	if ret.End > tf.numPieces {
+		ret.Begin = tf.numPieces
+	}
+
 	return
 }
 
