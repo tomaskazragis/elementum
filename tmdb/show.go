@@ -401,7 +401,7 @@ func GetTVGenres(language string) []*Genre {
 	key := fmt.Sprintf("com.tmdb.genres.shows.%s", language)
 	if err := cacheStore.Get(key, &genres); err != nil {
 		err = MakeRequest(APIRequest{
-			URL: fmt.Sprintf("%s/search/movie", tmdbEndpoint),
+			URL: fmt.Sprintf("%s/genre/tv/list", tmdbEndpoint),
 			Params: napping.Params{
 				"api_key":  apiKey,
 				"language": language,
