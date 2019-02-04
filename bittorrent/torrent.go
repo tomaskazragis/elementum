@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
-	"github.com/RoaringBitmap/roaring"
 	"github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/database"
@@ -25,9 +25,9 @@ type Torrent struct {
 	torrentFile    string
 	partsFile      string
 
-	infoHash     string
-	readers      map[int64]*TorrentFSEntry
-	readerPieces *roaring.Bitmap
+	infoHash string
+	readers  map[int64]*TorrentFSEntry
+	// readerPieces *roaring.Bitmap
 	// bufferReaders map[string]*FileReader
 
 	ChosenFiles []*File
@@ -41,11 +41,12 @@ type Torrent struct {
 	BufferPiecesProgress map[int]float64
 	BufferEndPieces      []int
 
-	IsPlaying    bool
-	IsPaused     bool
-	IsBuffering  bool
-	IsSeeding    bool
-	IsRarArchive bool
+	IsInitialized bool
+	IsPlaying     bool
+	IsPaused      bool
+	IsBuffering   bool
+	IsSeeding     bool
+	IsRarArchive  bool
 
 	DBItem *database.BTItem
 
@@ -76,8 +77,8 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 		ti:          info,
 		TorrentPath: path,
 
-		readers:      map[int64]*TorrentFSEntry{},
-		readerPieces: roaring.NewBitmap(),
+		readers: map[int64]*TorrentFSEntry{},
+		// readerPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
@@ -141,7 +142,21 @@ func (t *Torrent) bufferTickerEvent() {
 		// Making sure current progress is not less then previous
 		thisProgress := t.GetBufferProgress()
 
-		log.Debugf("Buffer ticker: %#v, %#v", t.IsBuffering, t.BufferPiecesProgress)
+		piecesStatus := "["
+		piecesKeys := []int{}
+		for k := range t.BufferPiecesProgress {
+			piecesKeys = append(piecesKeys, k)
+		}
+		sort.Ints(piecesKeys)
+
+		for _, k := range piecesKeys {
+			piecesStatus += fmt.Sprintf("%d:%d, ", k, int(t.BufferPiecesProgress[k]*100))
+		}
+
+		piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+
+		torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
+		log.Debugf("Buffer. Buffering: %v, Progress: %d%%, Speed: %s / %s, Pieces: %s", t.IsBuffering, int(thisProgress), humanize.Bytes(uint64(torrentStatus.GetDownloadRate())), humanize.Bytes(uint64(torrentStatus.GetUploadRate())), piecesStatus)
 
 		t.muBuffer.Lock()
 		defer t.muBuffer.Unlock()
@@ -281,7 +296,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if t.IsBuffering || t.th == nil {
+	if t.IsBuffering || t.th == nil || !t.IsInitialized {
 		return
 	}
 
@@ -289,14 +304,25 @@ func (t *Torrent) PrioritizePieces() {
 	t.muReaders.Lock()
 	defer t.muReaders.Unlock()
 
-	t.readerPieces.Clear()
-	for _, r := range t.readers {
-		pr := r.ReaderPiecesRange()
-		log.Debugf("Reader range: %#v", pr)
-		if pr.Begin < pr.End {
-			t.readerPieces.AddRange(uint64(pr.Begin), uint64(pr.End))
-		} else {
-			t.readerPieces.AddInt(pr.Begin)
+	readerPieces := map[int]int{}
+	readerKeys := []int64{}
+	for k := range t.readers {
+		readerKeys = append(readerKeys, k)
+	}
+
+	sort.Slice(readerKeys, func(i int, j int) bool {
+		return t.readers[readerKeys[i]].lastUsed.Before(t.readers[readerKeys[j]].lastUsed)
+	})
+
+	lastBonus := 0
+	for _, k := range readerKeys {
+		lastBonus++
+		currentPriority := len(readerKeys) - lastBonus
+
+		pr := t.readers[k].ReaderPiecesRange()
+		log.Debugf("Reader range: %#v, priority: %d", pr, currentPriority)
+		for i := pr.Begin; i <= pr.End; i++ {
+			readerPieces[i] = currentPriority
 		}
 	}
 
@@ -323,7 +349,7 @@ func (t *Torrent) PrioritizePieces() {
 	lastPiece := -2
 
 	for _ = 0; curPiece < numPieces; curPiece++ {
-		if t.readerPieces.ContainsInt(curPiece) {
+		if readerPriority, ok := readerPieces[curPiece]; ok {
 			if curPiece > lastPiece+1 {
 				seqPiece = curPiece
 				lastPiece = curPiece
@@ -331,7 +357,13 @@ func (t *Torrent) PrioritizePieces() {
 				lastPiece = curPiece
 			}
 
-			priority := max(2, 7-int((lastPiece-seqPiece+2)/3))
+			// Basically we set priority to each needed piece with this logic:
+			//   Starting from 7 (that is the max), then each next piece has
+			//   lower priority, plus more up to date reader has bigger priority,
+			//   that is because Kodi requests multiple pieces at once, while
+			//   not closing old readers, so we try to first download
+			//   for most recent reader.
+			priority := max(2, 7-readerPriority-int((lastPiece-seqPiece+2)/3))
 
 			// log.Debugf("Priority: %d with priority: %d", curPiece, priority)
 

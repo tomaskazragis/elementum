@@ -295,6 +295,10 @@ func (btp *BTPlayer) onMetadataReceived() {
 	database.Get().UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, files, btp.p.Query, btp.p.ShowID, btp.p.Season, btp.p.Episode)
 	btp.t.DBItem = database.Get().GetBTItem(infoHash)
 
+	defer func() {
+		btp.t.IsInitialized = true
+	}()
+
 	if btp.t.IsRarArchive {
 		// Just disable sequential download for RAR archives
 		log.Info("Disabling sequential download")

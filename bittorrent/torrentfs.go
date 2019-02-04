@@ -35,17 +35,24 @@ type TorrentFSEntry struct {
 	t   *Torrent
 	f   *File
 
-	pieceLength       int
-	numPieces         int
+	totalLength int64
+	pieceLength int
+	numPieces   int
+
 	piecesMx          sync.RWMutex
 	pieces            Bitfield
 	piecesLastUpdated time.Time
-	lastStatus        lt.TorrentStatus
-	removed           *broadcast.Broadcaster
-	dbItem            *database.BTItem
-	id                int64
-	readahead         int64
-	storageType       int
+
+	lastStatus lt.TorrentStatus
+
+	removed *broadcast.Broadcaster
+	dbItem  *database.BTItem
+
+	id          int64
+	readahead   int64
+	storageType int
+
+	lastUsed time.Time
 }
 
 // PieceRange ...
@@ -108,11 +115,14 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 		t:    t,
 		f:    f,
 
+		totalLength: t.ti.TotalSize(),
 		pieceLength: t.ti.PieceLength(),
 		numPieces:   t.ti.NumPieces(),
 		storageType: tfs.s.config.DownloadStorage,
 		removed:     broadcast.NewBroadcaster(),
 		id:          time.Now().UTC().UnixNano(),
+
+		lastUsed: time.Now(),
 	}
 	go tf.consumeAlerts()
 
@@ -214,6 +224,8 @@ func (tf *TorrentFSEntry) Close() error {
 
 // Read ...
 func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
+	tf.lastUsed = time.Now()
+
 	currentOffset, err := tf.File.Seek(0, os.SEEK_CUR)
 	if err != nil {
 		return 0, err
@@ -276,6 +288,8 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 
 // Seek ...
 func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
+	tf.lastUsed = time.Now()
+
 	seekingOffset := offset
 
 	switch whence {
@@ -295,6 +309,9 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 	piece, _ := tf.pieceFromOffset(seekingOffset)
 	if tf.hasPiece(piece) == false {
 		log.Infof("We don't have piece %d, setting piece priorities", piece)
+
+		// Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
+		tf.t.th.ClearPieceDeadlines()
 		go tf.t.PrioritizePieces()
 	}
 
@@ -312,7 +329,7 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 	removed, done := tf.removed.Listen()
 	defer close(done)
 
-	for tf.hasPiece(piece) == false || !tf.t.readerPieces.ContainsInt(piece) {
+	for tf.hasPiece(piece) == false {
 		select {
 		case <-removed:
 			log.Warningf("Unable to wait for piece %d as file was closed", piece)
@@ -349,10 +366,10 @@ func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
 
 	ret.Begin, ret.End = tf.byteRegionPieces(tf.torrentOffset(pos), ra)
 	if ret.Begin < 0 {
-		ret.Begin = 0 
+		ret.Begin = 0
 	}
 	if ret.End > tf.numPieces {
-		ret.Begin = tf.numPieces
+		ret.End = tf.numPieces
 	}
 
 	return
@@ -364,7 +381,7 @@ func (tf *TorrentFSEntry) torrentOffset(readerPos int64) int64 {
 
 // Returns the range of pieces [begin, end) that contains the extent of bytes.
 func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (begin, end int) {
-	if off >= tf.f.Size {
+	if off >= tf.totalLength {
 		return
 	}
 	if off < 0 {

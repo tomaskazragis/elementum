@@ -78,9 +78,8 @@ OUTPUT_NAME = $(NAME)$(EXT)
 BUILD_PATH = build/$(TARGET_OS)_$(TARGET_ARCH)
 LIBTORRENT_GO = github.com/ElementumOrg/libtorrent-go
 LIBTORRENT_GO_HOME = $(shell go env GOPATH)/src/$(LIBTORRENT_GO)
-LIBTORRENT_VERSION = $(shell (cd $(GOPATH)/src/github.com/ElementumOrg/libtorrent-go; $(GIT) rev-parse HEAD))
 GO_BUILD_TAGS =
-GO_LDFLAGS += -s -w -X $(GO_PKG)/util.Version=$(GIT_VERSION) -X $(GO_PKG)/util.LibtorrentVersion=$(LIBTORRENT_VERSION)
+GO_LDFLAGS += -s -w -X $(GO_PKG)/util.Version=$(GIT_VERSION)
 GO_EXTRALDFLAGS =
 PLATFORMS = \
 	android-arm \

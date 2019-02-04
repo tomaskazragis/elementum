@@ -5,15 +5,14 @@ import (
 	"encoding/base32"
 	"fmt"
 
+	"github.com/ElementumOrg/libtorrent-go"
+
 	"github.com/elgatito/elementum/config"
 )
 
 var (
 	// Version ...
 	Version = "v0.0.1"
-
-	// LibTorrentVersion ...
-	LibTorrentVersion = "v0.0.1-000000"
 )
 
 // GetVersion returns version, provided to compiler
@@ -28,12 +27,7 @@ func GetVersion() string {
 
 // GetTorrentVersion returns version of GoTorrent, provided to compiler
 func GetTorrentVersion() string {
-	if len(LibTorrentVersion) > 0 {
-		return LibTorrentVersion[:8]
-	}
-
-	// Return Dummy version if none provided by compiler
-	return "0.0.1"
+	return libtorrent.Version()
 }
 
 // DefaultUserAgent ...

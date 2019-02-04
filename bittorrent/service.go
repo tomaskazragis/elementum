@@ -714,7 +714,9 @@ func (s *BTService) Alerts() (<-chan *Alert, chan<- interface{}) {
 func (s *BTService) logAlerts() {
 	alerts, _ := s.Alerts()
 	for alert := range alerts {
-		if alert.Category&int(lt.AlertErrorNotification) != 0 {
+		if alert.Category&int(lt.AlertTrackerNotification) != 0 {
+			continue
+		} else if alert.Category&int(lt.AlertErrorNotification) != 0 {
 			log.Errorf("%s: %s", alert.What, alert.Message)
 		} else if alert.Category&int(lt.AlertDebugNotification) != 0 {
 			log.Debugf("%s: %s", alert.What, alert.Message)
@@ -758,6 +760,8 @@ func (s *BTService) loadTorrentFiles() {
 					}
 				}
 			}
+
+			t.IsInitialized = true
 		}
 	}
 }
