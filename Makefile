@@ -124,7 +124,7 @@ $(BUILD_PATH)/$(OUTPUT_NAME): $(BUILD_PATH) force
 	CC='$(CC)' CXX='$(CXX)' \
 	GOOS='$(GOOS)' GOARCH='$(GOARCH)' GOARM='$(GOARM)' \
 	CGO_ENABLED='$(CGO_ENABLED)' \
-	$(GO) build -v -x \
+	$(GO) build -v \
 		-gcflags '$(GO_GCFLAGS)' \
 		-ldflags '$(GO_LDFLAGS)' \
 		-o '$(BUILD_PATH)/$(OUTPUT_NAME)' \
