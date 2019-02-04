@@ -41,12 +41,13 @@ type Torrent struct {
 	BufferPiecesProgress map[int]float64
 	BufferEndPieces      []int
 
-	IsInitialized bool
-	IsPlaying     bool
-	IsPaused      bool
-	IsBuffering   bool
-	IsSeeding     bool
-	IsRarArchive  bool
+	IsWithMetadata bool
+	IsInitialized  bool
+	IsPlaying      bool
+	IsPaused       bool
+	IsBuffering    bool
+	IsSeeding      bool
+	IsRarArchive   bool
 
 	DBItem *database.BTItem
 
@@ -138,7 +139,7 @@ func (t *Torrent) startBufferTicker() {
 }
 
 func (t *Torrent) bufferTickerEvent() {
-	if t.IsBuffering {
+	if t.IsBuffering && len(t.BufferPiecesProgress) > 0 {
 		// Making sure current progress is not less then previous
 		thisProgress := t.GetBufferProgress()
 
@@ -153,7 +154,9 @@ func (t *Torrent) bufferTickerEvent() {
 			piecesStatus += fmt.Sprintf("%d:%d, ", k, int(t.BufferPiecesProgress[k]*100))
 		}
 
-		piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+		if len(piecesStatus) > 1 {
+			piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+		}
 
 		torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
 		log.Debugf("Buffer. Buffering: %v, Progress: %d%%, Speed: %s / %s, Pieces: %s", t.IsBuffering, int(thisProgress), humanize.Bytes(uint64(torrentStatus.GetDownloadRate())), humanize.Bytes(uint64(torrentStatus.GetUploadRate())), piecesStatus)

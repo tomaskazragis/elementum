@@ -156,6 +156,7 @@ func (btp *BTPlayer) addTorrent() error {
 	log.Infof("Downloading %s", btp.torrentName)
 
 	if status.GetHasMetadata() {
+		log.Debugf("Already having metadata")
 		btp.onMetadataReceived()
 	}
 
@@ -198,13 +199,17 @@ func (btp *BTPlayer) PlayURL() string {
 func (btp *BTPlayer) Buffer() error {
 	if btp.p.ResumeIndex >= 0 {
 		if err := btp.resumeTorrent(); err != nil {
+			log.Errorf("Error resuming torrent: %#v", err)
 			return err
 		}
 	} else {
 		if err := btp.addTorrent(); err != nil {
+			log.Errorf("Error adding torrent: %#v", err)
 			return err
 		}
 	}
+
+	btp.t.IsBuffering = true
 
 	buffered, done := btp.bufferEvents.Listen()
 	defer close(done)
@@ -252,14 +257,15 @@ func (btp *BTPlayer) waitCheckAvailableSpace() {
 func (btp *BTPlayer) onMetadataReceived() {
 	log.Info("Metadata received.")
 
+	btp.t.IsWithMetadata = true
 	if btp.p.ResumeIndex < 0 {
 		btp.t.th.AutoManaged(false)
 		btp.t.th.Pause()
 		defer btp.t.th.AutoManaged(true)
 	}
 
-	btp.torrentName = btp.t.Name()
 	btp.t.ti = btp.t.th.TorrentFile()
+	btp.torrentName = btp.t.Name()
 	btp.t.MakeFiles()
 
 	log.Infof("Downloading %s", btp.torrentName)
@@ -336,7 +342,12 @@ func (btp *BTPlayer) onMetadataReceived() {
 }
 
 func (btp *BTPlayer) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
-	line1 := fmt.Sprintf("%s (%.2f%%)", StatusStrings[int(status.GetState())], progress)
+	statusName := StatusStrings[int(status.GetState())]
+	if btp.t.IsBuffering {
+		statusName = "Buffering"
+	}
+
+	line1 := fmt.Sprintf("%s (%.2f%%)", statusName, progress)
 	if btp.t.ti != nil && btp.t.ti.Swigcptr() != 0 {
 		var totalSize int64
 		if btp.fileSize > 0 && !btp.t.IsRarArchive {
@@ -670,7 +681,7 @@ func (btp *BTPlayer) bufferDialog() {
 				status := btp.t.GetStatus()
 				line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
 				btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
-				if !btp.t.IsBuffering && btp.t.GetState() != StatusChecking {
+				if !btp.t.IsBuffering && btp.t.IsWithMetadata && btp.t.GetState() != StatusChecking {
 					btp.bufferEvents.Signal()
 					btp.setRateLimiting(true)
 					return
@@ -724,6 +735,7 @@ func (btp *BTPlayer) playerLoop() {
 	go btp.bufferDialog()
 
 	if err := <-buffered; err != nil {
+		log.Errorf("Error buffering: %#v", err)
 		return
 	}
 
