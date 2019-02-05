@@ -99,13 +99,6 @@ var (
 
 	log = logging.MustGetLogger("library")
 
-	libraryPath string
-
-	// MoviesLibraryPath contains calculated path for saving Movies strm files
-	MoviesLibraryPath string
-	// ShowsLibraryPath contains calculated path for saving Shows strm files
-	ShowsLibraryPath string
-
 	cacheStore *cache.DBStore
 
 	// Scanning shows if Kodi library Scan is in progress
@@ -388,6 +381,16 @@ func Init() {
 	}
 }
 
+// MoviesLibraryPath contains calculated path for saving Movies strm files
+func MoviesLibraryPath() string {
+	return filepath.Join(config.Get().LibraryPath, "Movies")
+}
+
+// ShowsLibraryPath contains calculated path for saving Shows strm files
+func ShowsLibraryPath() string {
+	return filepath.Join(config.Get().LibraryPath, "Shows")
+}
+
 //
 // Library updates
 //
@@ -429,9 +432,7 @@ func doUpdateLibrary() error {
 // Path checks
 //
 func checkLibraryPath() error {
-	if libraryPath == "" {
-		libraryPath = config.Get().LibraryPath
-	}
+	libraryPath := config.Get().LibraryPath
 	if libraryPath == "" || libraryPath == "." {
 		log.Warningf("Library path is not initialized")
 		return errors.New("LOCALIZE[30220]")
@@ -456,11 +457,10 @@ func checkMoviesPath() error {
 	if err := checkLibraryPath(); err != nil {
 		return err
 	}
-	if MoviesLibraryPath == "" {
-		MoviesLibraryPath = filepath.Join(libraryPath, "Movies")
-	}
-	if _, err := os.Stat(MoviesLibraryPath); os.IsNotExist(err) {
-		if err := os.Mkdir(MoviesLibraryPath, 0755); err != nil {
+
+	moviesLibraryPath := MoviesLibraryPath()
+	if _, err := os.Stat(moviesLibraryPath); os.IsNotExist(err) {
+		if err := os.Mkdir(moviesLibraryPath, 0755); err != nil {
 			log.Error(err)
 			return err
 		}
@@ -472,11 +472,10 @@ func checkShowsPath() error {
 	if err := checkLibraryPath(); err != nil {
 		return err
 	}
-	if ShowsLibraryPath == "" {
-		ShowsLibraryPath = filepath.Join(libraryPath, "Shows")
-	}
-	if _, err := os.Stat(ShowsLibraryPath); os.IsNotExist(err) {
-		if err := os.Mkdir(ShowsLibraryPath, 0755); err != nil {
+
+	showsLibraryPath := ShowsLibraryPath()
+	if _, err := os.Stat(showsLibraryPath); os.IsNotExist(err) {
+		if err := os.Mkdir(showsLibraryPath, 0755); err != nil {
 			log.Error(err)
 			return err
 		}
@@ -499,7 +498,7 @@ func writeMovieStrm(tmdbID string, force bool) (*tmdb.Movie, error) {
 		movieName = movie.Title
 	}
 	movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", movieName, strings.Split(movie.ReleaseDate, "-")[0]))
-	moviePath := filepath.Join(MoviesLibraryPath, movieStrm)
+	moviePath := filepath.Join(MoviesLibraryPath(), movieStrm)
 
 	if _, err := os.Stat(moviePath); os.IsNotExist(err) {
 		if err := os.Mkdir(moviePath, 0755); err != nil {
@@ -573,7 +572,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 	}
 
 	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(ShowsLibraryPath, showStrm)
+	showPath := filepath.Join(ShowsLibraryPath(), showStrm)
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
 		if err := os.Mkdir(showPath, 0755); err != nil {
@@ -728,7 +727,7 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 
 	movieName := fmt.Sprintf("%s (%s)", movieTitle, strings.Split(movie.ReleaseDate, "-")[0])
 	movieStrm := util.ToFileName(movieName)
-	moviePath := filepath.Join(MoviesLibraryPath, movieStrm)
+	moviePath := filepath.Join(MoviesLibraryPath(), movieStrm)
 
 	if _, err := os.Stat(moviePath); err != nil {
 		return movie, errors.New("LOCALIZE[30282]")
@@ -763,7 +762,7 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 	}
 
 	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(ShowsLibraryPath, showStrm)
+	showPath := filepath.Join(ShowsLibraryPath(), showStrm)
 
 	if _, err := os.Stat(showPath); err != nil {
 		log.Warning(err)
@@ -797,7 +796,7 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 
 	showPath := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
 	episodeStrm := fmt.Sprintf("%s S%02dE%02d.strm", showPath, seasonNumber, episodeNumber)
-	episodePath := filepath.Join(ShowsLibraryPath, showPath, episodeStrm)
+	episodePath := filepath.Join(ShowsLibraryPath(), showPath, episodeStrm)
 
 	alreadyRemoved := false
 	if _, err := os.Stat(episodePath); err != nil {

@@ -839,13 +839,14 @@ func RefreshLocal() error {
 }
 
 func refreshLocalMovies() {
-	if _, err := os.Stat(MoviesLibraryPath); err != nil {
+	moviesLibraryPath := MoviesLibraryPath()
+	if _, err := os.Stat(moviesLibraryPath); err != nil {
 		return
 	}
 
 	begin := time.Now()
 	addon := []byte(config.Get().Info.ID)
-	files := searchStrm(MoviesLibraryPath)
+	files := searchStrm(moviesLibraryPath)
 	IDs := []int{}
 	for _, f := range files {
 		fileContent, err := ioutil.ReadFile(f)
@@ -877,13 +878,14 @@ func refreshLocalMovies() {
 }
 
 func refreshLocalShows() {
-	if _, err := os.Stat(ShowsLibraryPath); err != nil {
+	showsLibraryPath := ShowsLibraryPath()
+	if _, err := os.Stat(showsLibraryPath); err != nil {
 		return
 	}
 
 	begin := time.Now()
 	addon := []byte(config.Get().Info.ID)
-	files := searchStrm(ShowsLibraryPath)
+	files := searchStrm(showsLibraryPath)
 	IDs := map[int]bool{}
 	for _, f := range files {
 		fileContent, err := ioutil.ReadFile(f)

@@ -306,7 +306,7 @@ func Reload() *Configuration {
 	torrentsPath := TranslatePath(xbmc.GetSettingString("torrents_path"))
 	downloadStorage := xbmc.GetSettingInt("download_storage")
 
-	log.Debugf("Paths translated by Kodi: Download = %s , Library = %s , Torrents = %s , Storage = %d", downloadPath, libraryPath, torrentsPath, downloadStorage)
+	log.Noticef("Paths translated by Kodi: Download = %s , Library = %s , Torrents = %s , Storage = %d", downloadPath, libraryPath, torrentsPath, downloadStorage)
 
 	if downloadStorage != 1 {
 		if downloadPath == "." {
@@ -639,6 +639,23 @@ func AddonResource(args ...string) string {
 
 // TranslatePath ...
 func TranslatePath(path string) string {
+	// Special case for temporary path in Kodi
+	if strings.HasPrefix(path, "special://temp/") {
+		dir := strings.Replace(path, "special://temp/", "", 1)
+		kodiDir := xbmc.TranslatePath("special://temp")
+		pathDir := filepath.Join(kodiDir, dir)
+
+		if PathExists(pathDir) {
+			return pathDir
+		}
+		if err := os.MkdirAll(pathDir, 0777); err != nil {
+			log.Errorf("Could not create temporary directory: %#v", err)
+			return path
+		}
+
+		return pathDir
+	}
+
 	// Do not translate nfs/smb path
 	// if strings.HasPrefix(path, "nfs:") || strings.HasPrefix(path, "smb:") {
 	// 	if !strings.HasSuffix(path, "/") {
@@ -647,6 +664,15 @@ func TranslatePath(path string) string {
 	// 	return path
 	// }
 	return filepath.Dir(xbmc.TranslatePath(path))
+}
+
+// PathExists returns whether path exists in OS
+func PathExists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }
 
 // IsWritablePath ...

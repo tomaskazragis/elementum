@@ -67,7 +67,7 @@ func AddMovie(ctx *gin.Context) {
 
 	log.Noticef(logMsg, movie.Title, tmdbID)
 	if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, movie.Title))) {
-		xbmc.VideoLibraryScanDirectory(library.MoviesLibraryPath, true)
+		xbmc.VideoLibraryScanDirectory(library.MoviesLibraryPath(), true)
 	} else {
 		if ctx != nil {
 			ctx.Abort()
@@ -139,7 +139,7 @@ func AddShow(ctx *gin.Context) {
 
 	log.Noticef(logMsg, show.Name, tmdbID)
 	if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("%s;;%s", label, show.Name))) {
-		xbmc.VideoLibraryScanDirectory(library.ShowsLibraryPath, true)
+		xbmc.VideoLibraryScanDirectory(library.ShowsLibraryPath(), true)
 	} else {
 		library.ClearPageCache()
 	}
