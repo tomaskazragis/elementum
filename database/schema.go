@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS settings (
   name TEXT NOT NULL UNIQUE,
   value TEXT NOT NULL
 );
-INSERT OR REPLACE INTO settings (name, value) VALUES ('version', '0');
+INSERT OR REPLACE INTO settings (name, value) VALUES ('version', '1');
 
 -- Table for Search queries history
 CREATE TABLE IF NOT EXISTS history_queries (
