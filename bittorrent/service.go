@@ -86,6 +86,7 @@ func NewBTService() *BTService {
 	}
 
 	s.configure()
+	s.startServices()
 
 	go s.saveResumeDataConsumer()
 	go s.saveResumeDataLoop()
@@ -267,7 +268,7 @@ func (s *BTService) configure() {
 			lt.AlertStorageNotification|
 			lt.AlertErrorNotification))
 
-	log.Infof("DownloadStorage: %d", s.config.DownloadStorage)
+	log.Infof("DownloadStorage: %s", Storages[s.config.DownloadStorage])
 	if s.config.DownloadStorage == StorageMemory {
 		memSize := int64(config.Get().MemorySize)
 		needSize := int64(s.config.BufferSize) + endBufferSize + 6*1024*1024
@@ -714,7 +715,9 @@ func (s *BTService) Alerts() (<-chan *Alert, chan<- interface{}) {
 func (s *BTService) logAlerts() {
 	alerts, _ := s.Alerts()
 	for alert := range alerts {
-		if alert.Category&int(lt.AlertTrackerNotification) != 0 {
+		// Skipping Tracker communication, Save_Resume, UDP errors
+		// No need to spam logs.
+		if alert.Category&int(lt.AlertTrackerNotification) != 0 || alert.Category&int(lt.SaveResumeDataAlertAlertType) != 0 || alert.Category&int(lt.UdpErrorAlertAlertType) != 0 {
 			continue
 		} else if alert.Category&int(lt.AlertErrorNotification) != 0 {
 			log.Errorf("%s: %s", alert.What, alert.Message)

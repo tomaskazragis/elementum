@@ -6,9 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
-	"unsafe"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 
@@ -38,12 +36,6 @@ type TorrentFSEntry struct {
 	totalLength int64
 	pieceLength int
 	numPieces   int
-
-	piecesMx          sync.RWMutex
-	pieces            Bitfield
-	piecesLastUpdated time.Time
-
-	lastStatus lt.TorrentStatus
 
 	removed *broadcast.Broadcaster
 	dbItem  *database.BTItem
@@ -169,40 +161,6 @@ func (tf *TorrentFSEntry) setSubtitles() {
 	}
 }
 
-func (tf *TorrentFSEntry) updatePieces() error {
-	tf.piecesMx.Lock()
-	defer tf.piecesMx.Unlock()
-
-	if time.Now().After(tf.piecesLastUpdated.Add(piecesRefreshDuration)) {
-		// need to keep a reference to the status or else the pieces bitfield
-		// is at risk of being collected
-		tf.lastStatus = tf.t.th.Status(uint(lt.TorrentHandleQueryPieces))
-		if tf.lastStatus.GetState() > lt.TorrentStatusSeeding {
-			return errors.New("Torrent file has invalid state")
-		}
-		piecesBits := tf.lastStatus.GetPieces()
-		piecesBitsSize := piecesBits.Size()
-		piecesSliceSize := piecesBitsSize / 8
-		if piecesBitsSize%8 > 0 {
-			// Add +1 to round up the bitfield
-			piecesSliceSize++
-		}
-		data := (*[100000000]byte)(unsafe.Pointer(piecesBits.Bytes()))[:piecesSliceSize]
-		tf.pieces = Bitfield(data)
-		tf.piecesLastUpdated = time.Now()
-	}
-	return nil
-}
-
-func (tf *TorrentFSEntry) hasPiece(idx int) bool {
-	if err := tf.updatePieces(); err != nil {
-		return false
-	}
-	tf.piecesMx.RLock()
-	defer tf.piecesMx.RUnlock()
-	return tf.pieces.GetBit(idx)
-}
-
 // Close ...
 func (tf *TorrentFSEntry) Close() error {
 	log.Info("Closing file...")
@@ -307,11 +265,12 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 
 	log.Infof("Seeking at %d...", seekingOffset)
 	piece, _ := tf.pieceFromOffset(seekingOffset)
-	if tf.hasPiece(piece) == false {
+	if tf.t.hasPiece(piece) == false {
 		log.Infof("We don't have piece %d, setting piece priorities", piece)
 
-		// Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
-		tf.t.th.ClearPieceDeadlines()
+		// TODO: Need this? Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
+		// tf.t.th.ClearPieceDeadlines()
+		tf.t.PrioritizePiece(piece)
 		go tf.t.PrioritizePieces()
 	}
 
@@ -319,7 +278,7 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (tf *TorrentFSEntry) waitForPiece(piece int) error {
-	if tf.hasPiece(piece) {
+	if tf.t.hasPiece(piece) {
 		return nil
 	}
 
@@ -329,7 +288,7 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 	removed, done := tf.removed.Listen()
 	defer close(done)
 
-	for tf.hasPiece(piece) == false {
+	for tf.t.hasPiece(piece) == false {
 		select {
 		case <-removed:
 			log.Warningf("Unable to wait for piece %d as file was closed", piece)

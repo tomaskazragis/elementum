@@ -2,12 +2,15 @@ package bittorrent
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"sort"
 	"sync"
 	"time"
+	"unsafe"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/dustin/go-humanize"
@@ -25,8 +28,9 @@ type Torrent struct {
 	torrentFile    string
 	partsFile      string
 
-	infoHash string
-	readers  map[int64]*TorrentFSEntry
+	infoHash       string
+	readers        map[int64]*TorrentFSEntry
+	reservedPieces []int
 	// readerPieces *roaring.Bitmap
 	// bufferReaders map[string]*FileReader
 
@@ -60,6 +64,10 @@ type Torrent struct {
 	closing        chan struct{}
 	bufferFinished chan struct{}
 
+	piecesMx          sync.RWMutex
+	pieces            Bitfield
+	piecesLastUpdated time.Time
+
 	bufferTicker     *time.Ticker
 	prioritizeTicker *time.Ticker
 }
@@ -78,7 +86,8 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 		ti:          info,
 		TorrentPath: path,
 
-		readers: map[int64]*TorrentFSEntry{},
+		readers:        map[int64]*TorrentFSEntry{},
+		reservedPieces: []int{},
 		// readerPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
@@ -158,8 +167,8 @@ func (t *Torrent) bufferTickerEvent() {
 			piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
 		}
 
-		torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
-		log.Debugf("Buffer. Buffering: %v, Progress: %d%%, Speed: %s / %s, Pieces: %s", t.IsBuffering, int(thisProgress), humanize.Bytes(uint64(torrentStatus.GetDownloadRate())), humanize.Bytes(uint64(torrentStatus.GetUploadRate())), piecesStatus)
+		downSpeed, upSpeed := t.GetHumanizedSpeeds()
+		log.Debugf("Buffer. Buffering: %v, Progress: %d%%, Speed: %s / %s, Pieces: %s", t.IsBuffering, int(thisProgress), downSpeed, upSpeed, piecesStatus)
 
 		t.muBuffer.Lock()
 		defer t.muBuffer.Unlock()
@@ -173,6 +182,18 @@ func (t *Torrent) bufferTickerEvent() {
 			t.bufferFinished <- struct{}{}
 		}
 	}
+}
+
+// GetSpeeds returns download and upload speeds
+func (t *Torrent) GetSpeeds() (down, up int) {
+	torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
+	return torrentStatus.GetDownloadRate(), torrentStatus.GetUploadRate()
+}
+
+// GetHumanizedSpeeds returns humanize download and upload speeds
+func (t *Torrent) GetHumanizedSpeeds() (down, up string) {
+	downInt, upInt := t.GetSpeeds()
+	return humanize.Bytes(uint64(downInt)), humanize.Bytes(uint64(upInt))
 }
 
 func (t *Torrent) bufferFinishedEvent() {
@@ -236,6 +257,9 @@ func (t *Torrent) Buffer(file *File) {
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
 
+	// Reserving first piece in this file, it is usually re-requested by Kodi
+	t.reservedPieces = append(t.reservedPieces, preBufferStart)
+
 	// Properly set the pieces priority vector
 	curPiece := 0
 	for _ = 0; curPiece < preBufferStart; curPiece++ {
@@ -273,7 +297,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 
 	offsetEnd := offsetStart + length
 	pieceOffsetEnd := offsetEnd % pieceLength
-	endPiece = int(float64(offsetEnd) / float64(pieceLength))
+	endPiece = int(math.Ceil(float64(offsetEnd) / float64(pieceLength)))
 
 	piecesCount := int(t.ti.NumPieces())
 	if pieceOffsetEnd == 0 {
@@ -297,15 +321,26 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 	return
 }
 
+// PrioritizePiece ...
+func (t *Torrent) PrioritizePiece(piece int) {
+	if t.IsBuffering || t.th == nil || !t.IsInitialized {
+		return
+	}
+
+	t.th.PiecePriority(piece, 7)
+	t.th.SetPieceDeadline(piece, 0, 0)
+}
+
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
 	if t.IsBuffering || t.th == nil || !t.IsInitialized {
 		return
 	}
 
-	log.Debugf("Prioritizing pieces")
+	downSpeed, upSpeed := t.GetHumanizedSpeeds()
+	log.Debugf("Prioritizing pieces: %s / %s", downSpeed, upSpeed)
+
 	t.muReaders.Lock()
-	defer t.muReaders.Unlock()
 
 	readerPieces := map[int]int{}
 	readerKeys := []int64{}
@@ -320,19 +355,44 @@ func (t *Torrent) PrioritizePieces() {
 	lastBonus := 0
 	for _, k := range readerKeys {
 		lastBonus++
-		currentPriority := len(readerKeys) - lastBonus
+		readerPriority := len(readerKeys) - lastBonus
 
 		pr := t.readers[k].ReaderPiecesRange()
-		log.Debugf("Reader range: %#v, priority: %d", pr, currentPriority)
-		for i := pr.Begin; i <= pr.End; i++ {
-			readerPieces[i] = currentPriority
+		log.Debugf("Reader range: %#v, priority: %d", pr, readerPriority)
+
+		for curPiece := pr.Begin; curPiece <= pr.End; curPiece++ {
+			// Basically we set priority to each needed piece with this logic:
+			//   Starting from 7 (that is the max), then each next piece has
+			//   lower priority, plus more up to date reader has bigger priority,
+			//   that is because Kodi requests multiple pieces at once, while
+			//   not closing old readers, so we try to first download
+			//   for most recent reader.
+			readerPieces[curPiece] = max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
 		}
 	}
+	t.muReaders.Unlock()
+
+	piecesStatus := "["
+	piecesKeys := []int{}
+	for k := range readerPieces {
+		piecesKeys = append(piecesKeys, k)
+	}
+	sort.Ints(piecesKeys)
+
+	for _, k := range piecesKeys {
+		if readerPieces[k] > 0 {
+			piecesStatus += fmt.Sprintf("%d:%d:%v, ", k, readerPieces[k], t.hasPiece(k))
+		}
+	}
+
+	if len(piecesStatus) > 1 {
+		piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+	}
+	log.Debugf("Priorities: %s", piecesStatus)
 
 	piecesPriorities := lt.NewStdVectorInt()
 	defer lt.DeleteStdVectorInt(piecesPriorities)
 
-	curPiece := 0
 	numPieces := t.ti.NumPieces()
 
 	readerVector := lt.NewStdVectorInt()
@@ -341,41 +401,31 @@ func (t *Torrent) PrioritizePieces() {
 	reservedVector := lt.NewStdVectorInt()
 	defer lt.DeleteStdVectorInt(reservedVector)
 
-	reservedVector.Add(0)
+	for _, piece := range t.reservedPieces {
+		reservedVector.Add(piece)
+	}
 
 	defaultPriority := 1
 	if t.Service.config.DownloadStorage == StorageMemory {
 		defaultPriority = 0
 	}
 
-	seqPiece := -2
-	lastPiece := -2
-
-	for _ = 0; curPiece < numPieces; curPiece++ {
-		if readerPriority, ok := readerPieces[curPiece]; ok {
-			if curPiece > lastPiece+1 {
-				seqPiece = curPiece
-				lastPiece = curPiece
-			} else {
-				lastPiece = curPiece
-			}
-
-			// Basically we set priority to each needed piece with this logic:
-			//   Starting from 7 (that is the max), then each next piece has
-			//   lower priority, plus more up to date reader has bigger priority,
-			//   that is because Kodi requests multiple pieces at once, while
-			//   not closing old readers, so we try to first download
-			//   for most recent reader.
-			priority := max(2, 7-readerPriority-int((lastPiece-seqPiece+2)/3))
-
-			// log.Debugf("Priority: %d with priority: %d", curPiece, priority)
-
+	// Splitting to first set priorities, then deadlines,
+	// so that latest set deadline is the nearest piece number
+	for curPiece := 0; curPiece < numPieces; curPiece++ {
+		if priority, ok := readerPieces[curPiece]; ok {
 			readerVector.Add(curPiece)
 			piecesPriorities.Add(priority)
 			// t.th.SetPieceDeadline(curPiece, 0, 0)
-			t.th.SetPieceDeadline(curPiece, (7-priority)*250, 0)
+			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
 		} else {
 			piecesPriorities.Add(defaultPriority)
+		}
+	}
+
+	for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
+		if priority, ok := readerPieces[curPiece]; ok {
+			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
 		}
 	}
 
@@ -637,6 +687,40 @@ func (t *Torrent) MakeFiles() {
 			Path:   files.FilePath(i),
 		})
 	}
+}
+
+func (t *Torrent) updatePieces() error {
+	t.piecesMx.Lock()
+	defer t.piecesMx.Unlock()
+
+	if time.Now().After(t.piecesLastUpdated.Add(piecesRefreshDuration)) {
+		// need to keep a reference to the status or else the pieces bitfield
+		// is at risk of being collected
+		t.lastStatus = t.th.Status(uint(lt.TorrentHandleQueryPieces))
+		if t.lastStatus.GetState() > lt.TorrentStatusSeeding {
+			return errors.New("Torrent file has invalid state")
+		}
+		piecesBits := t.lastStatus.GetPieces()
+		piecesBitsSize := piecesBits.Size()
+		piecesSliceSize := piecesBitsSize / 8
+		if piecesBitsSize%8 > 0 {
+			// Add +1 to round up the bitfield
+			piecesSliceSize++
+		}
+		data := (*[100000000]byte)(unsafe.Pointer(piecesBits.Bytes()))[:piecesSliceSize]
+		t.pieces = Bitfield(data)
+		t.piecesLastUpdated = time.Now()
+	}
+	return nil
+}
+
+func (t *Torrent) hasPiece(idx int) bool {
+	if err := t.updatePieces(); err != nil {
+		return false
+	}
+	t.piecesMx.RLock()
+	defer t.piecesMx.RUnlock()
+	return t.pieces.GetBit(idx)
 }
 
 func average(xs []int64) float64 {
