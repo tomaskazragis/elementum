@@ -37,6 +37,7 @@ type TorrentFSEntry struct {
 	pieceLength int
 	numPieces   int
 
+	closing <-chan struct{}
 	removed *broadcast.Broadcaster
 	dbItem  *database.BTItem
 
@@ -107,6 +108,7 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 		t:    t,
 		f:    f,
 
+		closing:     t.Closing.C(),
 		totalLength: t.ti.TotalSize(),
 		pieceLength: t.ti.PieceLength(),
 		numPieces:   t.ti.NumPieces(),
@@ -166,7 +168,7 @@ func (tf *TorrentFSEntry) Close() error {
 	log.Info("Closing file...")
 	tf.removed.Signal()
 
-	if tf.tfs.s == nil || tf.tfs.s.ShuttingDown {
+	if tf.tfs.s == nil || tf.tfs.s.Closing.IsSet() {
 		return nil
 	}
 
@@ -290,6 +292,9 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 
 	for tf.t.hasPiece(piece) == false {
 		select {
+		case <-tf.closing:
+			log.Warningf("Unable to wait for piece %d as torrent was closed", piece)
+			return errors.New("Closing")
 		case <-removed:
 			log.Warningf("Unable to wait for piece %d as file was closed", piece)
 			return errors.New("File was closed")

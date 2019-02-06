@@ -125,7 +125,7 @@ func (d *SqliteDatabase) CreateBackup(backupPath string) {
 
 // Close ...
 func (d *SqliteDatabase) Close() {
-	log.Debug("Closing Database")
+	log.Debug("Closing Sqlite Database")
 	d.quit <- struct{}{}
 	d.DB.Close()
 }

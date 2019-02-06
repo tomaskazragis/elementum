@@ -29,7 +29,6 @@ import (
 )
 
 var log = logging.MustGetLogger("main")
-var shuttingDown = false
 
 func init() {
 	sync.Enable()
@@ -109,15 +108,15 @@ func main() {
 	btService := bittorrent.NewBTService()
 
 	var shutdown = func(fromSignal bool) {
-		if btService == nil || btService.ShuttingDown {
+		if btService == nil || btService.Closing.IsSet() {
 			return
 		}
 
-		btService.ShuttingDown = true
+		btService.Closing.Set()
 
 		log.Info("Shutting down...")
 		library.CloseLibrary()
-		btService.Close(true)
+		btService.Close()
 
 		db.Close()
 		cacheDb.Close()
@@ -177,6 +176,7 @@ func main() {
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
+	signal.Ignore(syscall.SIGPIPE, syscall.SIGILL)
 
 	go func() {
 		<-sigc

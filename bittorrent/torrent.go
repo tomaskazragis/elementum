@@ -13,8 +13,10 @@ import (
 	"unsafe"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/anacrolix/missinggo"
 	"github.com/dustin/go-humanize"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 )
 
@@ -24,6 +26,7 @@ type Torrent struct {
 	th             lt.TorrentHandle
 	ti             lt.TorrentInfo
 	lastStatus     lt.TorrentStatus
+	ms             lt.MemoryStorage
 	fastResumeFile string
 	torrentFile    string
 	partsFile      string
@@ -59,9 +62,9 @@ type Torrent struct {
 	muBuffer  *sync.RWMutex
 	muReaders *sync.Mutex
 
-	pieceLength float64
+	pieceLength int64
 
-	closing        chan struct{}
+	Closing        missinggo.Event
 	bufferFinished chan struct{}
 
 	piecesMx          sync.RWMutex
@@ -98,7 +101,7 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 		muBuffer:  &sync.RWMutex{},
 		muReaders: &sync.Mutex{},
 
-		closing: make(chan struct{}),
+		Closing: missinggo.Event{},
 	}
 
 	log.Debugf("Waiting for information fetched for torrent: %#v", infoHash)
@@ -136,7 +139,7 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-t.closing:
+		case <-t.Closing.C():
 			log.Debug("Stopping watch events")
 			return
 		}
@@ -220,7 +223,19 @@ func (t *Torrent) Buffer(file *File) {
 	t.startBufferTicker()
 
 	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file.Offset, 0, t.Service.GetBufferSize())
-	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-endBufferSize, endBufferSize)
+	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-EndBufferSize, EndBufferSize)
+
+	if config.Get().DownloadStorage == StorageMemory {
+		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
+		t.ms.SetTorrentHandle(t.th)
+
+		memory := int64(config.Get().MemorySize)
+		if preBufferSize+postBufferSize > memory {
+			memory = preBufferSize + postBufferSize + (2 * t.pieceLength)
+		}
+
+		t.ms.SetMemorySize(memory)
+	}
 
 	t.muBuffer.Lock()
 	t.IsBuffering = true
@@ -288,16 +303,16 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 		off = 0
 	}
 
-	pieceLength := int64(t.ti.PieceLength())
+	t.pieceLength = int64(t.ti.PieceLength())
 
 	offsetStart := fileOffset + off
-	startPiece = int(offsetStart / pieceLength)
-	pieceOffset := offsetStart % pieceLength
+	startPiece = int(offsetStart / t.pieceLength)
+	pieceOffset := offsetStart % t.pieceLength
 	offset = offsetStart - pieceOffset
 
 	offsetEnd := offsetStart + length
-	pieceOffsetEnd := offsetEnd % pieceLength
-	endPiece = int(math.Ceil(float64(offsetEnd) / float64(pieceLength)))
+	pieceOffsetEnd := offsetEnd % t.pieceLength
+	endPiece = int(math.Ceil(float64(offsetEnd) / float64(t.pieceLength)))
 
 	piecesCount := int(t.ti.NumPieces())
 	if pieceOffsetEnd == 0 {
@@ -307,7 +322,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 		endPiece = piecesCount - 1
 	}
 
-	size = int64(endPiece-startPiece+1) * pieceLength
+	size = int64(endPiece-startPiece+1) * t.pieceLength
 
 	// Calculated offset is more than we have in torrent, so correcting the size
 	if t.ti.TotalSize() != 0 && offset+size >= t.ti.TotalSize() {
@@ -405,6 +420,11 @@ func (t *Torrent) PrioritizePieces() {
 		reservedVector.Add(piece)
 	}
 
+	if t.Service.config.DownloadStorage == StorageMemory && t.th != nil && t.ms != nil {
+		t.ms.UpdateReaderPieces(readerVector)
+		t.ms.UpdateReservedPieces(reservedVector)
+	}
+
 	defaultPriority := 1
 	if t.Service.config.DownloadStorage == StorageMemory {
 		defaultPriority = 0
@@ -430,13 +450,6 @@ func (t *Torrent) PrioritizePieces() {
 	}
 
 	t.th.PrioritizePieces(piecesPriorities)
-
-	if t.Service.config.DownloadStorage == StorageMemory && t.th != nil {
-		f := t.th.GetMemoryStorage().(lt.MemoryStorage)
-		f.SetTorrentHandle(t.th)
-		f.UpdateReaderPieces(readerVector)
-		f.UpdateReservedPieces(reservedVector)
-	}
 }
 
 // GetStatus ...
@@ -559,7 +572,7 @@ func (t *Torrent) Length() int64 {
 // Drop ...
 func (t *Torrent) Drop(removeFiles bool) {
 	log.Infof("Dropping torrent: %s", t.Name())
-	t.closing <- struct{}{}
+	t.Closing.Set()
 
 	for _, r := range t.readers {
 		if r != nil {

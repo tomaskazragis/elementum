@@ -151,7 +151,7 @@ func (d *BoltDatabase) GetFilename() string {
 
 // Close ...
 func (d *BoltDatabase) Close() {
-	log.Debug("Closing Database")
+	log.Debug("Closing Bolt Database")
 	d.quit <- struct{}{}
 	d.db.Close()
 }
