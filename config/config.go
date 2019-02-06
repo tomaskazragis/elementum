@@ -586,12 +586,6 @@ func Reload() *Configuration {
 		newConfig.ProxyURL += newConfig.ProxyHost + ":" + strconv.Itoa(newConfig.ProxyPort)
 	}
 
-	// Setting default connection limit per torrent.
-	// This should be taken from gotorrent.Config{} defaults, but it's set internally.
-	if newConfig.ConnectionsLimit == 0 {
-		newConfig.ConnectionsLimit = 50
-	}
-
 	// Reading Kodi's advancedsettings file for MemorySize variable to avoid waiting for playback
 	// after Elementum's buffer is finished.
 	newConfig.KodiBufferSize = getKodiBufferSize()

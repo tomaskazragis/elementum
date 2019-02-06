@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/zeebo/bencode"
@@ -58,10 +59,8 @@ type BTService struct {
 	SpaceChecked map[string]bool
 	MarkedToMove string
 
-	ShuttingDown bool
-
 	alertsBroadcaster *broadcast.Broadcaster
-	closing           chan interface{}
+	Closing           missinggo.Event
 }
 
 type activeTorrent struct {
@@ -81,7 +80,7 @@ func NewBTService() *BTService {
 		Torrents: map[string]*Torrent{},
 		Players:  map[string]*BTPlayer{},
 
-		closing:           make(chan interface{}),
+		Closing:           missinggo.Event{},
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 	}
 
@@ -102,14 +101,11 @@ func NewBTService() *BTService {
 }
 
 // Close ...
-func (s *BTService) Close(shutdown bool) {
+func (s *BTService) Close() {
 	log.Info("Stopping BT Services...")
-	if !shutdown {
-		s.stopServices()
-	}
+	s.stopServices()
 
 	log.Info("Closing Client")
-	close(s.closing)
 	lt.DeleteSession(s.Session)
 }
 
@@ -248,7 +244,7 @@ func (s *BTService) configure() {
 		settings.SetBool("prefer_rc4", preferRc4)
 	}
 
-	if s.config.ProxyEnabled && config.Get().ProxyUseDownload {
+	if s.config.ProxyEnabled && config.Get().ProxyUseDownload && s.config.ProxyHost != "" {
 		log.Info("Applying proxy settings...")
 		proxyType := s.config.ProxyType + 1
 		settings.SetInt("proxy_type", proxyType)
@@ -270,18 +266,28 @@ func (s *BTService) configure() {
 
 	log.Infof("DownloadStorage: %s", Storages[s.config.DownloadStorage])
 	if s.config.DownloadStorage == StorageMemory {
-		memSize := int64(config.Get().MemorySize)
-		needSize := int64(s.config.BufferSize) + endBufferSize + 6*1024*1024
+		needSize := s.config.BufferSize + int(EndBufferSize) + 8*1024*1024
 
-		if memSize < needSize {
-			log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", memSize, needSize)
-			memSize = needSize
+		if config.Get().MemorySize < needSize {
+			log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", config.Get().MemorySize, needSize)
+			config.Get().MemorySize = needSize
 		}
 
-		lt.SetMemorySize(memSize)
+		// lt.SetMemorySize(int64(config.Get().MemorySize))
 
 		// Set Memory storage specific settings
 		settings.SetBool("close_redundant_connections", false)
+		settings.SetInt("share_ratio_limit", 1000)
+		settings.SetInt("seed_time_ratio_limit", 1000)
+		settings.SetInt("seed_time_limit", 84600)
+		settings.SetInt("active_downloads", -1)
+		settings.SetInt("active_seeds", -1)
+		settings.SetInt("active_limit", -1)
+		settings.SetInt("active_tracker_limit", -1)
+		settings.SetInt("active_dht_limit", -1)
+		settings.SetInt("active_lsd_limit", -1)
+		settings.SetInt("unchoke_slots_limit", 0)
+
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)
 		// settings.SetInt("cache_size", 0)
@@ -326,7 +332,7 @@ func (s *BTService) startServices() {
 
 	if s.config.DisableDHT == false {
 		log.Info("Starting DHT...")
-		s.PackSettings.SetStr("dht_bootstrap_nodes", strings.Join(dhtBootstrapNodes, ":6881,")+":6881")
+		s.PackSettings.SetStr("dht_bootstrap_nodes", strings.Join(dhtBootstrapNodes, ","))
 		s.PackSettings.SetBool("enable_dht", true)
 	}
 
@@ -520,6 +526,11 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	go torrent.SaveMetainfo(s.config.TorrentsPath)
 	go torrent.Watch()
 
+	if config.Get().DownloadStorage == StorageMemory {
+		torrent.ms = torrentHandle.GetMemoryStorage().(lt.MemoryStorage)
+		torrent.ms.SetTorrentHandle(torrent.th)
+	}
+
 	return torrent, nil
 }
 
@@ -576,6 +587,8 @@ func (s *BTService) saveResumeDataLoop() {
 
 	for {
 		select {
+		case <-s.Closing.C():
+			return
 		case <-saveResumeWait.C:
 			torrentsVector := s.Session.GetHandle().GetTorrents()
 			torrentsVectorSize := int(torrentsVector.Size())
@@ -652,7 +665,7 @@ func (s *BTService) alertsConsumer() {
 	log.Info("Consuming alerts...")
 	for {
 		select {
-		case <-s.closing:
+		case <-s.Closing.C():
 			log.Info("Closing all alert channels...")
 			return
 		default:
@@ -787,7 +800,7 @@ func (s *BTService) downloadProgress() {
 			// 	continue
 			// }
 
-			if s.Session == nil || s.Session.GetHandle() == nil {
+			if s.Closing.IsSet() || s.Session == nil || s.Session.GetHandle() == nil {
 				return
 			}
 
@@ -837,7 +850,7 @@ func (s *BTService) downloadProgress() {
 					seedingTime = finishedTime
 				}
 
-				if s.config.SeedTimeLimit > 0 {
+				if config.Get().DownloadStorage != StorageMemory && s.config.SeedTimeLimit > 0 {
 					if seedingTime >= s.config.SeedTimeLimit {
 						if !isPaused {
 							log.Warningf("Seeding time limit reached, pausing %s", torrentName)
@@ -848,7 +861,7 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
-				if s.config.SeedTimeRatioLimit > 0 {
+				if config.Get().DownloadStorage != StorageMemory && s.config.SeedTimeRatioLimit > 0 {
 					timeRatio := 0
 					downloadTime := torrentStatus.GetActiveTime() - seedingTime
 					if downloadTime > 1 {
@@ -864,7 +877,7 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
-				if s.config.ShareRatioLimit > 0 {
+				if config.Get().DownloadStorage != StorageMemory && s.config.ShareRatioLimit > 0 {
 					ratio := int64(0)
 					allTimeDownload := torrentStatus.GetAllTimeDownload()
 					if allTimeDownload > 0 {
@@ -1135,15 +1148,15 @@ func (s *BTService) GetSeedTime() int64 {
 // GetBufferSize ...
 func (s *BTService) GetBufferSize() int64 {
 	b := int64(s.config.BufferSize)
-	if b < endBufferSize {
-		return endBufferSize
+	if b < EndBufferSize {
+		return EndBufferSize
 	}
 	return b
 }
 
 // GetMemorySize ...
 func (s *BTService) GetMemorySize() int64 {
-	return int64(s.config.MemorySize)
+	return int64(config.Get().MemorySize)
 }
 
 // GetStorageType ...

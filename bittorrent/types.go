@@ -72,10 +72,11 @@ const (
 )
 
 var dhtBootstrapNodes = []string{
-	"router.bittorrent.com",
-	"router.utorrent.com",
-	"dht.transmissionbt.com",
-	"dht.aelitis.com", // Vuze
+	"router.bittorrent.com:6881",
+	"router.utorrent.com:6881",
+	"dht.transmissionbt.com:6881",
+	"dht.aelitis.com:6881",     // Vuze
+	"dht.libtorrent.org:25401", // Libtorrent
 }
 
 // DefaultTrackers ...
