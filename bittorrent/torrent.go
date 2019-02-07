@@ -13,7 +13,9 @@ import (
 	"unsafe"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/missinggo"
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 
 	"github.com/elgatito/elementum/config"
@@ -34,7 +36,7 @@ type Torrent struct {
 	infoHash       string
 	readers        map[int64]*TorrentFSEntry
 	reservedPieces []int
-	// readerPieces *roaring.Bitmap
+	awaitingPieces *roaring.Bitmap
 	// bufferReaders map[string]*FileReader
 
 	ChosenFiles []*File
@@ -91,6 +93,7 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 
 		readers:        map[int64]*TorrentFSEntry{},
 		reservedPieces: []int{},
+		awaitingPieces: roaring.NewBitmap(),
 		// readerPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
@@ -139,6 +142,10 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
+		case <-t.Service.Closing.C():
+			t.Closing.Set()
+			return
+
 		case <-t.Closing.C():
 			log.Debug("Stopping watch events")
 			return
@@ -151,6 +158,8 @@ func (t *Torrent) startBufferTicker() {
 }
 
 func (t *Torrent) bufferTickerEvent() {
+	defer perf.ScopeTimer()()
+
 	if t.IsBuffering && len(t.BufferPiecesProgress) > 0 {
 		// Making sure current progress is not less then previous
 		thisProgress := t.GetBufferProgress()
@@ -171,7 +180,7 @@ func (t *Torrent) bufferTickerEvent() {
 		}
 
 		downSpeed, upSpeed := t.GetHumanizedSpeeds()
-		log.Debugf("Buffer. Buffering: %v, Progress: %d%%, Speed: %s / %s, Pieces: %s", t.IsBuffering, int(thisProgress), downSpeed, upSpeed, piecesStatus)
+		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Pi: %s", int(thisProgress), downSpeed, upSpeed, piecesStatus)
 
 		t.muBuffer.Lock()
 		defer t.muBuffer.Unlock()
@@ -232,9 +241,8 @@ func (t *Torrent) Buffer(file *File) {
 		memory := int64(config.Get().MemorySize)
 		if preBufferSize+postBufferSize > memory {
 			memory = preBufferSize + postBufferSize + (2 * t.pieceLength)
+			t.ms.SetMemorySize(memory)
 		}
-
-		t.ms.SetMemorySize(memory)
 	}
 
 	t.muBuffer.Lock()
@@ -342,6 +350,10 @@ func (t *Torrent) PrioritizePiece(piece int) {
 		return
 	}
 
+	defer perf.ScopeTimer()()
+
+	t.awaitingPieces.AddInt(piece)
+
 	t.th.PiecePriority(piece, 7)
 	t.th.SetPieceDeadline(piece, 0, 0)
 }
@@ -351,6 +363,8 @@ func (t *Torrent) PrioritizePieces() {
 	if t.IsBuffering || t.th == nil || !t.IsInitialized {
 		return
 	}
+
+	defer perf.ScopeTimer()()
 
 	downSpeed, upSpeed := t.GetHumanizedSpeeds()
 	log.Debugf("Prioritizing pieces: %s / %s", downSpeed, upSpeed)
@@ -382,10 +396,23 @@ func (t *Torrent) PrioritizePieces() {
 			//   that is because Kodi requests multiple pieces at once, while
 			//   not closing old readers, so we try to first download
 			//   for most recent reader.
-			readerPieces[curPiece] = max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
+			if t.awaitingPieces.ContainsInt(curPiece) {
+				readerPieces[curPiece] = 7
+			} else {
+				readerPieces[curPiece] = max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
+			}
 		}
 	}
 	t.muReaders.Unlock()
+
+	piecesPriorities := lt.NewStdVectorInt()
+	defer lt.DeleteStdVectorInt(piecesPriorities)
+
+	readerVector := lt.NewStdVectorInt()
+	defer lt.DeleteStdVectorInt(readerVector)
+
+	reservedVector := lt.NewStdVectorInt()
+	defer lt.DeleteStdVectorInt(reservedVector)
 
 	piecesStatus := "["
 	piecesKeys := []int{}
@@ -395,6 +422,8 @@ func (t *Torrent) PrioritizePieces() {
 	sort.Ints(piecesKeys)
 
 	for _, k := range piecesKeys {
+		readerVector.Add(k)
+
 		if readerPieces[k] > 0 {
 			piecesStatus += fmt.Sprintf("%d:%d:%v, ", k, readerPieces[k], t.hasPiece(k))
 		}
@@ -405,16 +434,7 @@ func (t *Torrent) PrioritizePieces() {
 	}
 	log.Debugf("Priorities: %s", piecesStatus)
 
-	piecesPriorities := lt.NewStdVectorInt()
-	defer lt.DeleteStdVectorInt(piecesPriorities)
-
 	numPieces := t.ti.NumPieces()
-
-	readerVector := lt.NewStdVectorInt()
-	defer lt.DeleteStdVectorInt(readerVector)
-
-	reservedVector := lt.NewStdVectorInt()
-	defer lt.DeleteStdVectorInt(reservedVector)
 
 	for _, piece := range t.reservedPieces {
 		reservedVector.Add(piece)
@@ -469,6 +489,8 @@ func (t *Torrent) GetStateString() string {
 
 // GetBufferProgress ...
 func (t *Torrent) GetBufferProgress() float64 {
+	defer perf.ScopeTimer()()
+
 	t.BufferProgress = float64(0)
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
@@ -490,6 +512,8 @@ func (t *Torrent) GetBufferProgress() float64 {
 }
 
 func (t *Torrent) piecesProgress(pieces map[int]float64) {
+	defer perf.ScopeTimer()()
+
 	queue := lt.NewStdVectorPartialPieceInfo()
 	defer lt.DeleteStdVectorPartialPieceInfo(queue)
 
@@ -571,6 +595,8 @@ func (t *Torrent) Length() int64 {
 
 // Drop ...
 func (t *Torrent) Drop(removeFiles bool) {
+	defer perf.ScopeTimer()()
+
 	log.Infof("Dropping torrent: %s", t.Name())
 	t.Closing.Set()
 
@@ -611,6 +637,8 @@ func (t *Torrent) GetDBItem() *database.BTItem {
 
 // SaveMetainfo ...
 func (t *Torrent) SaveMetainfo(path string) error {
+	defer perf.ScopeTimer()()
+
 	// Not saving torrent for memory storage
 	if t.Service.config.DownloadStorage == StorageMemory {
 		return nil
@@ -630,6 +658,8 @@ func (t *Torrent) SaveMetainfo(path string) error {
 
 // GetReadaheadSize ...
 func (t *Torrent) GetReadaheadSize() (ret int64) {
+	defer perf.ScopeTimer()()
+
 	defer func() {
 		log.Debugf("Readahead size: %s", humanize.Bytes(uint64(ret)))
 	}()
@@ -647,7 +677,7 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 		return 0
 	}
 
-	return int64(float64(size-int64(3*t.ti.PieceLength())) * (1 / float64(len(t.readers))))
+	return int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (1 / float64(len(t.readers))))
 }
 
 // CloseReaders ...
@@ -680,6 +710,8 @@ func (t *Torrent) ResetReaders() {
 
 // GetMetadata ...
 func (t *Torrent) GetMetadata() []byte {
+	defer perf.ScopeTimer()()
+
 	torrentFile := lt.NewCreateTorrent(t.ti)
 	defer lt.DeleteCreateTorrent(torrentFile)
 	torrentContent := torrentFile.Generate()
@@ -703,6 +735,8 @@ func (t *Torrent) MakeFiles() {
 }
 
 func (t *Torrent) updatePieces() error {
+	defer perf.ScopeTimer()()
+
 	t.piecesMx.Lock()
 	defer t.piecesMx.Unlock()
 

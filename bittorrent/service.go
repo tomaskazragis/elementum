@@ -277,16 +277,18 @@ func (s *BTService) configure() {
 
 		// Set Memory storage specific settings
 		settings.SetBool("close_redundant_connections", false)
-		settings.SetInt("share_ratio_limit", 1000)
-		settings.SetInt("seed_time_ratio_limit", 1000)
-		settings.SetInt("seed_time_limit", 84600)
+		settings.SetInt("share_ratio_limit", 0)
+		settings.SetInt("seed_time_ratio_limit", 0)
+		settings.SetInt("seed_time_limit", 0)
 		settings.SetInt("active_downloads", -1)
 		settings.SetInt("active_seeds", -1)
 		settings.SetInt("active_limit", -1)
 		settings.SetInt("active_tracker_limit", -1)
 		settings.SetInt("active_dht_limit", -1)
 		settings.SetInt("active_lsd_limit", -1)
-		settings.SetInt("unchoke_slots_limit", 0)
+		// settings.SetInt("unchoke_slots_limit", 0)
+
+		// settings.SetBool("strict_end_game_mode", false)
 
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)
@@ -525,11 +527,6 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 
 	go torrent.SaveMetainfo(s.config.TorrentsPath)
 	go torrent.Watch()
-
-	if config.Get().DownloadStorage == StorageMemory {
-		torrent.ms = torrentHandle.GetMemoryStorage().(lt.MemoryStorage)
-		torrent.ms.SetTorrentHandle(torrent.th)
-	}
 
 	return torrent, nil
 }

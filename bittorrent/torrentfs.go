@@ -135,6 +135,7 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 func (tf *TorrentFSEntry) consumeAlerts() {
 	alerts, done := tf.tfs.s.Alerts()
 	defer close(done)
+
 	for alert := range alerts {
 		switch alert.Type {
 		case lt.TorrentRemovedAlertAlertType:
@@ -186,7 +187,7 @@ func (tf *TorrentFSEntry) Close() error {
 func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 	tf.lastUsed = time.Now()
 
-	currentOffset, err := tf.File.Seek(0, os.SEEK_CUR)
+	currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return 0, err
 	}
@@ -252,20 +253,36 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 
 	seekingOffset := offset
 
+	// switch whence {
+	// default:
+	// 	return 0, errWhence
+	// case SeekStart:
+	// 	offset += s.base
+	// case SeekCurrent:
+	// 	offset += s.off
+	// case SeekEnd:
+	// 	offset += s.limit
+	// }
+	// if offset < s.base {
+	// 	return 0, errOffset
+	// }
+	// s.off = offset
+	// return offset - s.base, nil
+
 	switch whence {
-	case os.SEEK_CUR:
-		currentOffset, err := tf.File.Seek(0, os.SEEK_CUR)
+	case io.SeekCurrent:
+		currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return currentOffset, err
 		}
 		seekingOffset += currentOffset
 		break
-	case os.SEEK_END:
+	case io.SeekEnd:
 		seekingOffset = tf.f.Size - offset
 		break
 	}
 
-	log.Infof("Seeking at %d...", seekingOffset)
+	log.Infof("Seeking at %d... with %d", seekingOffset, whence)
 	piece, _ := tf.pieceFromOffset(seekingOffset)
 	if tf.t.hasPiece(piece) == false {
 		log.Infof("We don't have piece %d, setting piece priorities", piece)
@@ -285,6 +302,7 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 	}
 
 	log.Infof("Waiting for piece %d", piece)
+	tf.t.PrioritizePiece(piece)
 
 	pieceRefreshTicker := time.Tick(piecesRefreshDuration)
 	removed, done := tf.removed.Listen()
@@ -302,6 +320,8 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 			continue
 		}
 	}
+
+	tf.t.awaitingPieces.Remove(uint32(piece))
 	return nil
 }
 
@@ -323,20 +343,13 @@ func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
 		// anything.
 		ra = 1
 	}
-	pos, _ := tf.File.Seek(0, os.SEEK_CUR)
-	if ra > tf.f.Size-pos {
+	pos, _ := tf.File.Seek(0, io.SeekCurrent)
+	if tf.f.Size > 0 && ra > tf.f.Size-pos {
 		ra = tf.f.Size - pos
 	}
+	log.Infof("Range: id=%d, pos=%d, ra=%d, orig=%d, size=%d", tf.id, pos, ra, tf.readahead, tf.f.Size)
 
-	ret.Begin, ret.End = tf.byteRegionPieces(tf.torrentOffset(pos), ra)
-	if ret.Begin < 0 {
-		ret.Begin = 0
-	}
-	if ret.End > tf.numPieces {
-		ret.End = tf.numPieces
-	}
-
-	return
+	return tf.byteRegionPieces(tf.torrentOffset(pos), ra)
 }
 
 func (tf *TorrentFSEntry) torrentOffset(readerPos int64) int64 {
@@ -344,7 +357,7 @@ func (tf *TorrentFSEntry) torrentOffset(readerPos int64) int64 {
 }
 
 // Returns the range of pieces [begin, end) that contains the extent of bytes.
-func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (begin, end int) {
+func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 	if off >= tf.totalLength {
 		return
 	}
@@ -355,10 +368,9 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (begin, end int) {
 	if size <= 0 {
 		return
 	}
-	begin = int(off) / tf.pieceLength
-	end = int((off + size + int64(tf.pieceLength) - 1) / int64(tf.pieceLength))
-	if end > int(tf.numPieces) {
-		end = int(tf.numPieces)
-	}
+
+	pr.Begin = max(0, int(off)/tf.pieceLength)
+	pr.End = min(tf.numPieces, int((off+size+int64(tf.pieceLength)-1)/int64(tf.pieceLength)))
+
 	return
 }

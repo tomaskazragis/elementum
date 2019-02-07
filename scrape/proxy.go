@@ -341,7 +341,7 @@ func StartProxy() *http.Server {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Debugf("Could not start internal proxy: %s", err)
+			log.Warningf("Could not start internal proxy: %s", err)
 		}
 	}()
 

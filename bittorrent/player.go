@@ -150,8 +150,8 @@ func (btp *BTPlayer) addTorrent() error {
 	go btp.consumeAlerts()
 
 	log.Info("Enabling sequential download")
-	btp.t.th.SetSequentialDownload(true)
-	// btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
+	// btp.t.th.SetSequentialDownload(true)
+	btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
 
 	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
 	btp.torrentName = status.GetName()
@@ -173,8 +173,8 @@ func (btp *BTPlayer) resumeTorrent() error {
 	go btp.consumeAlerts()
 
 	log.Info("Enabling sequential download")
-	btp.t.th.SetSequentialDownload(true)
-	// btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
+	// btp.t.th.SetSequentialDownload(true)
+	btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
 
 	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
 	btp.torrentName = status.GetName()

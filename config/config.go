@@ -305,6 +305,9 @@ func Reload() *Configuration {
 	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
 	torrentsPath := TranslatePath(xbmc.GetSettingString("torrents_path"))
 	downloadStorage := xbmc.GetSettingInt("download_storage")
+	if downloadStorage > 1 {
+		downloadStorage = 1
+	}
 
 	log.Noticef("Paths translated by Kodi: Download = %s , Library = %s , Torrents = %s , Storage = %d", downloadPath, libraryPath, torrentsPath, downloadStorage)
 
@@ -533,6 +536,11 @@ func Reload() *Configuration {
 		CompletedShowsPath:  settings["completed_shows_path"].(string),
 
 		LocalOnlyClient: settings["local_only_client"].(bool),
+	}
+
+	// Fallback for old configuration with additional storage variants
+	if newConfig.DownloadStorage > 1 {
+		newConfig.DownloadStorage = 1
 	}
 
 	// For memory storage we are changing configuration
