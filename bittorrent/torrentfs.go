@@ -37,7 +37,7 @@ type TorrentFSEntry struct {
 	pieceLength int
 	numPieces   int
 
-	closing <-chan struct{}
+	closing <-chan interface{}
 	removed *broadcast.Broadcaster
 	dbItem  *database.BTItem
 
@@ -108,7 +108,7 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 		t:    t,
 		f:    f,
 
-		closing:     t.Closing.C(),
+		closing:     t.Closing.Listen(),
 		totalLength: t.ti.TotalSize(),
 		pieceLength: t.ti.PieceLength(),
 		numPieces:   t.ti.NumPieces(),
@@ -369,8 +369,9 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 		return
 	}
 
-	pr.Begin = max(0, int(off)/tf.pieceLength)
-	pr.End = min(tf.numPieces, int((off+size+int64(tf.pieceLength)-1)/int64(tf.pieceLength)))
+	pl := int64(tf.pieceLength)
+	pr.Begin = max(0, int(off/pl))
+	pr.End = min(tf.numPieces-1, int((off+size+pl-1)/pl))
 
 	return
 }

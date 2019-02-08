@@ -14,10 +14,10 @@ import (
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/RoaringBitmap/roaring"
-	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 
+	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 )
@@ -66,7 +66,7 @@ type Torrent struct {
 
 	pieceLength int64
 
-	Closing        missinggo.Event
+	Closing        *broadcast.Closer
 	bufferFinished chan struct{}
 
 	piecesMx          sync.RWMutex
@@ -104,7 +104,7 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 		muBuffer:  &sync.RWMutex{},
 		muReaders: &sync.Mutex{},
 
-		Closing: missinggo.Event{},
+		Closing: broadcast.NewCloser(),
 	}
 
 	log.Debugf("Waiting for information fetched for torrent: %#v", infoHash)
@@ -142,11 +142,11 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-t.Service.Closing.C():
+		case <-t.Service.Closing.Listen():
 			t.Closing.Set()
 			return
 
-		case <-t.Closing.C():
+		case <-t.Closing.Listen():
 			log.Debug("Stopping watch events")
 			return
 		}
@@ -251,11 +251,11 @@ func (t *Torrent) Buffer(file *File) {
 	t.BufferLength = preBufferSize + postBufferSize
 
 	for i := preBufferStart; i <= preBufferEnd; i++ {
-		t.BufferPiecesProgress[int(i)] = 0
+		t.BufferPiecesProgress[i] = 0
 	}
 	for i := postBufferStart; i <= postBufferEnd; i++ {
-		t.BufferPiecesProgress[int(i)] = 0
-		t.BufferEndPieces = append(t.BufferEndPieces, int(i))
+		t.BufferPiecesProgress[i] = 0
+		t.BufferEndPieces = append(t.BufferEndPieces, i)
 	}
 
 	t.BufferPiecesLength = 0

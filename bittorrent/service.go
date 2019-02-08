@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/zeebo/bencode"
@@ -60,7 +59,7 @@ type BTService struct {
 	MarkedToMove string
 
 	alertsBroadcaster *broadcast.Broadcaster
-	Closing           missinggo.Event
+	Closing           *broadcast.Closer
 }
 
 type activeTorrent struct {
@@ -80,7 +79,7 @@ func NewBTService() *BTService {
 		Torrents: map[string]*Torrent{},
 		Players:  map[string]*BTPlayer{},
 
-		Closing:           missinggo.Event{},
+		Closing:           broadcast.NewCloser(),
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 	}
 
@@ -106,7 +105,29 @@ func (s *BTService) Close() {
 	s.stopServices()
 
 	log.Info("Closing Client")
-	lt.DeleteSession(s.Session)
+	s.CloseSession()
+}
+
+// CloseSession tries to close libtorrent session with a timeout,
+// because it takes too much to close and Kodi hangs.
+func (s *BTService) CloseSession() {
+	doWithTimeout(3*time.Second, func() {
+		lt.DeleteSession(s.Session)
+	})
+}
+
+func doWithTimeout(timeout time.Duration, doFunc func()) {
+	select {
+	case <-time.After(timeout):
+		break
+
+	default:
+		doFunc()
+		return
+	}
+
+	// timeout handling
+	log.Infof("Did not complete operation in time")
 }
 
 // Reconfigure fired every time addon configuration has changed
@@ -358,15 +379,15 @@ func (s *BTService) stopServices() {
 	// TODO: cleanup these messages after windows hang is fixed
 	// Don't need to execute RPC calls when Kodi is closing
 	if s.dialogProgressBG != nil {
-		log.Debugf("Closing existing Dialog")
+		log.Infof("Closing existing Dialog")
 		s.dialogProgressBG.Close()
 	}
 	s.dialogProgressBG = nil
 
-	log.Debugf("Cleaning up all DialogBG")
+	log.Infof("Cleaning up all DialogBG")
 	xbmc.DialogProgressBGCleanup()
 
-	log.Debugf("Resetting RPC")
+	log.Infof("Resetting RPC")
 	xbmc.ResetRPC()
 
 	log.Info("Stopping LSD...")
@@ -580,11 +601,13 @@ func (s *BTService) GetTorrentByHash(hash string) *Torrent {
 
 func (s *BTService) saveResumeDataLoop() {
 	saveResumeWait := time.NewTicker(time.Duration(s.config.SessionSave) * time.Second)
+	closer := s.Closing.Subscribe()
 	defer saveResumeWait.Stop()
+	defer closer.Close()
 
 	for {
 		select {
-		case <-s.Closing.C():
+		case <-closer.Values:
 			return
 		case <-saveResumeWait.C:
 			torrentsVector := s.Session.GetHandle().GetTorrents()
@@ -657,13 +680,15 @@ func (s *BTService) saveResumeDataConsumer() {
 
 func (s *BTService) alertsConsumer() {
 	defer s.alertsBroadcaster.Close()
+	closer := s.Closing.Listen()
 
 	ltOneSecond := lt.Seconds(ltAlertWaitTime)
 	log.Info("Consuming alerts...")
 	for {
 		select {
-		case <-s.Closing.C():
+		case <-closer:
 			log.Info("Closing all alert channels...")
+
 			return
 		default:
 			if s.Session.GetHandle().WaitForAlert(ltOneSecond).Swigcptr() == 0 {

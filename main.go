@@ -179,9 +179,10 @@ func main() {
 	signal.Ignore(syscall.SIGPIPE, syscall.SIGILL)
 
 	go func() {
+		closer := btService.Closing.Listen()
 		for {
 			select {
-			case <-btService.Closing.C():
+			case <-closer:
 				return
 			case <-sigc:
 				shutdown(true)
