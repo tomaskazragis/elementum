@@ -19,6 +19,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/zeebo/bencode"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
@@ -108,6 +109,7 @@ func (s *BTService) Close() {
 	s.stopServices()
 
 	s.CloseSession()
+
 	log.Infof("Closed service in %s", time.Since(now))
 }
 
@@ -241,14 +243,17 @@ func (s *BTService) configure() {
 			settings.SetInt("choking_algorithm", int(lt.SettingsPackBittyrantChoker))
 		}
 	}
+	if s.config.DisableUpload {
+		s.Session.AddUploadExtension()
+	}
 
-	if s.config.ShareRatioLimit > 0 {
+	if !s.config.DisableUpload && s.config.ShareRatioLimit > 0 {
 		settings.SetInt("share_ratio_limit", s.config.ShareRatioLimit)
 	}
-	if s.config.SeedTimeRatioLimit > 0 {
+	if !s.config.DisableUpload && s.config.SeedTimeRatioLimit > 0 {
 		settings.SetInt("seed_time_ratio_limit", s.config.SeedTimeRatioLimit)
 	}
-	if s.config.SeedTimeLimit > 0 {
+	if !s.config.DisableUpload && s.config.SeedTimeLimit > 0 {
 		settings.SetInt("seed_time_limit", s.config.SeedTimeLimit)
 	}
 
@@ -454,7 +459,7 @@ func (s *BTService) checkAvailableSpace(t *Torrent) bool {
 
 		log.Infof("Pausing torrent %s", t.th.Status(uint(lt.TorrentHandleQueryName)).GetName())
 		t.th.AutoManaged(false)
-		t.th.Pause(1)
+		t.Pause()
 		return false
 	}
 
@@ -1138,12 +1143,7 @@ func (s *BTService) SetDownloadLimit(i int) {
 func (s *BTService) SetUploadLimit(i int) {
 	settings := s.PackSettings
 
-	if s.config.DisableUpload {
-		settings.SetInt("upload_rate_limit", -1)
-	} else {
-		settings.SetInt("upload_rate_limit", i)
-	}
-
+	settings.SetInt("upload_rate_limit", i)
 	s.Session.GetHandle().ApplySettings(settings)
 }
 
@@ -1413,6 +1413,12 @@ func (s *BTService) GetListenIP(network string) string {
 		return s.ListenIPv6
 	}
 	return s.ListenIP
+}
+
+// GetMemoryStats returns total and free memory sizes for this OS
+func (s *BTService) GetMemoryStats() (int64, int64) {
+	v, _ := mem.VirtualMemory()
+	return int64(v.Total), int64(v.Free)
 }
 
 func min(a, b int) int {

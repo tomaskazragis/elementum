@@ -265,9 +265,13 @@ func (btp *BTPlayer) waitCheckAvailableSpace() {
 }
 
 func (btp *BTPlayer) processMetadata() {
+	if btp.t.IsInitialized {
+		return
+	}
+
 	if btp.p.ResumeIndex < 0 {
 		btp.t.th.AutoManaged(false)
-		btp.t.th.Pause()
+		btp.t.Pause()
 		defer btp.t.th.AutoManaged(true)
 	}
 

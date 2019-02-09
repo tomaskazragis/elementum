@@ -243,8 +243,18 @@ func (t *Torrent) Buffer(file *File) {
 
 	t.startBufferTicker()
 
-	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file.Offset, 0, t.Service.GetBufferSize())
+	startBufferSize := t.Service.GetBufferSize()
+	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file.Offset, 0, startBufferSize)
 	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-EndBufferSize, EndBufferSize)
+
+	if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
+		_, free := t.Service.GetMemoryStats()
+		startBufferSize = t.pieceLength * 10
+		if startBufferSize*2 < free {
+			preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
+			log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
+		}
+	}
 
 	if config.Get().DownloadStorage == StorageMemory {
 		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
@@ -631,6 +641,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 
 // Pause ...
 func (t *Torrent) Pause() {
+	log.Infof("Pausing torrent: %s", t.InfoHash())
 	t.th.Pause()
 
 	t.IsPaused = true
@@ -638,6 +649,7 @@ func (t *Torrent) Pause() {
 
 // Resume ...
 func (t *Torrent) Resume() {
+	log.Infof("Resuming torrent: %s", t.InfoHash())
 	t.th.Resume()
 
 	t.IsPaused = false

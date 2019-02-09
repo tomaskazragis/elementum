@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash"
 	"github.com/op/go-logging"
 
+	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -94,8 +95,8 @@ const (
 )
 
 var (
-	closing         = make(chan struct{})
 	removedEpisodes = make(chan *removedEpisode)
+	closer          = broadcast.NewCloser()
 
 	log = logging.MustGetLogger("library")
 
@@ -154,11 +155,17 @@ func Init() {
 	// Removed episodes debouncer
 	go func() {
 		var episodes []*removedEpisode
+
+		closing := closer.Subscribe()
 		timer := time.NewTicker(3 * time.Second)
+
 		defer timer.Stop()
 
 		for {
 			select {
+			case <-closing.Values:
+				return
+
 			case <-timer.C:
 				if len(episodes) == 0 {
 					break
@@ -239,8 +246,10 @@ func Init() {
 		}
 		go func() {
 			time.Sleep(time.Duration(updateDelay) * time.Second)
+			closing := closer.Subscribe()
+
 			select {
-			case <-closing:
+			case <-closing.Values:
 				return
 			default:
 				go func() {
@@ -278,6 +287,7 @@ func Init() {
 			xbmc.Notify("Elementum", "LOCALIZE[30147]", config.AddonIcon())
 		}
 	}()
+
 	started := time.Now()
 	language := config.Get().Language
 	tmdb.PopularMovies(tmdb.DiscoverFilters{}, language, 1)
@@ -313,6 +323,8 @@ func Init() {
 
 	markedForRemovalTicker := time.NewTicker(30 * time.Second)
 	defer markedForRemovalTicker.Stop()
+
+	closing := closer.Subscribe()
 
 	for {
 		select {
@@ -377,7 +389,7 @@ func Init() {
 				log.Infof("Removed %s from database", infoHash)
 			}
 			rows.Close()
-		case <-closing:
+		case <-closing.Values:
 			close(removedEpisodes)
 			return
 		}
@@ -967,7 +979,7 @@ func wasRemoved(id int, mediaType int) (wasRemoved bool) {
 // CloseLibrary ...
 func CloseLibrary() {
 	log.Info("Closing library...")
-	close(closing)
+	closer.Set()
 }
 
 // ClearPageCache deletes cached page listings

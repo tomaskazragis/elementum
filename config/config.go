@@ -65,8 +65,10 @@ type Configuration struct {
 	PlaybackPercent           int
 	DownloadStorage           int
 	AutoMemorySize            bool
+	AutoAdjustMemorySize      bool
 	AutoMemorySizeStrategy    int
 	MemorySize                int
+	AutoAdjustBufferSize      bool
 	BufferSize                int
 	KodiBufferSize            int
 	UploadRateLimit           int
@@ -405,8 +407,10 @@ func Reload() *Configuration {
 		XbmcPath:                  info.Xbmc,
 		DownloadStorage:           settings["download_storage"].(int),
 		AutoMemorySize:            settings["auto_memory_size"].(bool),
+		AutoAdjustMemorySize:      settings["auto_adjust_memory_size"].(bool),
 		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
 		MemorySize:                settings["memory_size"].(int) * 1024 * 1024,
+		AutoAdjustBufferSize:      settings["auto_adjust_buffer_size"].(bool),
 		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
 		DownloadRateLimit:         settings["max_download_rate"].(int) * 1024,
