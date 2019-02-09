@@ -154,9 +154,12 @@ func Init() {
 	// Removed episodes debouncer
 	go func() {
 		var episodes []*removedEpisode
+		timer := time.NewTicker(3 * time.Second)
+		defer timer.Stop()
+
 		for {
 			select {
-			case <-time.After(3 * time.Second):
+			case <-timer.C:
 				if len(episodes) == 0 {
 					break
 				}

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/anacrolix/missinggo"
 
-	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -37,8 +37,7 @@ type TorrentFSEntry struct {
 	pieceLength int
 	numPieces   int
 
-	closing <-chan interface{}
-	removed *broadcast.Broadcaster
+	removed missinggo.Event
 	dbItem  *database.BTItem
 
 	id          int64
@@ -108,12 +107,10 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 		t:    t,
 		f:    f,
 
-		closing:     t.Closing.Listen(),
 		totalLength: t.ti.TotalSize(),
 		pieceLength: t.ti.PieceLength(),
 		numPieces:   t.ti.NumPieces(),
 		storageType: tfs.s.config.DownloadStorage,
-		removed:     broadcast.NewBroadcaster(),
 		id:          time.Now().UTC().UnixNano(),
 
 		lastUsed: time.Now(),
@@ -141,7 +138,7 @@ func (tf *TorrentFSEntry) consumeAlerts() {
 		case lt.TorrentRemovedAlertAlertType:
 			removedAlert := lt.SwigcptrTorrentAlert(alert.Pointer)
 			if removedAlert.GetHandle().Equal(tf.t.th) {
-				tf.removed.Signal()
+				tf.removed.Set()
 				return
 			}
 		}
@@ -167,7 +164,7 @@ func (tf *TorrentFSEntry) setSubtitles() {
 // Close ...
 func (tf *TorrentFSEntry) Close() error {
 	log.Info("Closing file...")
-	tf.removed.Signal()
+	tf.removed.Set()
 
 	if tf.tfs.s == nil || tf.tfs.s.Closing.IsSet() {
 		return nil
@@ -305,14 +302,10 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 	tf.t.PrioritizePiece(piece)
 
 	pieceRefreshTicker := time.Tick(piecesRefreshDuration)
-	removed, done := tf.removed.Listen()
-	defer close(done)
+	removed := tf.removed.C()
 
 	for tf.t.hasPiece(piece) == false {
 		select {
-		case <-tf.closing:
-			log.Warningf("Unable to wait for piece %d as torrent was closed", piece)
-			return errors.New("Closing")
 		case <-removed:
 			log.Warningf("Unable to wait for piece %d as file was closed", piece)
 			return errors.New("File was closed")

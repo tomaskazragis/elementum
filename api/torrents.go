@@ -238,7 +238,10 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 // ListTorrentsWeb ...
 func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		btService.Session.GetHandle().GetTorrents()
+		if btService.Closing.IsSet() {
+			return
+		}
+
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
 		torrentsVectorSize := int(torrentsVector.Size())
 		torrents := make([]*TorrentsWeb, 0, torrentsVectorSize)

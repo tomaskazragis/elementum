@@ -177,12 +177,15 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 	signal.Ignore(syscall.SIGPIPE, syscall.SIGILL)
+	defer close(sigc)
 
 	go func() {
-		closer := btService.Closing.Listen()
+		closer := btService.Closing.Subscribe()
+		defer closer.Close()
+
 		for {
 			select {
-			case <-closer:
+			case <-closer.Values:
 				return
 			case <-sigc:
 				shutdown(true)

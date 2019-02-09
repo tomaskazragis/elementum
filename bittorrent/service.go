@@ -101,34 +101,39 @@ func NewBTService() *BTService {
 
 // Close ...
 func (s *BTService) Close() {
+	defer s.Closing.Close()
+
+	now := time.Now()
 	log.Info("Stopping BT Services...")
 	s.stopServices()
 
-	log.Info("Closing Client")
 	s.CloseSession()
+	log.Infof("Closed service in %s", time.Since(now))
 }
 
 // CloseSession tries to close libtorrent session with a timeout,
 // because it takes too much to close and Kodi hangs.
 func (s *BTService) CloseSession() {
-	doWithTimeout(3*time.Second, func() {
-		lt.DeleteSession(s.Session)
-	})
+	log.Info("Closing Session")
+	lt.DeleteSession(s.Session)
 }
 
-func doWithTimeout(timeout time.Duration, doFunc func()) {
-	select {
-	case <-time.After(timeout):
-		break
+// func doWithTimeout(timeout time.Duration, doFunc func()) {
+// 	timer := time.NewTimer(timeout)
+// 	defer timer.Stop()
 
-	default:
-		doFunc()
-		return
-	}
+// 	select {
+// 	case <-timer.C:
+// 		break
 
-	// timeout handling
-	log.Infof("Did not complete operation in time")
-}
+// 	default:
+// 		doFunc()
+// 		return
+// 	}
+
+// 	// timeout handling
+// 	log.Infof("Did not complete operation in time")
+// }
 
 // Reconfigure fired every time addon configuration has changed
 // and Kodi sent a notification about that.
@@ -546,7 +551,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 
 	s.Torrents[torrent.infoHash] = torrent
 
-	go torrent.SaveMetainfo(s.config.TorrentsPath)
+	// go torrent.SaveMetainfo(s.config.TorrentsPath)
 	go torrent.Watch()
 
 	return torrent, nil
@@ -679,14 +684,15 @@ func (s *BTService) saveResumeDataConsumer() {
 }
 
 func (s *BTService) alertsConsumer() {
+	closer := s.Closing.Subscribe()
+	defer closer.Close()
 	defer s.alertsBroadcaster.Close()
-	closer := s.Closing.Listen()
 
 	ltOneSecond := lt.Seconds(ltAlertWaitTime)
 	log.Info("Consuming alerts...")
 	for {
 		select {
-		case <-closer:
+		case <-closer.Values:
 			log.Info("Closing all alert channels...")
 
 			return
@@ -718,7 +724,15 @@ func (s *BTService) alertsConsumer() {
 					splitMessage := strings.Split(alertMessage, ":")
 					splitIP := strings.Split(splitMessage[len(splitMessage)-1], ".")
 					alertMessage = strings.Join(splitMessage[:len(splitMessage)-1], ":") + splitIP[0] + ".XX.XX.XX"
+				case lt.MetadataReceivedAlertAlertType:
+					metadataAlert := lt.SwigcptrMetadataReceivedAlert(alertPtr)
+					for _, t := range s.Torrents {
+						if t.th != nil && metadataAlert.GetHandle().Equal(t.th) {
+							t.onMetadataReceived()
+						}
+					}
 				}
+
 				alert := &Alert{
 					Type:     alertType,
 					Category: ltAlert.Category(),

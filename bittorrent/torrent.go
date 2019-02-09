@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/RoaringBitmap/roaring"
+	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 
@@ -66,6 +68,7 @@ type Torrent struct {
 
 	pieceLength int64
 
+	gotMetainfo    missinggo.Event
 	Closing        *broadcast.Closer
 	bufferFinished chan struct{}
 
@@ -108,9 +111,13 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 	}
 
 	log.Debugf("Waiting for information fetched for torrent: %#v", infoHash)
-	// TODO: Do we need to wait for torrent information fetched?
 
 	return t
+}
+
+// GotInfo ...
+func (t *Torrent) GotInfo() <-chan struct{} {
+	return t.gotMetainfo.C()
 }
 
 // Storage ...
@@ -127,9 +134,14 @@ func (t *Torrent) Watch() {
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
 
+	sc := t.Service.Closing.Subscribe()
+	tc := t.Closing.Subscribe()
+
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
 	defer close(t.bufferFinished)
+	defer sc.Close()
+	defer tc.Close()
 
 	for {
 		select {
@@ -142,11 +154,11 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-t.Service.Closing.Listen():
+		case <-sc.Values:
 			t.Closing.Set()
 			return
 
-		case <-t.Closing.Listen():
+		case <-tc.Values:
 			log.Debug("Stopping watch events")
 			return
 		}
@@ -599,6 +611,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 
 	log.Infof("Dropping torrent: %s", t.Name())
 	t.Closing.Set()
+	defer t.Closing.Close()
 
 	for _, r := range t.readers {
 		if r != nil {
@@ -776,4 +789,22 @@ func average(xs []int64) float64 {
 		total += v
 	}
 	return float64(total) / float64(len(xs))
+}
+
+func (t *Torrent) onMetadataReceived() {
+	log.Info("Metadata received.")
+
+	defer t.gotMetainfo.Set()
+
+	t.ti = t.th.TorrentFile()
+	t.MakeFiles()
+
+	t.IsWithMetadata = true
+
+	// Reset fastResumeFile
+	infoHash := t.InfoHash()
+	t.fastResumeFile = filepath.Join(t.Service.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
+	t.partsFile = filepath.Join(t.Service.config.DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
+
+	go t.SaveMetainfo(t.Service.config.TorrentsPath)
 }

@@ -159,7 +159,8 @@ func (btp *BTPlayer) addTorrent() error {
 
 	if status.GetHasMetadata() {
 		log.Debugf("Already having metadata")
-		btp.onMetadataReceived()
+		btp.t.onMetadataReceived()
+		btp.processMetadata()
 	}
 
 	return nil
@@ -181,7 +182,8 @@ func (btp *BTPlayer) resumeTorrent() error {
 	log.Infof("Resuming %s", btp.torrentName)
 
 	if status.GetHasMetadata() {
-		btp.onMetadataReceived()
+		btp.t.onMetadataReceived()
+		btp.processMetadata()
 	}
 
 	btp.t.th.AutoManaged(true)
@@ -211,6 +213,11 @@ func (btp *BTPlayer) Buffer() error {
 			return err
 		}
 	}
+
+	<-btp.t.GotInfo()
+	btp.processMetadata()
+
+	log.Debugf("Information fetched for torrent: %s", btp.t.Name())
 
 	btp.t.IsBuffering = true
 
@@ -257,26 +264,19 @@ func (btp *BTPlayer) waitCheckAvailableSpace() {
 	}
 }
 
-func (btp *BTPlayer) onMetadataReceived() {
-	log.Info("Metadata received.")
-
-	btp.t.IsWithMetadata = true
+func (btp *BTPlayer) processMetadata() {
 	if btp.p.ResumeIndex < 0 {
 		btp.t.th.AutoManaged(false)
 		btp.t.th.Pause()
 		defer btp.t.th.AutoManaged(true)
 	}
 
-	btp.t.ti = btp.t.th.TorrentFile()
 	btp.torrentName = btp.t.Name()
-	btp.t.MakeFiles()
 
 	log.Infof("Downloading %s", btp.torrentName)
 
 	// Reset fastResumeFile
 	infoHash := btp.t.InfoHash()
-	btp.t.fastResumeFile = filepath.Join(btp.s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
-	btp.t.partsFile = filepath.Join(btp.s.config.DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
 
 	var err error
 	btp.chosenFile, err = btp.chooseFile()
@@ -1011,13 +1011,12 @@ func (btp *BTPlayer) consumeAlerts() {
 				return
 			}
 			switch alert.Type {
-			case lt.MetadataReceivedAlertAlertType:
-				metadataAlert := lt.SwigcptrMetadataReceivedAlert(alert.Pointer)
-				log.Debugf("Metadata received: %#v --- %#v", metadataAlert.GetHandle(), btp.t.th)
-				if metadataAlert.GetHandle().Equal(btp.t.th) {
-					btp.onMetadataReceived()
-					go btp.s.AttachPlayer(btp)
-				}
+			// case lt.MetadataReceivedAlertAlertType:
+			// 	metadataAlert := lt.SwigcptrMetadataReceivedAlert(alert.Pointer)
+			// 	if metadataAlert.GetHandle().Equal(btp.t.th) {
+			// 		btp.onMetadataReceived()
+			// 		go btp.s.AttachPlayer(btp)
+			// 	}
 			case lt.StateChangedAlertAlertType:
 				stateAlert := lt.SwigcptrStateChangedAlert(alert.Pointer)
 				if stateAlert.GetHandle().Equal(btp.t.th) {
@@ -1025,6 +1024,7 @@ func (btp *BTPlayer) consumeAlerts() {
 				}
 			}
 		case <-btp.closing:
+			log.Debugf("Stopping player alerts")
 			return
 		}
 	}

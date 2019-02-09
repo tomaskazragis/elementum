@@ -23,8 +23,3 @@ func (c *Closer) Set() {
 func (c *Closer) IsSet() bool {
 	return c.done
 }
-
-// Listen ...
-func (c *Closer) Listen() <-chan interface{} {
-	return c.Subscribe().Values
-}
