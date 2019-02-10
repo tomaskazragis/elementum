@@ -19,6 +19,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/zeebo/bencode"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
@@ -1415,10 +1416,10 @@ func (s *BTService) GetListenIP(network string) string {
 }
 
 // GetMemoryStats returns total and free memory sizes for this OS
-// func (s *BTService) GetMemoryStats() (int64, int64) {
-// 	v, _ := mem.VirtualMemory()
-// 	return int64(v.Total), int64(v.Free)
-// }
+func (s *BTService) GetMemoryStats() (int64, int64) {
+	v, _ := mem.VirtualMemory()
+	return int64(v.Total), int64(v.Free)
+}
 
 func min(a, b int) int {
 	if a < b {

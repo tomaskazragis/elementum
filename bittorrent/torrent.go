@@ -248,12 +248,12 @@ func (t *Torrent) Buffer(file *File) {
 	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-EndBufferSize, EndBufferSize)
 
 	if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
-		// _, free := t.Service.GetMemoryStats()
+		_, free := t.Service.GetMemoryStats()
 		startBufferSize = t.pieceLength * 10
-		// if startBufferSize*2 < free {
-		preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
-		log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
-		// }
+		if free == 0 || startBufferSize*2 < free {
+			preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
+			log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
+		}
 	}
 
 	if config.Get().DownloadStorage == StorageMemory {

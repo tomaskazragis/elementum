@@ -157,9 +157,6 @@ clean:
 distclean:
 	rm -rf build
 
-dep: force 
-	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) go get -u ./...
-
 build: force
 	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) make dist TARGET_OS=$(TARGET_OS) TARGET_ARCH=$(TARGET_ARCH) GIT_VERSION=$(GIT_VERSION)
 
@@ -194,11 +191,6 @@ dist: elementum vendor_$(TARGET_OS) strip checksum
 else
 dist: elementum vendor_$(TARGET_OS) strip checksum
 endif
-
-deps: force
-	for i in $(PLATFORMS); do \
-		$(MAKE) dep TARGET_OS=$(firstword $(subst -, ,$i)) TARGET_ARCH=$(word 2, $(subst -, ,$i))
-	done
 
 libs: force
 	$(MAKE) libtorrent-go PLATFORM=$(PLATFORM)
