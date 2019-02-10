@@ -33,8 +33,6 @@ import (
 const (
 	// EndBufferSize ...
 	EndBufferSize     int64 = 5400276 // ~5.5mb
-	playbackMaxWait         = 30 * time.Second
-	minCandidateSize        = 100 * 1024 * 1024
 	episodeMatchRegex       = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
 )
 
@@ -399,7 +397,7 @@ func (btp *BTPlayer) chooseFile() (*File, error) {
 			maxSize = size
 			biggestFile = i
 		}
-		if size > minCandidateSize {
+		if size > config.Get().MinCandidateSize {
 			candidateFiles = append(candidateFiles, i)
 		}
 		if strings.Contains(f.Path, "BDMV/STREAM/") {
@@ -749,7 +747,7 @@ func (btp *BTPlayer) playerLoop() {
 	log.Info("Waiting for playback...")
 	oneSecond := time.NewTicker(1 * time.Second)
 	defer oneSecond.Stop()
-	playbackTimeout := time.After(playbackMaxWait)
+	playbackTimeout := time.After(time.Duration(config.Get().BufferTimeout) * time.Second)
 
 playbackWaitLoop:
 	for {
@@ -758,7 +756,7 @@ playbackWaitLoop:
 		}
 		select {
 		case <-playbackTimeout:
-			log.Warningf("Playback was unable to start after %d seconds. Aborting...", playbackMaxWait/time.Second)
+			log.Warningf("Playback was unable to start after %d seconds. Aborting...", config.Get().BufferTimeout)
 			btp.bufferEvents.Broadcast(errors.New("Playback was unable to start before timeout"))
 			return
 		case <-oneSecond.C:

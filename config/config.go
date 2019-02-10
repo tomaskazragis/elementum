@@ -69,6 +69,8 @@ type Configuration struct {
 	AutoMemorySizeStrategy    int
 	MemorySize                int
 	AutoAdjustBufferSize      bool
+	MinCandidateSize          int64
+	BufferTimeout             int
 	BufferSize                int
 	KodiBufferSize            int
 	UploadRateLimit           int
@@ -411,6 +413,8 @@ func Reload() *Configuration {
 		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
 		MemorySize:                settings["memory_size"].(int) * 1024 * 1024,
 		AutoAdjustBufferSize:      settings["auto_adjust_buffer_size"].(bool),
+		MinCandidateSize:          int64(settings["min_candidate_size"].(int) * 1024 * 1024),
+		BufferTimeout:             settings["buffer_timeout"].(int),
 		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
 		DownloadRateLimit:         settings["max_download_rate"].(int) * 1024,
