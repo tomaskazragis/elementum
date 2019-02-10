@@ -197,7 +197,7 @@ endif
 
 deps: force
 	for i in $(PLATFORMS); do \
-		$(MAKE) dep PLATFORM=$$i; \
+		$(MAKE) dep TARGET_OS=$(firstword $(subst -, ,$i)) TARGET_ARCH=$(word 2, $(subst -, ,$i))
 	done
 
 libs: force
