@@ -242,6 +242,7 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
+		// TODO: Need to rewrite all this lists to use Service.[]Torrent
 		torrentsVector := btService.Session.GetHandle().GetTorrents()
 		torrentsVectorSize := int(torrentsVector.Size())
 		torrents := make([]*TorrentsWeb, 0, torrentsVectorSize)
@@ -264,9 +265,12 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			torrentName := torrentStatus.GetName()
 			progress := float64(torrentStatus.GetProgress()) * 100
 
+			shaHash := torrentHandle.Status().GetInfoHash().ToString()
+			infoHash := hex.EncodeToString([]byte(shaHash))
+
 			status := bittorrent.StatusStrings[int(torrentStatus.GetState())]
 			if btService.Session.GetHandle().IsPaused() {
-				status = "Paused"
+				status = bittorrent.StatusStrings[bittorrent.StatusPaused]
 			} else if torrentStatus.GetPaused() && status != "Finished" {
 				if progress == 100 {
 					status = "Finished"
@@ -275,6 +279,9 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 				}
 			} else if !torrentStatus.GetPaused() && (status == "Finished" || progress == 100) {
 				status = "Seeding"
+			}
+			if t := btService.GetTorrentByHash(infoHash); t != nil {
+				status = t.GetStateString()
 			}
 
 			ratio := float64(0)
@@ -305,9 +312,6 @@ func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 			seedersTotal := torrentStatus.GetNumComplete()
 			peers := torrentStatus.GetNumPeers() - seeders
 			peersTotal := torrentStatus.GetNumIncomplete()
-
-			shaHash := torrentHandle.Status().GetInfoHash().ToString()
-			infoHash := hex.EncodeToString([]byte(shaHash))
 
 			t := TorrentsWeb{
 				ID:            infoHash,

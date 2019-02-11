@@ -65,6 +65,7 @@ type Configuration struct {
 	PlaybackPercent           int
 	DownloadStorage           int
 	AutoMemorySize            bool
+	AutoKodiBufferSize        bool
 	AutoAdjustMemorySize      bool
 	AutoMemorySizeStrategy    int
 	MemorySize                int
@@ -412,6 +413,7 @@ func Reload() *Configuration {
 		AutoAdjustMemorySize:      settings["auto_adjust_memory_size"].(bool),
 		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
 		MemorySize:                settings["memory_size"].(int) * 1024 * 1024,
+		AutoKodiBufferSize:        settings["auto_kodi_buffer_size"].(bool),
 		AutoAdjustBufferSize:      settings["auto_adjust_buffer_size"].(bool),
 		MinCandidateSize:          int64(settings["min_candidate_size"].(int) * 1024 * 1024),
 		BufferTimeout:             settings["buffer_timeout"].(int),
@@ -605,7 +607,7 @@ func Reload() *Configuration {
 	// Reading Kodi's advancedsettings file for MemorySize variable to avoid waiting for playback
 	// after Elementum's buffer is finished.
 	newConfig.KodiBufferSize = getKodiBufferSize()
-	if newConfig.KodiBufferSize > newConfig.BufferSize {
+	if newConfig.AutoKodiBufferSize && newConfig.KodiBufferSize > newConfig.BufferSize {
 		newConfig.BufferSize = newConfig.KodiBufferSize
 		log.Debugf("Adjusting buffer size according to Kodi advancedsettings.xml configuration to %s", humanize.Bytes(uint64(newConfig.BufferSize)))
 	}

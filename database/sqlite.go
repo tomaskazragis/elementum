@@ -35,7 +35,7 @@ func InitSqliteDB(conf *config.Configuration) (*SqliteDatabase, error) {
 	newVersion := currentVersion
 	for _, s := range schemaChanges {
 		if ok, err := s(&newVersion, sqliteDatabase); err != nil {
-			log.Debugf("Error migrating schema: %s", err)
+			log.Errorf("Error migrating schema: %s", err)
 			break
 		} else if ok {
 			continue
@@ -58,6 +58,7 @@ func CreateSqliteDB(conf *config.Configuration, fileName string, backupFileName 
 
 	defer func() {
 		if r := recover(); r != nil {
+			log.Errorf("Got critical error while creating SQLite: %v", r)
 			RestoreBackup(databasePath, backupPath)
 			os.Exit(1)
 		}

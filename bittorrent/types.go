@@ -28,10 +28,6 @@ const (
 	StatusChecking
 	// StatusFinding ...
 	StatusFinding
-	// StatusPaused ...
-	StatusPaused
-	// StatusBuffering ...
-	StatusBuffering
 	// StatusDownloading ...
 	StatusDownloading
 	// StatusFinished ...
@@ -42,6 +38,10 @@ const (
 	StatusAllocating
 	// StatusStalled ...
 	StatusStalled
+	// StatusPaused ...
+	StatusPaused
+	// StatusBuffering ...
+	StatusBuffering
 )
 
 // StatusStrings ...
@@ -49,11 +49,13 @@ var StatusStrings = []string{
 	"Queued",
 	"Checking",
 	"Finding",
-	"Buffering",
+	"Downloading",
 	"Finished",
 	"Seeding",
 	"Allocating",
 	"Stalled",
+	"Paused",
+	"Buffering",
 }
 
 const (

@@ -209,6 +209,7 @@ func (s *BTService) configure() {
 	settings.SetBool("ignore_limits_on_local_network", true)
 	settings.SetBool("rate_limit_utp", true)
 	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
+	settings.SetBool("upnp_ignore_nonrouters", true)
 
 	// For Android external storage / OS-mounted NAS setups
 	if s.config.TunedStorage {
@@ -860,10 +861,18 @@ func (s *BTService) downloadProgress() {
 				}
 
 				torrentStatus := torrentHandle.Status(uint(lt.TorrentHandleQueryName))
-				status := StatusStrings[int(torrentStatus.GetState())]
-				isPaused := torrentStatus.GetPaused()
 				if torrentStatus.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
 					continue
+				}
+
+				shaHash := torrentHandle.Status().GetInfoHash().ToString()
+				infoHash := hex.EncodeToString([]byte(shaHash))
+
+				status := StatusStrings[int(torrentStatus.GetState())]
+				isPaused := torrentStatus.GetPaused()
+
+				if t := s.GetTorrentByHash(infoHash); t != nil {
+					status = t.GetStateString()
 				}
 
 				downloadRate := float64(torrentStatus.GetDownloadRate()) / 1024
@@ -933,9 +942,6 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
-
-				shaHash := torrentHandle.Status().GetInfoHash().ToString()
-				infoHash := hex.EncodeToString([]byte(shaHash))
 
 				if s.MarkedToMove != "" && infoHash == s.MarkedToMove {
 					s.MarkedToMove = ""
@@ -1419,6 +1425,11 @@ func (s *BTService) GetListenIP(network string) string {
 func (s *BTService) GetMemoryStats() (int64, int64) {
 	v, _ := mem.VirtualMemory()
 	return int64(v.Total), int64(v.Free)
+}
+
+// IsMemoryStorage is a shortcut for checking whether we run memory storage
+func (s *BTService) IsMemoryStorage() bool {
+	return s.config.DownloadStorage == StorageMemory
 }
 
 func min(a, b int) int {

@@ -229,6 +229,7 @@ func (btp *BTPlayer) Buffer() error {
 
 	go btp.waitCheckAvailableSpace()
 	go btp.playerLoop()
+	go btp.s.AttachPlayer(btp)
 
 	if err := <-buffered; err != nil {
 		return err.(error)
@@ -349,7 +350,9 @@ func (btp *BTPlayer) processMetadata() {
 func (btp *BTPlayer) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
 	statusName := StatusStrings[int(status.GetState())]
 	if btp.t.IsBuffering {
-		statusName = "Buffering"
+		statusName = StatusStrings[StatusBuffering]
+	} else if btp.t.Service.config.DownloadStorage == StorageMemory {
+		statusName = StatusStrings[StatusDownloading]
 	}
 
 	line1 := fmt.Sprintf("%s (%.2f%%)", statusName, progress)

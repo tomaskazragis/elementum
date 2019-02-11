@@ -506,6 +506,14 @@ func (t *Torrent) GetState() int {
 
 // GetStateString ...
 func (t *Torrent) GetStateString() string {
+	if t.Service.config.DownloadStorage == StorageMemory {
+		if t.IsBuffering {
+			return StatusStrings[StatusBuffering]
+		} else if t.IsPlaying {
+			return StatusStrings[StatusDownloading]
+		}
+	}
+
 	return StatusStrings[t.GetState()]
 }
 
@@ -568,6 +576,14 @@ func (t *Torrent) piecesProgress(pieces map[int]float64) {
 func (t *Torrent) GetProgress() float64 {
 	if t == nil {
 		return 0
+	}
+
+	// For memory storage let's show playback progress,
+	// because we can't know real progress of download
+	if t.Service.config.DownloadStorage == StorageMemory {
+		if player := t.Service.GetActivePlayer(); player != nil && player.p.VideoDuration != 0 {
+			return player.p.WatchedTime / player.p.VideoDuration * 100
+		}
 	}
 
 	return float64(t.th.Status().GetProgress()) * 100
