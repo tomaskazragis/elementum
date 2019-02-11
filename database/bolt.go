@@ -106,6 +106,7 @@ func CreateBoltDB(conf *config.Configuration, fileName string, backupFileName st
 
 	defer func() {
 		if r := recover(); r != nil {
+			log.Errorf("Got critical error while creating Bolt: %v", r)
 			RestoreBackup(databasePath, backupPath)
 			os.Exit(1)
 		}
@@ -115,12 +116,11 @@ func CreateBoltDB(conf *config.Configuration, fileName string, backupFileName st
 		ReadOnly: false,
 		Timeout:  15 * time.Second,
 	})
-	db.NoSync = true
-
 	if err != nil {
-		log.Warningf("Could not open database at %s: %s", databasePath, err.Error())
+		log.Warningf("Could not open database at %s: %#v", databasePath, err)
 		return nil, err
 	}
+	db.NoSync = true
 
 	return db, nil
 }
@@ -206,7 +206,7 @@ func (d *BoltDatabase) MaintenanceRefreshHandler() {
 
 // RestoreBackup ...
 func RestoreBackup(databasePath string, backupPath string) {
-	log.Debug("Restoring backup")
+	log.Warningf("Restoring backup from '%s' to '%s'", backupPath, databasePath)
 
 	// Remove existing library.db if needed
 	if _, err := os.Stat(databasePath); err == nil {
