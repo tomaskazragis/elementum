@@ -643,10 +643,14 @@ func (s *BTService) saveResumeDataLoop() {
 
 func (s *BTService) saveResumeDataConsumer() {
 	alerts, alertsDone := s.Alerts()
+	closer := s.Closing.Subscribe()
 	defer close(alertsDone)
+	defer closer.Close()
 
 	for {
 		select {
+		case <-closer.Values:
+			return
 		case alert, ok := <-alerts:
 			if !ok { // was the alerts channel closed?
 				return
