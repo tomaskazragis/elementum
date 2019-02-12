@@ -10,6 +10,7 @@ import (
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/anacrolix/missinggo"
+	"github.com/anacrolix/missinggo/perf"
 
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
@@ -163,10 +164,12 @@ func (tf *TorrentFSEntry) setSubtitles() {
 
 // Close ...
 func (tf *TorrentFSEntry) Close() error {
+	defer perf.ScopeTimer()()
+
 	log.Info("Closing file...")
 	tf.removed.Set()
 
-	if tf.tfs.s == nil || tf.tfs.s.Closing.IsSet() {
+	if tf.tfs.s == nil || tf.t.Closer.IsSet() || tf.tfs.s.Closer.IsSet() {
 		return nil
 	}
 
@@ -182,6 +185,7 @@ func (tf *TorrentFSEntry) Close() error {
 
 // Read ...
 func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
+	defer perf.ScopeTimer()()
 	tf.lastUsed = time.Now()
 
 	currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
@@ -192,10 +196,8 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 	left := len(data)
 	pos := 0
 	piece, pieceOffset := tf.pieceFromOffset(currentOffset)
-	// log.Debugf("Star slice: [0:%d], piece: %d, offset: %d", len(data), piece, pieceOffset)
 
 	for left > 0 && err == nil {
-		// log.Debugf("Loop slice: left=%d, data[%d:%d] piece: %d, offset: %d", left, pos, pos+left, piece, pieceOffset)
 		size := left
 
 		if err = tf.waitForPiece(piece); err != nil {
@@ -204,11 +206,9 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 		}
 
 		if pieceOffset+size > tf.pieceLength {
-			// log.Debugf("Adju slice: cur: %d; %d + %d (%d) > %d == %d", currentOffset, pieceOffset, size, pieceOffset+size, tf.pieceLength, tf.pieceLength-pieceOffset+1)
 			size = tf.pieceLength - pieceOffset
 		}
 
-		// log.Debugf("Sele slice: [%d:%d], piece: %d, left: %d", pos, pos+size, piece, left)
 		b := data[pos : pos+size]
 		n1 := 0
 
@@ -246,25 +246,10 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 
 // Seek ...
 func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
+	defer perf.ScopeTimer()()
 	tf.lastUsed = time.Now()
 
 	seekingOffset := offset
-
-	// switch whence {
-	// default:
-	// 	return 0, errWhence
-	// case SeekStart:
-	// 	offset += s.base
-	// case SeekCurrent:
-	// 	offset += s.off
-	// case SeekEnd:
-	// 	offset += s.limit
-	// }
-	// if offset < s.base {
-	// 	return 0, errOffset
-	// }
-	// s.off = offset
-	// return offset - s.base, nil
 
 	switch whence {
 	case io.SeekCurrent:
@@ -280,17 +265,19 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	log.Infof("Seeking at %d... with %d", seekingOffset, whence)
-	piece, _ := tf.pieceFromOffset(seekingOffset)
-	if tf.t.hasPiece(piece) == false {
-		log.Infof("We don't have piece %d, setting piece priorities", piece)
-
-		// TODO: Need this? Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
-		// tf.t.th.ClearPieceDeadlines()
-		tf.t.PrioritizePiece(piece)
-		go tf.t.PrioritizePieces()
-	}
-
 	return tf.File.Seek(offset, whence)
+
+	// piece, _ := tf.pieceFromOffset(seekingOffset)
+	// if tf.t.hasPiece(piece) == false {
+	// 	log.Infof("We don't have piece %d, setting piece priorities", piece)
+
+	// 	// TODO: Need this? Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
+	// 	// tf.t.th.ClearPieceDeadlines()
+	// 	tf.t.PrioritizePiece(piece)
+	// 	go tf.t.PrioritizePieces()
+	// }
+
+	// return tf.File.Seek(offset, whence)
 }
 
 func (tf *TorrentFSEntry) waitForPiece(piece int) error {
@@ -298,6 +285,7 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 		return nil
 	}
 
+	defer perf.ScopeTimer()()
 	log.Infof("Waiting for piece %d", piece)
 	tf.t.PrioritizePiece(piece)
 
@@ -363,8 +351,8 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 	}
 
 	pl := int64(tf.pieceLength)
-	pr.Begin = max(0, int(off/pl))
-	pr.End = min(tf.numPieces-1, int((off+size+pl-1)/pl))
+	pr.Begin = util.Max(0, int(off/pl))
+	pr.End = util.Min(tf.numPieces-1, int((off+size+pl-1)/pl))
 
 	return
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/anacrolix/missinggo/perf"
 )
 
 type pieceRange struct {
@@ -55,16 +56,12 @@ func (mf *MemoryFile) Read(b []byte) (n int, err error) {
 
 // ReadPiece ...
 func (mf *MemoryFile) ReadPiece(b []byte, piece int, pieceOffset int) (n int, err error) {
+	defer perf.ScopeTimer()()
+
 	mf.opMu.Lock()
 	defer mf.opMu.Unlock()
 
 	n = mf.s.Read(b, len(b), piece, pieceOffset)
-
-	// defer func() {
-	// 	if err != nil {
-	// 		log.Debugf("Memory. ReadPiece: len(%d), n=%d, piece=%d, offset=%d, err=%#v", len(b), n, piece, pieceOffset, err)
-	// 	}
-	// }()
 
 	if n == -1 {
 		err = io.ErrShortBuffer
@@ -90,12 +87,6 @@ func (mf *MemoryFile) ReadPiece(b []byte, piece int, pieceOffset int) (n int, er
 
 // Seek ...
 func (mf *MemoryFile) Seek(off int64, whence int) (ret int64, err error) {
-	// defer func() {
-	// 	if err != nil {
-	// 		log.Debugf("Memory. Seek2: off: %d, whence: %d, ret=%d, err=%#v", off, whence, ret, err)
-	// 	}
-	// }()
-
 	mf.opMu.Lock()
 	defer mf.opMu.Unlock()
 

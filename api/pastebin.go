@@ -17,11 +17,13 @@ import (
 
 // PasteProject describes each pastebin project
 type PasteProject struct {
-	Name   string
-	URL    string
-	IsJSON bool
-	Fields PasteFields
-	Values PasteFields
+	Name    string
+	URL     string
+	BaseURL string
+	IsJSON  bool
+	IsRAW   bool
+	Fields  PasteFields
+	Values  PasteFields
 }
 
 // PasteFields describes [string]string values for projects
@@ -35,8 +37,15 @@ type PasteFields struct {
 
 var pasteProjects = []PasteProject{
 	PasteProject{
-		URL:  "https://paste.ubuntu.com/",
-		Name: "Ubuntu Pastebin",
+		URL:     "https://paste.kodi.tv/documents",
+		BaseURL: "https://paste.kodi.tv",
+		Name:    "Kodi.tv Hastebin",
+		IsRAW:   true,
+	},
+	PasteProject{
+		URL:     "https://paste.ubuntu.com/",
+		BaseURL: "https://paste.ubuntu.com",
+		Name:    "Ubuntu Pastebin",
 		Fields: PasteFields{
 			Poster:     "poster",
 			Syntax:     "syntax",
@@ -48,9 +57,10 @@ var pasteProjects = []PasteProject{
 		},
 	},
 	PasteProject{
-		URL:    "https://paste.fedoraproject.org/api/paste/submit",
-		Name:   "Fedora Pastebin",
-		IsJSON: true,
+		URL:     "https://paste.fedoraproject.org/api/paste/submit",
+		BaseURL: "https://paste.fedoraproject.org",
+		Name:    "Fedora Pastebin",
+		IsJSON:  true,
 		Fields: PasteFields{
 			Title:      "title",
 			Syntax:     "language",
@@ -107,26 +117,34 @@ func Pastebin(ctx *gin.Context) {
 		log.Infof("Uploading to %#v, %s bytes", p, humanize.Bytes(uint64(len(content))))
 		values := url.Values{}
 
-		if p.Fields.Poster != "" {
-			values.Set(p.Fields.Poster, u.Name)
-		}
-		if p.Fields.Syntax != "" {
-			values.Set(p.Fields.Syntax, p.Values.Syntax)
-		}
-		if p.Fields.Expiration != "" {
-			values.Set(p.Fields.Expiration, p.Values.Expiration)
-		}
-		if p.Fields.Title != "" {
-			values.Set(p.Fields.Title, rurl)
-		}
+		if !p.IsRAW {
+			if p.Fields.Poster != "" {
+				values.Set(p.Fields.Poster, u.Name)
+			}
+			if p.Fields.Syntax != "" {
+				values.Set(p.Fields.Syntax, p.Values.Syntax)
+			}
+			if p.Fields.Expiration != "" {
+				values.Set(p.Fields.Expiration, p.Values.Expiration)
+			}
+			if p.Fields.Title != "" {
+				values.Set(p.Fields.Title, rurl)
+			}
 
-		values.Set(p.Fields.Content, string(content))
+			values.Set(p.Fields.Content, string(content))
+		}
 
 		var resp *http.Response
 		var err error
 
 		log.Infof("Doing upload to %s", p.URL)
-		if !p.IsJSON {
+		if p.IsRAW {
+			resp, err = http.Post(p.URL, "application/x-www-form-urlencoded", bytes.NewReader(content))
+			if err != nil {
+				log.Errorf("Error creating http request: %s", err)
+				continue
+			}
+		} else if !p.IsJSON {
 			resp, err = http.PostForm(p.URL, values)
 		} else {
 			jsonValue, _ := json.Marshal(values)
@@ -142,7 +160,7 @@ func Pastebin(ctx *gin.Context) {
 		}
 
 		defer resp.Body.Close()
-		if !p.IsJSON {
+		if !p.IsJSON && !p.IsRAW {
 			pasteURL = resp.Request.URL.String()
 		} else {
 			content, _ := ioutil.ReadAll(resp.Body)
@@ -156,7 +174,15 @@ func Pastebin(ctx *gin.Context) {
 			log.Infof("Got response: %#v", respData)
 			if _, ok := respData["url"]; ok {
 				json.Unmarshal(*respData["url"], &pasteURL)
+			} else if _, ok := respData["key"]; ok {
+				json.Unmarshal(*respData["key"], &pasteURL)
+				pasteURL = p.BaseURL + "/" + pasteURL
 			}
+		}
+
+		if pasteURL == p.BaseURL || pasteURL == p.BaseURL+"/" {
+			log.Warningf("Trying next Paste service, because there is no key in url: %s", pasteURL)
+			continue
 		}
 
 		log.Noticef("Log uploaded to: %s", pasteURL)

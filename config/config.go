@@ -305,6 +305,12 @@ func Reload() *Configuration {
 			log.Info("Using /storage/emulated/legacy path.")
 		}
 	}
+	if !PathExists(info.Profile) {
+		log.Infof("Profile path does not exist, creating it at: %s", info.Profile)
+		if err := os.MkdirAll(info.Profile, 0777); err != nil {
+			log.Errorf("Could not create profile directory: %#v", err)
+		}
+	}
 
 	downloadPath := TranslatePath(xbmc.GetSettingString("download_path"))
 	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
@@ -631,7 +637,6 @@ func Reload() *Configuration {
 	lock.Lock()
 	config = &newConfig
 	lock.Unlock()
-
 	go CheckBurst()
 
 	log.Debugf("Using configuration: %s", litter.Sdump(config))

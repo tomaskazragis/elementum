@@ -19,9 +19,9 @@ import (
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 
-	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/util"
 )
 
 // Torrent ...
@@ -69,7 +69,7 @@ type Torrent struct {
 	pieceLength int64
 
 	gotMetainfo    missinggo.Event
-	Closing        *broadcast.Closer
+	Closer         missinggo.Event
 	bufferFinished chan struct{}
 
 	piecesMx          sync.RWMutex
@@ -106,8 +106,6 @@ func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo
 		mu:        &sync.Mutex{},
 		muBuffer:  &sync.RWMutex{},
 		muReaders: &sync.Mutex{},
-
-		Closing: broadcast.NewCloser(),
 	}
 
 	log.Debugf("Waiting for information fetched for torrent: %#v", infoHash)
@@ -134,14 +132,12 @@ func (t *Torrent) Watch() {
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
 
-	sc := t.Service.Closing.Subscribe()
-	tc := t.Closing.Subscribe()
+	sc := t.Service.Closer.C()
+	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
 	defer close(t.bufferFinished)
-	defer sc.Close()
-	defer tc.Close()
 
 	for {
 		select {
@@ -154,11 +150,11 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-sc.Values:
-			t.Closing.Set()
+		case <-sc:
+			t.Closer.Set()
 			return
 
-		case <-tc.Values:
+		case <-tc:
 			log.Debug("Stopping watch events")
 			return
 		}
@@ -303,7 +299,7 @@ func (t *Torrent) Buffer(file *File) {
 	defer t.muBuffer.Unlock()
 
 	// Reserving first piece in this file, it is usually re-requested by Kodi
-	t.reservedPieces = append(t.reservedPieces, preBufferStart)
+	t.reservedPieces = append(t.reservedPieces, preBufferStart, postBufferEnd)
 
 	// Properly set the pieces priority vector
 	curPiece := 0
@@ -393,6 +389,7 @@ func (t *Torrent) PrioritizePieces() {
 
 	t.muReaders.Lock()
 
+	readerProgress := map[int]float64{}
 	readerPieces := map[int]int{}
 	readerKeys := []int64{}
 	for k := range t.readers {
@@ -421,11 +418,15 @@ func (t *Torrent) PrioritizePieces() {
 			if t.awaitingPieces.ContainsInt(curPiece) {
 				readerPieces[curPiece] = 7
 			} else {
-				readerPieces[curPiece] = max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
+				readerPieces[curPiece] = util.Max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
 			}
+			readerProgress[curPiece] = 0
 		}
 	}
 	t.muReaders.Unlock()
+
+	// Update progress for piece completion
+	t.piecesProgress(readerProgress)
 
 	piecesPriorities := lt.NewStdVectorInt()
 	defer lt.DeleteStdVectorInt(piecesPriorities)
@@ -447,7 +448,7 @@ func (t *Torrent) PrioritizePieces() {
 		readerVector.Add(k)
 
 		if readerPieces[k] > 0 {
-			piecesStatus += fmt.Sprintf("%d:%d:%v, ", k, readerPieces[k], t.hasPiece(k))
+			piecesStatus += fmt.Sprintf("%d:%d:%d, ", k, readerPieces[k], int(readerProgress[k]*100))
 		}
 	}
 
@@ -636,8 +637,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 	defer perf.ScopeTimer()()
 
 	log.Infof("Dropping torrent: %s", t.Name())
-	t.Closing.Set()
-	defer t.Closing.Close()
+	t.Closer.Set()
 
 	for _, r := range t.readers {
 		if r != nil {

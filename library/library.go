@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/op/go-logging"
 
-	"github.com/elgatito/elementum/broadcast"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -96,7 +96,7 @@ const (
 
 var (
 	removedEpisodes = make(chan *removedEpisode)
-	closer          = broadcast.NewCloser()
+	closer          = missinggo.Event{}
 
 	log = logging.MustGetLogger("library")
 
@@ -156,14 +156,14 @@ func Init() {
 	go func() {
 		var episodes []*removedEpisode
 
-		closing := closer.Subscribe()
+		closing := closer.C()
 		timer := time.NewTicker(3 * time.Second)
-
 		defer timer.Stop()
+		defer close(removedEpisodes)
 
 		for {
 			select {
-			case <-closing.Values:
+			case <-closing:
 				return
 
 			case <-timer.C:
@@ -246,10 +246,10 @@ func Init() {
 		}
 		go func() {
 			time.Sleep(time.Duration(updateDelay) * time.Second)
-			closing := closer.Subscribe()
+			closing := closer.C()
 
 			select {
-			case <-closing.Values:
+			case <-closing:
 				return
 			default:
 				go func() {
@@ -298,6 +298,7 @@ func Init() {
 	if _, _, err := trakt.TopShows("trending", "1"); err != nil {
 		log.Warning(err)
 	}
+
 	tmdb.WarmingUp = false
 	took := time.Since(started)
 	if took.Seconds() > 30 {
@@ -305,26 +306,18 @@ func Init() {
 	}
 	log.Noticef("Caches warmed up in %s", took)
 
-	updateFrequency := 1
-	configUpdateFrequency := config.Get().UpdateFrequency
-	if configUpdateFrequency > 1 {
-		updateFrequency = configUpdateFrequency
-	}
+	updateFrequency := util.Max(1, config.Get().UpdateFrequency)
+	traktFrequency := util.Max(1, config.Get().TraktSyncFrequency)
+
 	updateTicker := time.NewTicker(time.Duration(updateFrequency) * time.Hour)
-	defer updateTicker.Stop()
-
-	traktFrequency := 1
-	configTraktSyncFrequency := config.Get().TraktSyncFrequency
-	if configTraktSyncFrequency > 1 {
-		traktFrequency = configTraktSyncFrequency
-	}
 	traktSyncTicker := time.NewTicker(time.Duration(traktFrequency) * time.Hour)
-	defer traktSyncTicker.Stop()
-
 	markedForRemovalTicker := time.NewTicker(30 * time.Second)
+
+	defer updateTicker.Stop()
+	defer traktSyncTicker.Stop()
 	defer markedForRemovalTicker.Stop()
 
-	closing := closer.Subscribe()
+	closing := closer.C()
 
 	for {
 		select {
@@ -389,8 +382,7 @@ func Init() {
 				log.Infof("Removed %s from database", infoHash)
 			}
 			rows.Close()
-		case <-closing.Values:
-			close(removedEpisodes)
+		case <-closing:
 			return
 		}
 	}

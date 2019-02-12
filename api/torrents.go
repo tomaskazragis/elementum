@@ -238,7 +238,7 @@ func ListTorrents(btService *bittorrent.BTService) gin.HandlerFunc {
 // ListTorrentsWeb ...
 func ListTorrentsWeb(btService *bittorrent.BTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		if btService.Closing.IsSet() {
+		if btService.Closer.IsSet() {
 			return
 		}
 

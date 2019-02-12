@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/shirou/gopsutil/mem"
@@ -60,7 +61,7 @@ type BTService struct {
 	MarkedToMove string
 
 	alertsBroadcaster *broadcast.Broadcaster
-	Closing           *broadcast.Closer
+	Closer            missinggo.Event
 }
 
 type activeTorrent struct {
@@ -80,7 +81,6 @@ func NewBTService() *BTService {
 		Torrents: map[string]*Torrent{},
 		Players:  map[string]*BTPlayer{},
 
-		Closing:           broadcast.NewCloser(),
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 	}
 
@@ -102,9 +102,10 @@ func NewBTService() *BTService {
 
 // Close ...
 func (s *BTService) Close() {
-	defer s.Closing.Close()
-
 	now := time.Now()
+
+	s.Closer.Set()
+
 	log.Info("Stopping BT Services...")
 	s.stopServices()
 
@@ -119,23 +120,6 @@ func (s *BTService) CloseSession() {
 	log.Info("Closing Session")
 	lt.DeleteSession(s.Session)
 }
-
-// func doWithTimeout(timeout time.Duration, doFunc func()) {
-// 	timer := time.NewTimer(timeout)
-// 	defer timer.Stop()
-
-// 	select {
-// 	case <-timer.C:
-// 		break
-
-// 	default:
-// 		doFunc()
-// 		return
-// 	}
-
-// 	// timeout handling
-// 	log.Infof("Did not complete operation in time")
-// }
 
 // Reconfigure fired every time addon configuration has changed
 // and Kodi sent a notification about that.
@@ -276,18 +260,23 @@ func (s *BTService) configure() {
 		settings.SetBool("prefer_rc4", preferRc4)
 	}
 
-	if s.config.ProxyEnabled && config.Get().ProxyUseDownload && s.config.ProxyHost != "" {
-		log.Info("Applying proxy settings...")
-		proxyType := s.config.ProxyType + 1
-		settings.SetInt("proxy_type", proxyType)
-		settings.SetInt("proxy_port", s.config.ProxyPort)
-		settings.SetStr("proxy_hostname", s.config.ProxyHost)
-		settings.SetStr("proxy_username", s.config.ProxyLogin)
-		settings.SetStr("proxy_password", s.config.ProxyPassword)
-		settings.SetBool("proxy_tracker_connections", true)
-		settings.SetBool("proxy_peer_connections", true)
-		settings.SetBool("proxy_hostnames", true)
-		settings.SetBool("force_proxy", true)
+	if s.config.ProxyEnabled && s.config.ProxyHost != "" {
+		if config.Get().ProxyUseDownload {
+			log.Info("Applying proxy settings...")
+			proxyType := s.config.ProxyType + 1
+			settings.SetInt("proxy_type", proxyType)
+			settings.SetInt("proxy_port", s.config.ProxyPort)
+			settings.SetStr("proxy_hostname", s.config.ProxyHost)
+			settings.SetStr("proxy_username", s.config.ProxyLogin)
+			settings.SetStr("proxy_password", s.config.ProxyPassword)
+			settings.SetBool("proxy_tracker_connections", true)
+			settings.SetBool("proxy_peer_connections", true)
+			settings.SetBool("proxy_hostnames", true)
+			settings.SetBool("force_proxy", true)
+		}
+		if config.Get().ProxyUseTracker {
+			settings.SetBool("proxy_tracker_connections", true)
+		}
 	}
 
 	// Set alert_mask here so it also applies on reconfigure...
@@ -612,13 +601,12 @@ func (s *BTService) GetTorrentByHash(hash string) *Torrent {
 
 func (s *BTService) saveResumeDataLoop() {
 	saveResumeWait := time.NewTicker(time.Duration(s.config.SessionSave) * time.Second)
-	closer := s.Closing.Subscribe()
+	closing := s.Closer.C()
 	defer saveResumeWait.Stop()
-	defer closer.Close()
 
 	for {
 		select {
-		case <-closer.Values:
+		case <-closing:
 			return
 		case <-saveResumeWait.C:
 			torrentsVector := s.Session.GetHandle().GetTorrents()
@@ -643,13 +631,12 @@ func (s *BTService) saveResumeDataLoop() {
 
 func (s *BTService) saveResumeDataConsumer() {
 	alerts, alertsDone := s.Alerts()
-	closer := s.Closing.Subscribe()
+	closing := s.Closer.C()
 	defer close(alertsDone)
-	defer closer.Close()
 
 	for {
 		select {
-		case <-closer.Values:
+		case <-closing:
 			return
 		case alert, ok := <-alerts:
 			if !ok { // was the alerts channel closed?
@@ -694,15 +681,14 @@ func (s *BTService) saveResumeDataConsumer() {
 }
 
 func (s *BTService) alertsConsumer() {
-	closer := s.Closing.Subscribe()
-	defer closer.Close()
+	closing := s.Closer.C()
 	defer s.alertsBroadcaster.Close()
 
 	ltOneSecond := lt.Seconds(ltAlertWaitTime)
 	log.Info("Consuming alerts...")
 	for {
 		select {
-		case <-closer.Values:
+		case <-closing:
 			log.Info("Closing all alert channels...")
 
 			return
@@ -829,6 +815,7 @@ func (s *BTService) loadTorrentFiles() {
 }
 
 func (s *BTService) downloadProgress() {
+	closing := s.Closer.C()
 	rotateTicker := time.NewTicker(5 * time.Second)
 	defer rotateTicker.Stop()
 
@@ -838,6 +825,9 @@ func (s *BTService) downloadProgress() {
 	showNext := 0
 	for {
 		select {
+		case <-closing:
+			return
+
 		case <-rotateTicker.C:
 			// TODO: there should be a check whether service is in Pause state
 			// if !s.config.DisableBgProgress && s.dialogProgressBG != nil {
@@ -846,7 +836,7 @@ func (s *BTService) downloadProgress() {
 			// 	continue
 			// }
 
-			if s.Closing.IsSet() || s.Session == nil || s.Session.GetHandle() == nil {
+			if s.Closer.IsSet() || s.Session == nil || s.Session.GetHandle() == nil {
 				return
 			}
 
@@ -1434,18 +1424,4 @@ func (s *BTService) GetMemoryStats() (int64, int64) {
 // IsMemoryStorage is a shortcut for checking whether we run memory storage
 func (s *BTService) IsMemoryStorage() bool {
 	return s.config.DownloadStorage == StorageMemory
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

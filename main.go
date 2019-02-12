@@ -108,11 +108,11 @@ func main() {
 	btService := bittorrent.NewBTService()
 
 	var shutdown = func(fromSignal bool) {
-		if btService == nil || btService.Closing.IsSet() {
+		if btService == nil || btService.Closer.IsSet() {
 			return
 		}
 
-		btService.Closing.Set()
+		btService.Closer.Set()
 
 		log.Info("Shutting down...")
 		library.CloseLibrary()
@@ -180,12 +180,11 @@ func main() {
 	defer close(sigc)
 
 	go func() {
-		closer := btService.Closing.Subscribe()
-		defer closer.Close()
+		closer := btService.Closer.C()
 
 		for {
 			select {
-			case <-closer.Values:
+			case <-closer:
 				return
 			case <-sigc:
 				shutdown(true)
