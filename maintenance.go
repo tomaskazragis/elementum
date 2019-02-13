@@ -21,7 +21,7 @@ const (
 )
 
 // Notification serves callbacks from Kodi
-func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.BTService) {
+func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service) {
 	sender := r.URL.Query().Get("sender")
 	method := r.URL.Query().Get("method")
 	data := r.URL.Query().Get("data")

@@ -44,7 +44,7 @@ type Torrent struct {
 	ChosenFiles []*File
 	TorrentPath string
 
-	Service *BTService
+	Service *Service
 
 	BufferLength         int64
 	BufferProgress       float64
@@ -81,7 +81,7 @@ type Torrent struct {
 }
 
 // NewTorrent ...
-func NewTorrent(service *BTService, handle lt.TorrentHandle, info lt.TorrentInfo, path string) *Torrent {
+func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, path string) *Torrent {
 	shaHash := handle.Status().GetInfoHash().ToString()
 	infoHash := hex.EncodeToString([]byte(shaHash))
 
@@ -252,7 +252,7 @@ func (t *Torrent) Buffer(file *File) {
 		}
 	}
 
-	if config.Get().DownloadStorage == StorageMemory {
+	if t.Service.IsMemoryStorage() {
 		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
 		t.ms.SetTorrentHandle(t.th)
 
@@ -463,13 +463,13 @@ func (t *Torrent) PrioritizePieces() {
 		reservedVector.Add(piece)
 	}
 
-	if t.Service.config.DownloadStorage == StorageMemory && t.th != nil && t.ms != nil {
+	if t.Service.IsMemoryStorage() && t.th != nil && t.ms != nil {
 		t.ms.UpdateReaderPieces(readerVector)
 		t.ms.UpdateReservedPieces(reservedVector)
 	}
 
 	defaultPriority := 1
-	if t.Service.config.DownloadStorage == StorageMemory {
+	if t.Service.IsMemoryStorage() {
 		defaultPriority = 0
 	}
 
@@ -507,7 +507,7 @@ func (t *Torrent) GetState() int {
 
 // GetStateString ...
 func (t *Torrent) GetStateString() string {
-	if t.Service.config.DownloadStorage == StorageMemory {
+	if t.Service.IsMemoryStorage() {
 		if t.IsBuffering {
 			return StatusStrings[StatusBuffering]
 		} else if t.IsPlaying {
@@ -581,7 +581,7 @@ func (t *Torrent) GetProgress() float64 {
 
 	// For memory storage let's show playback progress,
 	// because we can't know real progress of download
-	if t.Service.config.DownloadStorage == StorageMemory {
+	if t.Service.IsMemoryStorage() {
 		if player := t.Service.GetActivePlayer(); player != nil && player.p.VideoDuration != 0 {
 			return player.p.WatchedTime / player.p.VideoDuration * 100
 		}
@@ -681,7 +681,7 @@ func (t *Torrent) SaveMetainfo(path string) error {
 	defer perf.ScopeTimer()()
 
 	// Not saving torrent for memory storage
-	if t.Service.config.DownloadStorage == StorageMemory {
+	if t.Service.IsMemoryStorage() {
 		return nil
 	}
 	if t.th == nil {
@@ -706,7 +706,7 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 	}()
 
 	defaultRA := int64(50 * 1024 * 1024)
-	if t.Service.config.DownloadStorage != StorageMemory {
+	if !t.Service.IsMemoryStorage() {
 		return defaultRA
 	}
 

@@ -19,7 +19,7 @@ import (
 var searchLog = logging.MustGetLogger("search")
 
 // Search ...
-func Search(btService *bittorrent.BTService) gin.HandlerFunc {
+func Search(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		query := ctx.Query("q")
@@ -40,7 +40,7 @@ func Search(btService *bittorrent.BTService) gin.HandlerFunc {
 		}
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
-		existingTorrent := btService.HasTorrentByQuery(query)
+		existingTorrent := s.HasTorrentByQuery(query)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			xbmc.PlayURLWithTimeout(URLQuery(
 				URLForXBMC("/play"),

@@ -13,7 +13,7 @@ import (
 )
 
 // DebugAll ...
-func DebugAll(s *BTService) http.Handler {
+func DebugAll(s *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 
@@ -32,7 +32,7 @@ func DebugAll(s *BTService) http.Handler {
 }
 
 // DebugBundle ...
-func DebugBundle(s *BTService) http.Handler {
+func DebugBundle(s *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logPath := xbmc.TranslatePath("special://logpath/kodi.log")
 		logFile, err := os.Open(logPath)

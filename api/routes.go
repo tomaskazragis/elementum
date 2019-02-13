@@ -16,7 +16,7 @@ import (
 var log = logging.MustGetLogger("api")
 
 // Routes ...
-func Routes(btService *bittorrent.BTService) *gin.Engine {
+func Routes(s *bittorrent.Service) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.LoggerWithWriter(gin.DefaultWriter, "/torrents/list", "/notification"))
@@ -25,16 +25,16 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	r.GET("/", Index)
 	r.GET("/playtorrent", PlayTorrent)
-	r.GET("/infolabels", InfoLabelsStored(btService))
+	r.GET("/infolabels", InfoLabelsStored(s))
 	r.GET("/changelog", Changelog)
 	r.GET("/status", Status)
 
 	search := r.Group("/search")
 	{
-		search.GET("", Search(btService))
+		search.GET("", Search(s))
 		search.GET("/remove", SearchRemove)
 		search.GET("/clear", SearchClear)
-		search.GET("/infolabels/:tmdbId", InfoLabelsSearch(btService))
+		search.GET("/infolabels/:tmdbId", InfoLabelsSearch(s))
 	}
 
 	r.LoadHTMLGlob(filepath.Join(config.Get().Info.Path, "resources", "web", "*.html"))
@@ -49,17 +49,17 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 
 	torrents := r.Group("/torrents")
 	{
-		torrents.GET("/", ListTorrents(btService))
-		torrents.Any("/add", AddTorrent(btService))
-		torrents.GET("/pause", PauseSession(btService))
-		torrents.GET("/resume", ResumeSession(btService))
-		torrents.GET("/move/:torrentId", MoveTorrent(btService))
-		torrents.GET("/pause/:torrentId", PauseTorrent(btService))
-		torrents.GET("/resume/:torrentId", ResumeTorrent(btService))
-		torrents.GET("/delete/:torrentId", RemoveTorrent(btService))
+		torrents.GET("/", ListTorrents(s))
+		torrents.Any("/add", AddTorrent(s))
+		torrents.GET("/pause", PauseSession(s))
+		torrents.GET("/resume", ResumeSession(s))
+		torrents.GET("/move/:torrentId", MoveTorrent(s))
+		torrents.GET("/pause/:torrentId", PauseTorrent(s))
+		torrents.GET("/resume/:torrentId", ResumeTorrent(s))
+		torrents.GET("/delete/:torrentId", RemoveTorrent(s))
 
 		// Web UI json
-		torrents.GET("/list", ListTorrentsWeb(btService))
+		torrents.GET("/list", ListTorrentsWeb(s))
 	}
 
 	movies := r.Group("/movies")
@@ -114,11 +114,11 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	}
 	movie := r.Group("/movie")
 	{
-		movie.GET("/:tmdbId/infolabels", InfoLabelsMovie(btService))
-		movie.GET("/:tmdbId/links", MoviePlaySelector("links", btService))
-		movie.GET("/:tmdbId/forcelinks", MoviePlaySelector("forcelinks", btService))
-		movie.GET("/:tmdbId/play", MoviePlaySelector("play", btService))
-		movie.GET("/:tmdbId/forceplay", MoviePlaySelector("forceplay", btService))
+		movie.GET("/:tmdbId/infolabels", InfoLabelsMovie(s))
+		movie.GET("/:tmdbId/links", MoviePlaySelector("links", s))
+		movie.GET("/:tmdbId/forcelinks", MoviePlaySelector("forcelinks", s))
+		movie.GET("/:tmdbId/play", MoviePlaySelector("play", s))
+		movie.GET("/:tmdbId/forceplay", MoviePlaySelector("forceplay", s))
 		movie.GET("/:tmdbId/watchlist/add", AddMovieToWatchlist)
 		movie.GET("/:tmdbId/watchlist/remove", RemoveMovieFromWatchlist)
 		movie.GET("/:tmdbId/collection/add", AddMovieToCollection)
@@ -182,14 +182,14 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	show := r.Group("/show")
 	{
 		show.GET("/:showId/seasons", ShowSeasons)
-		show.GET("/:showId/season/:season/links", ShowSeasonLinks(btService))
-		show.GET("/:showId/season/:season/play", ShowSeasonPlay(btService))
+		show.GET("/:showId/season/:season/links", ShowSeasonLinks(s))
+		show.GET("/:showId/season/:season/play", ShowSeasonPlay(s))
 		show.GET("/:showId/season/:season/episodes", ShowEpisodes)
-		show.GET("/:showId/season/:season/episode/:episode/infolabels", InfoLabelsEpisode(btService))
-		show.GET("/:showId/season/:season/episode/:episode/play", ShowEpisodePlaySelector("play", btService))
-		show.GET("/:showId/season/:season/episode/:episode/forceplay", ShowEpisodePlaySelector("forceplay", btService))
-		show.GET("/:showId/season/:season/episode/:episode/links", ShowEpisodePlaySelector("links", btService))
-		show.GET("/:showId/season/:season/episode/:episode/forcelinks", ShowEpisodePlaySelector("forcelinks", btService))
+		show.GET("/:showId/season/:season/episode/:episode/infolabels", InfoLabelsEpisode(s))
+		show.GET("/:showId/season/:season/episode/:episode/play", ShowEpisodePlaySelector("play", s))
+		show.GET("/:showId/season/:season/episode/:episode/forceplay", ShowEpisodePlaySelector("forceplay", s))
+		show.GET("/:showId/season/:season/episode/:episode/links", ShowEpisodePlaySelector("links", s))
+		show.GET("/:showId/season/:season/episode/:episode/forcelinks", ShowEpisodePlaySelector("forcelinks", s))
 		show.GET("/:showId/watchlist/add", AddShowToWatchlist)
 		show.GET("/:showId/watchlist/remove", RemoveShowFromWatchlist)
 		show.GET("/:showId/collection/add", AddShowToCollection)
@@ -206,22 +206,22 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 		library.GET("/movie/add/:tmdbId", AddMovie)
 		library.GET("/movie/remove/:tmdbId", RemoveMovie)
 		library.GET("/movie/list/add/:listId", AddMoviesList)
-		library.GET("/movie/play/:tmdbId", PlayMovie(btService))
+		library.GET("/movie/play/:tmdbId", PlayMovie(s))
 		library.GET("/show/add/:tmdbId", AddShow)
 		library.GET("/show/remove/:tmdbId", RemoveShow)
 		library.GET("/show/list/add/:listId", AddShowsList)
-		library.GET("/show/play/:showId/:season/:episode", PlayShow(btService))
+		library.GET("/show/play/:showId/:season/:episode", PlayShow(s))
 
 		library.GET("/update", UpdateLibrary)
 
 		// DEPRECATED
-		library.GET("/play/movie/:tmdbId", PlayMovie(btService))
-		library.GET("/play/show/:showId/season/:season/episode/:episode", PlayShow(btService))
+		library.GET("/play/movie/:tmdbId", PlayMovie(s))
+		library.GET("/play/show/:showId/season/:season/episode/:episode", PlayShow(s))
 	}
 
 	context := r.Group("/context")
 	{
-		context.GET("/:media/:kodiID/play", ContextPlaySelector(btService))
+		context.GET("/:media/:kodiID/play", ContextPlaySelector(s))
 	}
 
 	provider := r.Group("/provider")
@@ -263,14 +263,14 @@ func Routes(btService *bittorrent.BTService) *gin.Engine {
 	r.GET("/subtitles", SubtitlesIndex)
 	r.GET("/subtitle/:id", SubtitleGet)
 
-	r.GET("/play", Play(btService))
-	r.Any("/playuri", PlayURI(btService))
+	r.GET("/play", Play(s))
+	r.Any("/playuri", PlayURI(s))
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
 
-	// r.GET("/notification", Notification(btService))
+	// r.GET("/notification", Notification(s))
 
-	r.GET("/versions", Versions(btService))
+	r.GET("/versions", Versions(s))
 
 	cmd := r.Group("/cmd")
 	{

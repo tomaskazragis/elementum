@@ -24,7 +24,7 @@ const (
 // TorrentFS ...
 type TorrentFS struct {
 	http.Dir
-	s *BTService
+	s *Service
 }
 
 // TorrentFSEntry ...
@@ -54,7 +54,7 @@ type PieceRange struct {
 }
 
 // NewTorrentFS ...
-func NewTorrentFS(service *BTService) *TorrentFS {
+func NewTorrentFS(service *Service) *TorrentFS {
 	return &TorrentFS{
 		s:   service,
 		Dir: http.Dir(service.config.DownloadPath),
@@ -352,7 +352,7 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 
 	pl := int64(tf.pieceLength)
 	pr.Begin = util.Max(0, int(off/pl))
-	pr.End = util.Min(tf.numPieces-1, int((off+size+pl-1)/pl))
+	pr.End = util.Min(tf.numPieces-1, int((off+size-1)/pl))
 
 	return
 }

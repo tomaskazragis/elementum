@@ -11,7 +11,7 @@ import (
 )
 
 // ContextPlaySelector ...
-func ContextPlaySelector(btService *bittorrent.BTService) gin.HandlerFunc {
+func ContextPlaySelector(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 

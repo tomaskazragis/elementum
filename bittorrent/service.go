@@ -35,8 +35,8 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
-// BTService ...
-type BTService struct {
+// Service ...
+type Service struct {
 	config *config.Configuration
 	mu     sync.Mutex
 
@@ -45,7 +45,7 @@ type BTService struct {
 
 	InternalProxy *http.Server
 
-	Players  map[string]*BTPlayer
+	Players  map[string]*Player
 	Torrents map[string]*Torrent
 
 	UserAgent   string
@@ -71,15 +71,15 @@ type activeTorrent struct {
 	progress     int
 }
 
-// NewBTService ...
-func NewBTService() *BTService {
-	s := &BTService{
+// NewService ...
+func NewService() *Service {
+	s := &Service{
 		config: config.Get(),
 
 		SpaceChecked: make(map[string]bool, 0),
 
 		Torrents: map[string]*Torrent{},
-		Players:  map[string]*BTPlayer{},
+		Players:  map[string]*Player{},
 
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 	}
@@ -88,7 +88,10 @@ func NewBTService() *BTService {
 	s.startServices()
 
 	go s.saveResumeDataConsumer()
-	go s.saveResumeDataLoop()
+	if !s.IsMemoryStorage() {
+		go s.saveResumeDataLoop()
+	}
+
 	go s.alertsConsumer()
 	go s.logAlerts()
 
@@ -101,7 +104,7 @@ func NewBTService() *BTService {
 }
 
 // Close ...
-func (s *BTService) Close() {
+func (s *Service) Close() {
 	now := time.Now()
 
 	s.Closer.Set()
@@ -116,7 +119,7 @@ func (s *BTService) Close() {
 
 // CloseSession tries to close libtorrent session with a timeout,
 // because it takes too much to close and Kodi hangs.
-func (s *BTService) CloseSession() {
+func (s *Service) CloseSession() {
 	log.Info("Closing Session")
 	lt.DeleteSession(s.Session)
 }
@@ -125,7 +128,7 @@ func (s *BTService) CloseSession() {
 // and Kodi sent a notification about that.
 // Should reassemble Service configuration and restart everything.
 // For non-memory storage it should also load old torrent files.
-func (s *BTService) Reconfigure() {
+func (s *Service) Reconfigure() {
 	s.stopServices()
 
 	config.Reload()
@@ -142,7 +145,7 @@ func (s *BTService) Reconfigure() {
 	s.loadTorrentFiles()
 }
 
-func (s *BTService) configure() {
+func (s *Service) configure() {
 	log.Info("Configuring client...")
 
 	if s.config.InternalProxyEnabled {
@@ -286,7 +289,7 @@ func (s *BTService) configure() {
 			lt.AlertErrorNotification))
 
 	log.Infof("DownloadStorage: %s", Storages[s.config.DownloadStorage])
-	if s.config.DownloadStorage == StorageMemory {
+	if s.IsMemoryStorage() {
 		needSize := s.config.BufferSize + int(EndBufferSize) + 8*1024*1024
 
 		if config.Get().MemorySize < needSize {
@@ -311,9 +314,9 @@ func (s *BTService) configure() {
 
 		// settings.SetBool("strict_end_game_mode", false)
 
-		// settings.SetInt("disk_io_write_mode", 2)
-		// settings.SetInt("disk_io_read_mode", 2)
-		// settings.SetInt("cache_size", 0)
+		settings.SetInt("disk_io_write_mode", 2)
+		settings.SetInt("disk_io_read_mode", 2)
+		settings.SetInt("cache_size", 0)
 	}
 
 	s.PackSettings = settings
@@ -325,7 +328,7 @@ func (s *BTService) configure() {
 
 }
 
-func (s *BTService) startServices() {
+func (s *Service) startServices() {
 	var listenPorts []string
 	for p := s.config.ListenPortMin; p <= s.config.ListenPortMax; p++ {
 		listenPorts = append(listenPorts, strconv.Itoa(p))
@@ -370,7 +373,7 @@ func (s *BTService) startServices() {
 	s.Session.GetHandle().ApplySettings(s.PackSettings)
 }
 
-func (s *BTService) stopServices() {
+func (s *Service) stopServices() {
 	if s.InternalProxy != nil {
 		log.Infof("Stopping internal proxy")
 		s.InternalProxy.Shutdown(nil)
@@ -410,9 +413,9 @@ func (s *BTService) stopServices() {
 }
 
 // CheckAvailableSpace ...
-func (s *BTService) checkAvailableSpace(t *Torrent) bool {
+func (s *Service) checkAvailableSpace(t *Torrent) bool {
 	// For memory storage we don't need to check available space
-	if s.config.DownloadStorage != StorageMemory {
+	if s.IsMemoryStorage() {
 		return true
 	}
 
@@ -457,10 +460,10 @@ func (s *BTService) checkAvailableSpace(t *Torrent) bool {
 }
 
 // AddTorrent ...
-func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
+func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 	log.Infof("Adding torrent from %s", uri)
 
-	if s.config.DownloadStorage != StorageMemory && s.config.DownloadPath == "." {
+	if !s.IsMemoryStorage() && s.config.DownloadPath == "." {
 		log.Warningf("Cannot add torrent since download path is not set")
 		xbmc.Notify("Elementum", "LOCALIZE[30113]", config.AddonIcon())
 		return nil, fmt.Errorf("Download path empty")
@@ -469,7 +472,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	torrentParams := lt.NewAddTorrentParams()
 	defer lt.DeleteAddTorrentParams(torrentParams)
 
-	if s.config.DownloadStorage == StorageMemory {
+	if s.IsMemoryStorage() {
 		torrentParams.SetMemoryStorage(s.GetMemorySize())
 	}
 
@@ -517,7 +520,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 	log.Infof("Setting save path to %s", s.config.DownloadPath)
 	torrentParams.SetSavePath(s.config.DownloadPath)
 
-	if s.config.DownloadStorage != StorageMemory {
+	if !s.IsMemoryStorage() {
 		log.Infof("Checking for fast resume data in %s.fastresume", infoHash)
 		fastResumeFile := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.fastresume", infoHash))
 		if _, err := os.Stat(fastResumeFile); err == nil {
@@ -553,7 +556,7 @@ func (s *BTService) AddTorrent(uri string) (*Torrent, error) {
 }
 
 // RemoveTorrent ...
-func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
+func (s *Service) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 	log.Debugf("Removing torrent: %s", torrent.Name())
 	if torrent == nil {
 		return false
@@ -572,7 +575,7 @@ func (s *BTService) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 	return false
 }
 
-func (s *BTService) onStateChanged(stateAlert lt.StateChangedAlert) {
+func (s *Service) onStateChanged(stateAlert lt.StateChangedAlert) {
 	switch stateAlert.GetState() {
 	case lt.TorrentStatusDownloading:
 		torrentHandle := stateAlert.GetHandle()
@@ -591,7 +594,7 @@ func (s *BTService) onStateChanged(stateAlert lt.StateChangedAlert) {
 }
 
 // GetTorrentByHash ...
-func (s *BTService) GetTorrentByHash(hash string) *Torrent {
+func (s *Service) GetTorrentByHash(hash string) *Torrent {
 	if t, ok := s.Torrents[hash]; ok {
 		return t
 	}
@@ -599,7 +602,7 @@ func (s *BTService) GetTorrentByHash(hash string) *Torrent {
 	return nil
 }
 
-func (s *BTService) saveResumeDataLoop() {
+func (s *Service) saveResumeDataLoop() {
 	saveResumeWait := time.NewTicker(time.Duration(s.config.SessionSave) * time.Second)
 	closing := s.Closer.C()
 	defer saveResumeWait.Stop()
@@ -629,7 +632,7 @@ func (s *BTService) saveResumeDataLoop() {
 	}
 }
 
-func (s *BTService) saveResumeDataConsumer() {
+func (s *Service) saveResumeDataConsumer() {
 	alerts, alertsDone := s.Alerts()
 	closing := s.Closer.C()
 	defer close(alertsDone)
@@ -680,7 +683,7 @@ func (s *BTService) saveResumeDataConsumer() {
 	}
 }
 
-func (s *BTService) alertsConsumer() {
+func (s *Service) alertsConsumer() {
 	closing := s.Closer.C()
 	defer s.alertsBroadcaster.Close()
 
@@ -746,7 +749,7 @@ func (s *BTService) alertsConsumer() {
 }
 
 // Alerts ...
-func (s *BTService) Alerts() (<-chan *Alert, chan<- interface{}) {
+func (s *Service) Alerts() (<-chan *Alert, chan<- interface{}) {
 	c, done := s.alertsBroadcaster.Listen()
 	ac := make(chan *Alert)
 	go func() {
@@ -757,7 +760,7 @@ func (s *BTService) Alerts() (<-chan *Alert, chan<- interface{}) {
 	return ac, done
 }
 
-func (s *BTService) logAlerts() {
+func (s *Service) logAlerts() {
 	alerts, _ := s.Alerts()
 	for alert := range alerts {
 		// Skipping Tracker communication, Save_Resume, UDP errors
@@ -776,10 +779,10 @@ func (s *BTService) logAlerts() {
 	}
 }
 
-func (s *BTService) loadTorrentFiles() {
+func (s *Service) loadTorrentFiles() {
 	// Not loading previous torrents on start
 	// Otherwise we can dig out all the memory and halt the device
-	if s.config.DownloadStorage == StorageMemory || !s.config.AutoloadTorrents {
+	if s.IsMemoryStorage() || !s.config.AutoloadTorrents {
 		return
 	}
 
@@ -814,7 +817,7 @@ func (s *BTService) loadTorrentFiles() {
 	}
 }
 
-func (s *BTService) downloadProgress() {
+func (s *Service) downloadProgress() {
 	closing := s.Closer.C()
 	rotateTicker := time.NewTicker(5 * time.Second)
 	defer rotateTicker.Stop()
@@ -894,7 +897,7 @@ func (s *BTService) downloadProgress() {
 					seedingTime = finishedTime
 				}
 
-				if config.Get().DownloadStorage != StorageMemory && s.config.SeedTimeLimit > 0 {
+				if !s.IsMemoryStorage() && s.config.SeedTimeLimit > 0 {
 					if seedingTime >= s.config.SeedTimeLimit {
 						if !isPaused {
 							log.Warningf("Seeding time limit reached, pausing %s", torrentName)
@@ -905,7 +908,7 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
-				if config.Get().DownloadStorage != StorageMemory && s.config.SeedTimeRatioLimit > 0 {
+				if !s.IsMemoryStorage() && s.config.SeedTimeRatioLimit > 0 {
 					timeRatio := 0
 					downloadTime := torrentStatus.GetActiveTime() - seedingTime
 					if downloadTime > 1 {
@@ -921,7 +924,7 @@ func (s *BTService) downloadProgress() {
 						status = "Seeded"
 					}
 				}
-				if config.Get().DownloadStorage != StorageMemory && s.config.ShareRatioLimit > 0 {
+				if !s.IsMemoryStorage() && s.config.ShareRatioLimit > 0 {
 					ratio := int64(0)
 					allTimeDownload := torrentStatus.GetAllTimeDownload()
 					if allTimeDownload > 0 {
@@ -1132,7 +1135,7 @@ func (s *BTService) downloadProgress() {
 }
 
 // SetDownloadLimit ...
-func (s *BTService) SetDownloadLimit(i int) {
+func (s *Service) SetDownloadLimit(i int) {
 	settings := s.PackSettings
 	settings.SetInt("download_rate_limit", i)
 
@@ -1140,7 +1143,7 @@ func (s *BTService) SetDownloadLimit(i int) {
 }
 
 // SetUploadLimit ...
-func (s *BTService) SetUploadLimit(i int) {
+func (s *Service) SetUploadLimit(i int) {
 	settings := s.PackSettings
 
 	settings.SetInt("upload_rate_limit", i)
@@ -1148,7 +1151,7 @@ func (s *BTService) SetUploadLimit(i int) {
 }
 
 // RestoreLimits ...
-func (s *BTService) RestoreLimits() {
+func (s *Service) RestoreLimits() {
 	if s.config.DownloadRateLimit > 0 {
 		s.SetDownloadLimit(s.config.DownloadRateLimit)
 		log.Infof("Rate limiting download to %s", humanize.Bytes(uint64(s.config.DownloadRateLimit)))
@@ -1165,7 +1168,7 @@ func (s *BTService) RestoreLimits() {
 }
 
 // SetBufferingLimits ...
-func (s *BTService) SetBufferingLimits() {
+func (s *Service) SetBufferingLimits() {
 	if s.config.LimitAfterBuffering {
 		s.SetDownloadLimit(0)
 		log.Info("Resetting rate limited download for buffering")
@@ -1173,7 +1176,7 @@ func (s *BTService) SetBufferingLimits() {
 }
 
 // GetSeedTime ...
-func (s *BTService) GetSeedTime() int64 {
+func (s *Service) GetSeedTime() int64 {
 	if s.config.DisableUpload {
 		return 0
 	}
@@ -1182,7 +1185,7 @@ func (s *BTService) GetSeedTime() int64 {
 }
 
 // GetBufferSize ...
-func (s *BTService) GetBufferSize() int64 {
+func (s *Service) GetBufferSize() int64 {
 	b := int64(s.config.BufferSize)
 	if b < EndBufferSize {
 		return EndBufferSize
@@ -1191,34 +1194,34 @@ func (s *BTService) GetBufferSize() int64 {
 }
 
 // GetMemorySize ...
-func (s *BTService) GetMemorySize() int64 {
+func (s *Service) GetMemorySize() int64 {
 	return int64(config.Get().MemorySize)
 }
 
 // GetStorageType ...
-func (s *BTService) GetStorageType() int {
+func (s *Service) GetStorageType() int {
 	return s.config.DownloadStorage
 }
 
 // PlayerStop ...
-func (s *BTService) PlayerStop() {
+func (s *Service) PlayerStop() {
 	log.Debugf("PlayerStop")
 }
 
 // PlayerSeek ...
-func (s *BTService) PlayerSeek() {
+func (s *Service) PlayerSeek() {
 	log.Debugf("PlayerSeek")
 }
 
 // ClientInfo ...
-func (s *BTService) ClientInfo(w io.Writer) {
+func (s *Service) ClientInfo(w io.Writer) {
 	// TODO: Print any client info here
 	// s.Client.WriteStatus(w)
 	// s.ClientConfig.ConnTracker.PrintStatus(w)
 }
 
 // AttachPlayer adds Player instance to service
-func (s *BTService) AttachPlayer(p *BTPlayer) {
+func (s *Service) AttachPlayer(p *Player) {
 	if p == nil || p.t == nil {
 		return
 	}
@@ -1234,7 +1237,7 @@ func (s *BTService) AttachPlayer(p *BTPlayer) {
 }
 
 // DetachPlayer removes Player instance
-func (s *BTService) DetachPlayer(p *BTPlayer) {
+func (s *Service) DetachPlayer(p *Player) {
 	if p == nil || p.t == nil {
 		return
 	}
@@ -1246,7 +1249,7 @@ func (s *BTService) DetachPlayer(p *BTPlayer) {
 }
 
 // GetPlayer searches for player with desired TMDB id
-func (s *BTService) GetPlayer(kodiID int, tmdbID int) *BTPlayer {
+func (s *Service) GetPlayer(kodiID int, tmdbID int) *Player {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1263,7 +1266,7 @@ func (s *BTService) GetPlayer(kodiID int, tmdbID int) *BTPlayer {
 	return nil
 }
 
-func (s *BTService) anyPlayerIsPlaying() bool {
+func (s *Service) anyPlayerIsPlaying() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1281,7 +1284,7 @@ func (s *BTService) anyPlayerIsPlaying() bool {
 }
 
 // GetActivePlayer searches for player that is Playing anything
-func (s *BTService) GetActivePlayer() *BTPlayer {
+func (s *Service) GetActivePlayer() *Player {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1299,7 +1302,7 @@ func (s *BTService) GetActivePlayer() *BTPlayer {
 }
 
 // HasTorrentByID checks whether there is active torrent for queried tmdb id
-func (s *BTService) HasTorrentByID(tmdbID int) string {
+func (s *Service) HasTorrentByID(tmdbID int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1317,7 +1320,7 @@ func (s *BTService) HasTorrentByID(tmdbID int) string {
 }
 
 // HasTorrentByQuery checks whether there is active torrent with searches query
-func (s *BTService) HasTorrentByQuery(query string) string {
+func (s *Service) HasTorrentByQuery(query string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1335,7 +1338,7 @@ func (s *BTService) HasTorrentByQuery(query string) string {
 }
 
 // HasTorrentBySeason checks whether there is active torrent for queried season
-func (s *BTService) HasTorrentBySeason(tmdbID int, season int) string {
+func (s *Service) HasTorrentBySeason(tmdbID int, season int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1353,7 +1356,7 @@ func (s *BTService) HasTorrentBySeason(tmdbID int, season int) string {
 }
 
 // HasTorrentByEpisode checks whether there is active torrent for queried episode
-func (s *BTService) HasTorrentByEpisode(tmdbID int, season, episode int) string {
+func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1371,7 +1374,7 @@ func (s *BTService) HasTorrentByEpisode(tmdbID int, season, episode int) string 
 }
 
 // HasTorrentByName checks whether there is active torrent for queried name
-func (s *BTService) HasTorrentByName(query string) string {
+func (s *Service) HasTorrentByName(query string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1389,7 +1392,7 @@ func (s *BTService) HasTorrentByName(query string) string {
 }
 
 // GetTorrentByFakeID checks whether there is active torrent with fake id
-func (s *BTService) GetTorrentByFakeID(query string) *Torrent {
+func (s *Service) GetTorrentByFakeID(query string) *Torrent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1408,7 +1411,7 @@ func (s *BTService) GetTorrentByFakeID(query string) *Torrent {
 }
 
 // GetListenIP returns calculated IP for TCP/TCP6
-func (s *BTService) GetListenIP(network string) string {
+func (s *Service) GetListenIP(network string) string {
 	if strings.Contains(network, "6") {
 		return s.ListenIPv6
 	}
@@ -1416,12 +1419,12 @@ func (s *BTService) GetListenIP(network string) string {
 }
 
 // GetMemoryStats returns total and free memory sizes for this OS
-func (s *BTService) GetMemoryStats() (int64, int64) {
+func (s *Service) GetMemoryStats() (int64, int64) {
 	v, _ := mem.VirtualMemory()
 	return int64(v.Total), int64(v.Free)
 }
 
 // IsMemoryStorage is a shortcut for checking whether we run memory storage
-func (s *BTService) IsMemoryStorage() bool {
+func (s *Service) IsMemoryStorage() bool {
 	return s.config.DownloadStorage == StorageMemory
 }

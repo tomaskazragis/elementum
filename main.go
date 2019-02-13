@@ -105,18 +105,18 @@ func main() {
 	// Do database migration if needed
 	migrateDB()
 
-	btService := bittorrent.NewBTService()
+	s := bittorrent.NewService()
 
 	var shutdown = func(fromSignal bool) {
-		if btService == nil || btService.Closer.IsSet() {
+		if s == nil || s.Closer.IsSet() {
 			return
 		}
 
-		btService.Closer.Set()
+		s.Closer.Set()
 
 		log.Info("Shutting down...")
 		library.CloseLibrary()
-		btService.Close()
+		s.Close()
 
 		db.Close()
 		cacheDb.Close()
@@ -145,24 +145,24 @@ func main() {
 	}
 	go watchParentProcess()
 
-	http.Handle("/", api.Routes(btService))
+	http.Handle("/", api.Routes(s))
 
 	http.Handle("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		btService.ClientInfo(w)
+		s.ClientInfo(w)
 	}))
-	http.Handle("/debug/all", bittorrent.DebugAll(btService))
-	http.Handle("/debug/bundle", bittorrent.DebugBundle(btService))
+	http.Handle("/debug/all", bittorrent.DebugAll(s))
+	http.Handle("/debug/bundle", bittorrent.DebugBundle(s))
 
 	http.Handle("/files/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
-		handler := http.StripPrefix("/files/", http.FileServer(bittorrent.NewTorrentFS(btService)))
+		handler := http.StripPrefix("/files/", http.FileServer(bittorrent.NewTorrentFS(s)))
 		handler.ServeHTTP(w, r)
 	}))
 	http.Handle("/reload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		btService.Reconfigure()
+		s.Reconfigure()
 	}))
 	http.Handle("/notification", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		Notification(w, r, btService)
+		Notification(w, r, s)
 	}))
 	http.Handle("/shutdown", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		shutdown(false)
@@ -180,7 +180,7 @@ func main() {
 	defer close(sigc)
 
 	go func() {
-		closer := btService.Closer.C()
+		closer := s.Closer.C()
 
 		for {
 			select {

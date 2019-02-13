@@ -372,7 +372,7 @@ func movieLinks(tmdbID string) []*bittorrent.TorrentFile {
 }
 
 // MoviePlaySelector ...
-func MoviePlaySelector(link string, btService *bittorrent.BTService) gin.HandlerFunc {
+func MoviePlaySelector(link string, s *bittorrent.Service) gin.HandlerFunc {
 	play := strings.Contains(link, "play")
 
 	if !strings.Contains(link, "force") && config.Get().ForceLinkType {
@@ -384,13 +384,13 @@ func MoviePlaySelector(link string, btService *bittorrent.BTService) gin.Handler
 	}
 
 	if play {
-		return MoviePlay(btService)
+		return MoviePlay(s)
 	}
-	return MovieLinks(btService)
+	return MovieLinks(s)
 }
 
 // MovieLinks ...
-func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func MovieLinks(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -403,7 +403,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		existingTorrent := btService.HasTorrentByID(movie.ID)
+		existingTorrent := s.HasTorrentByID(movie.ID)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"doresume", doresume,
@@ -506,7 +506,7 @@ func MovieLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // MoviePlay ...
-func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
+func MoviePlay(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -519,7 +519,7 @@ func MoviePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		existingTorrent := btService.HasTorrentByID(movie.ID)
+		existingTorrent := s.HasTorrentByID(movie.ID)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"doresume", doresume,

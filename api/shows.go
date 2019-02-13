@@ -411,7 +411,7 @@ func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, e
 }
 
 // ShowSeasonLinks ...
-func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowSeasonLinks(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -433,7 +433,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		longName := fmt.Sprintf("%s Season %02d", show.Name, seasonNumber)
 
-		existingTorrent := btService.HasTorrentBySeason(showID, seasonNumber)
+		existingTorrent := s.HasTorrentBySeason(showID, seasonNumber)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"resume", existingTorrent,
@@ -537,7 +537,7 @@ func ShowSeasonLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // ShowSeasonPlay ...
-func ShowSeasonPlay(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowSeasonPlay(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -557,7 +557,7 @@ func ShowSeasonPlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		existingTorrent := btService.HasTorrentBySeason(showID, seasonNumber)
+		existingTorrent := s.HasTorrentBySeason(showID, seasonNumber)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"resume", existingTorrent,
@@ -652,7 +652,7 @@ func showEpisodeLinks(showID int, seasonNumber int, episodeNumber int) ([]*bitto
 }
 
 // ShowEpisodePlaySelector ...
-func ShowEpisodePlaySelector(link string, btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowEpisodePlaySelector(link string, s *bittorrent.Service) gin.HandlerFunc {
 	play := strings.Contains(link, "play")
 
 	if !strings.Contains(link, "force") && config.Get().ForceLinkType {
@@ -664,13 +664,13 @@ func ShowEpisodePlaySelector(link string, btService *bittorrent.BTService) gin.H
 	}
 
 	if play {
-		return ShowEpisodePlay(btService)
+		return ShowEpisodePlay(s)
 	}
-	return ShowEpisodeLinks(btService)
+	return ShowEpisodeLinks(s)
 }
 
 // ShowEpisodeLinks ...
-func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowEpisodeLinks(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -695,7 +695,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 
 		longName := fmt.Sprintf("%s S%02dE%02d", show.Name, seasonNumber, episodeNumber)
 
-		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
+		existingTorrent := s.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
 		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"doresume", doresume,
@@ -813,7 +813,7 @@ func ShowEpisodeLinks(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // ShowEpisodePlay ...
-func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
+func ShowEpisodePlay(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -836,7 +836,7 @@ func ShowEpisodePlay(btService *bittorrent.BTService) gin.HandlerFunc {
 			return
 		}
 
-		existingTorrent := btService.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
+		existingTorrent := s.HasTorrentByEpisode(showID, seasonNumber, episodeNumber)
 		if existingTorrent != "" && xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing) {
 			rURL := URLQuery(URLForXBMC("/play"),
 				"doresume", doresume,

@@ -36,9 +36,9 @@ const (
 	episodeMatchRegex       = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
 )
 
-// BTPlayer ...
-type BTPlayer struct {
-	s                        *BTService
+// Player ...
+type Player struct {
+	s                        *Service
 	t                        *Torrent
 	p                        *PlayerParams
 	dialogProgress           *xbmc.DialogProgress
@@ -98,11 +98,11 @@ type candidateFile struct {
 	DisplayName string
 }
 
-// NewBTPlayer ...
-func NewBTPlayer(bts *BTService, params PlayerParams) *BTPlayer {
+// NewPlayer ...
+func NewPlayer(bts *Service, params PlayerParams) *Player {
 	params.Playing = true
 
-	btp := &BTPlayer{
+	btp := &Player{
 		s: bts,
 		p: &params,
 
@@ -123,16 +123,16 @@ func NewBTPlayer(bts *BTService, params PlayerParams) *BTPlayer {
 }
 
 // GetTorrent ...
-func (btp *BTPlayer) GetTorrent() *Torrent {
+func (btp *Player) GetTorrent() *Torrent {
 	return btp.t
 }
 
 // SetTorrent ...
-func (btp *BTPlayer) SetTorrent(t *Torrent) {
+func (btp *Player) SetTorrent(t *Torrent) {
 	btp.t = t
 }
 
-func (btp *BTPlayer) addTorrent() error {
+func (btp *Player) addTorrent() error {
 	if btp.t == nil {
 		torrent, err := btp.s.AddTorrent(btp.p.URI)
 		if err != nil {
@@ -149,7 +149,7 @@ func (btp *BTPlayer) addTorrent() error {
 
 	log.Info("Enabling sequential download")
 	// btp.t.th.SetSequentialDownload(true)
-	btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
+	btp.t.th.SetSequentialDownload(!btp.s.IsMemoryStorage())
 
 	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
 	btp.torrentName = status.GetName()
@@ -164,7 +164,7 @@ func (btp *BTPlayer) addTorrent() error {
 	return nil
 }
 
-func (btp *BTPlayer) resumeTorrent() error {
+func (btp *Player) resumeTorrent() error {
 	if btp.t == nil || btp.t.th == nil {
 		return fmt.Errorf("Unable to resume torrent with index %d", btp.p.ResumeIndex)
 	}
@@ -173,7 +173,7 @@ func (btp *BTPlayer) resumeTorrent() error {
 
 	log.Info("Enabling sequential download")
 	// btp.t.th.SetSequentialDownload(true)
-	btp.t.th.SetSequentialDownload(config.Get().DownloadStorage != StorageMemory)
+	btp.t.th.SetSequentialDownload(!btp.s.IsMemoryStorage())
 
 	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
 	btp.torrentName = status.GetName()
@@ -190,7 +190,7 @@ func (btp *BTPlayer) resumeTorrent() error {
 }
 
 // PlayURL ...
-func (btp *BTPlayer) PlayURL() string {
+func (btp *Player) PlayURL() string {
 	if btp.t.IsRarArchive {
 		extractedPath := filepath.Join(filepath.Dir(btp.chosenFile.Path), "extracted", btp.extracted)
 		return util.EncodeFileURL(extractedPath)
@@ -199,7 +199,7 @@ func (btp *BTPlayer) PlayURL() string {
 }
 
 // Buffer ...
-func (btp *BTPlayer) Buffer() error {
+func (btp *Player) Buffer() error {
 	if btp.p.ResumeIndex >= 0 {
 		if err := btp.resumeTorrent(); err != nil {
 			log.Errorf("Error resuming torrent: %#v", err)
@@ -240,8 +240,8 @@ func (btp *BTPlayer) Buffer() error {
 	return nil
 }
 
-func (btp *BTPlayer) waitCheckAvailableSpace() {
-	if btp.s.config.DownloadStorage == StorageMemory {
+func (btp *Player) waitCheckAvailableSpace() {
+	if btp.s.IsMemoryStorage() {
 		return
 	}
 
@@ -263,7 +263,7 @@ func (btp *BTPlayer) waitCheckAvailableSpace() {
 	}
 }
 
-func (btp *BTPlayer) processMetadata() {
+func (btp *Player) processMetadata() {
 	if btp.t.IsInitialized {
 		return
 	}
@@ -325,7 +325,7 @@ func (btp *BTPlayer) processMetadata() {
 	defer lt.DeleteStdVectorInt(filesPriorities)
 
 	for _, f := range btp.t.files {
-		if btp.s.config.DownloadStorage == StorageMemory {
+		if btp.s.IsMemoryStorage() {
 			filesPriorities.Add(0)
 		} else if f == btp.chosenFile {
 			filesPriorities.Add(4)
@@ -347,11 +347,11 @@ func (btp *BTPlayer) processMetadata() {
 	// }
 }
 
-func (btp *BTPlayer) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
+func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
 	statusName := StatusStrings[int(status.GetState())]
 	if btp.t.IsBuffering {
 		statusName = StatusStrings[StatusBuffering]
-	} else if btp.t.Service.config.DownloadStorage == StorageMemory {
+	} else if btp.s.IsMemoryStorage() {
 		statusName = StatusStrings[StatusDownloading]
 	}
 
@@ -383,11 +383,11 @@ func (btp *BTPlayer) statusStrings(progress float64, status lt.TorrentStatus) (s
 }
 
 // HasChosenFile ...
-func (btp *BTPlayer) HasChosenFile() bool {
+func (btp *Player) HasChosenFile() bool {
 	return btp.hasChosenFile && btp.chosenFile != nil
 }
 
-func (btp *BTPlayer) chooseFile() (*File, error) {
+func (btp *Player) chooseFile() (*File, error) {
 	biggestFile := 0
 	maxSize := int64(0)
 	files := btp.t.files
@@ -509,7 +509,7 @@ func (btp *BTPlayer) chooseFile() (*File, error) {
 	return files[biggestFile], nil
 }
 
-func (btp *BTPlayer) findSubtitlesFile() *File {
+func (btp *Player) findSubtitlesFile() *File {
 	extension := filepath.Ext(btp.fileName)
 	chosenName := btp.fileName[0 : len(btp.fileName)-len(extension)]
 	srtFileName := chosenName + ".srt"
@@ -537,7 +537,7 @@ func (btp *BTPlayer) findSubtitlesFile() *File {
 }
 
 // Close ...
-func (btp *BTPlayer) Close() {
+func (btp *Player) Close() {
 	// Prevent double-closing
 	if btp.closed {
 		return
@@ -578,7 +578,7 @@ func (btp *BTPlayer) Close() {
 		}
 	}
 
-	if keepDownloading == false || deleteAnswer == true || btp.notEnoughSpace || btp.s.config.DownloadStorage == StorageMemory {
+	if keepDownloading == false || deleteAnswer == true || btp.notEnoughSpace || btp.s.IsMemoryStorage() {
 		// Delete torrent file
 		if len(btp.t.torrentFile) > 0 {
 			if _, err := os.Stat(btp.t.torrentFile); err == nil {
@@ -606,7 +606,7 @@ func (btp *BTPlayer) Close() {
 	}
 }
 
-func (btp *BTPlayer) bufferDialog() {
+func (btp *Player) bufferDialog() {
 	halfSecond := time.NewTicker(500 * time.Millisecond)
 	defer halfSecond.Stop()
 	oneSecond := time.NewTicker(1 * time.Second)
@@ -699,7 +699,7 @@ func (btp *BTPlayer) bufferDialog() {
 	}
 }
 
-func (btp *BTPlayer) findExtracted(destPath string) {
+func (btp *Player) findExtracted(destPath string) {
 	files, err := ioutil.ReadDir(destPath)
 	if err != nil {
 		log.Error(err)
@@ -723,7 +723,7 @@ func (btp *BTPlayer) findExtracted(destPath string) {
 	}
 }
 
-func (btp *BTPlayer) updateWatchTimes() {
+func (btp *Player) updateWatchTimes() {
 	ret := xbmc.GetWatchTimes()
 	if ret["error"] != "" {
 		return
@@ -732,7 +732,7 @@ func (btp *BTPlayer) updateWatchTimes() {
 	btp.p.VideoDuration, _ = strconv.ParseFloat(ret["videoDuration"], 64)
 }
 
-func (btp *BTPlayer) playerLoop() {
+func (btp *Player) playerLoop() {
 	defer btp.Close()
 
 	log.Info("Buffer loop")
@@ -849,12 +849,12 @@ playbackLoop:
 }
 
 // Params returns Params for external use
-func (btp *BTPlayer) Params() *PlayerParams {
+func (btp *Player) Params() *PlayerParams {
 	return btp.p
 }
 
 // UpdateWatched is updating watched progress is Kodi
-func (btp *BTPlayer) UpdateWatched() {
+func (btp *Player) UpdateWatched() {
 	log.Debugf("Updating Watched state: %s", litter.Sdump(btp.p))
 
 	if btp.p.VideoDuration == 0 || btp.p.WatchedTime == 0 {
@@ -916,11 +916,11 @@ func (btp *BTPlayer) UpdateWatched() {
 }
 
 // IsWatched ...
-func (btp *BTPlayer) IsWatched() bool {
+func (btp *Player) IsWatched() bool {
 	return (100 * btp.p.WatchedTime / btp.p.VideoDuration) > float64(config.Get().PlaybackPercent)
 }
 
-func (btp *BTPlayer) smartMatch(choices []*candidateFile) {
+func (btp *Player) smartMatch(choices []*candidateFile) {
 	if !config.Get().SmartEpisodeMatch {
 		return
 	}
@@ -953,7 +953,7 @@ func (btp *BTPlayer) smartMatch(choices []*candidateFile) {
 }
 
 // GetIdent tries to find playing item in Kodi library
-func (btp *BTPlayer) GetIdent() {
+func (btp *Player) GetIdent() {
 	if btp.p.TMDBId == 0 || btp.p.KodiID != 0 {
 		return
 	}
@@ -982,7 +982,7 @@ func (btp *BTPlayer) GetIdent() {
 	}
 }
 
-func (btp *BTPlayer) setRateLimiting(enable bool) {
+func (btp *Player) setRateLimiting(enable bool) {
 	if btp.s.config.LimitAfterBuffering {
 		settings := btp.s.PackSettings
 		if enable == true {
@@ -1004,7 +1004,7 @@ func (btp *BTPlayer) setRateLimiting(enable bool) {
 	}
 }
 
-func (btp *BTPlayer) consumeAlerts() {
+func (btp *Player) consumeAlerts() {
 	log.Debugf("Consuming alerts")
 	alerts, alertsDone := btp.s.Alerts()
 	defer close(alertsDone)
@@ -1035,7 +1035,7 @@ func (btp *BTPlayer) consumeAlerts() {
 	}
 }
 
-func (btp *BTPlayer) onStateChanged(stateAlert lt.StateChangedAlert) {
+func (btp *Player) onStateChanged(stateAlert lt.StateChangedAlert) {
 	switch stateAlert.GetState() {
 	case lt.TorrentStatusDownloading:
 		btp.isDownloading = true

@@ -14,7 +14,7 @@ import (
 )
 
 // Play ...
-func Play(btService *bittorrent.BTService) gin.HandlerFunc {
+func Play(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Query("uri")
 		index := ctx.Query("index")
@@ -87,9 +87,9 @@ func Play(btService *bittorrent.BTService) gin.HandlerFunc {
 			Query:        query,
 		}
 
-		player := bittorrent.NewBTPlayer(btService, params)
+		player := bittorrent.NewPlayer(s, params)
 		log.Debugf("Playing item: %#v", params)
-		if t, ok := btService.Torrents[resume]; resume != "" && ok {
+		if t, ok := s.Torrents[resume]; resume != "" && ok {
 			player.SetTorrent(t)
 		}
 		if player.Buffer() != nil || !player.HasChosenFile() {
@@ -115,7 +115,7 @@ func PlayTorrent(ctx *gin.Context) {
 }
 
 // PlayURI ...
-func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
+func PlayURI(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Request.FormValue("uri")
 		file, header, fileError := ctx.Request.FormFile("file")
@@ -145,7 +145,7 @@ func PlayURI(btService *bittorrent.BTService) gin.HandlerFunc {
 				query       string
 				contentType string
 			)
-			t := btService.Torrents[resume]
+			t := s.Torrents[resume]
 
 			if t != nil {
 				infoHash := t.InfoHash()

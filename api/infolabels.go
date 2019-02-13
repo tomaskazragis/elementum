@@ -69,7 +69,7 @@ func encodeItem(item *xbmc.ListItem) string {
 }
 
 // InfoLabelsStored ...
-func InfoLabelsStored(btService *bittorrent.BTService) gin.HandlerFunc {
+func InfoLabelsStored(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		labelsString := "{}"
 
@@ -95,7 +95,7 @@ func InfoLabelsStored(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // InfoLabelsEpisode ...
-func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
+func InfoLabelsEpisode(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tmdbID := ctx.Params.ByName("showId")
 		showID, _ := strconv.Atoi(tmdbID)
@@ -112,7 +112,7 @@ func InfoLabelsEpisode(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // InfoLabelsMovie ...
-func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
+func InfoLabelsMovie(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tmdbID := ctx.Params.ByName("tmdbId")
 
@@ -126,11 +126,11 @@ func InfoLabelsMovie(btService *bittorrent.BTService) gin.HandlerFunc {
 }
 
 // InfoLabelsSearch ...
-func InfoLabelsSearch(btService *bittorrent.BTService) gin.HandlerFunc {
+func InfoLabelsSearch(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		tmdbID := ctx.Params.ByName("tmdbId")
 
-		if item, err := GetSearchLabels(btService, tmdbID); err == nil {
+		if item, err := GetSearchLabels(s, tmdbID); err == nil {
 			saveEncoded(encodeItem(item))
 			ctx.JSON(200, item)
 		} else {
@@ -194,8 +194,8 @@ func GetMovieLabels(tmdbID string) (item *xbmc.ListItem, err error) {
 }
 
 // GetSearchLabels returnes listitem for a search query
-func GetSearchLabels(btService *bittorrent.BTService, tmdbID string) (item *xbmc.ListItem, err error) {
-	torrent := btService.GetTorrentByFakeID(tmdbID)
+func GetSearchLabels(s *bittorrent.Service, tmdbID string) (item *xbmc.ListItem, err error) {
+	torrent := s.GetTorrentByFakeID(tmdbID)
 	if torrent == nil || torrent.DBItem == nil {
 		return nil, errors.New("Unable to find the torrent")
 	}
