@@ -55,6 +55,7 @@ type Configuration struct {
 	ForceLinkType             bool
 	UseOriginalTitle          bool
 	AddSpecials               bool
+	AddEpisodeNumbers         bool
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
 	SmartEpisodeMatch         bool
@@ -454,6 +455,7 @@ func Reload() *Configuration {
 		ForceLinkType:             settings["force_link_type"].(bool),
 		UseOriginalTitle:          settings["use_original_title"].(bool),
 		AddSpecials:               settings["add_specials"].(bool),
+		AddEpisodeNumbers:         settings["add_episode_numbers"].(bool),
 		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
 		PlaybackPercent:           settings["playback_percent"].(int),

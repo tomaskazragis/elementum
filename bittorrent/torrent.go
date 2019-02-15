@@ -658,6 +658,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 		}
 	}
 
+	// Removing in background to avoid blocking UI
 	go func() {
 		toRemove := 0
 		if removeFiles {
@@ -665,6 +666,19 @@ func (t *Torrent) Drop(removeFiles bool) {
 		}
 
 		t.Service.Session.GetHandle().RemoveTorrent(t.th, toRemove)
+		if removeFiles {
+			// Removing .parts file
+			if _, err := os.Stat(t.partsFile); err == nil {
+				log.Infof("Deleting parts file at %s", t.partsFile)
+				defer os.Remove(t.partsFile)
+			}
+
+			// Removing .fastresume file
+			if _, err := os.Stat(t.fastResumeFile); err == nil {
+				log.Infof("Deleting fast resume data at %s", t.fastResumeFile)
+				defer os.Remove(t.fastResumeFile)
+			}
+		}
 	}()
 }
 

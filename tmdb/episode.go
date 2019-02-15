@@ -80,8 +80,10 @@ func (episodes EpisodeList) ToListItems(show *Show, season *Season) []*xbmc.List
 
 // ToListItem ...
 func (episode *Episode) ToListItem(show *Show, season *Season) *xbmc.ListItem {
-	// episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
 	episodeLabel := episode.Name
+	if config.Get().AddEpisodeNumbers {
+		episodeLabel = fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.Name)
+	}
 
 	runtime := 1800
 	if len(show.EpisodeRunTime) > 0 {

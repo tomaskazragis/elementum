@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -115,8 +116,10 @@ func (season *Season) ToListItem(show *Show) *xbmc.ListItem {
 
 // ToListItem ...
 func (episode *Episode) ToListItem(show *Show) *xbmc.ListItem {
-	// episodeLabel := fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.EpisodeName)
 	episodeLabel := episode.EpisodeName
+	if config.Get().AddEpisodeNumbers {
+		episodeLabel = fmt.Sprintf("%dx%02d %s", episode.SeasonNumber, episode.EpisodeNumber, episode.EpisodeName)
+	}
 
 	item := &xbmc.ListItem{
 		Label: episodeLabel,
