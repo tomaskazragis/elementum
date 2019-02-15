@@ -65,6 +65,8 @@ func ensureSingleInstance(conf *config.Configuration) (lock *lockfile.LockFile, 
 }
 
 func main() {
+	now := time.Now()
+
 	tagflag.Parse(&config.Args)
 
 	// Make sure we are properly multithreaded.
@@ -207,5 +209,7 @@ func main() {
 	go db.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
 
+	log.Infof("Prepared in %s", time.Since(now))
+	log.Infof("Starting HTTP server")
 	http.ListenAndServe(":"+strconv.Itoa(config.Args.LocalPort), nil)
 }

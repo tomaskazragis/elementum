@@ -75,6 +75,11 @@ type activeTorrent struct {
 
 // NewService ...
 func NewService() *Service {
+	now := time.Now()
+	defer func() {
+		log.Infof("Service started in %s", time.Since(now))
+	}()
+
 	s := &Service{
 		config: config.Get(),
 
@@ -87,7 +92,7 @@ func NewService() *Service {
 	}
 
 	s.configure()
-	s.startServices()
+	go s.startServices()
 
 	go s.watchConfig()
 	go s.saveResumeDataConsumer()
@@ -98,7 +103,7 @@ func NewService() *Service {
 	go s.alertsConsumer()
 	go s.logAlerts()
 
-	tmdb.CheckAPIKey()
+	go tmdb.CheckAPIKey()
 
 	go s.loadTorrentFiles()
 	go s.downloadProgress()
