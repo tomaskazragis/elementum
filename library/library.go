@@ -280,10 +280,9 @@ func Init() {
 	}
 
 	log.Notice("Warming up caches...")
-	tmdb.WarmingUp = true
 	go func() {
 		time.Sleep(30 * time.Second)
-		if tmdb.WarmingUp == true {
+		if !tmdb.WarmingUp.IsSet() {
 			xbmc.Notify("Elementum", "LOCALIZE[30147]", config.AddonIcon())
 		}
 	}()
@@ -299,7 +298,7 @@ func Init() {
 		log.Warning(err)
 	}
 
-	tmdb.WarmingUp = false
+	tmdb.WarmingUp.Set()
 	took := time.Since(started)
 	if took.Seconds() > 30 {
 		xbmc.Notify("Elementum", "LOCALIZE[30148]", config.AddonIcon())

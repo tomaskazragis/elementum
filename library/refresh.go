@@ -36,7 +36,7 @@ func RefreshOnScan() error {
 
 // RefreshOnClean is launched when clear is finished
 func RefreshOnClean() error {
-	if tmdb.WarmingUp || !initialized {
+	if !tmdb.WarmingUp.IsSet() || !initialized {
 		return nil
 	}
 
