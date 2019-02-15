@@ -131,12 +131,14 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
+	readersTicker := time.NewTicker(10 * time.Second)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
+	defer readersTicker.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -150,6 +152,8 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
+		case <-readersTicker.C:
+			go t.ResetReaders()
 		case <-sc:
 			t.Closer.Set()
 			return
@@ -480,9 +484,12 @@ func (t *Torrent) PrioritizePieces() {
 			readerVector.Add(curPiece)
 			piecesPriorities.Add(priority)
 			// t.th.SetPieceDeadline(curPiece, 0, 0)
-			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+			// t.th.SetPieceDeadline(curPiece, (7-priority)*20, 0)
 		} else {
 			piecesPriorities.Add(defaultPriority)
+			// if defaultPriority == 0 {
+			// 	t.th.ResetPieceDeadline(curPiece)
+			// }
 		}
 	}
 
@@ -491,6 +498,12 @@ func (t *Torrent) PrioritizePieces() {
 			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
 		}
 	}
+
+	// for curPiece, priority := range readerPieces {
+	// 	// if priority >= 5 {
+	// 	t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+	// 	// }
+	// }
 
 	t.th.PrioritizePieces(piecesPriorities)
 }
@@ -698,16 +711,16 @@ func (t *Torrent) SaveMetainfo(path string) error {
 }
 
 // GetReadaheadSize ...
-func (t *Torrent) GetReadaheadSize() (ret int64) {
+func (t *Torrent) GetReadaheadSize() (ret, retIdle int64) {
 	defer perf.ScopeTimer()()
 
 	defer func() {
-		log.Debugf("Readahead size: %s", humanize.Bytes(uint64(ret)))
+		log.Debugf("Readahead size: %s / %s", humanize.Bytes(uint64(ret)), humanize.Bytes(uint64(retIdle)))
 	}()
 
 	defaultRA := int64(50 * 1024 * 1024)
 	if !t.Service.IsMemoryStorage() {
-		return defaultRA
+		return defaultRA, defaultRA
 	}
 
 	size := defaultRA
@@ -715,10 +728,20 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 		size = lt.GetMemorySize()
 	}
 	if size < 0 {
-		return 0
+		return 0, 0
 	}
 
-	return int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (1 / float64(len(t.readers))))
+	points := 0.0
+	for _, r := range t.readers {
+		if r.IsIdle() {
+			points += 0.5
+		} else {
+			points += 1.0
+		}
+	}
+
+	return int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (1.0 / points)),
+		int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (0.5 / points))
 }
 
 // CloseReaders ...
@@ -742,10 +765,19 @@ func (t *Torrent) ResetReaders() {
 		return
 	}
 
-	perReaderSize := t.GetReadaheadSize()
+	perReaderSize, perReaserSizeIdle := t.GetReadaheadSize()
 	for _, r := range t.readers {
-		log.Infof("Setting readahead for reader %d as %s", r.id, humanize.Bytes(uint64(perReaderSize)))
-		r.readahead = perReaderSize
+		size := perReaderSize
+		if r.IsIdle() {
+			size = perReaserSizeIdle
+		}
+
+		if r.readahead == size {
+			continue
+		}
+
+		log.Infof("Setting readahead for reader %d as %s", r.id, humanize.Bytes(uint64(size)))
+		r.readahead = size
 	}
 }
 

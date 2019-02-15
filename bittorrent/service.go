@@ -1,6 +1,7 @@
 package bittorrent
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/hex"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
+	"github.com/radovskyb/watcher"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/zeebo/bencode"
 
@@ -87,6 +89,7 @@ func NewService() *Service {
 	s.configure()
 	s.startServices()
 
+	go s.watchConfig()
 	go s.saveResumeDataConsumer()
 	if !s.IsMemoryStorage() {
 		go s.saveResumeDataLoop()
@@ -312,7 +315,13 @@ func (s *Service) configure() {
 		settings.SetInt("active_lsd_limit", -1)
 		// settings.SetInt("unchoke_slots_limit", 0)
 
-		// settings.SetBool("strict_end_game_mode", false)
+		settings.SetInt("max_allowed_in_request_queue", 2000)
+		settings.SetInt("max_out_request_queue", 2000)
+		settings.SetInt("send_buffer_low_watermark", 100*1024)
+		settings.SetInt("send_buffer_watermark", 1000*1024)
+		settings.SetInt("send_buffer_watermark_factor", 150)
+
+		settings.SetBool("strict_end_game_mode", false)
 
 		settings.SetInt("disk_io_write_mode", 2)
 		settings.SetInt("disk_io_read_mode", 2)
@@ -326,6 +335,7 @@ func (s *Service) configure() {
 		s.RestoreLimits()
 	}
 
+	s.applyCustomSettings()
 }
 
 func (s *Service) startServices() {
@@ -1427,4 +1437,94 @@ func (s *Service) GetMemoryStats() (int64, int64) {
 // IsMemoryStorage is a shortcut for checking whether we run memory storage
 func (s *Service) IsMemoryStorage() bool {
 	return s.config.DownloadStorage == StorageMemory
+}
+
+// watchConfig watches for libtorrent.config changes to reapply libtorrent settings
+func (s *Service) watchConfig() {
+	w := watcher.New()
+
+	go func() {
+		closing := s.Closer.C()
+
+		for {
+			select {
+			case event := <-w.Event:
+				log.Infof("Watcher notify: %v", event)
+				s.applyCustomSettings()
+			case err := <-w.Error:
+				log.Errorf("Watcher error: %s", err)
+			case <-w.Closed:
+				return
+			case <-closing:
+				w.Close()
+				return
+			}
+		}
+	}()
+
+	filePath := filepath.Join(config.Get().ProfilePath, "libtorrent.config")
+	if err := w.Add(filePath); err != nil {
+		log.Errorf("Watcher error. Could not add file to watch: %s", err)
+	}
+
+	if err := w.Start(time.Millisecond * 500); err != nil {
+		log.Errorf("Error watching files: %s", err)
+	}
+}
+
+func (s *Service) applyCustomSettings() {
+	settings := s.PackSettings
+
+	for k, v := range s.readCustomSettings() {
+		if v == "true" {
+			settings.SetBool(k, true)
+			log.Infof("Applying bool setting: %s=true", k)
+			continue
+		} else if v == "false" {
+			settings.SetBool(k, false)
+			log.Infof("Applying bool setting: %s=false", k)
+			continue
+		} else if in, err := strconv.Atoi(v); err == nil {
+			settings.SetInt(k, in)
+			log.Infof("Applying int setting: %s=%d", k, in)
+			continue
+		}
+
+		log.Errorf("Cannot parse config settings for: %s=%s", k, v)
+	}
+
+	s.Session.GetHandle().ApplySettings(settings)
+}
+
+func (s *Service) readCustomSettings() map[string]string {
+	ret := map[string]string{}
+
+	filePath := filepath.Join(config.Get().ProfilePath, "libtorrent.config")
+	f, err := os.Open(filePath)
+	if err != nil {
+		return ret
+	}
+	defer f.Close()
+
+	reReplace := regexp.MustCompile(`[^_\d\w=]`)
+	reFind := regexp.MustCompile(`([_\d\w=]+)=(\w+)`)
+	scan := bufio.NewScanner(f)
+	for scan.Scan() {
+		l := scan.Text()
+
+		l = strings.Replace(l, " ", "", -1)
+		if strings.HasPrefix(l, "#") {
+			continue
+		}
+
+		l = reReplace.ReplaceAllString(l, "")
+		res := reFind.FindStringSubmatch(l)
+		if len(res) < 3 {
+			continue
+		}
+
+		ret[res[1]] = res[2]
+	}
+
+	return ret
 }

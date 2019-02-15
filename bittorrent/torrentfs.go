@@ -287,6 +287,11 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 
 	defer perf.ScopeTimer()()
 	log.Infof("Waiting for piece %d", piece)
+	now := time.Now()
+	defer func() {
+		log.Infof("Waiting for piece %d finished in %s", piece, time.Since(now))
+	}()
+
 	tf.t.PrioritizePiece(piece)
 
 	pieceRefreshTicker := time.Tick(piecesRefreshDuration)
@@ -355,4 +360,9 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 	pr.End = util.Min(tf.numPieces-1, int((off+size-1)/pl))
 
 	return
+}
+
+// IsIdle ...
+func (tf *TorrentFSEntry) IsIdle() bool {
+	return tf.lastUsed.Before(time.Now().Add(time.Minute * -1))
 }

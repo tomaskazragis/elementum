@@ -98,6 +98,7 @@ type Configuration struct {
 	ListenAutoDetectPort      bool
 	OutgoingInterfaces        string
 	TunedStorage              bool
+	UseLibtorrentConfig       bool
 	Scrobble                  bool
 
 	TraktUsername                  string
@@ -311,6 +312,13 @@ func Reload() *Configuration {
 			log.Errorf("Could not create profile directory: %#v", err)
 		}
 	}
+	if !PathExists(filepath.Join(info.Profile, "libtorrent.config")) {
+		filePath := filepath.Join(info.Profile, "libtorrent.config")
+		log.Infof("Creating libtorrent.config to further usage at: %s", filePath)
+		if _, err := os.Create(filePath); err == nil {
+			os.Chmod(filePath, 0666)
+		}
+	}
 
 	downloadPath := TranslatePath(xbmc.GetSettingString("download_path"))
 	libraryPath := TranslatePath(xbmc.GetSettingString("library_path"))
@@ -470,6 +478,7 @@ func Reload() *Configuration {
 		ListenAutoDetectPort:      settings["listen_autodetect_port"].(bool),
 		OutgoingInterfaces:        settings["outgoing_interfaces"].(string),
 		TunedStorage:              settings["tuned_storage"].(bool),
+		UseLibtorrentConfig:       settings["use_libtorrent_config"].(bool),
 		ConnectionsLimit:          settings["connections_limit"].(int),
 		ConnTrackerLimit:          settings["conntracker_limit"].(int),
 		ConnTrackerLimitAuto:      settings["conntracker_limit_auto"].(bool),
