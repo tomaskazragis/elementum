@@ -51,6 +51,7 @@ type Torrent struct {
 	BufferPiecesLength   int64
 	BufferPiecesProgress map[int]float64
 	BufferEndPieces      []int
+	MemorySize           int64
 
 	IsWithMetadata bool
 	IsInitialized  bool
@@ -249,8 +250,23 @@ func (t *Torrent) Buffer(file *File) {
 
 	if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
 		_, free := t.Service.GetMemoryStats()
-		startBufferSize = t.pieceLength * 10
-		if free == 0 || startBufferSize*2 < free {
+
+		// Let's try to
+		var newBufferSize int64
+		for i := 10; i >= 4; i -= 2 {
+			mem := int64(i) * t.pieceLength
+
+			if mem < startBufferSize {
+				break
+			}
+			if free == 0 || !t.Service.IsMemoryStorage() || (mem*2)-startBufferSize < free {
+				newBufferSize = mem
+				break
+			}
+		}
+
+		if newBufferSize > 0 {
+			startBufferSize = newBufferSize
 			preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
 			log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
 		}
@@ -260,10 +276,36 @@ func (t *Torrent) Buffer(file *File) {
 		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
 		t.ms.SetTorrentHandle(t.th)
 
-		memory := int64(config.Get().MemorySize)
-		if preBufferSize+postBufferSize > memory {
-			memory = preBufferSize + postBufferSize + (2 * t.pieceLength)
-			t.ms.SetMemorySize(memory)
+		// Try to increase memory size to at most 25 pieces to have more comfortable playback.
+		// Also check for free memory to avoid spending too much!
+		if config.Get().AutoAdjustMemorySize {
+			_, free := t.Service.GetMemoryStats()
+
+			var newMemorySize int64
+			for i := 25; i >= 10; i -= 5 {
+				mem := int64(i) * t.pieceLength
+
+				if mem < t.MemorySize || free == 0 {
+					break
+				}
+				if (mem*2)-t.MemorySize < free {
+					newMemorySize = mem
+					break
+				}
+			}
+
+			if newMemorySize > 0 {
+				t.MemorySize = newMemorySize
+				log.Infof("Adjusting memory size to %s!", humanize.Bytes(uint64(t.MemorySize)))
+				t.ms.SetMemorySize(t.MemorySize)
+			}
+		}
+
+		// Increase memory size if buffer does not fit there
+		if preBufferSize+postBufferSize > t.MemorySize {
+			t.MemorySize = preBufferSize + postBufferSize + (1 * t.pieceLength)
+			log.Infof("Adjusting memory size to %s, to fit all buffer!", humanize.Bytes(uint64(t.MemorySize)))
+			t.ms.SetMemorySize(t.MemorySize)
 		}
 	}
 
@@ -282,7 +324,7 @@ func (t *Torrent) Buffer(file *File) {
 
 	t.BufferPiecesLength = 0
 	for range t.BufferPiecesProgress {
-		t.BufferPiecesLength += int64(t.ti.PieceLength())
+		t.BufferPiecesLength += t.pieceLength
 	}
 
 	t.muBuffer.Unlock()
@@ -302,8 +344,9 @@ func (t *Torrent) Buffer(file *File) {
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
 
+	// Let's try without reserving pieces
 	// Reserving first piece in this file, it is usually re-requested by Kodi
-	t.reservedPieces = append(t.reservedPieces, preBufferStart, postBufferEnd)
+	// t.reservedPieces = append(t.reservedPieces, preBufferStart, postBufferEnd)
 
 	// Properly set the pieces priority vector
 	curPiece := 0
@@ -725,16 +768,16 @@ func (t *Torrent) SaveMetainfo(path string) error {
 }
 
 // GetReadaheadSize ...
-func (t *Torrent) GetReadaheadSize() (ret, retIdle int64) {
+func (t *Torrent) GetReadaheadSize() (ret int64) {
 	defer perf.ScopeTimer()()
 
 	defer func() {
-		log.Debugf("Readahead size: %s / %s", humanize.Bytes(uint64(ret)), humanize.Bytes(uint64(retIdle)))
+		log.Debugf("Readahead size: %s", humanize.Bytes(uint64(ret)))
 	}()
 
 	defaultRA := int64(50 * 1024 * 1024)
 	if !t.Service.IsMemoryStorage() {
-		return defaultRA, defaultRA
+		return defaultRA
 	}
 
 	size := defaultRA
@@ -742,20 +785,16 @@ func (t *Torrent) GetReadaheadSize() (ret, retIdle int64) {
 		size = lt.GetMemorySize()
 	}
 	if size < 0 {
-		return 0, 0
+		return 0
 	}
 
-	points := 0.0
-	for _, r := range t.readers {
-		if r.IsIdle() {
-			points += 0.5
-		} else {
-			points += 1.0
-		}
+	log.Debugf("Size from lt: %d, set: %d, res: %d, pl: %d, pl2: %d", size, t.MemorySize, len(t.reservedPieces), t.ti.PieceLength(), t.pieceLength)
+	base := float64(t.MemorySize - (int64(len(t.reservedPieces)+1))*t.pieceLength)
+	if len(t.readers) == 1 {
+		return int64(base)
 	}
 
-	return int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (1.0 / points)),
-		int64(float64(size-int64((len(t.reservedPieces)+3)*t.ti.PieceLength())) * (0.5 / points))
+	return int64(base * 0.5)
 }
 
 // CloseReaders ...
@@ -779,12 +818,9 @@ func (t *Torrent) ResetReaders() {
 		return
 	}
 
-	perReaderSize, perReaserSizeIdle := t.GetReadaheadSize()
+	perReaderSize := t.GetReadaheadSize()
 	for _, r := range t.readers {
 		size := perReaderSize
-		if r.IsIdle() {
-			size = perReaserSizeIdle
-		}
 
 		if r.readahead == size {
 			continue
@@ -871,6 +907,7 @@ func (t *Torrent) onMetadataReceived() {
 	defer t.gotMetainfo.Set()
 
 	t.ti = t.th.TorrentFile()
+	t.pieceLength = int64(t.ti.PieceLength())
 	t.MakeFiles()
 
 	t.IsWithMetadata = true

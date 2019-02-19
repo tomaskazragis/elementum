@@ -193,7 +193,6 @@ func (s *Service) configure() {
 	settings.SetBool("no_atime_storage", true)
 	settings.SetBool("announce_double_nat", true)
 	settings.SetBool("prioritize_partial_pieces", false)
-	settings.SetBool("free_torrent_hashes", true)
 	settings.SetBool("use_parole_mode", true)
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 	settings.SetBool("upnp_ignore_nonrouters", true)
@@ -201,8 +200,6 @@ func (s *Service) configure() {
 	settings.SetInt("stop_tracker_timeout", 1)
 	settings.SetInt("auto_scrape_interval", 1200)
 	settings.SetInt("auto_scrape_min_interval", 900)
-	settings.SetBool("ignore_limits_on_local_network", true)
-	settings.SetBool("rate_limit_utp", true)
 	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
 	settings.SetBool("upnp_ignore_nonrouters", true)
 
@@ -239,9 +236,10 @@ func (s *Service) configure() {
 			settings.SetInt("choking_algorithm", int(lt.SettingsPackBittyrantChoker))
 		}
 	}
-	if s.config.DisableUpload {
-		s.Session.AddUploadExtension()
-	}
+	// TODO: Enable when it's working!
+	// if s.config.DisableUpload {
+	// 	s.Session.AddUploadExtension()
+	// }
 
 	if !s.config.DisableUpload && s.config.ShareRatioLimit > 0 {
 		settings.SetInt("share_ratio_limit", s.config.ShareRatioLimit)
@@ -305,8 +303,6 @@ func (s *Service) configure() {
 			config.Get().MemorySize = needSize
 		}
 
-		// lt.SetMemorySize(int64(config.Get().MemorySize))
-
 		// Set Memory storage specific settings
 		settings.SetBool("close_redundant_connections", false)
 		settings.SetInt("share_ratio_limit", 0)
@@ -318,6 +314,7 @@ func (s *Service) configure() {
 		settings.SetInt("active_tracker_limit", -1)
 		settings.SetInt("active_dht_limit", -1)
 		settings.SetInt("active_lsd_limit", -1)
+		// settings.SetInt("read_cache_line_size", 0)
 		// settings.SetInt("unchoke_slots_limit", 0)
 
 		settings.SetInt("max_allowed_in_request_queue", 2000)
@@ -325,11 +322,14 @@ func (s *Service) configure() {
 		settings.SetInt("send_buffer_low_watermark", 100*1024)
 		settings.SetInt("send_buffer_watermark", 1000*1024)
 		settings.SetInt("send_buffer_watermark_factor", 150)
+		settings.SetInt("initial_picker_threshold", 20)
+		settings.SetInt("share_mode_target", 1)
+		settings.SetBool("use_read_cache", false)
 
 		settings.SetBool("strict_end_game_mode", false)
 
-		settings.SetInt("disk_io_write_mode", 2)
-		settings.SetInt("disk_io_read_mode", 2)
+		// settings.SetInt("disk_io_write_mode", 2)
+		// settings.SetInt("disk_io_read_mode", 2)
 		settings.SetInt("cache_size", 0)
 	}
 
@@ -560,6 +560,9 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 	torrent := NewTorrent(s, torrentHandle, torrentHandle.TorrentFile(), uri)
 	if s.config.ConnectionsLimit > 0 {
 		torrentHandle.SetMaxConnections(s.config.ConnectionsLimit)
+	}
+	if s.IsMemoryStorage() {
+		torrent.MemorySize = s.GetMemorySize()
 	}
 
 	s.Torrents[torrent.infoHash] = torrent
@@ -887,8 +890,8 @@ func (s *Service) downloadProgress() {
 					status = t.GetStateString()
 				}
 
-				downloadRate := float64(torrentStatus.GetDownloadRate()) / 1024
-				uploadRate := float64(torrentStatus.GetUploadRate()) / 1024
+				downloadRate := float64(torrentStatus.GetDownloadRate())
+				uploadRate := float64(torrentStatus.GetUploadRate())
 				totalDownloadRate += downloadRate
 				totalUploadRate += uploadRate
 
