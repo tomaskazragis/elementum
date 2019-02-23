@@ -64,7 +64,8 @@ else ifeq ($(TARGET_OS), android)
 	CXX := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang++
 endif
 
-PROJECT = elementumorg
+# PROJECT = elementumorg
+PROJECT = quasarhq
 NAME = elementum
 GO_PKG = github.com/elgatito/elementum
 GO = go
@@ -92,8 +93,8 @@ PLATFORMS = \
 	linux-x64 \
 	linux-x86 \
 	windows-x64 \
-	windows-x86
-	# darwin-x64 \
+	windows-x86 \
+	darwin-x64
 	# darwin-x86 \
 
 .PHONY: $(PLATFORMS)
@@ -139,13 +140,16 @@ vendor_windows:
 	find $(shell go env GOPATH)/pkg/$(GOOS)_$(GOARCH) -name *.dll -exec cp -f {} $(BUILD_PATH) \;
 
 vendor_android:
-	cp $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so $(BUILD_PATH)
-	chmod +rx $(BUILD_PATH)/libc++_shared.so
+	# cp $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so $(BUILD_PATH)
+	# chmod +rx $(BUILD_PATH)/libc++_shared.so
+	cp $(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so $(BUILD_PATH)
+	chmod +rx $(BUILD_PATH)/libgnustl_shared.so
 
 vendor_libs_windows:
 
 vendor_libs_android:
-	$(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
+	# $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
+	$(CROSS_ROOT)/arm-linux-androideabi/lib/libgnustl_shared.so
 
 elementum: $(BUILD_PATH)/$(OUTPUT_NAME)
 
@@ -158,10 +162,10 @@ distclean:
 	rm -rf build
 
 build: force
-	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) make dist TARGET_OS=$(TARGET_OS) TARGET_ARCH=$(TARGET_ARCH) GIT_VERSION=$(GIT_VERSION)
+	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(PROJECT)/$(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) make dist TARGET_OS=$(TARGET_OS) TARGET_ARCH=$(TARGET_ARCH) GIT_VERSION=$(GIT_VERSION)
 
 docker: force
-	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH)
+	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(PROJECT)/$(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH)
 
 strip: force
 	@find $(BUILD_PATH) -type f ! -name "*.exe" -exec $(STRIP) {} \;
