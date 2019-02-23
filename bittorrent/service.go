@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,6 +41,7 @@ import (
 // Service ...
 type Service struct {
 	config *config.Configuration
+	q      *Queue
 	mu     sync.Mutex
 
 	Session      lt.Session
@@ -47,8 +49,8 @@ type Service struct {
 
 	InternalProxy *http.Server
 
-	Players  map[string]*Player
-	Torrents map[string]*Torrent
+	Players      map[string]*Player
+	SpaceChecked map[string]bool
 
 	UserAgent   string
 	PeerID      string
@@ -59,7 +61,6 @@ type Service struct {
 
 	dialogProgressBG *xbmc.DialogProgressBG
 
-	SpaceChecked map[string]bool
 	MarkedToMove string
 
 	alertsBroadcaster *broadcast.Broadcaster
@@ -83,13 +84,13 @@ func NewService() *Service {
 	s := &Service{
 		config: config.Get(),
 
-		SpaceChecked: make(map[string]bool, 0),
-
-		Torrents: map[string]*Torrent{},
-		Players:  map[string]*Player{},
+		SpaceChecked: map[string]bool{},
+		Players:      map[string]*Player{},
 
 		alertsBroadcaster: broadcast.NewBroadcaster(),
 	}
+
+	s.q = NewQueue(s)
 
 	s.configure()
 	go s.startServices()
@@ -202,6 +203,7 @@ func (s *Service) configure() {
 	settings.SetInt("auto_scrape_min_interval", 900)
 	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
 	settings.SetBool("upnp_ignore_nonrouters", true)
+	settings.SetInt("cache_size", -1)
 
 	// For Android external storage / OS-mounted NAS setups
 	if s.config.TunedStorage {
@@ -209,7 +211,6 @@ func (s *Service) configure() {
 		settings.SetBool("coalesce_reads", true)
 		settings.SetBool("coalesce_writes", true)
 		settings.SetInt("max_queued_disk_bytes", 10*1024*1024)
-		settings.SetInt("cache_size", -1)
 	}
 
 	if s.config.ConnectionsLimit > 0 {
@@ -565,7 +566,7 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 		torrent.MemorySize = s.GetMemorySize()
 	}
 
-	s.Torrents[torrent.infoHash] = torrent
+	s.q.Add(torrent)
 
 	// go torrent.SaveMetainfo(s.config.TorrentsPath)
 	go torrent.Watch()
@@ -584,8 +585,9 @@ func (s *Service) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 		database.Get().DeleteBTItem(torrent.InfoHash())
 	}()
 
-	if t, ok := s.Torrents[torrent.infoHash]; ok {
-		delete(s.Torrents, torrent.infoHash)
+	if t := s.q.FindByHash(torrent.InfoHash()); t != nil {
+		s.q.Delete(torrent)
+
 		t.Drop(removeFiles)
 		return true
 	}
@@ -613,11 +615,7 @@ func (s *Service) onStateChanged(stateAlert lt.StateChangedAlert) {
 
 // GetTorrentByHash ...
 func (s *Service) GetTorrentByHash(hash string) *Torrent {
-	if t, ok := s.Torrents[hash]; ok {
-		return t
-	}
-
-	return nil
+	return s.q.FindByHash(hash)
 }
 
 func (s *Service) saveResumeDataLoop() {
@@ -743,7 +741,7 @@ func (s *Service) alertsConsumer() {
 					alertMessage = strings.Join(splitMessage[:len(splitMessage)-1], ":") + splitIP[0] + ".XX.XX.XX"
 				case lt.MetadataReceivedAlertAlertType:
 					metadataAlert := lt.SwigcptrMetadataReceivedAlert(alertPtr)
-					for _, t := range s.Torrents {
+					for _, t := range s.q.All() {
 						if t.th != nil && metadataAlert.GetHandle().Equal(t.th) {
 							t.onMetadataReceived()
 						}
@@ -804,16 +802,28 @@ func (s *Service) loadTorrentFiles() {
 		return
 	}
 
-	pattern := filepath.Join(s.config.TorrentsPath, "*.torrent")
-	files, _ := filepath.Glob(pattern)
+	files, err := ioutil.ReadDir(s.config.TorrentsPath)
+	if err != nil {
+		log.Infof("Cannot read torrents dir: %s", err)
+		return
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().Unix() < files[j].ModTime().Unix()
+	})
 
 	for _, torrentFile := range files {
-		log.Infof("Loading torrent file %s", torrentFile)
+		if !strings.HasSuffix(torrentFile.Name(), ".torrent") {
+			continue
+		}
+
+		filePath := filepath.Join(s.config.TorrentsPath, torrentFile.Name())
+		log.Infof("Loading torrent file %s", torrentFile.Name())
 
 		torrentParams := lt.NewAddTorrentParams()
 		defer lt.DeleteAddTorrentParams(torrentParams)
 
-		t, _ := s.AddTorrent(torrentFile)
+		t, _ := s.AddTorrent(filePath)
 		if t != nil {
 			i := database.Get().GetBTItem(t.InfoHash())
 
@@ -1324,7 +1334,7 @@ func (s *Service) HasTorrentByID(tmdbID int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
 			continue
 		}
@@ -1342,7 +1352,7 @@ func (s *Service) HasTorrentByQuery(query string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
 			continue
 		}
@@ -1360,7 +1370,7 @@ func (s *Service) HasTorrentBySeason(tmdbID int, season int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
 			continue
 		}
@@ -1378,7 +1388,7 @@ func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
 			continue
 		}
@@ -1396,7 +1406,7 @@ func (s *Service) HasTorrentByName(query string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil {
 			continue
 		}
@@ -1414,7 +1424,7 @@ func (s *Service) GetTorrentByFakeID(query string) *Torrent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, t := range s.Torrents {
+	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
 			continue
 		}
@@ -1426,6 +1436,11 @@ func (s *Service) GetTorrentByFakeID(query string) *Torrent {
 	}
 
 	return nil
+}
+
+// GetTorrents return all active torrents
+func (s *Service) GetTorrents() []*Torrent {
+	return s.q.All()
 }
 
 // GetListenIP returns calculated IP for TCP/TCP6

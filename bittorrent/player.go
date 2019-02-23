@@ -79,7 +79,7 @@ type PlayerParams struct {
 	VideoDuration float64
 	URI           string
 	FileIndex     int
-	ResumeIndex   int
+	ResumeHash    string
 	SkipResume    bool
 	ContentType   string
 	KodiID        int
@@ -166,7 +166,7 @@ func (btp *Player) addTorrent() error {
 
 func (btp *Player) resumeTorrent() error {
 	if btp.t == nil || btp.t.th == nil {
-		return fmt.Errorf("Unable to resume torrent with index %d", btp.p.ResumeIndex)
+		return fmt.Errorf("Unable to resume torrent with index %s", btp.p.ResumeHash)
 	}
 
 	go btp.consumeAlerts()
@@ -200,7 +200,7 @@ func (btp *Player) PlayURL() string {
 
 // Buffer ...
 func (btp *Player) Buffer() error {
-	if btp.p.ResumeIndex >= 0 {
+	if btp.p.ResumeHash != "" {
 		if err := btp.resumeTorrent(); err != nil {
 			log.Errorf("Error resuming torrent: %#v", err)
 			return err
@@ -264,15 +264,16 @@ func (btp *Player) waitCheckAvailableSpace() {
 }
 
 func (btp *Player) processMetadata() {
-	if btp.t.IsInitialized {
+	if len(btp.t.BufferPiecesProgress) != 0 {
 		return
 	}
 
-	if btp.p.ResumeIndex < 0 {
-		btp.t.th.AutoManaged(false)
-		btp.t.Pause()
-		defer btp.t.th.AutoManaged(true)
-	}
+	// TODO: Do we need it?
+	// if btp.p.ResumeHash != "" {
+	// 	btp.t.th.AutoManaged(false)
+	// 	btp.t.Pause()
+	// 	defer btp.t.th.AutoManaged(true)
+	// }
 
 	btp.torrentName = btp.t.Name()
 

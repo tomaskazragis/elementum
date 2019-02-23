@@ -83,7 +83,7 @@ func (tfs *TorrentFS) Open(uname string) (http.File, error) {
 
 	log.Infof("Opening %s", name)
 
-	for _, t := range tfs.s.Torrents {
+	for _, t := range tfs.s.q.All() {
 		for _, f := range t.files {
 			log.Debugf("File: %#v, name: %#v", f, name[1:])
 			if name[1:] == f.Path {

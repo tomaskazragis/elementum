@@ -136,14 +136,14 @@ func SetCachedTorrents(tmdbID string, torrents []*bittorrent.TorrentFile) error 
 // ListTorrents ...
 func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		items := make(xbmc.ListItems, 0, len(s.Torrents))
-		if len(s.Torrents) == 0 {
+		items := make(xbmc.ListItems, 0, len(s.GetTorrents()))
+		if len(s.GetTorrents()) == 0 {
 			ctx.JSON(200, xbmc.NewView("", items))
 			return
 		}
 
 		// torrentsLog.Debug("Currently downloading:")
-		for i, torrent := range s.Torrents {
+		for _, torrent := range s.GetTorrents() {
 			if torrent == nil {
 				continue
 			}
@@ -152,13 +152,13 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			progress := torrent.GetProgress()
 			status := torrent.GetStateString()
 
-			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause/%s", i))}
+			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause/%s", torrent.InfoHash()))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause"))}
 
 			if status == "Paused" {
 				sessionAction = []string{"LOCALIZE[30234]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume"))}
 			} else if status != "Finished" {
-				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume/%s", i))}
+				torrentAction = []string{"LOCALIZE[30235]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/resume/%s", torrent.InfoHash()))}
 			}
 
 			color := "white"
@@ -205,7 +205,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			}
 
 			playURL := URLQuery(URLForXBMC("/play"),
-				"resume", i,
+				"resume", torrent.InfoHash(),
 				"type", contentType,
 				"tmdb", tmdb,
 				"show", show,
@@ -222,9 +222,9 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			item.ContextMenu = [][]string{
 				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playURL)},
 				torrentAction,
-				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s", i))},
-				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s?files=1", i))},
-				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/move/%s", i))},
+				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s", torrent.InfoHash()))},
+				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s?files=1", torrent.InfoHash()))},
+				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/move/%s", torrent.InfoHash()))},
 				sessionAction,
 			}
 			item.IsPlayable = true
@@ -516,8 +516,8 @@ func GetTorrentFromParam(s *bittorrent.Service, param string) (*bittorrent.Torre
 		return nil, errors.New("Empty param")
 	}
 
-	t, ok := s.Torrents[param]
-	if !ok {
+	t := s.GetTorrentByHash(param)
+	if t == nil {
 		return nil, errors.New("Torrent not found")
 	}
 	return t, nil

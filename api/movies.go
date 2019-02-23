@@ -396,7 +396,7 @@ func MovieLinks(s *bittorrent.Service) gin.HandlerFunc {
 
 		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
-		doresume := ctx.DefaultQuery("resume", "true")
+		doresume := ctx.DefaultQuery("doresume", "true")
 
 		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {
@@ -512,7 +512,7 @@ func MoviePlay(s *bittorrent.Service) gin.HandlerFunc {
 
 		tmdbID := ctx.Params.ByName("tmdbId")
 		external := ctx.Query("external")
-		doresume := ctx.DefaultQuery("resume", "true")
+		doresume := ctx.DefaultQuery("doresume", "true")
 
 		movie := tmdb.GetMovieByID(tmdbID, config.Get().Language)
 		if movie == nil {

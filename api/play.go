@@ -38,13 +38,6 @@ func Play(s *bittorrent.Service) gin.HandlerFunc {
 			}
 		}
 
-		resumeIndex := -1
-		if resume != "" {
-			if position, err := strconv.Atoi(resume); err == nil && position >= 0 {
-				resumeIndex = position
-			}
-		}
-
 		tmdbID := 0
 		if tmdb != "" {
 			if id, err := strconv.Atoi(tmdb); err == nil && id > 0 {
@@ -76,7 +69,7 @@ func Play(s *bittorrent.Service) gin.HandlerFunc {
 		params := bittorrent.PlayerParams{
 			URI:          uri,
 			FileIndex:    fileIndex,
-			ResumeIndex:  resumeIndex,
+			ResumeHash:   resume,
 			SkipResume:   doresume == "false",
 			KodiPosition: -1,
 			ContentType:  contentType,
@@ -89,7 +82,7 @@ func Play(s *bittorrent.Service) gin.HandlerFunc {
 
 		player := bittorrent.NewPlayer(s, params)
 		log.Debugf("Playing item: %#v", params)
-		if t, ok := s.Torrents[resume]; resume != "" && ok {
+		if t := s.GetTorrentByHash(resume); resume != "" && t != nil {
 			player.SetTorrent(t)
 		}
 		if player.Buffer() != nil || !player.HasChosenFile() {
@@ -145,7 +138,7 @@ func PlayURI(s *bittorrent.Service) gin.HandlerFunc {
 				query       string
 				contentType string
 			)
-			t := s.Torrents[resume]
+			t := s.GetTorrentByHash(resume)
 
 			if t != nil {
 				infoHash := t.InfoHash()

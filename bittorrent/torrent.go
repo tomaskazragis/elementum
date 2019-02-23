@@ -225,6 +225,7 @@ func (t *Torrent) bufferFinishedEvent() {
 	t.muBuffer.Lock()
 	log.Debugf("Buffer finished: %#v, %#v", t.IsBuffering, t.BufferPiecesProgress)
 
+	t.BufferPiecesProgress = map[int]float64{}
 	t.IsBuffering = false
 
 	t.muBuffer.Unlock()
@@ -369,6 +370,9 @@ func (t *Torrent) Buffer(file *File) {
 		piecesPriorities.Add(0)
 	}
 	t.th.PrioritizePieces(piecesPriorities)
+
+	// Resuming in case it was paused by anyone
+	t.Resume()
 }
 
 func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece, endPiece int, offset, size int64) {
@@ -425,7 +429,7 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if t.IsBuffering || t.th == nil || !t.IsInitialized {
+	if t.IsBuffering || t.th == nil || !t.IsInitialized || t.IsSeeding || !t.IsPlaying {
 		return
 	}
 
@@ -501,8 +505,8 @@ func (t *Torrent) PrioritizePieces() {
 
 	if len(piecesStatus) > 1 {
 		piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+		log.Debugf("Priorities: %s", piecesStatus)
 	}
-	log.Debugf("Priorities: %s", piecesStatus)
 
 	numPieces := t.ti.NumPieces()
 
@@ -761,6 +765,7 @@ func (t *Torrent) SaveMetainfo(path string) error {
 		return fmt.Errorf("Directory %s does not exist", path)
 	}
 
+	path = filepath.Join(path, t.InfoHash()+".torrent")
 	bEncodedTorrent := t.GetMetadata()
 	ioutil.WriteFile(path, bEncodedTorrent, 0644)
 
@@ -845,6 +850,7 @@ func (t *Torrent) GetMetadata() []byte {
 func (t *Torrent) MakeFiles() {
 	numFiles := t.ti.NumFiles()
 	files := t.ti.Files()
+	t.files = []*File{}
 
 	for i := 0; i < numFiles; i++ {
 		t.files = append(t.files, &File{
