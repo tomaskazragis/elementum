@@ -351,15 +351,20 @@ func (t *Torrent) Buffer(file *File) {
 
 	// Properly set the pieces priority vector
 	curPiece := 0
+	defaultPriority := 0
+	if !t.Service.IsMemoryStorage() {
+		defaultPriority = 1
+	}
+
 	for _ = 0; curPiece < preBufferStart; curPiece++ {
-		piecesPriorities.Add(0)
+		piecesPriorities.Add(defaultPriority)
 	}
 	for _ = 0; curPiece <= preBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
 		t.th.SetPieceDeadline(curPiece, 0, 0)
 	}
 	for _ = 0; curPiece < postBufferStart; curPiece++ {
-		piecesPriorities.Add(0)
+		piecesPriorities.Add(defaultPriority)
 	}
 	for _ = 0; curPiece <= postBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
@@ -367,7 +372,7 @@ func (t *Torrent) Buffer(file *File) {
 	}
 	numPieces := t.ti.NumPieces()
 	for _ = 0; curPiece < numPieces; curPiece++ {
-		piecesPriorities.Add(0)
+		piecesPriorities.Add(defaultPriority)
 	}
 	t.th.PrioritizePieces(piecesPriorities)
 
