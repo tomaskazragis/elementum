@@ -42,6 +42,8 @@ const (
 	StatusPaused
 	// StatusBuffering ...
 	StatusBuffering
+	// StatusPlaying ...
+	StatusPlaying
 )
 
 // StatusStrings ...
@@ -56,6 +58,7 @@ var StatusStrings = []string{
 	"Stalled",
 	"Paused",
 	"Buffering",
+	"Playing",
 }
 
 const (
@@ -83,12 +86,21 @@ var dhtBootstrapNodes = []string{
 
 // DefaultTrackers ...
 var DefaultTrackers = []string{
+	"http://bt4.t-ru.org/ann?magnet",
+	"http://retracker.mgts.by:80/announce",
+	"http://tracker.city9x.com:2710/announce",
+	"http://tracker.electro-torrent.pl:80/announce",
+	"http://tracker.internetwarriors.net:1337/announce",
+	"http://bt.svao-ix.ru/announce",
+
 	"udp://tracker.opentrackr.org:1337/announce",
 	"udp://tracker.coppersurfer.tk:6969/announce",
 	"udp://tracker.leechers-paradise.org:6969/announce",
 	"udp://tracker.openbittorrent.com:80/announce",
 	"udp://public.popcorn-tracker.org:6969/announce",
 	"udp://explodie.org:6969",
+	"udp://46.148.18.250:2710",
+	"udp://opentor.org:2710",
 }
 
 const (

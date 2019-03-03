@@ -35,6 +35,7 @@ type Torrent struct {
 	torrentFile    string
 	partsFile      string
 
+	name           string
 	infoHash       string
 	readers        map[int64]*TorrentFSEntry
 	reservedPieces []int
@@ -53,13 +54,11 @@ type Torrent struct {
 	BufferEndPieces      []int
 	MemorySize           int64
 
-	IsWithMetadata bool
-	IsInitialized  bool
-	IsPlaying      bool
-	IsPaused       bool
-	IsBuffering    bool
-	IsSeeding      bool
-	IsRarArchive   bool
+	IsPlaying    bool
+	IsPaused     bool
+	IsBuffering  bool
+	IsSeeding    bool
+	IsRarArchive bool
 
 	DBItem *database.BTItem
 
@@ -108,8 +107,6 @@ func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, 
 		muBuffer:  &sync.RWMutex{},
 		muReaders: &sync.Mutex{},
 	}
-
-	log.Debugf("Waiting for information fetched for torrent: %#v", infoHash)
 
 	return t
 }
@@ -212,7 +209,7 @@ func (t *Torrent) bufferTickerEvent() {
 // GetSpeeds returns download and upload speeds
 func (t *Torrent) GetSpeeds() (down, up int) {
 	torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
-	return torrentStatus.GetDownloadRate(), torrentStatus.GetUploadRate()
+	return torrentStatus.GetDownloadPayloadRate(), torrentStatus.GetUploadPayloadRate()
 }
 
 // GetHumanizedSpeeds returns humanize download and upload speeds
@@ -420,7 +417,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 
 // PrioritizePiece ...
 func (t *Torrent) PrioritizePiece(piece int) {
-	if t.IsBuffering || t.th == nil || !t.IsInitialized {
+	if t.IsBuffering || t.th == nil {
 		return
 	}
 
@@ -434,7 +431,7 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if t.IsBuffering || t.th == nil || !t.IsInitialized || t.IsSeeding || !t.IsPlaying {
+	if t.IsBuffering || t.IsSeeding || !t.IsPlaying || t.th == nil {
 		return
 	}
 
@@ -576,11 +573,29 @@ func (t *Torrent) GetStateString() string {
 		if t.IsBuffering {
 			return StatusStrings[StatusBuffering]
 		} else if t.IsPlaying {
-			return StatusStrings[StatusDownloading]
+			return StatusStrings[StatusPlaying]
 		}
 	}
 
-	return StatusStrings[t.GetState()]
+	torrentStatus := t.th.Status()
+	progress := float64(torrentStatus.GetProgress()) * 100
+	state := t.GetState()
+
+	if t.Service.Session.GetHandle().IsPaused() {
+		return StatusStrings[StatusPaused]
+	} else if torrentStatus.GetPaused() && state != StatusFinished && state != StatusFinding {
+		if progress == 100 {
+			return StatusStrings[StatusFinished]
+		}
+
+		return StatusStrings[StatusPaused]
+	} else if !torrentStatus.GetPaused() && (state == StatusFinished || progress == 100) {
+		return StatusStrings[StatusSeeding]
+	} else if state != StatusQueued && t.IsBuffering {
+		return StatusStrings[StatusBuffering]
+	}
+
+	return StatusStrings[state]
 }
 
 // GetBufferProgress ...
@@ -681,16 +696,21 @@ func (t *Torrent) InfoHash() string {
 
 // Name ...
 func (t *Torrent) Name() string {
+	if t.name != "" {
+		return t.name
+	}
+
 	if t.th == nil {
 		return ""
 	}
 
-	return t.ti.Name()
+	t.name = t.ti.Name()
+	return t.name
 }
 
 // Length ...
 func (t *Torrent) Length() int64 {
-	if t.th == nil {
+	if t.th == nil || !t.gotMetainfo.IsSet() {
 		return 0
 	}
 
@@ -718,7 +738,7 @@ func (t *Torrent) Drop(removeFiles bool) {
 		}
 
 		t.Service.Session.GetHandle().RemoveTorrent(t.th, toRemove)
-		if removeFiles {
+		if removeFiles || t.Service.IsMemoryStorage() {
 			// Removing .parts file
 			if _, err := os.Stat(t.partsFile); err == nil {
 				log.Infof("Deleting parts file at %s", t.partsFile)
@@ -913,15 +933,11 @@ func average(xs []int64) float64 {
 }
 
 func (t *Torrent) onMetadataReceived() {
-	log.Info("Metadata received.")
-
-	defer t.gotMetainfo.Set()
+	t.gotMetainfo.Set()
 
 	t.ti = t.th.TorrentFile()
 	t.pieceLength = int64(t.ti.PieceLength())
 	t.MakeFiles()
-
-	t.IsWithMetadata = true
 
 	// Reset fastResumeFile
 	infoHash := t.InfoHash()
@@ -929,4 +945,21 @@ func (t *Torrent) onMetadataReceived() {
 	t.partsFile = filepath.Join(t.Service.config.DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
 
 	go t.SaveMetainfo(t.Service.config.TorrentsPath)
+}
+
+// HasMetadata ...
+func (t *Torrent) HasMetadata() bool {
+	status := t.th.Status(uint(lt.TorrentHandleQueryName))
+	return status.GetHasMetadata()
+}
+
+// GetHandle ...
+func (t *Torrent) GetHandle() lt.TorrentHandle {
+	return t.th
+}
+
+// GetPaused ...
+func (t *Torrent) GetPaused() bool {
+	ts := t.th.Status()
+	return ts.GetPaused()
 }

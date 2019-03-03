@@ -17,17 +17,6 @@ const (
 	playLabel  = "LOCALIZE[30023]"
 	linksLabel = "LOCALIZE[30202]"
 
-	statusQueued      = "Queued"
-	statusDownloading = "Downloading"
-	statusSeeding     = "Seeding"
-	statusFinished    = "Finished"
-	statusPaused      = "Paused"
-	statusFinding     = "Finding"
-	statusBuffering   = "Buffering"
-	statusAllocating  = "Allocating"
-	statusStalled     = "Stalled"
-	statusChecking    = "Checking"
-
 	trueType  = "true"
 	falseType = "false"
 

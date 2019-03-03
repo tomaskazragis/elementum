@@ -22,6 +22,7 @@ import (
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -351,12 +352,13 @@ func (t *TorrentFile) Magnet() {
 
 	params := url.Values{}
 	params.Set("dn", t.Name)
-	if len(t.Trackers) == 0 {
-		for _, tracker := range DefaultTrackers {
+	if len(t.Trackers) != 0 {
+		for _, tracker := range t.Trackers {
 			params.Add("tr", tracker)
 		}
-	} else {
-		for _, tracker := range t.Trackers {
+	}
+	for _, tracker := range DefaultTrackers {
+		if !util.StringSliceContains(t.Trackers, tracker) {
 			params.Add("tr", tracker)
 		}
 	}

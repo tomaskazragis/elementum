@@ -242,13 +242,13 @@ func (s *Service) configure() {
 	// 	s.Session.AddUploadExtension()
 	// }
 
-	if !s.config.DisableUpload && s.config.ShareRatioLimit > 0 {
+	if s.config.ShareRatioLimit > 0 {
 		settings.SetInt("share_ratio_limit", s.config.ShareRatioLimit)
 	}
-	if !s.config.DisableUpload && s.config.SeedTimeRatioLimit > 0 {
+	if s.config.SeedTimeRatioLimit > 0 {
 		settings.SetInt("seed_time_ratio_limit", s.config.SeedTimeRatioLimit)
 	}
-	if !s.config.DisableUpload && s.config.SeedTimeLimit > 0 {
+	if s.config.SeedTimeLimit > 0 {
 		settings.SetInt("seed_time_limit", s.config.SeedTimeLimit)
 	}
 
@@ -271,15 +271,15 @@ func (s *Service) configure() {
 	}
 
 	if s.config.ProxyEnabled && s.config.ProxyHost != "" {
+		log.Info("Applying proxy settings...")
+		proxyType := s.config.ProxyType + 1
+		settings.SetInt("proxy_type", proxyType)
+		settings.SetInt("proxy_port", s.config.ProxyPort)
+		settings.SetStr("proxy_hostname", s.config.ProxyHost)
+		settings.SetStr("proxy_username", s.config.ProxyLogin)
+		settings.SetStr("proxy_password", s.config.ProxyPassword)
+
 		if config.Get().ProxyUseDownload {
-			log.Info("Applying proxy settings...")
-			proxyType := s.config.ProxyType + 1
-			settings.SetInt("proxy_type", proxyType)
-			settings.SetInt("proxy_port", s.config.ProxyPort)
-			settings.SetStr("proxy_hostname", s.config.ProxyHost)
-			settings.SetStr("proxy_username", s.config.ProxyLogin)
-			settings.SetStr("proxy_password", s.config.ProxyPassword)
-			settings.SetBool("proxy_tracker_connections", true)
 			settings.SetBool("proxy_peer_connections", true)
 			settings.SetBool("proxy_hostnames", true)
 			settings.SetBool("force_proxy", true)
@@ -306,9 +306,11 @@ func (s *Service) configure() {
 
 		// Set Memory storage specific settings
 		settings.SetBool("close_redundant_connections", false)
+
 		settings.SetInt("share_ratio_limit", 0)
 		settings.SetInt("seed_time_ratio_limit", 0)
 		settings.SetInt("seed_time_limit", 0)
+
 		settings.SetInt("active_downloads", -1)
 		settings.SetInt("active_seeds", -1)
 		settings.SetInt("active_limit", -1)
@@ -327,6 +329,7 @@ func (s *Service) configure() {
 		settings.SetInt("share_mode_target", 1)
 		settings.SetBool("use_read_cache", false)
 
+		settings.SetInt("tick_interval", 300)
 		settings.SetBool("strict_end_game_mode", false)
 
 		// settings.SetInt("disk_io_write_mode", 2)
@@ -493,7 +496,7 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 	}
 
 	var err error
-	var torrentHandle lt.TorrentHandle
+	var th lt.TorrentHandle
 	var infoHash string
 
 	if strings.HasPrefix(uri, "magnet:") {
@@ -501,7 +504,8 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 
 		if torrent.IsMagnet() {
 			torrent.Magnet()
-			log.Infof("Parsed magnet: %s", torrent.URI)
+
+			log.Infof("Using modified magnet: %s", torrent.URI)
 			if err := torrent.IsValidMagnet(); err == nil {
 				torrentParams.SetUrl(torrent.URI)
 			} else {
@@ -511,6 +515,7 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 			torrent.Resolve()
 		}
 
+		uri = torrent.URI
 		infoHash = torrent.InfoHash
 	} else {
 		if strings.HasPrefix(uri, "http") {
@@ -555,23 +560,44 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 		}
 	}
 
-	torrentHandle = s.Session.GetHandle().AddTorrent(torrentParams)
+	// Setting default priorities to 0 to avoid downloading non-wanted files
+	filesPriorities := lt.NewStdVectorInt()
+	defer lt.DeleteStdVectorInt(filesPriorities)
+	for i := 0; i <= 50; i++ {
+		filesPriorities.Add(0)
+	}
+	torrentParams.SetFilePriorities(filesPriorities)
 
-	log.Debugf("Making new torrent item with url = '%s'", uri)
-	torrent := NewTorrent(s, torrentHandle, torrentHandle.TorrentFile(), uri)
+	// Call torrent creation
+	th = s.Session.GetHandle().AddTorrent(torrentParams)
+
+	log.Infof("Setting sequential download to: %v", !s.IsMemoryStorage())
+	th.SetSequentialDownload(!s.IsMemoryStorage())
+
+	log.Infof("Adding new torrent item with url: %s", uri)
+	t := NewTorrent(s, th, th.TorrentFile(), uri)
+
 	if s.config.ConnectionsLimit > 0 {
-		torrentHandle.SetMaxConnections(s.config.ConnectionsLimit)
+		th.SetMaxConnections(s.config.ConnectionsLimit)
 	}
 	if s.IsMemoryStorage() {
-		torrent.MemorySize = s.GetMemorySize()
+		t.MemorySize = s.GetMemorySize()
 	}
 
-	s.q.Add(torrent)
+	s.q.Add(t)
 
-	// go torrent.SaveMetainfo(s.config.TorrentsPath)
-	go torrent.Watch()
+	if !t.HasMetadata() {
+		log.Infof("Waiting for information fetched for torrent: %s", infoHash)
+		<-t.GotInfo()
+		log.Infof("Information fetched for torrent: %s", infoHash)
+	}
 
-	return torrent, nil
+	// Saving torrent file
+	t.onMetadataReceived()
+
+	go t.Watch()
+
+	return t, nil
 }
 
 // RemoveTorrent ...
@@ -662,23 +688,6 @@ func (s *Service) saveResumeDataConsumer() {
 				return
 			}
 			switch alert.Type {
-			case lt.MetadataReceivedAlertAlertType:
-				metadataAlert := lt.SwigcptrMetadataReceivedAlert(alert.Pointer)
-				torrentHandle := metadataAlert.GetHandle()
-				torrentStatus := torrentHandle.Status(uint(lt.TorrentHandleQueryName))
-				shaHash := torrentStatus.GetInfoHash().ToString()
-				infoHash := hex.EncodeToString([]byte(shaHash))
-				torrentFileName := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-
-				// Save .torrent
-				log.Infof("Saving %s...", torrentFileName)
-				torrentInfo := torrentHandle.TorrentFile()
-				torrentFile := lt.NewCreateTorrent(torrentInfo)
-				defer lt.DeleteCreateTorrent(torrentFile)
-				torrentContent := torrentFile.Generate()
-				bEncodedTorrent := []byte(lt.Bencode(torrentContent))
-				ioutil.WriteFile(torrentFileName, bEncodedTorrent, 0644)
-
 			case lt.StateChangedAlertAlertType:
 				stateAlert := lt.SwigcptrStateChangedAlert(alert.Pointer)
 				s.onStateChanged(stateAlert)
@@ -714,7 +723,10 @@ func (s *Service) alertsConsumer() {
 		default:
 			if s.Session.GetHandle().WaitForAlert(ltOneSecond).Swigcptr() == 0 {
 				continue
+			} else if s.Closer.IsSet() {
+				return
 			}
+
 			var alerts lt.StdVectorAlerts
 			alerts = s.Session.GetHandle().PopAlerts()
 			queueSize := alerts.Size()
@@ -726,6 +738,7 @@ func (s *Service) alertsConsumer() {
 				alertType := ltAlert.Type()
 				alertPtr := ltAlert.Swigcptr()
 				alertMessage := ltAlert.Message()
+
 				switch alertType {
 				case lt.SaveResumeDataAlertAlertType:
 					saveResumeData := lt.SwigcptrSaveResumeDataAlert(alertPtr)
@@ -743,7 +756,7 @@ func (s *Service) alertsConsumer() {
 					metadataAlert := lt.SwigcptrMetadataReceivedAlert(alertPtr)
 					for _, t := range s.q.All() {
 						if t.th != nil && metadataAlert.GetHandle().Equal(t.th) {
-							t.onMetadataReceived()
+							t.gotMetainfo.Set()
 						}
 					}
 				}
@@ -839,8 +852,6 @@ func (s *Service) loadTorrentFiles() {
 					}
 				}
 			}
-
-			t.IsInitialized = true
 		}
 	}
 }
@@ -900,8 +911,8 @@ func (s *Service) downloadProgress() {
 					status = t.GetStateString()
 				}
 
-				downloadRate := float64(torrentStatus.GetDownloadRate())
-				uploadRate := float64(torrentStatus.GetUploadRate())
+				downloadRate := float64(torrentStatus.GetDownloadPayloadRate())
+				uploadRate := float64(torrentStatus.GetUploadPayloadRate())
 				totalDownloadRate += downloadRate
 				totalUploadRate += uploadRate
 

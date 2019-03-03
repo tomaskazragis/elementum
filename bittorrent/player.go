@@ -54,7 +54,6 @@ type Player struct {
 	subtitlesFile            *File
 	fileSize                 int64
 	fileName                 string
-	torrentName              string
 	extracted                string
 	hasChosenFile            bool
 	isDownloading            bool
@@ -70,26 +69,26 @@ type Player struct {
 
 // PlayerParams ...
 type PlayerParams struct {
-	Playing       bool
-	Paused        bool
-	Seeked        bool
-	WasPlaying    bool
-	KodiPosition  int
-	WatchedTime   float64
-	VideoDuration float64
-	URI           string
-	FileIndex     int
-	ResumeHash    string
-	SkipResume    bool
-	ContentType   string
-	KodiID        int
-	TMDBId        int
-	ShowID        int
-	Season        int
-	Episode       int
-	Query         string
-	UIDs          *library.UniqueIDs
-	Resume        *library.Resume
+	Playing        bool
+	Paused         bool
+	Seeked         bool
+	WasPlaying     bool
+	KodiPosition   int
+	WatchedTime    float64
+	VideoDuration  float64
+	URI            string
+	FileIndex      int
+	ResumeHash     string
+	ResumePlayback bool
+	ContentType    string
+	KodiID         int
+	TMDBId         int
+	ShowID         int
+	Season         int
+	Episode        int
+	Query          string
+	UIDs           *library.UniqueIDs
+	Resume         *library.Resume
 }
 
 type candidateFile struct {
@@ -147,19 +146,7 @@ func (btp *Player) addTorrent() error {
 
 	go btp.consumeAlerts()
 
-	log.Info("Enabling sequential download")
-	// btp.t.th.SetSequentialDownload(true)
-	btp.t.th.SetSequentialDownload(!btp.s.IsMemoryStorage())
-
-	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
-	btp.torrentName = status.GetName()
-	log.Infof("Downloading %s", btp.torrentName)
-
-	if status.GetHasMetadata() {
-		log.Debugf("Already having metadata")
-		btp.t.onMetadataReceived()
-		btp.processMetadata()
-	}
+	log.Infof("Downloading %s", btp.t.Name())
 
 	return nil
 }
@@ -171,18 +158,7 @@ func (btp *Player) resumeTorrent() error {
 
 	go btp.consumeAlerts()
 
-	log.Info("Enabling sequential download")
-	// btp.t.th.SetSequentialDownload(true)
-	btp.t.th.SetSequentialDownload(!btp.s.IsMemoryStorage())
-
-	status := btp.t.th.Status(uint(lt.TorrentHandleQueryName))
-	btp.torrentName = status.GetName()
-	log.Infof("Resuming %s", btp.torrentName)
-
-	if status.GetHasMetadata() {
-		btp.t.onMetadataReceived()
-		btp.processMetadata()
-	}
+	log.Infof("Resuming %s", btp.t.Name())
 
 	btp.t.th.AutoManaged(true)
 
@@ -212,10 +188,7 @@ func (btp *Player) Buffer() error {
 		}
 	}
 
-	<-btp.t.GotInfo()
 	btp.processMetadata()
-
-	log.Debugf("Information fetched for torrent: %s", btp.t.Name())
 
 	btp.t.IsBuffering = true
 
@@ -264,23 +237,12 @@ func (btp *Player) waitCheckAvailableSpace() {
 }
 
 func (btp *Player) processMetadata() {
-	if len(btp.t.BufferPiecesProgress) != 0 {
-		return
-	}
-
 	// TODO: Do we need it?
 	// if btp.p.ResumeHash != "" {
 	// 	btp.t.th.AutoManaged(false)
 	// 	btp.t.Pause()
 	// 	defer btp.t.th.AutoManaged(true)
 	// }
-
-	btp.torrentName = btp.t.Name()
-
-	log.Infof("Downloading %s", btp.torrentName)
-
-	// Reset fastResumeFile
-	infoHash := btp.t.InfoHash()
 
 	var err error
 	btp.chosenFile, err = btp.chooseFile()
@@ -305,12 +267,9 @@ func (btp *Player) processMetadata() {
 		files = append(files, btp.subtitlesFile.Path)
 	}
 
+	infoHash := btp.t.InfoHash()
 	database.Get().UpdateBTItem(infoHash, btp.p.TMDBId, btp.p.ContentType, files, btp.p.Query, btp.p.ShowID, btp.p.Season, btp.p.Episode)
 	btp.t.DBItem = database.Get().GetBTItem(infoHash)
-
-	defer func() {
-		btp.t.IsInitialized = true
-	}()
 
 	if btp.t.IsRarArchive {
 		// Just disable sequential download for RAR archives
@@ -369,14 +328,14 @@ func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (str
 
 	seeders := status.GetNumSeeds()
 	line2 := fmt.Sprintf("D:%.0fkB/s U:%.0fkB/s S:%d/%d P:%d/%d",
-		float64(status.GetDownloadRate())/1024,
-		float64(status.GetUploadRate())/1024,
+		float64(status.GetDownloadPayloadRate())/1024,
+		float64(status.GetUploadPayloadRate())/1024,
 		seeders,
 		status.GetNumComplete(),
 		status.GetNumPeers()-seeders,
 		status.GetNumIncomplete(),
 	)
-	line3 := btp.torrentName
+	line3 := btp.t.Name()
 	if btp.fileName != "" && !btp.t.IsRarArchive {
 		line3 = btp.fileName
 	}
@@ -626,7 +585,7 @@ func (btp *Player) bufferDialog() {
 			status := btp.t.GetStatus()
 
 			// Handle "Checking" state for resumed downloads
-			if status.GetState() == 1 || btp.t.IsRarArchive {
+			if status.GetState() == StatusChecking || btp.t.IsRarArchive {
 				progress := btp.t.GetBufferProgress()
 				line1, line2, line3 := btp.statusStrings(progress, status)
 				btp.dialogProgress.Update(int(progress), line1, line2, line3)
@@ -690,7 +649,7 @@ func (btp *Player) bufferDialog() {
 				status := btp.t.GetStatus()
 				line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
 				btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
-				if !btp.t.IsBuffering && btp.t.IsWithMetadata && btp.t.GetState() != StatusChecking {
+				if !btp.t.IsBuffering && btp.t.HasMetadata() && btp.t.GetState() != StatusChecking {
 					btp.bufferEvents.Signal()
 					btp.setRateLimiting(true)
 					return
@@ -933,7 +892,7 @@ func (btp *Player) smartMatch(choices []*candidateFile) {
 	}
 
 	for _, season := range show.Seasons {
-		if season.EpisodeCount == 0 {
+		if season == nil || season.EpisodeCount == 0 {
 			continue
 		}
 		episodes := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language).Episodes
@@ -1016,13 +975,8 @@ func (btp *Player) consumeAlerts() {
 			if !ok { // was the alerts channel closed?
 				return
 			}
+
 			switch alert.Type {
-			// case lt.MetadataReceivedAlertAlertType:
-			// 	metadataAlert := lt.SwigcptrMetadataReceivedAlert(alert.Pointer)
-			// 	if metadataAlert.GetHandle().Equal(btp.t.th) {
-			// 		btp.onMetadataReceived()
-			// 		go btp.s.AttachPlayer(btp)
-			// 	}
 			case lt.StateChangedAlertAlertType:
 				stateAlert := lt.SwigcptrStateChangedAlert(alert.Pointer)
 				if stateAlert.GetHandle().Equal(btp.t.th) {
