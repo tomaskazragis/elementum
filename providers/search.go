@@ -275,8 +275,9 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 
 		if torrent.IsPrivate == false {
 			for _, trackerURL := range bittorrent.DefaultTrackers {
-				tracker, _ := bittorrent.NewTracker(trackerURL)
-				trackers[tracker.URL.Host] = tracker
+				if tracker, err := bittorrent.NewTracker(trackerURL); err == nil && tracker != nil {
+					trackers[tracker.URL.Host] = tracker
+				}
 			}
 		}
 	}
