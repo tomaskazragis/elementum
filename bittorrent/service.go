@@ -177,33 +177,34 @@ func (s *Service) configure() {
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
 	settings.SetStr("user_agent", s.UserAgent)
 
-	settings.SetInt("request_timeout", 2)
-	settings.SetInt("peer_connect_timeout", 2)
-	settings.SetBool("strict_end_game_mode", true)
-	settings.SetBool("announce_to_all_trackers", true)
-	settings.SetBool("announce_to_all_tiers", true)
-	settings.SetInt("download_rate_limit", 0)
-	settings.SetInt("upload_rate_limit", 0)
-	settings.SetInt("choking_algorithm", 0)
-	settings.SetInt("share_ratio_limit", 0)
-	settings.SetInt("seed_time_ratio_limit", 0)
-	settings.SetInt("seed_time_limit", 0)
-	settings.SetInt("peer_tos", ipToSLowCost)
-	settings.SetInt("torrent_connect_boost", 0)
-	settings.SetBool("rate_limit_ip_overhead", true)
-	settings.SetBool("no_atime_storage", true)
 	settings.SetBool("announce_double_nat", true)
-	settings.SetBool("prioritize_partial_pieces", false)
-	settings.SetBool("use_parole_mode", true)
-	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
-	settings.SetBool("upnp_ignore_nonrouters", true)
+	settings.SetBool("announce_to_all_tiers", true)
+	settings.SetBool("announce_to_all_trackers", true)
 	settings.SetBool("lazy_bitfields", true)
-	settings.SetInt("stop_tracker_timeout", 1)
+	settings.SetBool("no_atime_storage", true)
+	settings.SetBool("prioritize_partial_pieces", false)
+	settings.SetBool("rate_limit_ip_overhead", false)
+	settings.SetBool("strict_end_game_mode", true)
+	settings.SetBool("upnp_ignore_nonrouters", true)
+	settings.SetBool("use_parole_mode", true)
+
 	settings.SetInt("auto_scrape_interval", 1200)
 	settings.SetInt("auto_scrape_min_interval", 900)
-	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
-	settings.SetBool("upnp_ignore_nonrouters", true)
 	settings.SetInt("cache_size", -1)
+	settings.SetInt("choking_algorithm", 0)
+	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
+	settings.SetInt("peer_connect_timeout", 2)
+	settings.SetInt("peer_tos", ipToSLowCost)
+	settings.SetInt("request_timeout", 2)
+	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
+	settings.SetInt("seed_time_limit", 0)
+	settings.SetInt("seed_time_ratio_limit", 0)
+	settings.SetInt("share_ratio_limit", 0)
+	settings.SetInt("stop_tracker_timeout", 1)
+	settings.SetInt("torrent_connect_boost", 0)
+
+	settings.SetInt("download_rate_limit", 0)
+	settings.SetInt("upload_rate_limit", 0)
 
 	// For Android external storage / OS-mounted NAS setups
 	if s.config.TunedStorage {
@@ -220,7 +221,7 @@ func (s *Service) configure() {
 	}
 
 	if s.config.ConnTrackerLimitAuto || s.config.ConnTrackerLimit == 0 {
-		settings.SetInt("connection_speed", 500)
+		settings.SetInt("connection_speed", 50)
 	} else {
 		settings.SetInt("connection_speed", s.config.ConnTrackerLimit)
 	}
@@ -242,13 +243,13 @@ func (s *Service) configure() {
 	// 	s.Session.AddUploadExtension()
 	// }
 
-	if s.config.ShareRatioLimit > 0 {
+	if !s.IsMemoryStorage() && s.config.ShareRatioLimit > 0 {
 		settings.SetInt("share_ratio_limit", s.config.ShareRatioLimit)
 	}
-	if s.config.SeedTimeRatioLimit > 0 {
+	if !s.IsMemoryStorage() && s.config.SeedTimeRatioLimit > 0 {
 		settings.SetInt("seed_time_ratio_limit", s.config.SeedTimeRatioLimit)
 	}
-	if s.config.SeedTimeLimit > 0 {
+	if !s.IsMemoryStorage() && s.config.SeedTimeLimit > 0 {
 		settings.SetInt("seed_time_limit", s.config.SeedTimeLimit)
 	}
 
@@ -320,10 +321,13 @@ func (s *Service) configure() {
 		// settings.SetInt("read_cache_line_size", 0)
 		// settings.SetInt("unchoke_slots_limit", 0)
 
+		// settings.SetInt("request_timeout", 10)
+		// settings.SetInt("peer_connect_timeout", 10)
+
 		settings.SetInt("max_allowed_in_request_queue", 2000)
 		settings.SetInt("max_out_request_queue", 2000)
-		settings.SetInt("send_buffer_low_watermark", 100*1024)
-		settings.SetInt("send_buffer_watermark", 1000*1024)
+		settings.SetInt("send_buffer_low_watermark", 10*1024)
+		settings.SetInt("send_buffer_watermark", 500*1024)
 		settings.SetInt("send_buffer_watermark_factor", 150)
 		settings.SetInt("initial_picker_threshold", 20)
 		settings.SetInt("share_mode_target", 1)
@@ -331,6 +335,8 @@ func (s *Service) configure() {
 
 		settings.SetInt("tick_interval", 300)
 		settings.SetBool("strict_end_game_mode", false)
+		settings.SetInt("choking_algorithm", int(lt.SettingsPackFixedSlotsChoker))
+		settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)

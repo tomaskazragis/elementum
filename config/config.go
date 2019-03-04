@@ -579,9 +579,9 @@ func Reload() *Configuration {
 		newConfig.KeepFilesPlaying = 2
 
 		// TODO: Do we need this?
-		newConfig.SeedTimeLimit = 24 * 60 * 60
-		newConfig.SeedTimeRatioLimit = 10000
-		newConfig.ShareRatioLimit = 10000
+		// newConfig.SeedTimeLimit = 24 * 60 * 60
+		// newConfig.SeedTimeRatioLimit = 10000
+		// newConfig.ShareRatioLimit = 10000
 
 		// Calculate possible memory size, depending of selected strategy
 		if newConfig.AutoMemorySize {
