@@ -738,17 +738,24 @@ func (t *Torrent) Drop(removeFiles bool) {
 		}
 
 		t.Service.Session.GetHandle().RemoveTorrent(t.th, toRemove)
-		if removeFiles || t.Service.IsMemoryStorage() {
-			// Removing .parts file
-			if _, err := os.Stat(t.partsFile); err == nil {
-				log.Infof("Deleting parts file at %s", t.partsFile)
-				defer os.Remove(t.partsFile)
-			}
 
+		// Removing .torrent file
+		if _, err := os.Stat(t.torrentFile); err == nil {
+			log.Infof("Deleting torrent file at %s", t.torrentFile)
+			defer os.Remove(t.torrentFile)
+		}
+
+		if removeFiles || t.Service.IsMemoryStorage() {
 			// Removing .fastresume file
 			if _, err := os.Stat(t.fastResumeFile); err == nil {
 				log.Infof("Deleting fast resume data at %s", t.fastResumeFile)
 				defer os.Remove(t.fastResumeFile)
+			}
+
+			// Removing .parts file
+			if _, err := os.Stat(t.partsFile); err == nil {
+				log.Infof("Deleting parts file at %s", t.partsFile)
+				defer os.Remove(t.partsFile)
 			}
 		}
 	}()

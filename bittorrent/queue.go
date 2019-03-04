@@ -57,3 +57,9 @@ func (q *Queue) FindByHash(hash string) *Torrent {
 
 	return nil
 }
+
+// Clean would cleanup torrents list,
+// should be used in case of a service reload
+func (q *Queue) Clean() {
+	q.torrents = []*Torrent{}
+}

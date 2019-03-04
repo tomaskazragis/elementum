@@ -809,6 +809,9 @@ func (s *Service) logAlerts() {
 }
 
 func (s *Service) loadTorrentFiles() {
+	// Cleaning the queue
+	s.q.Clean()
+
 	// Not loading previous torrents on start
 	// Otherwise we can dig out all the memory and halt the device
 	if s.IsMemoryStorage() || !s.config.AutoloadTorrents {
@@ -852,6 +855,31 @@ func (s *Service) loadTorrentFiles() {
 					}
 				}
 			}
+		}
+	}
+
+	s.cleanStaleFiles(s.config.DownloadPath, ".parts")
+	s.cleanStaleFiles(s.config.TorrentsPath, ".fastresume")
+}
+
+func (s *Service) cleanStaleFiles(dir string, ext string) {
+	log.Infof("Cleaning up stale %s files at %s ...", ext, dir)
+
+	staleFiles, _ := filepath.Glob(filepath.Join(dir, "*"+ext))
+	for _, staleFile := range staleFiles {
+		infoHash := strings.Replace(strings.Replace(staleFile, dir, "", 1), ext, "", 1)[1:]
+		if infoHash[0] == '.' {
+			infoHash = strings.Replace(strings.Replace(staleFile, dir, "", 1), ext, "", 1)[2:]
+		}
+
+		if t := s.GetTorrentByHash(infoHash); t != nil {
+			continue
+		}
+
+		if err := os.Remove(staleFile); err != nil {
+			log.Error(err)
+		} else {
+			log.Info("Removed", staleFile)
 		}
 	}
 }
