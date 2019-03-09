@@ -118,7 +118,7 @@ func main() {
 
 		log.Info("Shutting down...")
 		library.CloseLibrary()
-		s.Close()
+		s.Close(true)
 
 		db.Close()
 		cacheDb.Close()

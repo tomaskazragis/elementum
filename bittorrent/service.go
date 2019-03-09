@@ -65,6 +65,7 @@ type Service struct {
 
 	alertsBroadcaster *broadcast.Broadcaster
 	Closer            missinggo.Event
+	isShutdown        bool
 }
 
 type activeTorrent struct {
@@ -113,9 +114,10 @@ func NewService() *Service {
 }
 
 // Close ...
-func (s *Service) Close() {
+func (s *Service) Close(isShutdown bool) {
 	now := time.Now()
 
+	s.isShutdown = isShutdown
 	s.Closer.Set()
 
 	log.Info("Stopping BT Services...")
@@ -412,11 +414,16 @@ func (s *Service) stopServices() {
 	}
 	s.dialogProgressBG = nil
 
-	log.Infof("Cleaning up all DialogBG")
-	xbmc.DialogProgressBGCleanup()
+	// Try to clean dialogs in background to avoid getting deadlock because of already closed Kodi
+	if !s.isShutdown {
+		go func() {
+			log.Infof("Cleaning up all DialogBG")
+			xbmc.DialogProgressBGCleanup()
 
-	log.Infof("Resetting RPC")
-	xbmc.ResetRPC()
+			log.Infof("Resetting RPC")
+			xbmc.ResetRPC()
+		}()
+	}
 
 	log.Info("Stopping LSD...")
 	s.PackSettings.SetBool("enable_lsd", false)
