@@ -129,9 +129,9 @@ $(BUILD_PATH)/$(OUTPUT_NAME): $(BUILD_PATH) force
 		-gcflags '$(GO_GCFLAGS)' \
 		-ldflags '$(GO_LDFLAGS)' \
 		-o '$(BUILD_PATH)/$(OUTPUT_NAME)' \
-		$(PKGDIR) && \
-	set -x && \
-	$(GO) vet -unsafeptr=false .
+		$(PKGDIR)
+	# set -x && \
+	# $(GO) vet -unsafeptr=false .
 	chmod -R 777 $(BUILD_PATH)
 
 vendor_darwin vendor_linux:
