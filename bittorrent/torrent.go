@@ -248,10 +248,16 @@ func (t *Torrent) Buffer(file *File) {
 
 	if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
 		_, free := t.Service.GetMemoryStats()
+		autodetectStart := 10
+		// If this file is only a part of big torrent with big pieces -
+		// we don't need that much to buffer. As it will take a lot of time.
+		if t.pieceLength > 0 && file.Size/t.pieceLength <= 300 {
+			autodetectStart = 6
+		}
 
 		// Let's try to
 		var newBufferSize int64
-		for i := 10; i >= 4; i -= 2 {
+		for i := autodetectStart; i >= 4; i -= 2 {
 			mem := int64(i) * t.pieceLength
 
 			if mem < startBufferSize {
