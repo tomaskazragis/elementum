@@ -131,7 +131,7 @@ $(BUILD_PATH)/$(OUTPUT_NAME): $(BUILD_PATH) force
 		-o '$(BUILD_PATH)/$(OUTPUT_NAME)' \
 		$(PKGDIR) && \
 	set -x && \
-	$(GO) tool vet -unsafeptr=false .
+	$(GO) vet -unsafeptr=false .
 	chmod -R 777 $(BUILD_PATH)
 
 vendor_darwin vendor_linux:
