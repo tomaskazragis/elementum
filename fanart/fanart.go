@@ -147,6 +147,7 @@ func GetMovie(tmdbID int) (movie *Movie) {
 
 		if err := resp.Unmarshal(&movie); err != nil {
 			log.Warningf("Unmarshal error for movie (%d): %#v", tmdbID, err)
+			return
 		}
 
 		cacheStore.Set(key, movie, cacheExpiration)
@@ -175,6 +176,7 @@ func GetShow(tvdbID int) (show *Show) {
 
 		if err := resp.Unmarshal(&show); err != nil {
 			log.Warningf("Unmarshal error for show (%d): %#v", tvdbID, err)
+			return
 		}
 
 		cacheStore.Set(key, show, cacheExpiration)
