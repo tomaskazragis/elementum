@@ -1556,6 +1556,10 @@ func (s *Service) watchConfig() {
 }
 
 func (s *Service) applyCustomSettings() {
+	if !s.config.UseLibtorrentConfig {
+		return
+	}
+
 	settings := s.PackSettings
 
 	for k, v := range s.readCustomSettings() {
