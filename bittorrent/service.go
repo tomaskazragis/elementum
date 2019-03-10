@@ -179,31 +179,36 @@ func (s *Service) configure() {
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
 	settings.SetStr("user_agent", s.UserAgent)
 
-	settings.SetBool("announce_double_nat", true)
 	settings.SetBool("announce_to_all_tiers", true)
-	settings.SetBool("announce_to_all_trackers", true)
+	settings.SetBool("announce_to_all_trackers", false)
+	settings.SetBool("apply_ip_filter_to_trackers", false)
 	settings.SetBool("lazy_bitfields", true)
 	settings.SetBool("no_atime_storage", true)
 	settings.SetBool("prioritize_partial_pieces", false)
 	settings.SetBool("rate_limit_ip_overhead", false)
 	settings.SetBool("strict_end_game_mode", true)
 	settings.SetBool("upnp_ignore_nonrouters", true)
+	settings.SetBool("use_dht_as_fallback", false)
 	settings.SetBool("use_parole_mode", true)
 
+	settings.SetInt("aio_threads", 4)
 	settings.SetInt("auto_scrape_interval", 1200)
 	settings.SetInt("auto_scrape_min_interval", 900)
 	settings.SetInt("cache_size", -1)
-	settings.SetInt("choking_algorithm", 0)
 	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
 	settings.SetInt("peer_connect_timeout", 2)
-	settings.SetInt("peer_tos", ipToSLowCost)
+	// settings.SetInt("peer_tos", ipToSLowCost)
 	settings.SetInt("request_timeout", 2)
-	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 	settings.SetInt("seed_time_limit", 0)
 	settings.SetInt("seed_time_ratio_limit", 0)
 	settings.SetInt("share_ratio_limit", 0)
 	settings.SetInt("stop_tracker_timeout", 1)
-	settings.SetInt("torrent_connect_boost", 0)
+	// settings.SetInt("torrent_connect_boost", 0)
+	settings.SetInt("choking_algorithm", int(lt.SettingsPackFixedSlotsChoker))
+	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
+	settings.SetInt("send_buffer_low_watermark", 10*1024)
+	settings.SetInt("send_buffer_watermark", 500*1024)
+	settings.SetInt("send_buffer_watermark_factor", 50)
 
 	settings.SetInt("download_rate_limit", 0)
 	settings.SetInt("upload_rate_limit", 0)
@@ -223,7 +228,7 @@ func (s *Service) configure() {
 	}
 
 	if s.config.ConnTrackerLimitAuto || s.config.ConnTrackerLimit == 0 {
-		settings.SetInt("connection_speed", 50)
+		settings.SetInt("connection_speed", 20)
 	} else {
 		settings.SetInt("connection_speed", s.config.ConnTrackerLimit)
 	}
@@ -256,6 +261,9 @@ func (s *Service) configure() {
 	}
 
 	log.Info("Applying encryption settings...")
+	settings.SetInt("allowed_enc_level", int(lt.SettingsPackPeRc4))
+	settings.SetBool("prefer_rc4", true)
+
 	if s.config.EncryptionPolicy > 0 {
 		policy := int(lt.SettingsPackPeDisabled)
 		level := int(lt.SettingsPackPeBoth)
@@ -326,19 +334,14 @@ func (s *Service) configure() {
 		// settings.SetInt("request_timeout", 10)
 		// settings.SetInt("peer_connect_timeout", 10)
 
-		settings.SetInt("max_allowed_in_request_queue", 2000)
-		settings.SetInt("max_out_request_queue", 2000)
-		settings.SetInt("send_buffer_low_watermark", 10*1024)
-		settings.SetInt("send_buffer_watermark", 500*1024)
-		settings.SetInt("send_buffer_watermark_factor", 150)
-		settings.SetInt("initial_picker_threshold", 20)
-		settings.SetInt("share_mode_target", 1)
+		// settings.SetInt("max_allowed_in_request_queue", 2000)
+		// settings.SetInt("max_out_request_queue", 2000)
+		// settings.SetInt("initial_picker_threshold", 20)
+		// settings.SetInt("share_mode_target", 1)
 		settings.SetBool("use_read_cache", false)
 
-		settings.SetInt("tick_interval", 300)
-		settings.SetBool("strict_end_game_mode", false)
-		settings.SetInt("choking_algorithm", int(lt.SettingsPackFixedSlotsChoker))
-		settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
+		// settings.SetInt("tick_interval", 300)
+		// settings.SetBool("strict_end_game_mode", false)
 
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)
@@ -375,6 +378,7 @@ func (s *Service) startServices() {
 		}
 	}
 	s.PackSettings.SetStr("listen_interfaces", strings.Join(listenInterfacesStrings, ","))
+	log.Infof("Listening on: %s", strings.Join(listenInterfacesStrings, ","))
 
 	if strings.TrimSpace(s.config.OutgoingInterfaces) != "" {
 		s.PackSettings.SetStr("outgoing_interfaces", strings.Replace(strings.TrimSpace(s.config.OutgoingInterfaces), " ", "", -1))
@@ -1239,6 +1243,10 @@ func (s *Service) RestoreLimits() {
 		s.SetDownloadLimit(0)
 	}
 
+	// if s.config.DisableUpload {
+	// 	s.SetUploadLimit(1)
+	// 	log.Infof("Rate limiting upload to %d byte, due to disabled upload", 1)
+	// } else if s.config.UploadRateLimit > 0 {
 	if s.config.UploadRateLimit > 0 {
 		s.SetUploadLimit(s.config.UploadRateLimit)
 		log.Infof("Rate limiting upload to %s", humanize.Bytes(uint64(s.config.UploadRateLimit)))
