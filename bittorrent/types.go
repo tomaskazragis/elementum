@@ -69,6 +69,12 @@ const (
 )
 
 const (
+	profileDefault = iota
+	profileMinMemory
+	profileHighSpeed
+)
+
+const (
 	ipToSDefault     = iota
 	ipToSLowDelay    = 1 << iota
 	ipToSReliability = 1 << iota

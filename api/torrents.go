@@ -150,6 +150,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			torrentName := t.Name()
 			progress := t.GetProgress()
 			status := t.GetStateString()
+			dt := t.GetAddedTime()
 
 			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause/%s", t.InfoHash()))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause"))}
@@ -213,7 +214,9 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %s", progress, color, status, torrentName),
 				Path:  playURL,
 				Info: &xbmc.ListItemInfo{
-					Title: torrentName,
+					Title:     torrentName,
+					Date:      dt.String(),
+					DateAdded: dt.String(),
 				},
 			}
 			item.ContextMenu = [][]string{
@@ -286,10 +289,8 @@ func ListTorrentsWeb(s *bittorrent.Service) gin.HandlerFunc {
 
 			downloadRate := float64(torrentStatus.GetDownloadPayloadRate()) / 1024
 			uploadRate := float64(torrentStatus.GetUploadPayloadRate()) / 1024
-			seeders := torrentStatus.GetNumSeeds()
-			seedersTotal := torrentStatus.GetNumComplete()
-			peers := torrentStatus.GetNumPeers() - seeders
-			peersTotal := torrentStatus.GetNumIncomplete()
+
+			seeders, seedersTotal, peers, peersTotal := t.GetConnections()
 
 			ti := &TorrentsWeb{
 				ID:            infoHash,

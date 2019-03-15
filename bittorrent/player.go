@@ -160,7 +160,7 @@ func (btp *Player) resumeTorrent() error {
 
 	log.Infof("Resuming %s", btp.t.Name())
 
-	btp.t.th.AutoManaged(true)
+	btp.t.Resume()
 
 	return nil
 }
@@ -326,14 +326,11 @@ func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (str
 		line1 += " - " + humanize.Bytes(uint64(totalSize))
 	}
 
-	seeders := status.GetNumSeeds()
+	seeds, seedsTotal, peers, peersTotal := btp.t.GetConnections()
 	line2 := fmt.Sprintf("D:%.0fkB/s U:%.0fkB/s S:%d/%d P:%d/%d",
 		float64(status.GetDownloadPayloadRate())/1024,
 		float64(status.GetUploadPayloadRate())/1024,
-		seeders,
-		status.GetNumComplete(),
-		status.GetNumPeers()-seeders,
-		status.GetNumIncomplete(),
+		seeds, seedsTotal, peers, peersTotal,
 	)
 	line3 := btp.t.Name()
 	if btp.fileName != "" && !btp.t.IsRarArchive {

@@ -34,6 +34,7 @@ type Torrent struct {
 	fastResumeFile string
 	torrentFile    string
 	partsFile      string
+	addedTime      time.Time
 
 	name           string
 	infoHash       string
@@ -189,8 +190,9 @@ func (t *Torrent) bufferTickerEvent() {
 			piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
 		}
 
+		seeds, seedsTotal, peers, peersTotal := t.GetConnections()
 		downSpeed, upSpeed := t.GetHumanizedSpeeds()
-		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Pi: %s", int(thisProgress), downSpeed, upSpeed, piecesStatus)
+		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus)
 
 		t.muBuffer.Lock()
 		defer t.muBuffer.Unlock()
@@ -206,10 +208,27 @@ func (t *Torrent) bufferTickerEvent() {
 	}
 }
 
+// GetConnections returns connected and overall number of peers
+func (t *Torrent) GetConnections() (int, int, int, int) {
+	ts := t.th.Status(uint(lt.TorrentHandleQueryName))
+
+	seedsTotal := ts.GetNumComplete()
+	if seedsTotal <= 0 {
+		seedsTotal = ts.GetListSeeds()
+	}
+
+	peersTotal := ts.GetNumComplete() + ts.GetNumIncomplete()
+	if peersTotal <= 0 {
+		peersTotal = ts.GetListPeers()
+	}
+
+	return ts.GetNumSeeds(), seedsTotal, ts.GetNumPeers() - ts.GetNumSeeds(), peersTotal
+}
+
 // GetSpeeds returns download and upload speeds
 func (t *Torrent) GetSpeeds() (down, up int) {
-	torrentStatus := t.th.Status(uint(lt.TorrentHandleQueryName))
-	return torrentStatus.GetDownloadPayloadRate(), torrentStatus.GetUploadPayloadRate()
+	ts := t.th.Status(uint(lt.TorrentHandleQueryName))
+	return ts.GetDownloadPayloadRate(), ts.GetUploadPayloadRate()
 }
 
 // GetHumanizedSpeeds returns humanize download and upload speeds
@@ -380,7 +399,14 @@ func (t *Torrent) Buffer(file *File) {
 	t.th.PrioritizePieces(piecesPriorities)
 
 	// Resuming in case it was paused by anyone
-	t.Resume()
+	// t.Pause()
+	// t.Resume()
+
+	// Force reannounce for trackers
+	t.th.ForceReannounce()
+	if !config.Get().DisableDHT {
+		t.th.ForceDhtAnnounce()
+	}
 }
 
 func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece, endPiece int, offset, size int64) {
@@ -444,7 +470,8 @@ func (t *Torrent) PrioritizePieces() {
 	defer perf.ScopeTimer()()
 
 	downSpeed, upSpeed := t.GetHumanizedSpeeds()
-	log.Debugf("Prioritizing pieces: %s / %s", downSpeed, upSpeed)
+	seeds, seedsTotal, peers, peersTotal := t.GetConnections()
+	log.Debugf("Prioritizing pieces: %s / %s, Con: %d/%d + %d/%d", downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal)
 
 	t.muReaders.Lock()
 
@@ -563,6 +590,11 @@ func (t *Torrent) PrioritizePieces() {
 	t.th.PrioritizePieces(piecesPriorities)
 }
 
+// GetAddedTime ...
+func (t *Torrent) GetAddedTime() time.Time {
+	return t.addedTime
+}
+
 // GetStatus ...
 func (t *Torrent) GetStatus() lt.TorrentStatus {
 	return t.th.Status(uint(lt.TorrentHandleQueryName))
@@ -596,7 +628,10 @@ func (t *Torrent) GetStateString() string {
 
 		return StatusStrings[StatusPaused]
 	} else if !torrentStatus.GetPaused() && (state == StatusFinished || progress == 100) {
-		return StatusStrings[StatusSeeding]
+		if t.Service.IsMemoryStorage() {
+			return StatusStrings[StatusQueued]
+		}
+		return StatusStrings[StatusFinished]
 	} else if state != StatusQueued && t.IsBuffering {
 		return StatusStrings[StatusBuffering]
 	}
@@ -770,6 +805,8 @@ func (t *Torrent) Drop(removeFiles bool) {
 // Pause ...
 func (t *Torrent) Pause() {
 	log.Infof("Pausing torrent: %s", t.InfoHash())
+
+	t.th.AutoManaged(false)
 	t.th.Pause()
 
 	t.IsPaused = true
@@ -778,6 +815,8 @@ func (t *Torrent) Pause() {
 // Resume ...
 func (t *Torrent) Resume() {
 	log.Infof("Resuming torrent: %s", t.InfoHash())
+
+	t.th.AutoManaged(true)
 	t.th.Resume()
 
 	t.IsPaused = false
