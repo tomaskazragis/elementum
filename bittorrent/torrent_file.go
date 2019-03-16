@@ -352,14 +352,18 @@ func (t *TorrentFile) Magnet() {
 
 	params := url.Values{}
 	params.Set("dn", t.Name)
-	if len(t.Trackers) != 0 {
-		for _, tracker := range t.Trackers {
-			params.Add("tr", tracker)
+	if config.Get().MagnetTrackers != magnetEnricherClear {
+		if len(t.Trackers) != 0 {
+			for _, tracker := range t.Trackers {
+				params.Add("tr", tracker)
+			}
 		}
 	}
-	for _, tracker := range DefaultTrackers {
-		if !util.StringSliceContains(t.Trackers, tracker) {
-			params.Add("tr", tracker)
+	if config.Get().MagnetTrackers == magnetEnricherAdd {
+		for _, tracker := range DefaultTrackers {
+			if !util.StringSliceContains(t.Trackers, tracker) {
+				params.Add("tr", tracker)
+			}
 		}
 	}
 
