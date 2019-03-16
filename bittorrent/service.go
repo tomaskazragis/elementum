@@ -419,9 +419,11 @@ func (s *Service) configure() {
 	}
 
 	if config.Get().LibtorrentProfile == profileMinMemory {
-
+		log.Info("Setting Libtorrent profile settings to MinimalMemory")
+		lt.MinMemoryUsage(settings)
 	} else if config.Get().LibtorrentProfile == profileHighSpeed {
-
+		log.Info("Setting Libtorrent profile settings to HighSpeed")
+		lt.HighPerformanceSeed(settings)
 	}
 
 	s.PackSettings = settings
