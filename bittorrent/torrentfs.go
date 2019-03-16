@@ -38,8 +38,10 @@ type TorrentFSEntry struct {
 	pieceLength int
 	numPieces   int
 
+	seeked  missinggo.Event
 	removed missinggo.Event
-	dbItem  *database.BTItem
+
+	dbItem *database.BTItem
 
 	id          int64
 	readahead   int64
@@ -296,9 +298,15 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 
 	pieceRefreshTicker := time.Tick(piecesRefreshDuration)
 	removed := tf.removed.C()
+	seeked := tf.seeked.C()
 
 	for tf.t.hasPiece(piece) == false {
 		select {
+		case <-seeked:
+			tf.seeked.Clear()
+
+			log.Warningf("Unable to wait for piece %d as file was seeked", piece)
+			return errors.New("File was seeked")
 		case <-removed:
 			log.Warningf("Unable to wait for piece %d as file was closed", piece)
 			return errors.New("File was closed")

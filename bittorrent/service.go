@@ -47,6 +47,8 @@ type Service struct {
 	Session      lt.Session
 	PackSettings lt.SettingsPack
 
+	mappedPorts map[string]int
+
 	InternalProxy *http.Server
 
 	Players      map[string]*Player
@@ -94,6 +96,10 @@ func NewService() *Service {
 	s.q = NewQueue(s)
 
 	s.configure()
+
+	go s.alertsConsumer()
+	go s.logAlerts()
+
 	go s.startServices()
 
 	go s.watchConfig()
@@ -101,9 +107,6 @@ func NewService() *Service {
 	if !s.IsMemoryStorage() {
 		go s.saveResumeDataLoop()
 	}
-
-	go s.alertsConsumer()
-	go s.logAlerts()
 
 	go tmdb.CheckAPIKey()
 
@@ -159,7 +162,7 @@ func (s *Service) Reconfigure() {
 func (s *Service) configure() {
 	log.Info("Configuring client...")
 
-	if s.config.InternalProxyEnabled {
+	if s.config.InternalProxyEnabled && s.InternalProxy == nil {
 		log.Infof("Starting internal proxy")
 		s.InternalProxy = scrape.StartProxy()
 	}
@@ -171,7 +174,6 @@ func (s *Service) configure() {
 	}
 
 	settings := lt.NewSettingsPack()
-	s.Session = lt.NewSession(settings, int(lt.SessionHandleAddDefaultPlugins))
 
 	log.Info("Applying session settings...")
 
@@ -179,33 +181,64 @@ func (s *Service) configure() {
 	log.Infof("UserAgent: %s, PeerID: %s", s.UserAgent, s.PeerID)
 	settings.SetStr("user_agent", s.UserAgent)
 
+	// Bools
 	settings.SetBool("announce_to_all_tiers", true)
 	settings.SetBool("announce_to_all_trackers", false)
 	settings.SetBool("apply_ip_filter_to_trackers", false)
 	settings.SetBool("lazy_bitfields", true)
 	settings.SetBool("no_atime_storage", true)
+	settings.SetBool("no_connect_privileged_ports", false)
 	settings.SetBool("prioritize_partial_pieces", false)
 	settings.SetBool("rate_limit_ip_overhead", false)
+	settings.SetBool("smooth_connects", false)
 	settings.SetBool("strict_end_game_mode", true)
 	settings.SetBool("upnp_ignore_nonrouters", true)
 	settings.SetBool("use_dht_as_fallback", false)
 	settings.SetBool("use_parole_mode", true)
 
+	// Disabling services, as they are enabled by default in libtorrent
+	settings.SetBool("enable_upnp", false)
+	settings.SetBool("enable_natpmp", false)
+	settings.SetBool("enable_lsd", false)
+	settings.SetBool("enable_dht", false)
+
+	// settings.SetInt("peer_tos", ipToSLowCost)
+	// settings.SetInt("torrent_connect_boost", 20)
+	// settings.SetInt("torrent_connect_boost", 100)
+	settings.SetInt("torrent_connect_boost", 0)
 	settings.SetInt("aio_threads", 4)
-	settings.SetInt("auto_scrape_interval", 1200)
-	settings.SetInt("auto_scrape_min_interval", 900)
 	settings.SetInt("cache_size", -1)
 	settings.SetInt("mixed_mode_algorithm", int(lt.SettingsPackPreferTcp))
-	settings.SetInt("peer_connect_timeout", 2)
-	// settings.SetInt("peer_tos", ipToSLowCost)
-	settings.SetInt("request_timeout", 2)
+
+	// Intervals and Timeouts
+	settings.SetInt("auto_scrape_interval", 1200)
+	settings.SetInt("auto_scrape_min_interval", 900)
+	settings.SetInt("min_announce_interval", 30)
+	settings.SetInt("dht_announce_interval", 60)
+	// settings.SetInt("peer_connect_timeout", 5)
+	// settings.SetInt("request_timeout", 2)
+	settings.SetInt("stop_tracker_timeout", 1)
+
+	// Ratios
 	settings.SetInt("seed_time_limit", 0)
 	settings.SetInt("seed_time_ratio_limit", 0)
 	settings.SetInt("share_ratio_limit", 0)
-	settings.SetInt("stop_tracker_timeout", 1)
-	// settings.SetInt("torrent_connect_boost", 0)
+
+	// Algorithms
 	settings.SetInt("choking_algorithm", int(lt.SettingsPackFixedSlotsChoker))
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
+
+	// Sizes
+	settings.SetInt("max_out_request_queue", 2000)
+	settings.SetInt("max_allowed_in_request_queue", 2000)
+	// settings.SetInt("listen_queue_size", 2000)
+	// settings.SetInt("unchoke_slots_limit", 20)
+	settings.SetInt("max_peerlist_size", 50000)
+	settings.SetInt("dht_upload_rate_limit", 50000)
+	settings.SetInt("max_pex_peers", 200)
+	settings.SetInt("max_suggest_pieces", 50)
+	// settings.SetInt("aio_threads", 8)
+
 	settings.SetInt("send_buffer_low_watermark", 10*1024)
 	settings.SetInt("send_buffer_watermark", 500*1024)
 	settings.SetInt("send_buffer_watermark_factor", 50)
@@ -224,11 +257,11 @@ func (s *Service) configure() {
 	if s.config.ConnectionsLimit > 0 {
 		settings.SetInt("connections_limit", s.config.ConnectionsLimit)
 	} else {
-		setPlatformSpecificSettings(settings)
+		settings.SetInt("connections_limit", getPlatformSpecificConnectionLimit())
 	}
 
 	if s.config.ConnTrackerLimitAuto || s.config.ConnTrackerLimit == 0 {
-		settings.SetInt("connection_speed", 20)
+		settings.SetInt("connection_speed", 100)
 	} else {
 		settings.SetInt("connection_speed", s.config.ConnTrackerLimit)
 	}
@@ -245,6 +278,7 @@ func (s *Service) configure() {
 			settings.SetInt("choking_algorithm", int(lt.SettingsPackBittyrantChoker))
 		}
 	}
+
 	// TODO: Enable when it's working!
 	// if s.config.DisableUpload {
 	// 	s.Session.AddUploadExtension()
@@ -304,7 +338,13 @@ func (s *Service) configure() {
 	settings.SetInt("alert_mask", int(
 		lt.AlertStatusNotification|
 			lt.AlertStorageNotification|
-			lt.AlertErrorNotification))
+			lt.AlertErrorNotification|
+			lt.AlertPerformanceWarning))
+
+	if s.config.UseLibtorrentLogging {
+		settings.SetInt("alert_mask", int(lt.AlertAllCategories))
+		settings.SetInt("alert_queue_size", 2500)
+	}
 
 	log.Infof("DownloadStorage: %s", Storages[s.config.DownloadStorage])
 	if s.IsMemoryStorage() {
@@ -348,17 +388,6 @@ func (s *Service) configure() {
 		settings.SetInt("cache_size", 0)
 	}
 
-	s.PackSettings = settings
-	s.Session.GetHandle().ApplySettings(s.PackSettings)
-
-	if !s.config.LimitAfterBuffering {
-		s.RestoreLimits()
-	}
-
-	s.applyCustomSettings()
-}
-
-func (s *Service) startServices() {
 	var listenPorts []string
 	for p := s.config.ListenPortMin; p <= s.config.ListenPortMax; p++ {
 		listenPorts = append(listenPorts, strconv.Itoa(p))
@@ -370,20 +399,44 @@ func (s *Service) startServices() {
 		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
 	}
 
+	s.mappedPorts = map[string]int{}
 	listenInterfacesStrings := make([]string, 0)
 	for _, listenInterface := range listenInterfaces {
-		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
+		port := listenPorts[rand.Intn(len(listenPorts))]
+		s.mappedPorts[port] = -1
+		listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+port)
 		if len(listenPorts) > 1 {
-			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+listenPorts[rand.Intn(len(listenPorts))])
+			port := listenPorts[rand.Intn(len(listenPorts))]
+			s.mappedPorts[port] = -1
+			listenInterfacesStrings = append(listenInterfacesStrings, listenInterface+":"+port)
 		}
 	}
-	s.PackSettings.SetStr("listen_interfaces", strings.Join(listenInterfacesStrings, ","))
+	settings.SetStr("listen_interfaces", strings.Join(listenInterfacesStrings, ","))
 	log.Infof("Listening on: %s", strings.Join(listenInterfacesStrings, ","))
 
 	if strings.TrimSpace(s.config.OutgoingInterfaces) != "" {
-		s.PackSettings.SetStr("outgoing_interfaces", strings.Replace(strings.TrimSpace(s.config.OutgoingInterfaces), " ", "", -1))
+		settings.SetStr("outgoing_interfaces", strings.Replace(strings.TrimSpace(s.config.OutgoingInterfaces), " ", "", -1))
 	}
 
+	if config.Get().LibtorrentProfile == profileMinMemory {
+
+	} else if config.Get().LibtorrentProfile == profileHighSpeed {
+
+	}
+
+	s.PackSettings = settings
+	s.Session = lt.NewSession(s.PackSettings, int(lt.SessionHandleAddDefaultPlugins))
+
+	// s.Session.GetHandle().ApplySettings(s.PackSettings)
+
+	if !s.config.LimitAfterBuffering {
+		s.RestoreLimits()
+	}
+
+	s.applyCustomSettings()
+}
+
+func (s *Service) startServices() {
 	log.Info("Starting LSD...")
 	s.PackSettings.SetBool("enable_lsd", true)
 
@@ -402,6 +455,12 @@ func (s *Service) startServices() {
 	}
 
 	s.Session.GetHandle().ApplySettings(s.PackSettings)
+
+	for p := range s.mappedPorts {
+		port, _ := strconv.Atoi(p)
+		s.mappedPorts[p] = s.Session.GetHandle().AddPortMapping(lt.SessionHandleTcp, port, port)
+		log.Infof("Adding port mapping %v: %v", port, s.mappedPorts[p])
+	}
 }
 
 func (s *Service) stopServices() {
@@ -445,6 +504,13 @@ func (s *Service) stopServices() {
 		s.PackSettings.SetBool("enable_natpmp", false)
 	}
 
+	for p := range s.mappedPorts {
+		port, _ := strconv.Atoi(p)
+		s.Session.GetHandle().DeletePortMapping(s.mappedPorts[p])
+		log.Infof("Deleting port mapping %v: %v", port, s.mappedPorts[p])
+	}
+	s.mappedPorts = map[string]int{}
+
 	s.Session.GetHandle().ApplySettings(s.PackSettings)
 }
 
@@ -487,7 +553,6 @@ func (s *Service) checkAvailableSpace(t *Torrent) bool {
 		xbmc.Notify("Elementum", "LOCALIZE[30207]", config.AddonIcon())
 
 		log.Infof("Pausing torrent %s", t.th.Status(uint(lt.TorrentHandleQueryName)).GetName())
-		t.th.AutoManaged(false)
 		t.Pause()
 		return false
 	}
@@ -497,6 +562,9 @@ func (s *Service) checkAvailableSpace(t *Torrent) bool {
 
 // AddTorrent ...
 func (s *Service) AddTorrent(uri string) (*Torrent, error) {
+	// To make sure no spaces coming from Web UI
+	uri = strings.TrimSpace(uri)
+
 	log.Infof("Adding torrent from %s", uri)
 
 	if !s.IsMemoryStorage() && s.config.DownloadPath == "." {
@@ -512,11 +580,16 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 		torrentParams.SetMemoryStorage(s.GetMemorySize())
 	}
 
+	torrentParams.SetMaxConnections(getPlatformSpecificConnectionLimit())
+
 	var err error
 	var th lt.TorrentHandle
 	var infoHash string
 
 	if strings.HasPrefix(uri, "magnet:") {
+		// Remove all spaces in magnet
+		uri = strings.Replace(uri, " ", "", -1)
+
 		torrent := NewTorrentFile(uri)
 
 		if torrent.IsMagnet() {
@@ -580,13 +653,14 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 	// Setting default priorities to 0 to avoid downloading non-wanted files
 	filesPriorities := lt.NewStdVectorInt()
 	defer lt.DeleteStdVectorInt(filesPriorities)
-	for i := 0; i <= 50; i++ {
+	for i := 0; i <= 500; i++ {
 		filesPriorities.Add(0)
 	}
 	torrentParams.SetFilePriorities(filesPriorities)
 
 	// Call torrent creation
 	th = s.Session.GetHandle().AddTorrent(torrentParams)
+	th.Resume()
 
 	log.Infof("Setting sequential download to: %v", !s.IsMemoryStorage())
 	th.SetSequentialDownload(!s.IsMemoryStorage())
@@ -594,13 +668,11 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 	log.Infof("Adding new torrent item with url: %s", uri)
 	t := NewTorrent(s, th, th.TorrentFile(), uri)
 
-	if s.config.ConnectionsLimit > 0 {
-		th.SetMaxConnections(s.config.ConnectionsLimit)
-	}
 	if s.IsMemoryStorage() {
 		t.MemorySize = s.GetMemorySize()
 	}
 
+	t.addedTime = time.Now()
 	s.q.Add(t)
 
 	if !t.HasMetadata() {
@@ -811,7 +883,7 @@ func (s *Service) logAlerts() {
 	for alert := range alerts {
 		// Skipping Tracker communication, Save_Resume, UDP errors
 		// No need to spam logs.
-		if alert.Category&int(lt.AlertTrackerNotification) != 0 || alert.Category&int(lt.SaveResumeDataAlertAlertType) != 0 || alert.Category&int(lt.UdpErrorAlertAlertType) != 0 {
+		if alert.Category&int(lt.SaveResumeDataAlertAlertType) != 0 || alert.Category&int(lt.UdpErrorAlertAlertType) != 0 || alert.Category&int(lt.AlertBlockProgressNotification) != 0 {
 			continue
 		} else if alert.Category&int(lt.AlertErrorNotification) != 0 {
 			log.Errorf("%s: %s", alert.What, alert.Message)
@@ -859,7 +931,6 @@ func (s *Service) loadTorrentFiles() {
 		t, _ := s.AddTorrent(filePath)
 		if t != nil {
 			i := database.Get().GetBTItem(t.InfoHash())
-
 			if i != nil {
 				t.DBItem = i
 
@@ -1533,6 +1604,7 @@ func (s *Service) watchConfig() {
 			select {
 			case event := <-w.Event:
 				log.Infof("Watcher notify: %v", event)
+				s.configure()
 				s.applyCustomSettings()
 			case err := <-w.Error:
 				log.Errorf("Watcher error: %s", err)
