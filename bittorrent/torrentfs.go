@@ -9,7 +9,6 @@ import (
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
-	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/perf"
 
 	"github.com/elgatito/elementum/database"
@@ -38,8 +37,8 @@ type TorrentFSEntry struct {
 	pieceLength int
 	numPieces   int
 
-	seeked  missinggo.Event
-	removed missinggo.Event
+	seeked  util.Event
+	removed util.Event
 
 	dbItem *database.BTItem
 
@@ -254,6 +253,9 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 	seekingOffset := offset
 
 	switch whence {
+	case io.SeekStart:
+		tf.seeked.Set()
+		break
 	case io.SeekCurrent:
 		currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
 		if err != nil {

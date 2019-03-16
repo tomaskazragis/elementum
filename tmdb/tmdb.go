@@ -7,7 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/elgatito/elementum/cache"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
@@ -365,7 +364,7 @@ var (
 	}
 	apiKey = apiKeys[rand.Intn(len(apiKeys))]
 	// WarmingUp ...
-	WarmingUp = missinggo.Event{}
+	WarmingUp = util.Event{}
 )
 
 var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)

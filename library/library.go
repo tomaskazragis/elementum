@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/op/go-logging"
 
@@ -96,7 +95,7 @@ const (
 
 var (
 	removedEpisodes = make(chan *removedEpisode)
-	closer          = missinggo.Event{}
+	closer          = util.Event{}
 
 	log = logging.MustGetLogger("library")
 

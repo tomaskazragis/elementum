@@ -15,7 +15,6 @@ import (
 
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/RoaringBitmap/roaring"
-	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 
@@ -69,8 +68,8 @@ type Torrent struct {
 
 	pieceLength int64
 
-	gotMetainfo    missinggo.Event
-	Closer         missinggo.Event
+	gotMetainfo    util.Event
+	Closer         util.Event
 	bufferFinished chan struct{}
 
 	piecesMx          sync.RWMutex

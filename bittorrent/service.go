@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/radovskyb/watcher"
@@ -66,7 +65,7 @@ type Service struct {
 	MarkedToMove string
 
 	alertsBroadcaster *broadcast.Broadcaster
-	Closer            missinggo.Event
+	Closer            util.Event
 	isShutdown        bool
 }
 
@@ -389,13 +388,18 @@ func (s *Service) configure() {
 	}
 
 	var listenPorts []string
+	if s.config.ListenAutoDetectPort {
+		s.config.ListenPortMin = 6891
+		s.config.ListenPortMax = 6899
+	}
+
 	for p := s.config.ListenPortMin; p <= s.config.ListenPortMax; p++ {
 		listenPorts = append(listenPorts, strconv.Itoa(p))
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	listenInterfaces := []string{"0.0.0.0"}
-	if strings.TrimSpace(s.config.ListenInterfaces) != "" {
+	if !s.config.ListenAutoDetectIP && strings.TrimSpace(s.config.ListenInterfaces) != "" {
 		listenInterfaces = strings.Split(strings.Replace(strings.TrimSpace(s.config.ListenInterfaces), " ", "", -1), ",")
 	}
 

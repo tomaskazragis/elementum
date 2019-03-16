@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/op/go-logging"
 	"github.com/zeebo/bencode"
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
+	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
 
@@ -146,7 +146,7 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	progress := 0
 	progressTotal := 1
 	progressUpdate := make(chan string)
-	closed := missinggo.Event{}
+	closed := util.Event{}
 
 	defer func() {
 		log.Debug("Closing progressupdate")
