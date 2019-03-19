@@ -40,6 +40,7 @@ type Torrent struct {
 	readers        map[int64]*TorrentFSEntry
 	reservedPieces []int
 	awaitingPieces *roaring.Bitmap
+	timedPieces    *roaring.Bitmap
 	// bufferReaders map[string]*FileReader
 
 	ChosenFiles []*File
@@ -97,6 +98,7 @@ func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, 
 		readers:        map[int64]*TorrentFSEntry{},
 		reservedPieces: []int{},
 		awaitingPieces: roaring.NewBitmap(),
+		timedPieces:    roaring.NewBitmap(),
 		// readerPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
@@ -456,6 +458,8 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 	t.awaitingPieces.AddInt(piece)
 
+	t.th.ClearPieceDeadlines()
+
 	t.th.PiecePriority(piece, 7)
 	t.th.SetPieceDeadline(piece, 0, 0)
 }
@@ -485,6 +489,7 @@ func (t *Torrent) PrioritizePieces() {
 		return t.readers[readerKeys[i]].lastUsed.Before(t.readers[readerKeys[j]].lastUsed)
 	})
 
+	t.timedPieces.Clear()
 	lastBonus := 0
 	for _, k := range readerKeys {
 		lastBonus++
@@ -493,6 +498,7 @@ func (t *Torrent) PrioritizePieces() {
 		pr := t.readers[k].ReaderPiecesRange()
 		log.Debugf("Reader range: %#v, priority: %d", pr, readerPriority)
 
+		bufferLeft := t.BufferLength
 		for curPiece := pr.Begin; curPiece <= pr.End; curPiece++ {
 			// Basically we set priority to each needed piece with this logic:
 			//   Starting from 7 (that is the max), then each next piece has
@@ -500,6 +506,14 @@ func (t *Torrent) PrioritizePieces() {
 			//   that is because Kodi requests multiple pieces at once, while
 			//   not closing old readers, so we try to first download
 			//   for most recent reader.
+
+			// We should detect first N pieces of each reader,
+			// to make sure we get them with the highest priority.
+			bufferLeft -= t.pieceLength
+			if bufferLeft >= 0 {
+				t.timedPieces.AddInt(curPiece)
+			}
+
 			if t.awaitingPieces.ContainsInt(curPiece) {
 				readerPieces[curPiece] = 7
 			} else {
@@ -575,16 +589,10 @@ func (t *Torrent) PrioritizePieces() {
 	}
 
 	for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
-		if priority, ok := readerPieces[curPiece]; ok {
+		if priority, ok := readerPieces[curPiece]; ok && t.timedPieces.ContainsInt(curPiece) && !t.hasPiece(curPiece) {
 			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
 		}
 	}
-
-	// for curPiece, priority := range readerPieces {
-	// 	// if priority >= 5 {
-	// 	t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
-	// 	// }
-	// }
 
 	t.th.PrioritizePieces(piecesPriorities)
 }
