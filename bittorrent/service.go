@@ -228,8 +228,8 @@ func (s *Service) configure() {
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 
 	// Sizes
-	settings.SetInt("max_out_request_queue", 2000)
-	settings.SetInt("max_allowed_in_request_queue", 2000)
+	settings.SetInt("max_out_request_queue", 3000)
+	settings.SetInt("max_allowed_in_request_queue", 3000)
 	// settings.SetInt("listen_queue_size", 2000)
 	// settings.SetInt("unchoke_slots_limit", 20)
 	settings.SetInt("max_peerlist_size", 50000)
@@ -385,6 +385,10 @@ func (s *Service) configure() {
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)
 		settings.SetInt("cache_size", 0)
+
+		// Adjust timeouts to avoid disconnect due to idling connections
+		settings.SetInt("inactivity_timeout", 60*20)
+		settings.SetInt("peer_timeout", 60*10)
 	}
 
 	var listenPorts []string
