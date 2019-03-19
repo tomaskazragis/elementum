@@ -11,6 +11,7 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sanity-io/litter"
 )
 
 // Play ...
@@ -81,7 +82,7 @@ func Play(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		player := bittorrent.NewPlayer(s, params)
-		log.Debugf("Playing item: %#v", params)
+		log.Debugf("Playing item: %s", litter.Sdump(params))
 		if t := s.GetTorrentByHash(resume); resume != "" && t != nil {
 			player.SetTorrent(t)
 		}

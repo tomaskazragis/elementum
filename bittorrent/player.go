@@ -745,16 +745,16 @@ playbackLoop:
 		}
 		select {
 		case <-oneSecond.C:
+			btp.updateWatchTimes()
+
 			if btp.p.Seeked {
 				btp.p.Seeked = false
-				btp.updateWatchTimes()
 				if btp.scrobble {
 					trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 				}
 			} else if xbmc.PlayerIsPaused() {
 				if playing == true {
 					playing = false
-					btp.updateWatchTimes()
 					if btp.scrobble {
 						trakt.Scrobble("pause", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 					}
@@ -770,7 +770,6 @@ playbackLoop:
 					}
 				}
 			} else {
-				btp.updateWatchTimes()
 				if playing == false {
 					playing = true
 					if btp.scrobble {

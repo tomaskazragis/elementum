@@ -83,9 +83,27 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 	case "Player.OnPlay":
-		time.Sleep(1 * time.Second) // Let player get its WatchedTime and VideoDuration
+		time.Sleep(400 * time.Millisecond) // Let player get its WatchedTime and VideoDuration
 		p := s.GetActivePlayer()
-		if p == nil || p.Params().VideoDuration == 0 {
+		if p == nil {
+			return
+		}
+
+		for i := 0; i <= 6; i++ {
+			if p.Params().VideoDuration != 0 {
+				break
+			}
+
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		if p.Params().VideoDuration == 0 {
+			log.Warningf("Cannot get player's VideoDuration")
+			return
+		}
+
+		// Do not need to seek if it's not starting from the beginning of file
+		if p.Params().WatchedTime > 30 {
 			return
 		}
 

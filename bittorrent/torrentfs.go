@@ -254,7 +254,11 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 
 	switch whence {
 	case io.SeekStart:
-		tf.seeked.Set()
+		// tf.seeked.Set()
+
+		// Clearing deadlines to have clean requests
+		tf.t.th.ClearPieceDeadlines()
+
 		break
 	case io.SeekCurrent:
 		currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
