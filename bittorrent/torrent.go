@@ -947,6 +947,28 @@ func (t *Torrent) MakeFiles() {
 	}
 }
 
+// GetFileByPath ...
+func (t *Torrent) GetFileByPath(q string) *File {
+	for _, f := range t.files {
+		if f.Path == q {
+			return f
+		}
+	}
+
+	return nil
+}
+
+// GetFileByIndex ...
+func (t *Torrent) GetFileByIndex(q int) *File {
+	for _, f := range t.files {
+		if f.Index == q {
+			return f
+		}
+	}
+
+	return nil
+}
+
 func (t *Torrent) updatePieces() error {
 	defer perf.ScopeTimer()()
 

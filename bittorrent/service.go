@@ -945,11 +945,9 @@ func (s *Service) loadTorrentFiles() {
 				t.DBItem = i
 
 				for _, p := range i.Files {
-					for _, f := range t.files {
-						if f.Path == p {
-							t.ChosenFiles = append(t.ChosenFiles, f)
-							t.DownloadFile(f)
-						}
+					if f := t.GetFileByPath(p); f != nil {
+						t.ChosenFiles = append(t.ChosenFiles, f)
+						t.DownloadFile(f)
 					}
 				}
 			}
@@ -1160,7 +1158,8 @@ func (s *Service) downloadProgress() {
 					}
 
 					log.Info("Removing the torrent without deleting files after Completed move ...")
-					s.RemoveTorrent(s.GetTorrentByHash(infoHash), false)
+					t := s.GetTorrentByHash(infoHash)
+					s.RemoveTorrent(t, false)
 
 					// Delete leftover .parts file if any
 					partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
@@ -1191,8 +1190,10 @@ func (s *Service) downloadProgress() {
 					}
 
 					torrentInfo := torrentHandle.TorrentFile()
-					for _, i := range item.Files {
-						filePath := torrentInfo.Files().FilePath(i)
+					for _, fp := range item.Files {
+						f := t.GetFileByPath(fp)
+
+						filePath := torrentInfo.Files().FilePath(f.Index)
 						fileName := filepath.Base(filePath)
 
 						extracted := ""

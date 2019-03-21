@@ -135,6 +135,7 @@ func (btp *Player) addTorrent() error {
 	if btp.t == nil {
 		torrent, err := btp.s.AddTorrent(btp.p.URI)
 		if err != nil {
+			log.Errorf("Error adding torrent to player: %s", err)
 			return err
 		}
 
@@ -975,7 +976,7 @@ func (btp *Player) consumeAlerts() {
 			switch alert.Type {
 			case lt.StateChangedAlertAlertType:
 				stateAlert := lt.SwigcptrStateChangedAlert(alert.Pointer)
-				if stateAlert.GetHandle().Equal(btp.t.th) {
+				if btp.t != nil && btp.t.th != nil && btp.t.th.Swigcptr() != 0 && stateAlert.GetHandle().Equal(btp.t.th) {
 					btp.onStateChanged(stateAlert)
 				}
 			}
