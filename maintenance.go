@@ -127,7 +127,15 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 		if p.Params().Resume.Position > 0 && p.Params().ResumePlayback {
-			xbmc.PlayerSeek(p.Params().Resume.Position)
+			pos := p.Params().Resume.Position
+			if config.Get().PlayResumeBack > 0 {
+				pos -= float64(config.Get().PlayResumeBack)
+				if pos < 0 {
+					pos = 0
+				}
+			}
+
+			xbmc.PlayerSeek(pos)
 		}
 
 	case "Player.OnStop":

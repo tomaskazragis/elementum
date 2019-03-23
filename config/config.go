@@ -145,6 +145,7 @@ type Configuration struct {
 	UpdateDelay     int
 	UpdateAutoScan  bool
 	PlayResume      bool
+	PlayResumeBack  int
 	TMDBApiKey      string
 
 	OSDBUser         string
@@ -534,6 +535,7 @@ func Reload() *Configuration {
 		UpdateDelay:      settings["library_update_delay"].(int),
 		UpdateAutoScan:   settings["library_auto_scan"].(bool),
 		PlayResume:       settings["play_resume"].(bool),
+		PlayResumeBack:   settings["play_resume_back"].(int),
 		TMDBApiKey:       settings["tmdb_api_key"].(string),
 		OSDBUser:         settings["osdb_user"].(string),
 		OSDBPass:         settings["osdb_pass"].(string),

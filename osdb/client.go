@@ -251,7 +251,6 @@ func (c *Client) LogIn(user string, pass string, lang string) (err error) {
 		return
 	}
 
-	log.Debugf("RS: %#v", res)
 	if res.Status != StatusSuccess {
 		return fmt.Errorf("Login: %s", res.Status)
 	}
