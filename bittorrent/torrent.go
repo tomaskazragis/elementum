@@ -260,6 +260,10 @@ func (t *Torrent) Buffer(file *File) {
 		return
 	}
 
+	if t.Service.IsMemoryStorage() && t.MemorySize < t.pieceLength*10 {
+		t.AdjustMemorySize(t.pieceLength * 10)
+	}
+
 	t.startBufferTicker()
 
 	startBufferSize := t.Service.GetBufferSize()
@@ -319,9 +323,7 @@ func (t *Torrent) Buffer(file *File) {
 			}
 
 			if newMemorySize > 0 {
-				t.MemorySize = newMemorySize
-				log.Infof("Adjusting memory size to %s!", humanize.Bytes(uint64(t.MemorySize)))
-				t.ms.SetMemorySize(t.MemorySize)
+				t.AdjustMemorySize(newMemorySize)
 			}
 		}
 
@@ -408,6 +410,17 @@ func (t *Torrent) Buffer(file *File) {
 	if !config.Get().DisableDHT {
 		t.th.ForceDhtAnnounce()
 	}
+}
+
+// AdjustMemorySize ...
+func (t *Torrent) AdjustMemorySize(ms int64) {
+	if t.ms == nil {
+		return
+	}
+
+	t.MemorySize = ms
+	log.Infof("Adjusting memory size to %s!", humanize.Bytes(uint64(t.MemorySize)))
+	t.ms.SetMemorySize(t.MemorySize)
 }
 
 func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece, endPiece int, offset, size int64) {
