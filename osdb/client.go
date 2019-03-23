@@ -98,7 +98,7 @@ func (c *Client) SearchSubtitles(payloads []SearchPayload) (Subtitles, error) {
 		payloads,
 	}
 	if err := c.Call("SearchSubtitles", args, &res); err != nil {
-		log.Error(err)
+		log.Errorf("Could not search subtitles: %s", err)
 		if !strings.Contains(err.Error(), "type mismatch") {
 			return nil, err
 		}
@@ -251,6 +251,7 @@ func (c *Client) LogIn(user string, pass string, lang string) (err error) {
 		return
 	}
 
+	log.Debugf("RS: %#v", res)
 	if res.Status != StatusSuccess {
 		return fmt.Errorf("Login: %s", res.Status)
 	}

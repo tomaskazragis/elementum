@@ -317,6 +317,15 @@ func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (str
 	}
 
 	line1 := fmt.Sprintf("%s (%.2f%%)", statusName, progress)
+
+	// Adding buffer size to progress window
+	if btp.t.IsBuffering {
+		query := int64(len(btp.t.BufferPiecesProgress)) * btp.t.pieceLength
+		done := int64(float64(progress/100) * float64(query))
+
+		line1 = fmt.Sprintf("%s (%.2f%%) | (%s / %s)", statusName, progress, humanize.Bytes(uint64(done)), humanize.Bytes(uint64(query)))
+	}
+
 	if btp.t.ti != nil && btp.t.ti.Swigcptr() != 0 {
 		var totalSize int64
 		if btp.fileSize > 0 && !btp.t.IsRarArchive {

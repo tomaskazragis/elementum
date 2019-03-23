@@ -178,13 +178,16 @@ func SubtitlesIndex(ctx *gin.Context) {
 		return
 	}
 	if err := client.LogIn(config.Get().OSDBUser, config.Get().OSDBPass, config.Get().OSDBLanguage); err != nil {
-		subLog.Error(err)
+		subLog.Errorf("Cound not login: %s", err)
 		ctx.String(200, err.Error())
 		return
 	}
 
 	items := make(xbmc.ListItems, 0)
-	results, _ := client.SearchSubtitles(payloads)
+	results, err := client.SearchSubtitles(payloads)
+	if err != nil {
+		subLog.Errorf("Error searching subtitles: %s", err)
+	}
 
 	// If needed - try to manually sort items
 	if preferredLanguage != "" {
