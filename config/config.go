@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 )
 
 var log = logging.MustGetLogger("config")
+var privacyRegex = regexp.MustCompile(`(?i)(pass|password): "(.+?)"`)
 
 const maxMemorySize = 300 * 1024 * 1024
 
@@ -662,7 +664,11 @@ func Reload() *Configuration {
 	lock.Unlock()
 	go CheckBurst()
 
-	log.Debugf("Using configuration: %s", litter.Sdump(config))
+	// Replacing passwords with asterisks
+	configOutput := litter.Sdump(config)
+	configOutput = privacyRegex.ReplaceAllString(configOutput, `$1: "********"`)
+
+	log.Debugf("Using configuration: %s", configOutput)
 
 	return config
 }
