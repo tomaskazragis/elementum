@@ -359,7 +359,7 @@ func AddTorrent(s *bittorrent.Service) gin.HandlerFunc {
 		}
 		torrentsLog.Infof("Adding torrent from %s", uri)
 
-		_, err := s.AddTorrent(uri)
+		_, err := s.AddTorrent(uri, false)
 		if err != nil {
 			ctx.String(404, err.Error())
 			return

@@ -571,7 +571,7 @@ func (s *Service) checkAvailableSpace(t *Torrent) bool {
 }
 
 // AddTorrent ...
-func (s *Service) AddTorrent(uri string) (*Torrent, error) {
+func (s *Service) AddTorrent(uri string, paused bool) (*Torrent, error) {
 	// To make sure no spaces coming from Web UI
 	uri = strings.TrimSpace(uri)
 
@@ -670,7 +670,9 @@ func (s *Service) AddTorrent(uri string) (*Torrent, error) {
 
 	// Call torrent creation
 	th = s.Session.GetHandle().AddTorrent(torrentParams)
-	th.Resume()
+	if !paused {
+		th.Resume()
+	}
 
 	log.Infof("Setting sequential download to: %v", !s.IsMemoryStorage())
 	th.SetSequentialDownload(!s.IsMemoryStorage())
@@ -938,7 +940,7 @@ func (s *Service) loadTorrentFiles() {
 		torrentParams := lt.NewAddTorrentParams()
 		defer lt.DeleteAddTorrentParams(torrentParams)
 
-		t, _ := s.AddTorrent(filePath)
+		t, _ := s.AddTorrent(filePath, s.config.AutoloadTorrentsPaused)
 		if t != nil {
 			i := database.Get().GetBTItem(t.InfoHash())
 			if i != nil {
