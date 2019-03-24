@@ -78,6 +78,8 @@ func MoviesIndex(ctx *gin.Context) {
 		{Label: "LOCALIZE[30374]", Path: URLForXBMC("/movies/countries"), Thumbnail: config.AddonResource("img", "movies.png")},
 
 		{Label: "LOCALIZE[30361]", Path: URLForXBMC("/movies/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
+
+		{Label: "LOCALIZE[30517]", Path: URLForXBMC("/movies/library"), Thumbnail: config.AddonResource("img", "movies.png")},
 	}
 	for _, item := range items {
 		item.ContextMenu = [][]string{
@@ -135,6 +137,32 @@ func MovieCountries(ctx *gin.Context) {
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_movies_countries", filterListItems(items)))
+}
+
+// MovieLibrary ...
+func MovieLibrary(ctx *gin.Context) {
+	movies, err := xbmc.VideoLibraryGetElementumMovies()
+	if err != nil || movies == nil || movies.Limits == nil || movies.Limits.Total == 0 {
+		return
+	}
+
+	tmdbMovies := tmdb.Movies{}
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+
+	for i := (page - 1) * config.Get().ResultsPerPage; i < movies.Limits.Total && i < page*config.Get().ResultsPerPage; i++ {
+		if movies == nil || movies.Movies == nil || len(movies.Movies) < i {
+			continue
+		}
+
+		if id, err := strconv.Atoi(movies.Movies[i].UniqueIDs.Elementum); err == nil {
+			m := tmdb.GetMovie(id, config.Get().Language)
+			if m != nil {
+				tmdbMovies = append(tmdbMovies, m)
+			}
+		}
+	}
+
+	renderMovies(ctx, tmdbMovies, page, movies.Limits.Total, "")
 }
 
 // TopTraktLists ...

@@ -512,14 +512,15 @@ func RefreshUIDs() error {
 	playcount.Mu.Lock()
 	defer playcount.Mu.Unlock()
 	playcount.Watched = map[uint64]bool{}
-	l.UIDs = map[int]*UniqueIDs{}
+	l.UIDs = map[uint64]*UniqueIDs{}
 	for k, v := range l.WatchedTrakt {
 		playcount.Watched[k] = v
 	}
 
 	for _, m := range l.Movies {
 		m.UIDs.MediaType = MovieType
-		l.UIDs[m.ID] = m.UIDs
+		id := xxhash.Sum64String(fmt.Sprintf("%d_%d", MovieType, m.UIDs.Kodi))
+		l.UIDs[id] = m.UIDs
 
 		if m.UIDs.Playcount > 0 {
 			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.UIDs.TMDB))] = true
@@ -529,7 +530,8 @@ func RefreshUIDs() error {
 	}
 	for _, s := range l.Shows {
 		s.UIDs.MediaType = ShowType
-		l.UIDs[s.ID] = s.UIDs
+		id := xxhash.Sum64String(fmt.Sprintf("%d_%d", ShowType, s.UIDs.Kodi))
+		l.UIDs[id] = s.UIDs
 
 		if s.UIDs.Playcount > 0 {
 			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.UIDs.TMDB))] = true
@@ -539,7 +541,8 @@ func RefreshUIDs() error {
 
 		for _, e := range l.Shows[s.ID].Seasons {
 			e.UIDs.MediaType = SeasonType
-			l.UIDs[e.ID] = e.UIDs
+			id := xxhash.Sum64String(fmt.Sprintf("%d_%d", SeasonType, e.UIDs.Kodi))
+			l.UIDs[id] = e.UIDs
 
 			if e.UIDs.Playcount > 0 {
 				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.UIDs.TMDB, e.Season))] = true
@@ -549,7 +552,8 @@ func RefreshUIDs() error {
 		}
 		for _, e := range l.Shows[s.ID].Episodes {
 			e.UIDs.MediaType = EpisodeType
-			l.UIDs[e.ID] = e.UIDs
+			id := xxhash.Sum64String(fmt.Sprintf("%d_%d", EpisodeType, e.UIDs.Kodi))
+			l.UIDs[id] = e.UIDs
 
 			if e.UIDs.Playcount > 0 {
 				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.UIDs.TMDB, e.Season, e.Episode))] = true

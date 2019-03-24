@@ -60,6 +60,51 @@ func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
 	return
 }
 
+// VideoLibraryGetElementumMovies ...
+func VideoLibraryGetElementumMovies() (movies *VideoLibraryMovies, err error) {
+	list := []interface{}{
+		"imdbnumber",
+		"playcount",
+		"file",
+		"resume",
+	}
+	sorts := map[string]interface{}{
+		"method": "title",
+	}
+
+	if KodiVersion > 16 {
+		list = append(list, "uniqueid", "year")
+	}
+	params := map[string]interface{}{
+		"properties": list,
+		"sort":       sorts,
+	}
+	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
+	if err != nil {
+		log.Errorf("Error getting tvshows: %#v", err)
+		return
+	}
+
+	if movies != nil && movies.Limits != nil && movies.Limits.Total == 0 {
+		return
+	}
+
+	total := 0
+	filteredMovies := &VideoLibraryMovies{
+		Movies: []*VideoLibraryMovieItem{},
+		Limits: &VideoLibraryLimits{},
+	}
+	for _, s := range movies.Movies {
+		if s != nil && s.UniqueIDs.Elementum != "" {
+			filteredMovies.Movies = append(filteredMovies.Movies, s)
+			total++
+		}
+	}
+
+	filteredMovies.Limits.Total = total
+	return filteredMovies, nil
+}
+
 // PlayerGetActive ...
 func PlayerGetActive() int {
 	params := map[string]interface{}{}
@@ -99,6 +144,50 @@ func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
 		log.Errorf("Error getting tvshows: %#v", err)
 	}
 	return
+}
+
+// VideoLibraryGetElementumShows returns shows added by Elementum
+func VideoLibraryGetElementumShows() (shows *VideoLibraryShows, err error) {
+	list := []interface{}{
+		"imdbnumber",
+		"episode",
+		"playcount",
+	}
+	sorts := map[string]interface{}{
+		"method": "tvshowtitle",
+	}
+
+	if KodiVersion > 16 {
+		list = append(list, "uniqueid", "year")
+	}
+	params := map[string]interface{}{
+		"properties": list,
+		"sort":       sorts,
+	}
+	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+	if err != nil {
+		log.Errorf("Error getting tvshows: %#v", err)
+		return
+	}
+
+	if shows != nil && shows.Limits != nil && shows.Limits.Total == 0 {
+		return
+	}
+
+	total := 0
+	filteredShows := &VideoLibraryShows{
+		Shows:  []*VideoLibraryShowItem{},
+		Limits: &VideoLibraryLimits{},
+	}
+	for _, s := range shows.Shows {
+		if s != nil && s.UniqueIDs.Elementum != "" {
+			filteredShows.Shows = append(filteredShows.Shows, s)
+			total++
+		}
+	}
+
+	filteredShows.Limits.Total = total
+	return filteredShows, nil
 }
 
 // VideoLibraryGetSeasons ...

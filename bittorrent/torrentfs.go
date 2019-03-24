@@ -2,6 +2,7 @@ package bittorrent
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -94,7 +95,7 @@ func (tfs *TorrentFS) Open(uname string) (http.File, error) {
 		}
 	}
 
-	return file, err
+	return file, fmt.Errorf("Could not open file: %s", name)
 }
 
 // NewTorrentFSEntry ...

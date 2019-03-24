@@ -112,7 +112,7 @@ var (
 )
 
 var l = &Library{
-	UIDs:   map[int]*UniqueIDs{},
+	UIDs:   map[uint64]*UniqueIDs{},
 	Movies: map[int]*Movie{},
 	Shows:  map[int]*Show{},
 
@@ -725,23 +725,28 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 		return nil, errors.New("Can't resolve movie")
 	}
 
-	movieTitle := movie.OriginalTitle
-	if config.Get().StrmLanguage != config.Get().Language && movie.Title != "" {
-		movieTitle = movie.Title
+	titles := []string{movie.Title, movie.OriginalTitle}
+	path := ""
+	for _, t := range titles {
+		movieStrm := util.ToFileName(fmt.Sprintf("%s (%s)", t, strings.Split(movie.ReleaseDate, "-")[0]))
+		moviePath := filepath.Join(MoviesLibraryPath(), movieStrm)
+
+		if _, err := os.Stat(moviePath); err == nil {
+			path = moviePath
+			break
+		}
 	}
 
-	movieName := fmt.Sprintf("%s (%s)", movieTitle, strings.Split(movie.ReleaseDate, "-")[0])
-	movieStrm := util.ToFileName(movieName)
-	moviePath := filepath.Join(MoviesLibraryPath(), movieStrm)
-
-	if _, err := os.Stat(moviePath); err != nil {
+	if path == "" {
+		log.Warningf("Cannot stat movie strm file")
 		return movie, errors.New("LOCALIZE[30282]")
 	}
-	if err := os.RemoveAll(moviePath); err != nil {
+	if err := os.RemoveAll(path); err != nil {
+		log.Warningf("Cannot remove movie strm file: %s", err)
 		return movie, err
 	}
 
-	log.Warningf("%s removed from library", movieName)
+	log.Warningf("%s removed from library", movie.Title)
 	return movie, nil
 }
 
@@ -761,19 +766,23 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 		return nil, errors.New("Unable to find show to remove")
 	}
 
-	showName := show.OriginalName
-	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
-		showName = show.Name
+	titles := []string{show.Name, show.OriginalName}
+	path := ""
+	for _, t := range titles {
+		showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", t, strings.Split(show.FirstAirDate, "-")[0]))
+		showPath := filepath.Join(ShowsLibraryPath(), showStrm)
+
+		if _, err := os.Stat(showPath); err == nil {
+			path = showPath
+			break
+		}
 	}
 
-	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(ShowsLibraryPath(), showStrm)
-
-	if _, err := os.Stat(showPath); err != nil {
-		log.Warning(err)
+	if path == "" {
+		log.Warningf("Cannot stat show strm file")
 		return show, errors.New("LOCALIZE[30282]")
 	}
-	if err := os.RemoveAll(showPath); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		log.Error(err)
 		return show, err
 	}

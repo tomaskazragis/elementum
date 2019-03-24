@@ -47,6 +47,8 @@ func TVIndex(ctx *gin.Context) {
 		// {Label: "LOCALIZE[30374]", Path: URLForXBMC("/shows/countries"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
 
 		{Label: "LOCALIZE[30361]", Path: URLForXBMC("/shows/trakt/history"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
+
+		{Label: "LOCALIZE[30517]", Path: URLForXBMC("/shows/library"), Thumbnail: config.AddonResource("img", "genre_tv.png")},
 	}
 	for _, item := range items {
 		item.ContextMenu = [][]string{
@@ -108,6 +110,32 @@ func TVCountries(ctx *gin.Context) {
 		})
 	}
 	ctx.JSON(200, xbmc.NewView("menus_tvshows_countries", filterListItems(items)))
+}
+
+// TVLibrary ...
+func TVLibrary(ctx *gin.Context) {
+	shows, err := xbmc.VideoLibraryGetElementumShows()
+	if err != nil || shows == nil || shows.Limits == nil || shows.Limits.Total == 0 {
+		return
+	}
+
+	tmdbShows := tmdb.Shows{}
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+
+	for i := (page - 1) * config.Get().ResultsPerPage; i < shows.Limits.Total && i < page*config.Get().ResultsPerPage; i++ {
+		if shows == nil || shows.Shows == nil || len(shows.Shows) < i {
+			continue
+		}
+
+		if id, err := strconv.Atoi(shows.Shows[i].UniqueIDs.Elementum); err == nil {
+			s := tmdb.GetShow(id, config.Get().Language)
+			if s != nil {
+				tmdbShows = append(tmdbShows, s)
+			}
+		}
+	}
+
+	renderShows(ctx, tmdbShows, page, shows.Limits.Total, "")
 }
 
 // TVTraktLists ...

@@ -80,6 +80,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 		movies.GET("/genres", MovieGenres)
 		movies.GET("/languages", MovieLanguages)
 		movies.GET("/countries", MovieCountries)
+		movies.GET("/library", MovieLibrary)
 
 		trakt := movies.Group("/trakt")
 		{
@@ -146,6 +147,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 		shows.GET("/genres", TVGenres)
 		shows.GET("/languages", TVLanguages)
 		shows.GET("/countries", TVCountries)
+		shows.GET("/library", TVLibrary)
 
 		trakt := shows.Group("/trakt")
 		{

@@ -11,7 +11,7 @@ type Library struct {
 	mu lMutex
 
 	// Stores all the unique IDs collected
-	UIDs map[int]*UniqueIDs
+	UIDs map[uint64]*UniqueIDs
 
 	// Stores Library Movies
 	Movies map[int]*Movie
