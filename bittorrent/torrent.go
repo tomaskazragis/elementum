@@ -386,14 +386,18 @@ func (t *Torrent) Buffer(file *File) {
 	}
 	for _ = 0; curPiece <= preBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
-		t.th.SetPieceDeadline(curPiece, 0, 0)
+		if config.Get().UseLibtorrentDeadlines {
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
 	}
 	for _ = 0; curPiece < postBufferStart; curPiece++ {
 		piecesPriorities.Add(defaultPriority)
 	}
 	for _ = 0; curPiece <= postBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
-		t.th.SetPieceDeadline(curPiece, 0, 0)
+		if config.Get().UseLibtorrentDeadlines {
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
 	}
 	numPieces := t.ti.NumPieces()
 	for _ = 0; curPiece < numPieces; curPiece++ {
@@ -471,10 +475,14 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 	t.awaitingPieces.AddInt(piece)
 
-	t.th.ClearPieceDeadlines()
-
+	if config.Get().UseLibtorrentDeadlines {
+		t.th.ClearPieceDeadlines()
+	}
 	t.th.PiecePriority(piece, 7)
-	t.th.SetPieceDeadline(piece, 0, 0)
+
+	if config.Get().UseLibtorrentDeadlines {
+		t.th.SetPieceDeadline(piece, 0, 0)
+	}
 }
 
 // PrioritizePieces ...
@@ -601,9 +609,11 @@ func (t *Torrent) PrioritizePieces() {
 		}
 	}
 
-	for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
-		if priority, ok := readerPieces[curPiece]; ok && t.timedPieces.ContainsInt(curPiece) && !t.hasPiece(curPiece) {
-			t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+	if config.Get().UseLibtorrentDeadlines {
+		for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
+			if priority, ok := readerPieces[curPiece]; ok && !t.hasPiece(curPiece) {
+				t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+			}
 		}
 	}
 

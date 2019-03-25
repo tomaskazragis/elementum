@@ -104,6 +104,7 @@ type Configuration struct {
 	TunedStorage              bool
 	UseLibtorrentConfig       bool
 	UseLibtorrentLogging      bool
+	UseLibtorrentDeadlines    bool
 	LibtorrentProfile         int
 	MagnetTrackers            int
 	Scrobble                  bool
@@ -490,6 +491,7 @@ func Reload() *Configuration {
 		TunedStorage:              settings["tuned_storage"].(bool),
 		UseLibtorrentConfig:       settings["use_libtorrent_config"].(bool),
 		UseLibtorrentLogging:      settings["use_libtorrent_logging"].(bool),
+		UseLibtorrentDeadlines:    settings["use_libtorrent_deadlines"].(bool),
 		LibtorrentProfile:         settings["libtorrent_profile"].(int),
 		MagnetTrackers:            settings["magnet_trackers"].(int),
 		ConnectionsLimit:          settings["connections_limit"].(int),

@@ -309,13 +309,7 @@ func (btp *Player) processMetadata() {
 }
 
 func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
-	statusName := StatusStrings[int(status.GetState())]
-	if btp.t.IsBuffering {
-		statusName = StatusStrings[StatusBuffering]
-	} else if btp.s.IsMemoryStorage() {
-		statusName = StatusStrings[StatusDownloading]
-	}
-
+	statusName := btp.t.GetStateString()
 	line1 := fmt.Sprintf("%s (%.2f%%)", statusName, progress)
 
 	// Adding buffer size to progress window
