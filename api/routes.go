@@ -306,5 +306,14 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 		}
 	}
 
+	menu := r.Group("/menu")
+	{
+		menu.GET("/:type/add", MenuAdd)
+		menu.GET("/:type/remove", MenuRemove)
+	}
+
+	MovieMenu.Load()
+	TVMenu.Load()
+
 	return r
 }

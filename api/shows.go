@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -53,6 +54,20 @@ func TVIndex(ctx *gin.Context) {
 	for _, item := range items {
 		item.ContextMenu = [][]string{
 			[]string{"LOCALIZE[30143]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_tvshows"))},
+		}
+	}
+
+	// Adding items from custom menu
+	if TVMenu.AddItems != nil && len(TVMenu.AddItems) > 0 {
+		index := 1
+		for _, i := range TVMenu.AddItems {
+			item := &xbmc.ListItem{Label: i.Name, Path: i.Link, Thumbnail: config.AddonResource("img", "genre_tv.png")}
+			item.ContextMenu = [][]string{
+				[]string{"LOCALIZE[30521]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/tv/remove"), "name", i.Name, "link", i.Link))},
+			}
+
+			items = append(items[:index], append([]*xbmc.ListItem{item}, items[index:]...)...)
+			index++
 		}
 	}
 
@@ -142,13 +157,26 @@ func TVLibrary(ctx *gin.Context) {
 func TVTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
 
-	for _, list := range trakt.Userlists() {
+	lists := trakt.Userlists()
+	lists = append(lists, trakt.Likedlists()...)
+
+	sort.Slice(lists, func(i int, j int) bool {
+		return lists[i].Name < lists[j].Name
+	})
+
+	for _, list := range lists {
+		link := URLForXBMC("/shows/trakt/lists/%s/%d", list.User.Ids.Slug, list.IDs.Trakt)
+		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/shows/add"), "name", list.Name, "link", link))}
+		if MovieMenu.Contains(addAction, &MenuItem{Name: list.Name, Link: link}) {
+			menuItem = []string{"LOCALIZE[30521]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/shows/remove"), "name", list.Name, "link", link))}
+		}
+
 		item := &xbmc.ListItem{
 			Label:     list.Name,
-			Path:      URLForXBMC("/shows/trakt/lists/id/%d", list.IDs.Trakt),
+			Path:      link,
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/list/add/%d", list.IDs.Trakt))},
+				menuItem,
 			},
 		}
 		items = append(items, item)

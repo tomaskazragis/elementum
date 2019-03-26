@@ -53,7 +53,6 @@ var genreSlugs = map[int]string{
 func MoviesIndex(ctx *gin.Context) {
 	items := xbmc.ListItems{
 		{Label: "LOCALIZE[30209]", Path: URLForXBMC("/movies/search"), Thumbnail: config.AddonResource("img", "search.png")},
-
 		{Label: "LOCALIZE[30263]", Path: URLForXBMC("/movies/trakt/lists/"), Thumbnail: config.AddonResource("img", "trakt.png"), TraktAuth: true},
 		{Label: "LOCALIZE[30254]", Path: URLForXBMC("/movies/trakt/watchlist"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/watchlist"))}}, TraktAuth: true},
 		{Label: "LOCALIZE[30257]", Path: URLForXBMC("/movies/trakt/collection"), Thumbnail: config.AddonResource("img", "trakt.png"), ContextMenu: [][]string{[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/collection"))}}, TraktAuth: true},
@@ -86,6 +85,21 @@ func MoviesIndex(ctx *gin.Context) {
 			[]string{"LOCALIZE[30142]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/menus_movies"))},
 		}
 	}
+
+	// Adding items from custom menu
+	if MovieMenu.AddItems != nil && len(MovieMenu.AddItems) > 0 {
+		index := 1
+		for _, i := range MovieMenu.AddItems {
+			item := &xbmc.ListItem{Label: i.Name, Path: i.Link, Thumbnail: config.AddonResource("img", "movies.png")}
+			item.ContextMenu = [][]string{
+				[]string{"LOCALIZE[30521]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/remove"), "name", i.Name, "link", i.Link))},
+			}
+
+			items = append(items[:index], append([]*xbmc.ListItem{item}, items[index:]...)...)
+			index++
+		}
+	}
+
 	ctx.JSON(200, xbmc.NewView("menus_movies", filterListItems(items)))
 }
 
@@ -173,12 +187,18 @@ func TopTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
 	lists, hasNextPage := trakt.TopLists(pageParam)
 	for _, list := range lists {
+		link := URLForXBMC("/movies/trakt/lists/%s/%d", list.List.User.Ids.Slug, list.List.IDs.Trakt)
+		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/add"), "name", list.List.Name, "link", link))}
+		if MovieMenu.Contains(addAction, &MenuItem{Name: list.List.Name, Link: link}) {
+			menuItem = []string{"LOCALIZE[30521]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/remove"), "name", list.List.Name, "link", link))}
+		}
+
 		item := &xbmc.ListItem{
 			Label:     list.List.Name,
-			Path:      URLForXBMC("/movies/trakt/lists/%s/%d", list.List.User.Username, list.List.IDs.Trakt),
+			Path:      link,
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/%d", list.List.IDs.Trakt))},
+				menuItem,
 			},
 		}
 		items = append(items, item)
@@ -199,13 +219,26 @@ func TopTraktLists(ctx *gin.Context) {
 // MoviesTraktLists ...
 func MoviesTraktLists(ctx *gin.Context) {
 	items := xbmc.ListItems{}
-	for _, list := range trakt.Userlists() {
+	lists := trakt.Userlists()
+	lists = append(lists, trakt.Likedlists()...)
+
+	sort.Slice(lists, func(i int, j int) bool {
+		return lists[i].Name < lists[j].Name
+	})
+
+	for _, list := range lists {
+		link := URLForXBMC("/movies/trakt/lists/%s/%d", list.User.Ids.Slug, list.IDs.Trakt)
+		menuItem := []string{"LOCALIZE[30520]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/add"), "name", list.Name, "link", link))}
+		if MovieMenu.Contains(addAction, &MenuItem{Name: list.Name, Link: link}) {
+			menuItem = []string{"LOCALIZE[30521]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLQuery(URLForXBMC("/menu/movie/remove"), "name", list.Name, "link", link))}
+		}
+
 		item := &xbmc.ListItem{
 			Label:     list.Name,
-			Path:      URLForXBMC("/movies/trakt/lists/id/%d", list.IDs.Trakt),
+			Path:      link,
 			Thumbnail: config.AddonResource("img", "trakt.png"),
 			ContextMenu: [][]string{
-				[]string{"LOCALIZE[30252]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/list/add/%d", list.IDs.Trakt))},
+				menuItem,
 			},
 		}
 		items = append(items, item)

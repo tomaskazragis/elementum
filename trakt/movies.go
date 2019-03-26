@@ -389,6 +389,53 @@ func Userlists() (lists []*List) {
 	return lists
 }
 
+// Likedlists ...
+func Likedlists() (lists []*List) {
+	traktUsername := config.Get().TraktUsername
+	if traktUsername == "" {
+		xbmc.Notify("Elementum", "LOCALIZE[30149]", config.AddonIcon())
+		return lists
+	}
+	endPoint := "users/likes"
+	params := napping.Params{}.AsUrlValues()
+
+	var resp *napping.Response
+	var err error
+
+	if config.Get().TraktToken == "" {
+		resp, err = Get(endPoint, params)
+	} else {
+		resp, err = GetWithAuth(endPoint, params)
+	}
+
+	if err != nil {
+		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+		log.Error(err)
+		return lists
+	}
+	if resp.Status() != 200 {
+		errMsg := fmt.Sprintf("Bad status getting liked lists for %s: %d", traktUsername, resp.Status())
+		xbmc.Notify("Elementum", errMsg, config.AddonIcon())
+		log.Warningf(errMsg)
+		return lists
+	}
+
+	inputLists := []*ListContainer{}
+	if err := resp.Unmarshal(&inputLists); err != nil {
+		log.Warning(err)
+	}
+
+	for _, l := range inputLists {
+		lists = append(lists, l.List)
+	}
+
+	sort.Slice(lists, func(i int, j int) bool {
+		return lists[i].Name < lists[j].Name
+	})
+
+	return lists
+}
+
 // TopLists ...
 func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 	pageInt, _ := strconv.Atoi(page)

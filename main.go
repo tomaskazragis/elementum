@@ -203,7 +203,7 @@ func main() {
 		xbmc.DialogProgressBGCleanup()
 		xbmc.ResetRPC()
 	}()
-
+	
 	go library.Init()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()

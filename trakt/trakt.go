@@ -314,9 +314,11 @@ type TokenRefresh struct {
 
 // ListContainer ...
 type ListContainer struct {
-	LikeCount    int   `json:"like_count"`
-	CommentCount int   `json:"comment_count"`
-	List         *List `json:"list"`
+	LikeCount    int       `json:"like_count"`
+	CommentCount int       `json:"comment_count"`
+	LikedAt      time.Time `json:"liked_at"`
+	Type         string    `json:"type"`
+	List         *List     `json:"list"`
 }
 
 // List ...
