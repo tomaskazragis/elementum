@@ -12,6 +12,7 @@ import (
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/anacrolix/missinggo/perf"
 
+	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -257,8 +258,10 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekStart:
 		// tf.seeked.Set()
 
-		// Clearing deadlines to have clean requests
-		tf.t.th.ClearPieceDeadlines()
+		if config.Get().UseLibtorrentDeadlines {
+			// Clearing deadlines to have clean requests
+			tf.t.th.ClearPieceDeadlines()
+		}
 
 		break
 	case io.SeekCurrent:
@@ -348,7 +351,7 @@ func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
 	if tf.f.Size > 0 && ra > tf.f.Size-pos {
 		ra = tf.f.Size - pos
 	}
-	log.Infof("Range: id=%d, pos=%d, ra=%d, orig=%d, size=%d", tf.id, pos, ra, tf.readahead, tf.f.Size)
+	// log.Infof("Range: id=%d, pos=%d, ra=%d, orig=%d, size=%d", tf.id, pos, ra, tf.readahead, tf.f.Size)
 
 	return tf.byteRegionPieces(tf.torrentOffset(pos), ra)
 }

@@ -584,6 +584,7 @@ func (btp *Player) bufferDialog() {
 			}
 		case <-oneSecond.C:
 			status := btp.t.GetStatus()
+			defer lt.DeleteTorrentStatus(status)
 
 			// Handle "Checking" state for resumed downloads
 			if status.GetState() == StatusChecking || btp.t.IsRarArchive {
@@ -648,6 +649,8 @@ func (btp *Player) bufferDialog() {
 				}
 			} else {
 				status := btp.t.GetStatus()
+				defer lt.DeleteTorrentStatus(status)
+
 				line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
 				btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
 				if !btp.t.IsBuffering && btp.t.HasMetadata() && btp.t.GetState() != StatusChecking {
@@ -765,6 +768,8 @@ playbackLoop:
 				}
 				if btp.overlayStatusEnabled == true {
 					status := btp.t.GetStatus()
+					defer lt.DeleteTorrentStatus(status)
+
 					progress := btp.t.GetProgress()
 					line1, line2, line3 := btp.statusStrings(progress, status)
 					btp.overlayStatus.Update(int(progress), line1, line2, line3)

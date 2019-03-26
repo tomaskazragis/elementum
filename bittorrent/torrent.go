@@ -83,7 +83,10 @@ type Torrent struct {
 
 // NewTorrent ...
 func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, path string) *Torrent {
-	shaHash := handle.Status().GetInfoHash().ToString()
+	ts := handle.Status()
+	defer lt.DeleteTorrentStatus(ts)
+
+	shaHash := ts.GetInfoHash().ToString()
 	infoHash := hex.EncodeToString([]byte(shaHash))
 
 	t := &Torrent{
@@ -212,6 +215,7 @@ func (t *Torrent) bufferTickerEvent() {
 // GetConnections returns connected and overall number of peers
 func (t *Torrent) GetConnections() (int, int, int, int) {
 	ts := t.th.Status(uint(lt.TorrentHandleQueryName))
+	defer lt.DeleteTorrentStatus(ts)
 
 	seedsTotal := ts.GetNumComplete()
 	if seedsTotal <= 0 {
@@ -229,6 +233,8 @@ func (t *Torrent) GetConnections() (int, int, int, int) {
 // GetSpeeds returns download and upload speeds
 func (t *Torrent) GetSpeeds() (down, up int) {
 	ts := t.th.Status(uint(lt.TorrentHandleQueryName))
+	defer lt.DeleteTorrentStatus(ts)
+
 	return ts.GetDownloadPayloadRate(), ts.GetUploadPayloadRate()
 }
 
@@ -542,6 +548,12 @@ func (t *Torrent) PrioritizePieces() {
 			} else {
 				readerPieces[curPiece] = util.Max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
 			}
+
+			// Non-first reader should have lower priorities
+			if readerPieces[curPiece] > 0 && readerPriority != 0 {
+				readerPieces[curPiece] = util.Max(1, 4-readerPriority-int((curPiece-pr.Begin+2)/3))
+			}
+
 			readerProgress[curPiece] = 0
 		}
 	}
@@ -648,6 +660,8 @@ func (t *Torrent) GetStateString() string {
 	}
 
 	torrentStatus := t.th.Status()
+	defer lt.DeleteTorrentStatus(torrentStatus)
+
 	progress := float64(torrentStatus.GetProgress()) * 100
 	state := t.GetState()
 
@@ -740,7 +754,10 @@ func (t *Torrent) GetProgress() float64 {
 		}
 	}
 
-	return float64(t.th.Status().GetProgress()) * 100
+	ts := t.th.Status()
+	defer lt.DeleteTorrentStatus(ts)
+
+	return float64(ts.GetProgress()) * 100
 }
 
 // DownloadFile ...
@@ -763,7 +780,10 @@ func (t *Torrent) InfoHash() string {
 		return ""
 	}
 
-	shaHash := t.th.Status().GetInfoHash().ToString()
+	ts := t.th.Status()
+	defer lt.DeleteTorrentStatus(ts)
+
+	shaHash := ts.GetInfoHash().ToString()
 	return hex.EncodeToString([]byte(shaHash))
 }
 
@@ -902,7 +922,7 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 		return 0
 	}
 
-	log.Debugf("Size from lt: %d, set: %d, res: %d, pl: %d, pl2: %d", size, t.MemorySize, len(t.reservedPieces), t.ti.PieceLength(), t.pieceLength)
+	// log.Debugf("Size from lt: %d, set: %d, res: %d, pl: %d, pl2: %d", size, t.MemorySize, len(t.reservedPieces), t.ti.PieceLength(), t.pieceLength)
 	base := float64(t.MemorySize - (int64(len(t.reservedPieces)+1))*t.pieceLength)
 	if len(t.readers) == 1 {
 		return int64(base)
@@ -951,6 +971,7 @@ func (t *Torrent) GetMetadata() []byte {
 
 	torrentFile := lt.NewCreateTorrent(t.ti)
 	defer lt.DeleteCreateTorrent(torrentFile)
+
 	torrentContent := torrentFile.Generate()
 	return []byte(lt.Bencode(torrentContent))
 }
@@ -1004,6 +1025,8 @@ func (t *Torrent) updatePieces() error {
 		// need to keep a reference to the status or else the pieces bitfield
 		// is at risk of being collected
 		t.lastStatus = t.th.Status(uint(lt.TorrentHandleQueryPieces))
+		// defer lt.DeleteTorrentStatus(t.lastStatus)
+
 		if t.lastStatus.GetState() > lt.TorrentStatusSeeding {
 			return errors.New("Torrent file has invalid state")
 		}
@@ -1055,8 +1078,10 @@ func (t *Torrent) onMetadataReceived() {
 
 // HasMetadata ...
 func (t *Torrent) HasMetadata() bool {
-	status := t.th.Status(uint(lt.TorrentHandleQueryName))
-	return status.GetHasMetadata()
+	ts := t.th.Status(uint(lt.TorrentHandleQueryName))
+	defer lt.DeleteTorrentStatus(ts)
+
+	return ts.GetHasMetadata()
 }
 
 // GetHandle ...
@@ -1067,5 +1092,7 @@ func (t *Torrent) GetHandle() lt.TorrentHandle {
 // GetPaused ...
 func (t *Torrent) GetPaused() bool {
 	ts := t.th.Status()
+	defer lt.DeleteTorrentStatus(ts)
+
 	return ts.GetPaused()
 }

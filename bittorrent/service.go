@@ -228,7 +228,7 @@ func (s *Service) configure() {
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 
 	// Sizes
-	settings.SetInt("max_out_request_queue", 3000)
+	settings.SetInt("max_out_request_queue", 6000)
 	settings.SetInt("max_allowed_in_request_queue", 3000)
 	// settings.SetInt("listen_queue_size", 2000)
 	// settings.SetInt("unchoke_slots_limit", 20)
@@ -378,6 +378,7 @@ func (s *Service) configure() {
 		// settings.SetInt("initial_picker_threshold", 20)
 		// settings.SetInt("share_mode_target", 1)
 		settings.SetBool("use_read_cache", false)
+		settings.SetBool("auto_sequential", false)
 
 		// settings.SetInt("tick_interval", 300)
 		// settings.SetBool("strict_end_game_mode", false)
@@ -538,6 +539,7 @@ func (s *Service) checkAvailableSpace(t *Torrent) bool {
 	}
 
 	torrentInfo := t.th.TorrentFile()
+	// defer lt.DeleteTorrentInfo(torrentInfo)
 
 	if torrentInfo == nil || torrentInfo.Swigcptr() == 0 {
 		log.Warning("Missing torrent info to check available space.")
@@ -545,6 +547,8 @@ func (s *Service) checkAvailableSpace(t *Torrent) bool {
 	}
 
 	status := t.th.Status(uint(lt.TorrentHandleQueryAccurateDownloadCounters) | uint(lt.TorrentHandleQuerySavePath))
+	defer lt.DeleteTorrentStatus(status)
+
 	totalSize := t.ti.TotalSize()
 	totalDone := status.GetTotalDone()
 	sizeLeft := totalSize - totalDone
@@ -765,6 +769,8 @@ func (s *Service) saveResumeDataLoop() {
 				}
 
 				status := torrentHandle.Status()
+				defer lt.DeleteTorrentStatus(status)
+
 				if status.GetHasMetadata() == false || status.GetNeedSaveResume() == false {
 					continue
 				}
@@ -1022,28 +1028,30 @@ func (s *Service) downloadProgress() {
 					continue
 				}
 
-				torrentStatus := torrentHandle.Status(uint(lt.TorrentHandleQueryName))
-				if torrentStatus.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
+				ts := torrentHandle.Status()
+				defer lt.DeleteTorrentStatus(ts)
+
+				if ts.GetHasMetadata() == false || s.Session.GetHandle().IsPaused() {
 					continue
 				}
 
-				shaHash := torrentHandle.Status().GetInfoHash().ToString()
+				shaHash := ts.GetInfoHash().ToString()
 				infoHash := hex.EncodeToString([]byte(shaHash))
 
-				status := StatusStrings[int(torrentStatus.GetState())]
-				isPaused := torrentStatus.GetPaused()
+				status := StatusStrings[int(ts.GetState())]
+				isPaused := ts.GetPaused()
 
 				if t := s.GetTorrentByHash(infoHash); t != nil {
 					status = t.GetStateString()
 				}
 
-				downloadRate := float64(torrentStatus.GetDownloadPayloadRate())
-				uploadRate := float64(torrentStatus.GetUploadPayloadRate())
+				downloadRate := float64(ts.GetDownloadPayloadRate())
+				uploadRate := float64(ts.GetUploadPayloadRate())
 				totalDownloadRate += downloadRate
 				totalUploadRate += uploadRate
 
-				torrentName := torrentStatus.GetName()
-				progress := int(float64(torrentStatus.GetProgress()) * 100)
+				torrentName := ts.GetName()
+				progress := int(float64(ts.GetProgress()) * 100)
 
 				if progress < 100 && !isPaused {
 					activeTorrents = append(activeTorrents, &activeTorrent{
@@ -1056,8 +1064,8 @@ func (s *Service) downloadProgress() {
 					continue
 				}
 
-				seedingTime := torrentStatus.GetSeedingTime()
-				finishedTime := torrentStatus.GetFinishedTime()
+				seedingTime := ts.GetSeedingTime()
+				finishedTime := ts.GetFinishedTime()
 				if progress == 100 && seedingTime == 0 {
 					seedingTime = finishedTime
 				}
@@ -1075,7 +1083,7 @@ func (s *Service) downloadProgress() {
 				}
 				if !s.IsMemoryStorage() && s.config.SeedTimeRatioLimit > 0 {
 					timeRatio := 0
-					downloadTime := torrentStatus.GetActiveTime() - seedingTime
+					downloadTime := ts.GetActiveTime() - seedingTime
 					if downloadTime > 1 {
 						timeRatio = seedingTime * 100 / downloadTime
 					}
@@ -1091,9 +1099,9 @@ func (s *Service) downloadProgress() {
 				}
 				if !s.IsMemoryStorage() && s.config.ShareRatioLimit > 0 {
 					ratio := int64(0)
-					allTimeDownload := torrentStatus.GetAllTimeDownload()
+					allTimeDownload := ts.GetAllTimeDownload()
 					if allTimeDownload > 0 {
-						ratio = torrentStatus.GetAllTimeUpload() * 100 / allTimeDownload
+						ratio = ts.GetAllTimeUpload() * 100 / allTimeDownload
 					}
 					if ratio >= int64(s.config.ShareRatioLimit) {
 						if !isPaused {

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
@@ -261,6 +262,7 @@ func ListTorrentsWeb(s *bittorrent.Service) gin.HandlerFunc {
 			}
 
 			torrentStatus := th.Status()
+			defer lt.DeleteTorrentStatus(torrentStatus)
 
 			torrentName := torrentStatus.GetName()
 			progress := float64(torrentStatus.GetProgress()) * 100
