@@ -405,9 +405,11 @@ func (t *Torrent) Buffer(file *File) {
 	}
 	t.th.PrioritizePieces(piecesPriorities)
 
-	// Resuming in case it was paused by anyone
-	// t.Pause()
-	// t.Resume()
+	// Using libtorrent hack to pause and resume the torrent
+	if config.Get().UseLibtorrentPauseResume {
+		t.Pause()
+		t.Resume()
+	}
 
 	// Force reannounce for trackers
 	t.th.ForceReannounce()

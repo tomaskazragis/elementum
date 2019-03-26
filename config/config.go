@@ -105,6 +105,7 @@ type Configuration struct {
 	UseLibtorrentConfig       bool
 	UseLibtorrentLogging      bool
 	UseLibtorrentDeadlines    bool
+	UseLibtorrentPauseResume  bool
 	LibtorrentProfile         int
 	MagnetTrackers            int
 	Scrobble                  bool
@@ -492,6 +493,7 @@ func Reload() *Configuration {
 		UseLibtorrentConfig:       settings["use_libtorrent_config"].(bool),
 		UseLibtorrentLogging:      settings["use_libtorrent_logging"].(bool),
 		UseLibtorrentDeadlines:    settings["use_libtorrent_deadlines"].(bool),
+		UseLibtorrentPauseResume:  settings["use_libtorrent_pauseresume"].(bool),
 		LibtorrentProfile:         settings["libtorrent_profile"].(int),
 		MagnetTrackers:            settings["magnet_trackers"].(int),
 		ConnectionsLimit:          settings["connections_limit"].(int),
