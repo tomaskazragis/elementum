@@ -161,7 +161,7 @@ func (s *Service) Reconfigure() {
 func (s *Service) configure() {
 	log.Info("Configuring client...")
 
-	if s.config.InternalProxyEnabled && s.InternalProxy == nil {
+	if s.config.InternalProxyEnabled {
 		log.Infof("Starting internal proxy")
 		s.InternalProxy = scrape.StartProxy()
 	}
