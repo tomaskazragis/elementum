@@ -353,6 +353,22 @@ func (btp *Player) chooseFile() (*File, error) {
 	maxSize := int64(0)
 	files := btp.t.files
 	isBluRay := false
+	minSize := config.Get().MinCandidateSize
+	if btp.p.ShowID != 0 {
+		if s := tmdb.GetShow(btp.p.ShowID, config.Get().Language); s != nil {
+			runtime := 30
+			if len(s.EpisodeRunTime) > 0 {
+				for _, r := range s.EpisodeRunTime {
+					if r < runtime {
+						runtime = r
+					}
+				}
+			}
+
+			minSize = config.Get().MinCandidateShowSize * int64(runtime)
+		}
+	}
+
 	var candidateFiles []int
 
 	for i, f := range files {
@@ -361,7 +377,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			maxSize = size
 			biggestFile = i
 		}
-		if size > config.Get().MinCandidateSize {
+		if size > minSize {
 			candidateFiles = append(candidateFiles, i)
 		}
 		if strings.Contains(f.Path, "BDMV/STREAM/") {

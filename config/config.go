@@ -74,6 +74,7 @@ type Configuration struct {
 	MemorySize                int
 	AutoAdjustBufferSize      bool
 	MinCandidateSize          int64
+	MinCandidateShowSize      int64
 	BufferTimeout             int
 	BufferSize                int
 	KodiBufferSize            int
@@ -440,6 +441,7 @@ func Reload() *Configuration {
 		AutoKodiBufferSize:        settings["auto_kodi_buffer_size"].(bool),
 		AutoAdjustBufferSize:      settings["auto_adjust_buffer_size"].(bool),
 		MinCandidateSize:          int64(settings["min_candidate_size"].(int) * 1024 * 1024),
+		MinCandidateShowSize:      int64(settings["min_candidate_show_size"].(int) * 1024 * 1024),
 		BufferTimeout:             settings["buffer_timeout"].(int),
 		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
@@ -492,7 +494,7 @@ func Reload() *Configuration {
 		TunedStorage:              settings["tuned_storage"].(bool),
 		UseLibtorrentConfig:       settings["use_libtorrent_config"].(bool),
 		UseLibtorrentLogging:      settings["use_libtorrent_logging"].(bool),
-		UseLibtorrentDeadlines:    settings["use_libtorrent_deadlines"].(bool),
+		UseLibtorrentDeadlines:    settings["use_libtorrent_deadline"].(bool),
 		UseLibtorrentPauseResume:  settings["use_libtorrent_pauseresume"].(bool),
 		LibtorrentProfile:         settings["libtorrent_profile"].(int),
 		MagnetTrackers:            settings["magnet_trackers"].(int),
