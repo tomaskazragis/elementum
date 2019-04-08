@@ -39,9 +39,10 @@ type Torrent struct {
 	infoHash       string
 	readers        map[int64]*TorrentFSEntry
 	reservedPieces []int
-	awaitingPieces *roaring.Bitmap
-	timedPieces    *roaring.Bitmap
-	// bufferReaders map[string]*FileReader
+
+	awaitingPieces  *roaring.Bitmap
+	timedPieces     *roaring.Bitmap
+	deadlinedPieces *roaring.Bitmap
 
 	ChosenFiles []*File
 	TorrentPath string
@@ -100,8 +101,10 @@ func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, 
 
 		readers:        map[int64]*TorrentFSEntry{},
 		reservedPieces: []int{},
-		awaitingPieces: roaring.NewBitmap(),
-		timedPieces:    roaring.NewBitmap(),
+
+		awaitingPieces:  roaring.NewBitmap(),
+		timedPieces:     roaring.NewBitmap(),
+		deadlinedPieces: roaring.NewBitmap(),
 		// readerPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
@@ -276,35 +279,36 @@ func (t *Torrent) Buffer(file *File) {
 	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file.Offset, 0, startBufferSize)
 	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-EndBufferSize, EndBufferSize)
 
-	if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
-		_, free := t.Service.GetMemoryStats()
-		autodetectStart := 10
-		// If this file is only a part of big torrent with big pieces -
-		// we don't need that much to buffer. As it will take a lot of time.
-		if t.pieceLength > 0 && file.Size/t.pieceLength <= 300 {
-			autodetectStart = 6
-		}
+	// TODO: Remove this piece of buffer adjustment?
+	// if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {
+	// 	_, free := t.Service.GetMemoryStats()
+	// 	autodetectStart := 10
+	// 	// If this file is only a part of big torrent with big pieces -
+	// 	// we don't need that much to buffer. As it will take a lot of time.
+	// 	if t.pieceLength > 0 && file.Size/t.pieceLength <= 300 {
+	// 		autodetectStart = 6
+	// 	}
 
-		// Let's try to
-		var newBufferSize int64
-		for i := autodetectStart; i >= 4; i -= 2 {
-			mem := int64(i) * t.pieceLength
+	// 	// Let's try to
+	// 	var newBufferSize int64
+	// 	for i := autodetectStart; i >= 4; i -= 2 {
+	// 		mem := int64(i) * t.pieceLength
 
-			if mem < startBufferSize {
-				break
-			}
-			if free == 0 || !t.Service.IsMemoryStorage() || (mem*2)-startBufferSize < free {
-				newBufferSize = mem
-				break
-			}
-		}
+	// 		if mem < startBufferSize {
+	// 			break
+	// 		}
+	// 		if free == 0 || !t.Service.IsMemoryStorage() || (mem*2)-startBufferSize < free {
+	// 			newBufferSize = mem
+	// 			break
+	// 		}
+	// 	}
 
-		if newBufferSize > 0 {
-			startBufferSize = newBufferSize
-			preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
-			log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
-		}
-	}
+	// 	if newBufferSize > 0 {
+	// 		startBufferSize = newBufferSize
+	// 		preBufferStart, preBufferEnd, preBufferOffset, preBufferSize = t.getBufferSize(file.Offset, 0, startBufferSize)
+	// 		log.Infof("Adjusting buffer size to %s, to have at least %d pieces ready!", humanize.Bytes(uint64(startBufferSize)), preBufferEnd-preBufferStart+1)
+	// 	}
+	// }
 
 	if t.Service.IsMemoryStorage() {
 		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
@@ -483,9 +487,9 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 	t.awaitingPieces.AddInt(piece)
 
-	if config.Get().UseLibtorrentDeadlines {
-		t.th.ClearPieceDeadlines()
-	}
+	// if config.Get().UseLibtorrentDeadlines {
+	// 	t.th.ClearPieceDeadlines()
+	// }
 	t.th.PiecePriority(piece, 7)
 
 	if config.Get().UseLibtorrentDeadlines {
@@ -617,21 +621,33 @@ func (t *Torrent) PrioritizePieces() {
 			// t.th.SetPieceDeadline(curPiece, (7-priority)*20, 0)
 		} else {
 			piecesPriorities.Add(defaultPriority)
+			t.deadlinedPieces.Remove(uint32(curPiece))
 			// if defaultPriority == 0 {
 			// 	t.th.ResetPieceDeadline(curPiece)
 			// }
 		}
 	}
 
+	t.th.PrioritizePieces(piecesPriorities)
+
 	if config.Get().UseLibtorrentDeadlines {
-		for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
+		// for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
+		// 	if priority, ok := readerPieces[curPiece]; ok && !t.hasPiece(curPiece) {
+		// 		t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+		// 	}
+		// }
+		for curPiece := 0; curPiece <= numPieces-1; curPiece++ {
 			if priority, ok := readerPieces[curPiece]; ok && !t.hasPiece(curPiece) {
-				t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
+				if t.awaitingPieces.ContainsInt(curPiece) {
+					t.deadlinedPieces.AddInt(curPiece)
+					t.th.SetPieceDeadline(curPiece, 0, 0)
+				} else if !t.deadlinedPieces.ContainsInt(curPiece) {
+					t.deadlinedPieces.AddInt(curPiece)
+					t.th.SetPieceDeadline(curPiece, (7-priority)*50, 0)
+				}
 			}
 		}
 	}
-
-	t.th.PrioritizePieces(piecesPriorities)
 }
 
 // GetAddedTime ...

@@ -262,6 +262,7 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 			// Clearing deadlines to have clean requests
 			tf.t.th.ClearPieceDeadlines()
 		}
+		tf.t.PrioritizePieces()
 
 		break
 	case io.SeekCurrent:
