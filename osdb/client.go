@@ -15,7 +15,7 @@ const (
 	// DefaultOSDBServer ...
 	DefaultOSDBServer = "https://api.opensubtitles.org/xml-rpc"
 	// DefaultUserAgent ...
-	DefaultUserAgent = "XBMC_Subtitles_Login_v5.0.16" // XBMC OpenSubtitles Agent
+	DefaultUserAgent = "XBMC_Subtitles_v1" // XBMC OpenSubtitles Agent
 	// SearchLimit ...
 	SearchLimit = 100
 	// StatusSuccess ...
@@ -242,7 +242,7 @@ func (c *Client) LogIn(user string, pass string, lang string) (err error) {
 	c.Login = user
 	c.Password = pass
 	c.Language = lang
-	args := []interface{}{user, pass, lang, c.UserAgent}
+	args := []interface{}{user, pass, "en", c.UserAgent}
 	res := struct {
 		Status string `xmlrpc:"status"`
 		Token  string `xmlrpc:"token"`
