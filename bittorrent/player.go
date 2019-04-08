@@ -189,7 +189,7 @@ func (btp *Player) Buffer() error {
 		}
 	}
 
-	btp.processMetadata()
+	go btp.processMetadata()
 
 	btp.t.IsBuffering = true
 
