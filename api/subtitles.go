@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/tmdb"
 
@@ -58,7 +59,7 @@ func appendMoviePayloads(labels map[string]string, payloads *[]osdb.SearchPayloa
 	return nil
 }
 
-func appendEpisodePayloads(labels map[string]string, payloads *[]osdb.SearchPayload) error {
+func appendEpisodePayloads(s *bittorrent.Service, labels map[string]string, payloads *[]osdb.SearchPayload) error {
 	season := -1
 	if labels["VideoPlayer.Season"] != "" {
 		if s, err := strconv.Atoi(labels["VideoPlayer.Season"]); err == nil {
@@ -71,8 +72,18 @@ func appendEpisodePayloads(labels map[string]string, payloads *[]osdb.SearchPayl
 			episode = e
 		}
 	}
+
 	if season >= 0 && episode > 0 {
-		searchString := fmt.Sprintf("%s S%02dE%02d", labels["VideoPlayer.TVshowtitle"], season, episode)
+		title := labels["VideoPlayer.TVshowtitle"]
+		if s != nil {
+			// Trying to get Original name of the show, otherwise we will likely fail to find anything.
+			show := tmdb.GetShow(s.GetActivePlayer().Params().ShowID, config.Get().Language)
+			if show != nil {
+				title = show.OriginalName
+			}
+		}
+
+		searchString := fmt.Sprintf("%s S%02dE%02d", title, season, episode)
 		*payloads = append(*payloads, osdb.SearchPayload{
 			Query: searchString,
 		})
@@ -81,150 +92,152 @@ func appendEpisodePayloads(labels map[string]string, payloads *[]osdb.SearchPayl
 }
 
 // SubtitlesIndex ...
-func SubtitlesIndex(ctx *gin.Context) {
-	q := ctx.Request.URL.Query()
-	searchString := q.Get("searchstring")
-	languages := strings.Split(q.Get("languages"), ",")
-	preferredLanguage := q.Get("preferredlanguage")
+func SubtitlesIndex(s *bittorrent.Service) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		q := ctx.Request.URL.Query()
+		searchString := q.Get("searchstring")
+		languages := strings.Split(q.Get("languages"), ",")
+		preferredLanguage := q.Get("preferredlanguage")
 
-	// First of all, we get Subtitles language settings from Kodi
-	// (there is a separate setting for that) in Player settings.
-	if !config.Get().OSDBAutoLanguage && config.Get().OSDBLanguage != "" {
-		languages = []string{config.Get().OSDBLanguage}
-	}
-
-	// If there is preferred language - we should use it
-	if preferredLanguage != "" && preferredLanguage != "Unknown" && !contains(languages, preferredLanguage) {
-		languages = append([]string{preferredLanguage}, languages...)
-		preferredLanguage = strings.ToLower(preferredLanguage)
-	} else {
-		preferredLanguage = ""
-	}
-
-	labels := xbmc.InfoLabels(
-		"VideoPlayer.Title",
-		"VideoPlayer.OriginalTitle",
-		"VideoPlayer.Year",
-		"VideoPlayer.TVshowtitle",
-		"VideoPlayer.Season",
-		"VideoPlayer.Episode",
-		"VideoPlayer.IMDBNumber",
-	)
-	playingFile := xbmc.PlayerGetPlayingFile()
-
-	// Check if we are reading a file from Elementum
-	if strings.HasPrefix(playingFile, util.GetContextHTTPHost(ctx)) {
-		playingFile = strings.Replace(playingFile, util.GetContextHTTPHost(ctx)+"/files", config.Get().DownloadPath, 1)
-		playingFile, _ = url.QueryUnescape(playingFile)
-	}
-
-	for i, lang := range languages {
-		if lang == "Portuguese (Brazil)" {
-			languages[i] = "pob"
-		} else {
-			isoLang := xbmc.ConvertLanguage(lang, xbmc.Iso639_2)
-			if isoLang == "gre" {
-				isoLang = "ell"
-			}
-			languages[i] = isoLang
+		// First of all, we get Subtitles language settings from Kodi
+		// (there is a separate setting for that) in Player settings.
+		if !config.Get().OSDBAutoLanguage && config.Get().OSDBLanguage != "" {
+			languages = []string{config.Get().OSDBLanguage}
 		}
-	}
 
-	payloads := []osdb.SearchPayload{}
-	if searchString != "" {
-		payloads = append(payloads, osdb.SearchPayload{
-			Query:     searchString,
-			Languages: strings.Join(languages, ","),
-		})
-	} else {
-		// If player ListItem has IMDBNumber specified - we try to get TMDB item from it.
-		// If not - we can use localized show/movie name - which is not always found on OSDB.
-		if strings.HasPrefix(labels["VideoPlayer.IMDBNumber"], "tt") {
-			if labels["VideoPlayer.TVshowtitle"] != "" {
-				r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
-				if r != nil && len(r.TVResults) > 0 {
-					labels["VideoPlayer.TVshowtitle"] = r.TVResults[0].OriginalName
-				}
+		// If there is preferred language - we should use it
+		if preferredLanguage != "" && preferredLanguage != "Unknown" && !contains(languages, preferredLanguage) {
+			languages = append([]string{preferredLanguage}, languages...)
+			preferredLanguage = strings.ToLower(preferredLanguage)
+		} else {
+			preferredLanguage = ""
+		}
+
+		labels := xbmc.InfoLabels(
+			"VideoPlayer.Title",
+			"VideoPlayer.OriginalTitle",
+			"VideoPlayer.Year",
+			"VideoPlayer.TVshowtitle",
+			"VideoPlayer.Season",
+			"VideoPlayer.Episode",
+			"VideoPlayer.IMDBNumber",
+		)
+		playingFile := xbmc.PlayerGetPlayingFile()
+
+		// Check if we are reading a file from Elementum
+		if strings.HasPrefix(playingFile, util.GetContextHTTPHost(ctx)) {
+			playingFile = strings.Replace(playingFile, util.GetContextHTTPHost(ctx)+"/files", config.Get().DownloadPath, 1)
+			playingFile, _ = url.QueryUnescape(playingFile)
+		}
+
+		for i, lang := range languages {
+			if lang == "Portuguese (Brazil)" {
+				languages[i] = "pob"
 			} else {
-				r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
-				if r != nil && len(r.MovieResults) > 0 {
-					labels["VideoPlayer.OriginalTitle"] = r.MovieResults[0].OriginalTitle
+				isoLang := xbmc.ConvertLanguage(lang, xbmc.Iso639_2)
+				if isoLang == "gre" {
+					isoLang = "ell"
 				}
+				languages[i] = isoLang
 			}
 		}
 
-		if strings.HasPrefix(playingFile, "http://") == false && strings.HasPrefix(playingFile, "https://") == false {
-			appendLocalFilePayloads(playingFile, &payloads)
-		}
-
-		if labels["VideoPlayer.TVshowtitle"] != "" {
-			appendEpisodePayloads(labels, &payloads)
+		payloads := []osdb.SearchPayload{}
+		if searchString != "" {
+			payloads = append(payloads, osdb.SearchPayload{
+				Query:     searchString,
+				Languages: strings.Join(languages, ","),
+			})
 		} else {
-			appendMoviePayloads(labels, &payloads)
+			// If player ListItem has IMDBNumber specified - we try to get TMDB item from it.
+			// If not - we can use localized show/movie name - which is not always found on OSDB.
+			if strings.HasPrefix(labels["VideoPlayer.IMDBNumber"], "tt") {
+				if labels["VideoPlayer.TVshowtitle"] != "" {
+					r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
+					if r != nil && len(r.TVResults) > 0 {
+						labels["VideoPlayer.TVshowtitle"] = r.TVResults[0].OriginalName
+					}
+				} else {
+					r := tmdb.Find(labels["VideoPlayer.IMDBNumber"], "imdb_id")
+					if r != nil && len(r.MovieResults) > 0 {
+						labels["VideoPlayer.OriginalTitle"] = r.MovieResults[0].OriginalTitle
+					}
+				}
+			}
+
+			if strings.HasPrefix(playingFile, "http://") == false && strings.HasPrefix(playingFile, "https://") == false {
+				appendLocalFilePayloads(playingFile, &payloads)
+			}
+
+			if labels["VideoPlayer.TVshowtitle"] != "" {
+				appendEpisodePayloads(s, labels, &payloads)
+			} else {
+				appendMoviePayloads(labels, &payloads)
+			}
 		}
-	}
 
-	for i, payload := range payloads {
-		payload.Languages = strings.Join(languages, ",")
-		payloads[i] = payload
-	}
-
-	subLog.Infof("Subtitles payload: %+v", payloads)
-
-	client, err := osdb.NewClient()
-	if err != nil {
-		subLog.Error(err)
-		ctx.String(200, err.Error())
-		return
-	}
-	if err := client.LogIn(config.Get().OSDBUser, config.Get().OSDBPass, config.Get().OSDBLanguage); err != nil {
-		subLog.Errorf("Cound not login: %s", err)
-		ctx.String(200, err.Error())
-		return
-	}
-
-	items := make(xbmc.ListItems, 0)
-	results, err := client.SearchSubtitles(payloads)
-	if err != nil {
-		subLog.Errorf("Error searching subtitles: %s", err)
-	}
-
-	// If needed - try to manually sort items
-	if preferredLanguage != "" {
-		sort.Slice(results, func(i, j int) bool {
-			id := strings.ToLower(results[i].LanguageName) == preferredLanguage
-			return id
-		})
-	}
-
-	for _, sub := range results {
-		rating, _ := strconv.ParseFloat(sub.SubRating, 64)
-		subLang := sub.LanguageName
-		if subLang == "Brazilian" {
-			subLang = "Portuguese (Brazil)"
+		for i, payload := range payloads {
+			payload.Languages = strings.Join(languages, ",")
+			payloads[i] = payload
 		}
-		item := &xbmc.ListItem{
-			Label:     subLang,
-			Label2:    sub.SubFileName,
-			Icon:      strconv.Itoa(int((rating / 2) + 0.5)),
-			Thumbnail: sub.ISO639,
-			Path: URLQuery(URLForXBMC("/subtitle/%s", sub.IDSubtitleFile),
-				"file", sub.SubFileName,
-				"lang", sub.SubLanguageID,
-				"fmt", sub.SubFormat,
-				"dl", sub.SubDownloadLink),
-			Properties: make(map[string]string),
-		}
-		if sub.MatchedBy == "moviehash" {
-			item.Properties["sync"] = trueType
-		}
-		if sub.SubHearingImpaired == "1" {
-			item.Properties["hearing_imp"] = trueType
-		}
-		items = append(items, item)
-	}
 
-	ctx.JSON(200, xbmc.NewView("", items))
+		subLog.Infof("Subtitles payload: %+v", payloads)
+
+		client, err := osdb.NewClient()
+		if err != nil {
+			subLog.Error(err)
+			ctx.String(200, err.Error())
+			return
+		}
+		if err := client.LogIn(config.Get().OSDBUser, config.Get().OSDBPass, config.Get().OSDBLanguage); err != nil {
+			subLog.Errorf("Cound not login: %s", err)
+			ctx.String(200, err.Error())
+			return
+		}
+
+		items := make(xbmc.ListItems, 0)
+		results, err := client.SearchSubtitles(payloads)
+		if err != nil {
+			subLog.Errorf("Error searching subtitles: %s", err)
+		}
+
+		// If needed - try to manually sort items
+		if preferredLanguage != "" {
+			sort.Slice(results, func(i, j int) bool {
+				id := strings.ToLower(results[i].LanguageName) == preferredLanguage
+				return id
+			})
+		}
+
+		for _, sub := range results {
+			rating, _ := strconv.ParseFloat(sub.SubRating, 64)
+			subLang := sub.LanguageName
+			if subLang == "Brazilian" {
+				subLang = "Portuguese (Brazil)"
+			}
+			item := &xbmc.ListItem{
+				Label:     subLang,
+				Label2:    sub.SubFileName,
+				Icon:      strconv.Itoa(int((rating / 2) + 0.5)),
+				Thumbnail: sub.ISO639,
+				Path: URLQuery(URLForXBMC("/subtitle/%s", sub.IDSubtitleFile),
+					"file", sub.SubFileName,
+					"lang", sub.SubLanguageID,
+					"fmt", sub.SubFormat,
+					"dl", sub.SubDownloadLink),
+				Properties: make(map[string]string),
+			}
+			if sub.MatchedBy == "moviehash" {
+				item.Properties["sync"] = trueType
+			}
+			if sub.SubHearingImpaired == "1" {
+				item.Properties["hearing_imp"] = trueType
+			}
+			items = append(items, item)
+		}
+
+		ctx.JSON(200, xbmc.NewView("", items))
+	}
 }
 
 // SubtitleGet ...

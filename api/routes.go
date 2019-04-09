@@ -23,7 +23,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	r.GET("/", Index)
+	r.GET("/", Index(s))
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(s))
 	r.GET("/changelog", Changelog)
@@ -262,7 +262,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 
 	r.GET("/setviewmode/:content_type", SetViewMode)
 
-	r.GET("/subtitles", SubtitlesIndex)
+	r.GET("/subtitles", SubtitlesIndex(s))
 	r.GET("/subtitle/:id", SubtitleGet)
 
 	r.GET("/play", Play(s))
