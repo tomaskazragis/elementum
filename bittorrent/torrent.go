@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"sync"
 	"time"
@@ -56,11 +57,13 @@ type Torrent struct {
 	BufferEndPieces      []int
 	MemorySize           int64
 
-	IsPlaying    bool
-	IsPaused     bool
-	IsBuffering  bool
-	IsSeeding    bool
-	IsRarArchive bool
+	IsPlaying           bool
+	IsPaused            bool
+	IsBuffering         bool
+	IsBufferingFinished bool
+	IsSeeding           bool
+	IsRarArchive        bool
+	IsNextEpisode       bool
 
 	DBItem *database.BTItem
 
@@ -182,6 +185,9 @@ func (t *Torrent) bufferTickerEvent() {
 		// Making sure current progress is not less then previous
 		thisProgress := t.GetBufferProgress()
 
+		t.muBuffer.Lock()
+		defer t.muBuffer.Unlock()
+
 		piecesStatus := "["
 		piecesKeys := []int{}
 		for k := range t.BufferPiecesProgress {
@@ -201,9 +207,6 @@ func (t *Torrent) bufferTickerEvent() {
 		downSpeed, upSpeed := t.GetHumanizedSpeeds()
 		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus)
 
-		t.muBuffer.Lock()
-		defer t.muBuffer.Unlock()
-
 		// thisProgress := float64(t.BufferPiecesLength-progressCount) / float64(t.BufferPiecesLength) * 100
 		if thisProgress > t.BufferProgress {
 			t.BufferProgress = thisProgress
@@ -211,6 +214,8 @@ func (t *Torrent) bufferTickerEvent() {
 
 		if t.BufferProgress >= 100 {
 			t.bufferFinished <- struct{}{}
+		} else {
+			t.IsBufferingFinished = false
 		}
 	}
 }
@@ -253,6 +258,7 @@ func (t *Torrent) bufferFinishedEvent() {
 
 	t.BufferPiecesProgress = map[int]float64{}
 	t.IsBuffering = false
+	t.IsBufferingFinished = true
 
 	t.muBuffer.Unlock()
 
@@ -1111,4 +1117,16 @@ func (t *Torrent) GetPaused() bool {
 	defer lt.DeleteTorrentStatus(ts)
 
 	return ts.GetPaused()
+}
+
+// GetNextEpisodeFile ...
+func (t *Torrent) GetNextEpisodeFile(season, episode int) *File {
+	re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season, episode))
+	for _, choice := range t.files {
+		if re.MatchString(choice.Path) {
+			return choice
+		}
+	}
+
+	return nil
 }

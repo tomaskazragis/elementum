@@ -430,6 +430,24 @@ func UpdatePath(path string) (retVal string) {
 	return
 }
 
+// PlaylistLeft ...
+func PlaylistLeft() (retVal int) {
+	executeJSONRPCEx("Playlist_Left", &retVal, Args{})
+	return
+}
+
+// PlaylistSize ...
+func PlaylistSize() (retVal int) {
+	executeJSONRPCEx("Playlist_Size", &retVal, Args{})
+	return
+}
+
+// PlaylistClear ...
+func PlaylistClear() (retVal int) {
+	executeJSONRPCEx("Playlist_Clear", &retVal, Args{})
+	return
+}
+
 // PlayURL ...
 func PlayURL(url string) {
 	retVal := ""

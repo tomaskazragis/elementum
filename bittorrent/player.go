@@ -43,6 +43,7 @@ type Player struct {
 	p                        *PlayerParams
 	dialogProgress           *xbmc.DialogProgress
 	overlayStatus            *xbmc.OverlayStatus
+	next                     NextEpisode
 	contentType              string
 	scrobble                 bool
 	deleteAfter              bool
@@ -69,26 +70,37 @@ type Player struct {
 
 // PlayerParams ...
 type PlayerParams struct {
-	Playing        bool
-	Paused         bool
-	Seeked         bool
-	WasPlaying     bool
-	KodiPosition   int
-	WatchedTime    float64
-	VideoDuration  float64
-	URI            string
-	FileIndex      int
-	ResumeHash     string
-	ResumePlayback bool
-	ContentType    string
-	KodiID         int
-	TMDBId         int
-	ShowID         int
-	Season         int
-	Episode        int
-	Query          string
-	UIDs           *library.UniqueIDs
-	Resume         *library.Resume
+	Playing         bool
+	Paused          bool
+	Seeked          bool
+	WasPlaying      bool
+	KodiPosition    int
+	WatchedProgress int
+	WatchedTime     float64
+	VideoDuration   float64
+	URI             string
+	FileIndex       int
+	ResumeHash      string
+	ResumePlayback  bool
+	ContentType     string
+	KodiID          int
+	TMDBId          int
+	ShowID          int
+	Season          int
+	Episode         int
+	Query           string
+	UIDs            *library.UniqueIDs
+	Resume          *library.Resume
+}
+
+// NextEpisode ...
+type NextEpisode struct {
+	f *File
+
+	started        bool
+	done           bool
+	bufferSize     int64
+	progressNeeded int
 }
 
 type candidateFile struct {
@@ -196,8 +208,10 @@ func (btp *Player) Buffer() error {
 	buffered, done := btp.bufferEvents.Listen()
 	defer close(done)
 
-	btp.dialogProgress = xbmc.NewDialogProgress("Elementum", "", "", "")
-	defer btp.dialogProgress.Close()
+	if !btp.t.IsBufferingFinished {
+		btp.dialogProgress = xbmc.NewDialogProgress("Elementum", "", "", "")
+		defer btp.dialogProgress.Close()
+	}
 
 	btp.overlayStatus = xbmc.NewOverlayStatus()
 
@@ -534,6 +548,10 @@ func (btp *Player) Close() {
 	}()
 
 	isWatched := btp.IsWatched()
+	if btp.t.IsNextEpisode && xbmc.PlaylistLeft() > 0 {
+		return
+	}
+
 	keepDownloading := false
 	if btp.keepDownloading == 2 {
 		keepDownloading = false
@@ -592,6 +610,11 @@ func (btp *Player) bufferDialog() {
 	for {
 		select {
 		case <-halfSecond.C:
+			if btp.dialogProgress == nil {
+				halfSecond.Stop()
+				break
+			}
+
 			if btp.dialogProgress.IsCanceled() || btp.notEnoughSpace {
 				errMsg := "User cancelled the buffering"
 				log.Info(errMsg)
@@ -606,7 +629,9 @@ func (btp *Player) bufferDialog() {
 			if status.GetState() == StatusChecking || btp.t.IsRarArchive {
 				progress := btp.t.GetBufferProgress()
 				line1, line2, line3 := btp.statusStrings(progress, status)
-				btp.dialogProgress.Update(int(progress), line1, line2, line3)
+				if btp.dialogProgress != nil {
+					btp.dialogProgress.Update(int(progress), line1, line2, line3)
+				}
 
 				if btp.t.IsRarArchive && progress >= 100 {
 					archivePath := filepath.Join(btp.s.config.DownloadPath, btp.chosenFile.Path)
@@ -668,7 +693,9 @@ func (btp *Player) bufferDialog() {
 				defer lt.DeleteTorrentStatus(status)
 
 				line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
-				btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
+				if btp.dialogProgress != nil {
+					btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
+				}
 				if !btp.t.IsBuffering && btp.t.HasMetadata() && btp.t.GetState() != StatusChecking {
 					btp.bufferEvents.Signal()
 					btp.setRateLimiting(true)
@@ -752,12 +779,14 @@ playbackWaitLoop:
 
 	btp.updateWatchTimes()
 	btp.GetIdent()
+	btp.findNextEpisode()
 
 	log.Infof("Got playback: %fs / %fs", btp.p.WatchedTime, btp.p.VideoDuration)
 	if btp.scrobble {
 		trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 	}
 
+	playlistSize := xbmc.PlaylistSize()
 	btp.t.IsPlaying = true
 
 playbackLoop:
@@ -805,6 +834,12 @@ playbackLoop:
 					btp.overlayStatus.Hide()
 					overlayStatusActive = false
 				}
+			}
+
+			btp.p.WatchedProgress = int(btp.p.WatchedTime / btp.p.VideoDuration * 100)
+
+			if playlistSize > 1 && btp.next.f != nil && btp.p.WatchedProgress > btp.next.progressNeeded {
+				btp.startNextEpisode()
 			}
 		}
 	}
@@ -1016,4 +1051,39 @@ func (btp *Player) onStateChanged(stateAlert lt.StateChangedAlert) {
 	case lt.TorrentStatusDownloading:
 		btp.isDownloading = true
 	}
+}
+
+func (btp *Player) startNextEpisode() {
+	if btp.p.ShowID == 0 || !btp.t.IsNextEpisode || !btp.next.done || btp.next.f == nil || btp.t.IsBuffering || btp.next.started {
+		return
+	}
+
+	btp.next.started = true
+	go btp.t.Buffer(btp.next.f)
+}
+
+func (btp *Player) findNextEpisode() {
+	if btp.p.ShowID == 0 || btp.next.done || !config.Get().SmartEpisodeStart {
+		return
+	}
+
+	// Set mark to avoid more than once
+	btp.next.done = true
+
+	// Searching if we have next episode in the torrent
+	if btp.next.f = btp.t.GetNextEpisodeFile(btp.p.Season, btp.p.Episode+1); btp.next.f == nil || btp.chosenFile == nil || btp.chosenFile.Size == 0 {
+		btp.t.IsNextEpisode = false
+		return
+	}
+
+	btp.t.IsNextEpisode = true
+
+	startBufferSize := btp.s.GetBufferSize()
+	_, _, _, preBufferSize := btp.t.getBufferSize(btp.next.f.Offset, 0, startBufferSize)
+	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-EndBufferSize, EndBufferSize)
+
+	btp.next.bufferSize = preBufferSize + postBufferSize
+	btp.next.progressNeeded = util.Min(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+1)
+
+	log.Debugf("Next episode prepared: %#v", btp.next)
 }

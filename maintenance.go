@@ -160,6 +160,9 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 
 		log.Infof("Stopped at %f%%", progress)
 
+	case "Playlist.OnClear":
+		// TODO: Do we need this endpoint?
+
 	case "VideoLibrary.OnUpdate":
 		if library.Scanning {
 			return

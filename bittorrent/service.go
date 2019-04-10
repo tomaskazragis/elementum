@@ -1550,9 +1550,11 @@ func (s *Service) HasTorrentBySeason(tmdbID int, season int) string {
 }
 
 // HasTorrentByEpisode checks whether there is active torrent for queried episode
-func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) string {
+func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season, episode))
 
 	for _, t := range s.q.All() {
 		if t == nil || t.DBItem == nil {
@@ -1560,11 +1562,19 @@ func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) string {
 		}
 
 		if t.DBItem.ShowID == tmdbID && t.DBItem.Season == season && t.DBItem.Episode == episode {
-			return t.InfoHash()
+			// This is a strict match
+			return t.InfoHash(), t.IsNextEpisode
+		} else if t.DBItem.ShowID == tmdbID {
+			// Try to find an episode
+			for _, choice := range t.files {
+				if re.MatchString(choice.Path) {
+					return t.InfoHash(), t.IsNextEpisode
+				}
+			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 // HasTorrentByName checks whether there is active torrent for queried name
