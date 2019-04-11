@@ -646,9 +646,9 @@ func (z *ListItem) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *ListItemArt) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 8
+	// map header, size 9
 	// string "Thumbnail"
-	o = append(o, 0x88, 0xa9, 0x54, 0x68, 0x75, 0x6d, 0x62, 0x6e, 0x61, 0x69, 0x6c)
+	o = append(o, 0x89, 0xa9, 0x54, 0x68, 0x75, 0x6d, 0x62, 0x6e, 0x61, 0x69, 0x6c)
 	o = msgp.AppendString(o, z.Thumbnail)
 	// string "Poster"
 	o = append(o, 0xa6, 0x50, 0x6f, 0x73, 0x74, 0x65, 0x72)
@@ -671,6 +671,9 @@ func (z *ListItemArt) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Landscape"
 	o = append(o, 0xa9, 0x4c, 0x61, 0x6e, 0x64, 0x73, 0x63, 0x61, 0x70, 0x65)
 	o = msgp.AppendString(o, z.Landscape)
+	// string "Icon"
+	o = append(o, 0xa4, 0x49, 0x63, 0x6f, 0x6e)
+	o = msgp.AppendString(o, z.Icon)
 	return
 }
 
@@ -730,6 +733,11 @@ func (z *ListItemArt) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "Icon":
+			z.Icon, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -743,7 +751,7 @@ func (z *ListItemArt) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *ListItemArt) Msgsize() (s int) {
-	s = 1 + 10 + msgp.StringPrefixSize + len(z.Thumbnail) + 7 + msgp.StringPrefixSize + len(z.Poster) + 13 + msgp.StringPrefixSize + len(z.TvShowPoster) + 7 + msgp.StringPrefixSize + len(z.Banner) + 7 + msgp.StringPrefixSize + len(z.FanArt) + 9 + msgp.StringPrefixSize + len(z.ClearArt) + 10 + msgp.StringPrefixSize + len(z.ClearLogo) + 10 + msgp.StringPrefixSize + len(z.Landscape)
+	s = 1 + 10 + msgp.StringPrefixSize + len(z.Thumbnail) + 7 + msgp.StringPrefixSize + len(z.Poster) + 13 + msgp.StringPrefixSize + len(z.TvShowPoster) + 7 + msgp.StringPrefixSize + len(z.Banner) + 7 + msgp.StringPrefixSize + len(z.FanArt) + 9 + msgp.StringPrefixSize + len(z.ClearArt) + 10 + msgp.StringPrefixSize + len(z.ClearLogo) + 10 + msgp.StringPrefixSize + len(z.Landscape) + 5 + msgp.StringPrefixSize + len(z.Icon)
 	return
 }
 

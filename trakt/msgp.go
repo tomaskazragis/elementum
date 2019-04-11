@@ -2002,13 +2002,19 @@ func (z *List) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *ListContainer) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 3
+	// map header, size 5
 	// string "LikeCount"
-	o = append(o, 0x83, 0xa9, 0x4c, 0x69, 0x6b, 0x65, 0x43, 0x6f, 0x75, 0x6e, 0x74)
+	o = append(o, 0x85, 0xa9, 0x4c, 0x69, 0x6b, 0x65, 0x43, 0x6f, 0x75, 0x6e, 0x74)
 	o = msgp.AppendInt(o, z.LikeCount)
 	// string "CommentCount"
 	o = append(o, 0xac, 0x43, 0x6f, 0x6d, 0x6d, 0x65, 0x6e, 0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74)
 	o = msgp.AppendInt(o, z.CommentCount)
+	// string "LikedAt"
+	o = append(o, 0xa7, 0x4c, 0x69, 0x6b, 0x65, 0x64, 0x41, 0x74)
+	o = msgp.AppendTime(o, z.LikedAt)
+	// string "Type"
+	o = append(o, 0xa4, 0x54, 0x79, 0x70, 0x65)
+	o = msgp.AppendString(o, z.Type)
 	// string "List"
 	o = append(o, 0xa4, 0x4c, 0x69, 0x73, 0x74)
 	if z.List == nil {
@@ -2048,6 +2054,16 @@ func (z *ListContainer) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "LikedAt":
+			z.LikedAt, bts, err = msgp.ReadTimeBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Type":
+			z.Type, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "List":
 			if msgp.IsNil(bts) {
 				bts, err = msgp.ReadNilBytes(bts)
@@ -2077,7 +2093,7 @@ func (z *ListContainer) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *ListContainer) Msgsize() (s int) {
-	s = 1 + 10 + msgp.IntSize + 13 + msgp.IntSize + 5
+	s = 1 + 10 + msgp.IntSize + 13 + msgp.IntSize + 8 + msgp.TimeSize + 5 + msgp.StringPrefixSize + len(z.Type) + 5
 	if z.List == nil {
 		s += msgp.NilSize
 	} else {

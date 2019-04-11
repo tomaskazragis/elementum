@@ -56,6 +56,7 @@ type Configuration struct {
 	ChooseStreamAuto          bool
 	ForceLinkType             bool
 	UseOriginalTitle          bool
+	UseAnimeEnTitle           bool
 	AddSpecials               bool
 	AddEpisodeNumbers         bool
 	ShowUnairedSeasons        bool
@@ -467,6 +468,7 @@ func Reload() *Configuration {
 		ChooseStreamAuto:          settings["choose_stream_auto"].(bool),
 		ForceLinkType:             settings["force_link_type"].(bool),
 		UseOriginalTitle:          settings["use_original_title"].(bool),
+		UseAnimeEnTitle:           settings["use_anime_en_title"].(bool),
 		AddSpecials:               settings["add_specials"].(bool),
 		AddEpisodeNumbers:         settings["add_episode_numbers"].(bool),
 		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),

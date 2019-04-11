@@ -439,6 +439,30 @@ func GetTVGenres(language string) []*Genre {
 	return genres.Genres
 }
 
+// IsAnime ...
+func (show *Show) IsAnime() bool {
+	if show == nil || show.OriginCountry == nil || show.Genres == nil {
+		return false
+	}
+
+	countryIsJP := false
+	for _, country := range show.OriginCountry {
+		if country == "JP" {
+			countryIsJP = true
+			break
+		}
+	}
+	genreIsAnim := false
+	for _, genre := range show.Genres {
+		if genre.ID == 16 {
+			genreIsAnim = true
+			break
+		}
+	}
+
+	return countryIsJP && genreIsAnim
+}
+
 // ToListItem ...
 func (show *Show) ToListItem() *xbmc.ListItem {
 	year, _ := strconv.Atoi(strings.Split(show.FirstAirDate, "-")[0])

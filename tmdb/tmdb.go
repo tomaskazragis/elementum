@@ -57,7 +57,7 @@ type Movie struct {
 	} `json:"alternative_titles"`
 
 	Translations *struct {
-		Translations []*Language `json:"translations"`
+		Translations []*Translation `json:"translations"`
 	} `json:"translations"`
 
 	Trailers *struct {
@@ -93,7 +93,7 @@ type Show struct {
 	ExternalIDs         *ExternalIDs `json:"external_ids"`
 
 	Translations *struct {
-		Translations []*Language `json:"translations"`
+		Translations []*Translation `json:"translations"`
 	} `json:"translations"`
 	AlternativeTitles *struct {
 		Titles []*AlternativeTitle `json:"results"`
@@ -120,7 +120,7 @@ type Season struct {
 	} `json:"alternative_titles"`
 
 	Translations *struct {
-		Translations []*Language `json:"translations"`
+		Translations []*Translation `json:"translations"`
 	} `json:"translations"`
 
 	Trailers *struct {
@@ -150,7 +150,7 @@ type Episode struct {
 	} `json:"alternative_titles"`
 
 	Translations *struct {
-		Translations []*Language `json:"translations"`
+		Translations []*Translation `json:"translations"`
 	} `json:"translations"`
 
 	Trailers *struct {
@@ -274,6 +274,23 @@ type Language struct {
 	Iso639_1    string `json:"iso_639_1"`
 	Name        string `json:"name"`
 	EnglishName string `json:"english_name,omitempty"`
+}
+
+// Translation ...
+type Translation struct {
+	Iso3166_1   string           `json:"iso_3166_1"`
+	Iso639_1    string           `json:"iso_639_1"`
+	Name        string           `json:"name"`
+	EnglishName string           `json:"english_name"`
+	Data        *TranslationData `json:"data"`
+}
+
+// TranslationData ...
+type TranslationData struct {
+	Name     string `json:"name"`
+	Title    string `json:"title"`
+	Overview string `json:"overview"`
+	Homepage string `json:"homepage"`
 }
 
 // FindResult ...

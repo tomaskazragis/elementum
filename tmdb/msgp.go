@@ -1126,16 +1126,10 @@ func (z *Episode) MarshalMsg(b []byte) (o []byte, err error) {
 			if z.Translations.Translations[za0002] == nil {
 				o = msgp.AppendNil(o)
 			} else {
-				// map header, size 3
-				// string "Iso639_1"
-				o = append(o, 0x83, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].Iso639_1)
-				// string "Name"
-				o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].Name)
-				// string "EnglishName"
-				o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].EnglishName)
+				o, err = z.Translations.Translations[za0002].MarshalMsg(o)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -1350,7 +1344,7 @@ func (z *Episode) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			} else {
 				if z.Translations == nil {
 					z.Translations = new(struct {
-						Translations []*Language `json:"translations"`
+						Translations []*Translation `json:"translations"`
 					})
 				}
 				var zb0005 uint32
@@ -1374,7 +1368,7 @@ func (z *Episode) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						if cap(z.Translations.Translations) >= int(zb0006) {
 							z.Translations.Translations = (z.Translations.Translations)[:zb0006]
 						} else {
-							z.Translations.Translations = make([]*Language, zb0006)
+							z.Translations.Translations = make([]*Translation, zb0006)
 						}
 						for za0002 := range z.Translations.Translations {
 							if msgp.IsNil(bts) {
@@ -1385,41 +1379,11 @@ func (z *Episode) UnmarshalMsg(bts []byte) (o []byte, err error) {
 								z.Translations.Translations[za0002] = nil
 							} else {
 								if z.Translations.Translations[za0002] == nil {
-									z.Translations.Translations[za0002] = new(Language)
+									z.Translations.Translations[za0002] = new(Translation)
 								}
-								var zb0007 uint32
-								zb0007, bts, err = msgp.ReadMapHeaderBytes(bts)
+								bts, err = z.Translations.Translations[za0002].UnmarshalMsg(bts)
 								if err != nil {
 									return
-								}
-								for zb0007 > 0 {
-									zb0007--
-									field, bts, err = msgp.ReadMapKeyZC(bts)
-									if err != nil {
-										return
-									}
-									switch msgp.UnsafeString(field) {
-									case "Iso639_1":
-										z.Translations.Translations[za0002].Iso639_1, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "Name":
-										z.Translations.Translations[za0002].Name, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "EnglishName":
-										z.Translations.Translations[za0002].EnglishName, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									default:
-										bts, err = msgp.Skip(bts)
-										if err != nil {
-											return
-										}
-									}
 								}
 							}
 						}
@@ -1444,28 +1408,28 @@ func (z *Episode) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						Youtube []*Trailer `json:"youtube"`
 					})
 				}
-				var zb0008 uint32
-				zb0008, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0007 uint32
+				zb0007, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0008 > 0 {
-					zb0008--
+				for zb0007 > 0 {
+					zb0007--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
 					}
 					switch msgp.UnsafeString(field) {
 					case "Youtube":
-						var zb0009 uint32
-						zb0009, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0008 uint32
+						zb0008, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.Trailers.Youtube) >= int(zb0009) {
-							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0009]
+						if cap(z.Trailers.Youtube) >= int(zb0008) {
+							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0008]
 						} else {
-							z.Trailers.Youtube = make([]*Trailer, zb0009)
+							z.Trailers.Youtube = make([]*Trailer, zb0008)
 						}
 						for za0003 := range z.Trailers.Youtube {
 							if msgp.IsNil(bts) {
@@ -1565,7 +1529,7 @@ func (z *Episode) Msgsize() (s int) {
 			if z.Translations.Translations[za0002] == nil {
 				s += msgp.NilSize
 			} else {
-				s += 1 + 9 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].Name) + 12 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].EnglishName)
+				s += z.Translations.Translations[za0002].Msgsize()
 			}
 		}
 	}
@@ -2957,16 +2921,10 @@ func (z *Movie) MarshalMsg(b []byte) (o []byte, err error) {
 			if z.Translations.Translations[za0004] == nil {
 				o = msgp.AppendNil(o)
 			} else {
-				// map header, size 3
-				// string "Iso639_1"
-				o = append(o, 0x83, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
-				o = msgp.AppendString(o, z.Translations.Translations[za0004].Iso639_1)
-				// string "Name"
-				o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0004].Name)
-				// string "EnglishName"
-				o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0004].EnglishName)
+				o, err = z.Translations.Translations[za0004].MarshalMsg(o)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -3307,7 +3265,7 @@ func (z *Movie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			} else {
 				if z.Translations == nil {
 					z.Translations = new(struct {
-						Translations []*Language `json:"translations"`
+						Translations []*Translation `json:"translations"`
 					})
 				}
 				var zb0009 uint32
@@ -3331,7 +3289,7 @@ func (z *Movie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						if cap(z.Translations.Translations) >= int(zb0010) {
 							z.Translations.Translations = (z.Translations.Translations)[:zb0010]
 						} else {
-							z.Translations.Translations = make([]*Language, zb0010)
+							z.Translations.Translations = make([]*Translation, zb0010)
 						}
 						for za0004 := range z.Translations.Translations {
 							if msgp.IsNil(bts) {
@@ -3342,41 +3300,11 @@ func (z *Movie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 								z.Translations.Translations[za0004] = nil
 							} else {
 								if z.Translations.Translations[za0004] == nil {
-									z.Translations.Translations[za0004] = new(Language)
+									z.Translations.Translations[za0004] = new(Translation)
 								}
-								var zb0011 uint32
-								zb0011, bts, err = msgp.ReadMapHeaderBytes(bts)
+								bts, err = z.Translations.Translations[za0004].UnmarshalMsg(bts)
 								if err != nil {
 									return
-								}
-								for zb0011 > 0 {
-									zb0011--
-									field, bts, err = msgp.ReadMapKeyZC(bts)
-									if err != nil {
-										return
-									}
-									switch msgp.UnsafeString(field) {
-									case "Iso639_1":
-										z.Translations.Translations[za0004].Iso639_1, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "Name":
-										z.Translations.Translations[za0004].Name, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "EnglishName":
-										z.Translations.Translations[za0004].EnglishName, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									default:
-										bts, err = msgp.Skip(bts)
-										if err != nil {
-											return
-										}
-									}
 								}
 							}
 						}
@@ -3401,28 +3329,28 @@ func (z *Movie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						Youtube []*Trailer `json:"youtube"`
 					})
 				}
-				var zb0012 uint32
-				zb0012, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0011 uint32
+				zb0011, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0012 > 0 {
-					zb0012--
+				for zb0011 > 0 {
+					zb0011--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
 					}
 					switch msgp.UnsafeString(field) {
 					case "Youtube":
-						var zb0013 uint32
-						zb0013, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0012 uint32
+						zb0012, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.Trailers.Youtube) >= int(zb0013) {
-							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0013]
+						if cap(z.Trailers.Youtube) >= int(zb0012) {
+							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0012]
 						} else {
-							z.Trailers.Youtube = make([]*Trailer, zb0013)
+							z.Trailers.Youtube = make([]*Trailer, zb0012)
 						}
 						for za0005 := range z.Trailers.Youtube {
 							if msgp.IsNil(bts) {
@@ -3492,28 +3420,28 @@ func (z *Movie) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				if z.ReleaseDates == nil {
 					z.ReleaseDates = new(ReleaseDatesResults)
 				}
-				var zb0014 uint32
-				zb0014, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0013 uint32
+				zb0013, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0014 > 0 {
-					zb0014--
+				for zb0013 > 0 {
+					zb0013--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
 					}
 					switch msgp.UnsafeString(field) {
 					case "Results":
-						var zb0015 uint32
-						zb0015, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0014 uint32
+						zb0014, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.ReleaseDates.Results) >= int(zb0015) {
-							z.ReleaseDates.Results = (z.ReleaseDates.Results)[:zb0015]
+						if cap(z.ReleaseDates.Results) >= int(zb0014) {
+							z.ReleaseDates.Results = (z.ReleaseDates.Results)[:zb0014]
 						} else {
-							z.ReleaseDates.Results = make([]*ReleaseDates, zb0015)
+							z.ReleaseDates.Results = make([]*ReleaseDates, zb0014)
 						}
 						for za0006 := range z.ReleaseDates.Results {
 							if msgp.IsNil(bts) {
@@ -3597,7 +3525,7 @@ func (z *Movie) Msgsize() (s int) {
 			if z.Translations.Translations[za0004] == nil {
 				s += msgp.NilSize
 			} else {
-				s += 1 + 9 + msgp.StringPrefixSize + len(z.Translations.Translations[za0004].Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Translations.Translations[za0004].Name) + 12 + msgp.StringPrefixSize + len(z.Translations.Translations[za0004].EnglishName)
+				s += z.Translations.Translations[za0004].Msgsize()
 			}
 		}
 	}
@@ -4037,16 +3965,10 @@ func (z *Season) MarshalMsg(b []byte) (o []byte, err error) {
 			if z.Translations.Translations[za0002] == nil {
 				o = msgp.AppendNil(o)
 			} else {
-				// map header, size 3
-				// string "Iso639_1"
-				o = append(o, 0x83, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].Iso639_1)
-				// string "Name"
-				o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].Name)
-				// string "EnglishName"
-				o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0002].EnglishName)
+				o, err = z.Translations.Translations[za0002].MarshalMsg(o)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -4264,7 +4186,7 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			} else {
 				if z.Translations == nil {
 					z.Translations = new(struct {
-						Translations []*Language `json:"translations"`
+						Translations []*Translation `json:"translations"`
 					})
 				}
 				var zb0005 uint32
@@ -4288,7 +4210,7 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						if cap(z.Translations.Translations) >= int(zb0006) {
 							z.Translations.Translations = (z.Translations.Translations)[:zb0006]
 						} else {
-							z.Translations.Translations = make([]*Language, zb0006)
+							z.Translations.Translations = make([]*Translation, zb0006)
 						}
 						for za0002 := range z.Translations.Translations {
 							if msgp.IsNil(bts) {
@@ -4299,41 +4221,11 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 								z.Translations.Translations[za0002] = nil
 							} else {
 								if z.Translations.Translations[za0002] == nil {
-									z.Translations.Translations[za0002] = new(Language)
+									z.Translations.Translations[za0002] = new(Translation)
 								}
-								var zb0007 uint32
-								zb0007, bts, err = msgp.ReadMapHeaderBytes(bts)
+								bts, err = z.Translations.Translations[za0002].UnmarshalMsg(bts)
 								if err != nil {
 									return
-								}
-								for zb0007 > 0 {
-									zb0007--
-									field, bts, err = msgp.ReadMapKeyZC(bts)
-									if err != nil {
-										return
-									}
-									switch msgp.UnsafeString(field) {
-									case "Iso639_1":
-										z.Translations.Translations[za0002].Iso639_1, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "Name":
-										z.Translations.Translations[za0002].Name, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "EnglishName":
-										z.Translations.Translations[za0002].EnglishName, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									default:
-										bts, err = msgp.Skip(bts)
-										if err != nil {
-											return
-										}
-									}
 								}
 							}
 						}
@@ -4358,28 +4250,28 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						Youtube []*Trailer `json:"youtube"`
 					})
 				}
-				var zb0008 uint32
-				zb0008, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0007 uint32
+				zb0007, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0008 > 0 {
-					zb0008--
+				for zb0007 > 0 {
+					zb0007--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
 					}
 					switch msgp.UnsafeString(field) {
 					case "Youtube":
-						var zb0009 uint32
-						zb0009, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0008 uint32
+						zb0008, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.Trailers.Youtube) >= int(zb0009) {
-							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0009]
+						if cap(z.Trailers.Youtube) >= int(zb0008) {
+							z.Trailers.Youtube = (z.Trailers.Youtube)[:zb0008]
 						} else {
-							z.Trailers.Youtube = make([]*Trailer, zb0009)
+							z.Trailers.Youtube = make([]*Trailer, zb0008)
 						}
 						for za0003 := range z.Trailers.Youtube {
 							if msgp.IsNil(bts) {
@@ -4439,15 +4331,15 @@ func (z *Season) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				}
 			}
 		case "Episodes":
-			var zb0010 uint32
-			zb0010, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0009 uint32
+			zb0009, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Episodes) >= int(zb0010) {
-				z.Episodes = (z.Episodes)[:zb0010]
+			if cap(z.Episodes) >= int(zb0009) {
+				z.Episodes = (z.Episodes)[:zb0009]
 			} else {
-				z.Episodes = make(EpisodeList, zb0010)
+				z.Episodes = make(EpisodeList, zb0009)
 			}
 			for za0004 := range z.Episodes {
 				if msgp.IsNil(bts) {
@@ -4507,7 +4399,7 @@ func (z *Season) Msgsize() (s int) {
 			if z.Translations.Translations[za0002] == nil {
 				s += msgp.NilSize
 			} else {
-				s += 1 + 9 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].Name) + 12 + msgp.StringPrefixSize + len(z.Translations.Translations[za0002].EnglishName)
+				s += z.Translations.Translations[za0002].Msgsize()
 			}
 		}
 	}
@@ -4739,16 +4631,10 @@ func (z *Show) MarshalMsg(b []byte) (o []byte, err error) {
 			if z.Translations.Translations[za0006] == nil {
 				o = msgp.AppendNil(o)
 			} else {
-				// map header, size 3
-				// string "Iso639_1"
-				o = append(o, 0x83, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
-				o = msgp.AppendString(o, z.Translations.Translations[za0006].Iso639_1)
-				// string "Name"
-				o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0006].Name)
-				// string "EnglishName"
-				o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
-				o = msgp.AppendString(o, z.Translations.Translations[za0006].EnglishName)
+				o, err = z.Translations.Translations[za0006].MarshalMsg(o)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -5106,7 +4992,7 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			} else {
 				if z.Translations == nil {
 					z.Translations = new(struct {
-						Translations []*Language `json:"translations"`
+						Translations []*Translation `json:"translations"`
 					})
 				}
 				var zb0010 uint32
@@ -5130,7 +5016,7 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						if cap(z.Translations.Translations) >= int(zb0011) {
 							z.Translations.Translations = (z.Translations.Translations)[:zb0011]
 						} else {
-							z.Translations.Translations = make([]*Language, zb0011)
+							z.Translations.Translations = make([]*Translation, zb0011)
 						}
 						for za0006 := range z.Translations.Translations {
 							if msgp.IsNil(bts) {
@@ -5141,41 +5027,11 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 								z.Translations.Translations[za0006] = nil
 							} else {
 								if z.Translations.Translations[za0006] == nil {
-									z.Translations.Translations[za0006] = new(Language)
+									z.Translations.Translations[za0006] = new(Translation)
 								}
-								var zb0012 uint32
-								zb0012, bts, err = msgp.ReadMapHeaderBytes(bts)
+								bts, err = z.Translations.Translations[za0006].UnmarshalMsg(bts)
 								if err != nil {
 									return
-								}
-								for zb0012 > 0 {
-									zb0012--
-									field, bts, err = msgp.ReadMapKeyZC(bts)
-									if err != nil {
-										return
-									}
-									switch msgp.UnsafeString(field) {
-									case "Iso639_1":
-										z.Translations.Translations[za0006].Iso639_1, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "Name":
-										z.Translations.Translations[za0006].Name, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									case "EnglishName":
-										z.Translations.Translations[za0006].EnglishName, bts, err = msgp.ReadStringBytes(bts)
-										if err != nil {
-											return
-										}
-									default:
-										bts, err = msgp.Skip(bts)
-										if err != nil {
-											return
-										}
-									}
 								}
 							}
 						}
@@ -5200,28 +5056,28 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						Titles []*AlternativeTitle `json:"results"`
 					})
 				}
-				var zb0013 uint32
-				zb0013, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0012 uint32
+				zb0012, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0013 > 0 {
-					zb0013--
+				for zb0012 > 0 {
+					zb0012--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
 					}
 					switch msgp.UnsafeString(field) {
 					case "Titles":
-						var zb0014 uint32
-						zb0014, bts, err = msgp.ReadArrayHeaderBytes(bts)
+						var zb0013 uint32
+						zb0013, bts, err = msgp.ReadArrayHeaderBytes(bts)
 						if err != nil {
 							return
 						}
-						if cap(z.AlternativeTitles.Titles) >= int(zb0014) {
-							z.AlternativeTitles.Titles = (z.AlternativeTitles.Titles)[:zb0014]
+						if cap(z.AlternativeTitles.Titles) >= int(zb0013) {
+							z.AlternativeTitles.Titles = (z.AlternativeTitles.Titles)[:zb0013]
 						} else {
-							z.AlternativeTitles.Titles = make([]*AlternativeTitle, zb0014)
+							z.AlternativeTitles.Titles = make([]*AlternativeTitle, zb0013)
 						}
 						for za0007 := range z.AlternativeTitles.Titles {
 							if msgp.IsNil(bts) {
@@ -5234,13 +5090,13 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 								if z.AlternativeTitles.Titles[za0007] == nil {
 									z.AlternativeTitles.Titles[za0007] = new(AlternativeTitle)
 								}
-								var zb0015 uint32
-								zb0015, bts, err = msgp.ReadMapHeaderBytes(bts)
+								var zb0014 uint32
+								zb0014, bts, err = msgp.ReadMapHeaderBytes(bts)
 								if err != nil {
 									return
 								}
-								for zb0015 > 0 {
-									zb0015--
+								for zb0014 > 0 {
+									zb0014--
 									field, bts, err = msgp.ReadMapKeyZC(bts)
 									if err != nil {
 										return
@@ -5306,15 +5162,15 @@ func (z *Show) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				}
 			}
 		case "Seasons":
-			var zb0016 uint32
-			zb0016, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0015 uint32
+			zb0015, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Seasons) >= int(zb0016) {
-				z.Seasons = (z.Seasons)[:zb0016]
+			if cap(z.Seasons) >= int(zb0015) {
+				z.Seasons = (z.Seasons)[:zb0015]
 			} else {
-				z.Seasons = make(SeasonList, zb0016)
+				z.Seasons = make(SeasonList, zb0015)
 			}
 			for za0008 := range z.Seasons {
 				if msgp.IsNil(bts) {
@@ -5389,7 +5245,7 @@ func (z *Show) Msgsize() (s int) {
 			if z.Translations.Translations[za0006] == nil {
 				s += msgp.NilSize
 			} else {
-				s += 1 + 9 + msgp.StringPrefixSize + len(z.Translations.Translations[za0006].Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Translations.Translations[za0006].Name) + 12 + msgp.StringPrefixSize + len(z.Translations.Translations[za0006].EnglishName)
+				s += z.Translations.Translations[za0006].Msgsize()
 			}
 		}
 	}
@@ -5561,5 +5417,180 @@ func (z *Trailer) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Trailer) Msgsize() (s int) {
 	s = 1 + 5 + msgp.StringPrefixSize + len(z.Name) + 5 + msgp.StringPrefixSize + len(z.Size) + 7 + msgp.StringPrefixSize + len(z.Source) + 5 + msgp.StringPrefixSize + len(z.Type)
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *Translation) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 5
+	// string "Iso3166_1"
+	o = append(o, 0x85, 0xa9, 0x49, 0x73, 0x6f, 0x33, 0x31, 0x36, 0x36, 0x5f, 0x31)
+	o = msgp.AppendString(o, z.Iso3166_1)
+	// string "Iso639_1"
+	o = append(o, 0xa8, 0x49, 0x73, 0x6f, 0x36, 0x33, 0x39, 0x5f, 0x31)
+	o = msgp.AppendString(o, z.Iso639_1)
+	// string "Name"
+	o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
+	o = msgp.AppendString(o, z.Name)
+	// string "EnglishName"
+	o = append(o, 0xab, 0x45, 0x6e, 0x67, 0x6c, 0x69, 0x73, 0x68, 0x4e, 0x61, 0x6d, 0x65)
+	o = msgp.AppendString(o, z.EnglishName)
+	// string "Data"
+	o = append(o, 0xa4, 0x44, 0x61, 0x74, 0x61)
+	if z.Data == nil {
+		o = msgp.AppendNil(o)
+	} else {
+		o, err = z.Data.MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *Translation) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Iso3166_1":
+			z.Iso3166_1, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Iso639_1":
+			z.Iso639_1, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Name":
+			z.Name, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "EnglishName":
+			z.EnglishName, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Data":
+			if msgp.IsNil(bts) {
+				bts, err = msgp.ReadNilBytes(bts)
+				if err != nil {
+					return
+				}
+				z.Data = nil
+			} else {
+				if z.Data == nil {
+					z.Data = new(TranslationData)
+				}
+				bts, err = z.Data.UnmarshalMsg(bts)
+				if err != nil {
+					return
+				}
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *Translation) Msgsize() (s int) {
+	s = 1 + 10 + msgp.StringPrefixSize + len(z.Iso3166_1) + 9 + msgp.StringPrefixSize + len(z.Iso639_1) + 5 + msgp.StringPrefixSize + len(z.Name) + 12 + msgp.StringPrefixSize + len(z.EnglishName) + 5
+	if z.Data == nil {
+		s += msgp.NilSize
+	} else {
+		s += z.Data.Msgsize()
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *TranslationData) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 4
+	// string "Name"
+	o = append(o, 0x84, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
+	o = msgp.AppendString(o, z.Name)
+	// string "Title"
+	o = append(o, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
+	o = msgp.AppendString(o, z.Title)
+	// string "Overview"
+	o = append(o, 0xa8, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65, 0x77)
+	o = msgp.AppendString(o, z.Overview)
+	// string "Homepage"
+	o = append(o, 0xa8, 0x48, 0x6f, 0x6d, 0x65, 0x70, 0x61, 0x67, 0x65)
+	o = msgp.AppendString(o, z.Homepage)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *TranslationData) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Name":
+			z.Name, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Title":
+			z.Title, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Overview":
+			z.Overview, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "Homepage":
+			z.Homepage, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *TranslationData) Msgsize() (s int) {
+	s = 1 + 5 + msgp.StringPrefixSize + len(z.Name) + 6 + msgp.StringPrefixSize + len(z.Title) + 9 + msgp.StringPrefixSize + len(z.Overview) + 9 + msgp.StringPrefixSize + len(z.Homepage)
 	return
 }
