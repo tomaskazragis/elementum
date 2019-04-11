@@ -118,6 +118,7 @@ type ListItemArt struct {
 	ClearArt     string `json:"clearart,omitempty"`
 	ClearLogo    string `json:"clearlogo,omitempty"`
 	Landscape    string `json:"landscape,omitempty"`
+	Icon         string `json:"icon,omitempty"`
 }
 
 // ContextMenuItem ...
