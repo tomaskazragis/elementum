@@ -27,6 +27,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 	r.GET("/playtorrent", PlayTorrent)
 	r.GET("/infolabels", InfoLabelsStored(s))
 	r.GET("/changelog", Changelog)
+	r.GET("/donate", Donate)
 	r.GET("/status", Status)
 
 	search := r.Group("/search")

@@ -39,6 +39,12 @@ func Changelog(ctx *gin.Context) {
 	ctx.String(200, "")
 }
 
+// Donate display
+func Donate(ctx *gin.Context) {
+	xbmc.Dialog("Elementum", "LOCALIZE[30141]")
+	ctx.String(200, "")
+}
+
 // Status display
 func Status(ctx *gin.Context) {
 	title := "LOCALIZE[30393]"
