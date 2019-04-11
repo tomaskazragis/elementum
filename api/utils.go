@@ -56,7 +56,7 @@ func URLQuery(route string, query ...string) string {
 	return route + "?" + v.Encode()
 }
 
-func contextPlayURL(f string, forced bool) string {
+func contextPlayURL(f string, title string, forced bool) string {
 	action := "links"
 	if config.Get().ChooseStreamAuto {
 		action = "play"
@@ -65,10 +65,10 @@ func contextPlayURL(f string, forced bool) string {
 		action = "force" + action
 	}
 
-	return fmt.Sprintf(f, action)
+	return fmt.Sprintf(f, action, url.PathEscape(title))
 }
 
-func contextPlayOppositeURL(f string, forced bool) string {
+func contextPlayOppositeURL(f string, title string, forced bool) string {
 	action := "links"
 	if !config.Get().ChooseStreamAuto {
 		action = "play"
@@ -77,5 +77,5 @@ func contextPlayOppositeURL(f string, forced bool) string {
 		action = "force" + action
 	}
 
-	return fmt.Sprintf(f, action)
+	return fmt.Sprintf(f, action, url.PathEscape(title))
 }

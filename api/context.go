@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -29,12 +31,14 @@ func ContextPlaySelector(s *bittorrent.Service) gin.HandlerFunc {
 			return
 		} else if media == "movie" {
 			if m := library.GetLibraryMovie(kodiID); m != nil && m.UIDs.TMDB != 0 {
-				ctx.Redirect(302, URLQuery(URLForXBMC("/movie/%d/%s", m.UIDs.TMDB, action)))
+				title := fmt.Sprintf("%s (%d)", m.Title, m.Year)
+				ctx.Redirect(302, URLQuery(URLForXBMC("/movie/%d/%s/%s", m.UIDs.TMDB, action, url.PathEscape(title))))
 				return
 			}
 		} else if media == "episode" {
 			if s, e := library.GetLibraryEpisode(kodiID); s != nil && e != nil && e.UIDs.TMDB != 0 {
-				ctx.Redirect(302, URLQuery(URLForXBMC("/show/%d/season/%d/episode/%d/%s", s.UIDs.TMDB, e.Season, e.Episode, action)))
+				title := fmt.Sprintf("%s S%dE%d", s.Title, e.Season, e.Episode)
+				ctx.Redirect(302, URLQuery(URLForXBMC("/show/%d/season/%d/episode/%d/%s/%s", s.UIDs.TMDB, e.Season, e.Episode, action, url.PathEscape(title))))
 				return
 			}
 		}

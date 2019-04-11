@@ -366,11 +366,12 @@ func ShowSeasons(ctx *gin.Context) {
 	for i := len(items) - 1; i >= 0; i-- {
 		item := items[i]
 
-		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s"
+		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s/%s"
+		contextTitle := fmt.Sprintf("%s S%d", show.OriginalName, item.Info.Season)
 		contextLabel := playLabel
 		contextOppositeLabel := linksLabel
-		contextURL := contextPlayOppositeURL(thisURL, false)
-		contextOppositeURL := contextPlayURL(thisURL, false)
+		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
+		contextOppositeURL := contextPlayURL(thisURL, contextTitle, false)
 		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
 			contextOppositeLabel = playLabel
@@ -415,14 +416,15 @@ func ShowEpisodes(ctx *gin.Context) {
 			show.ID,
 			seasonNumber,
 			item.Info.Episode,
-		) + "%s"
+		) + "%s/%s"
 		contextLabel := playLabel
-		contextURL := contextPlayOppositeURL(thisURL, false)
+		contextTitle := fmt.Sprintf("%s S%dE%d", show.OriginalName, seasonNumber, item.Info.Episode)
+		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
 		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
 		}
 
-		item.Path = contextPlayURL(thisURL, false)
+		item.Path = contextPlayURL(thisURL, contextTitle, false)
 
 		if config.Get().Platform.Kodi < 17 {
 			item.ContextMenu = [][]string{

@@ -60,6 +60,7 @@ type Configuration struct {
 	AddEpisodeNumbers         bool
 	ShowUnairedSeasons        bool
 	ShowUnairedEpisodes       bool
+	SmartEpisodeStart         bool
 	SmartEpisodeMatch         bool
 	LibraryUpdate             int
 	StrmLanguage              string
@@ -471,6 +472,7 @@ func Reload() *Configuration {
 		ShowUnairedSeasons:        settings["unaired_seasons"].(bool),
 		ShowUnairedEpisodes:       settings["unaired_episodes"].(bool),
 		PlaybackPercent:           settings["playback_percent"].(int),
+		SmartEpisodeStart:         settings["smart_episode_start"].(bool),
 		SmartEpisodeMatch:         settings["smart_episode_match"].(bool),
 		LibraryUpdate:             settings["library_update"].(int),
 		StrmLanguage:              settings["strm_language"].(string),

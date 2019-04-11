@@ -273,14 +273,15 @@ func renderMovies(ctx *gin.Context, movies tmdb.Movies, page int, total int, que
 		}
 		item := movie.ToListItem()
 
-		thisURL := URLForXBMC("/movie/%d/", movie.ID) + "%s"
+		thisURL := URLForXBMC("/movie/%d/", movie.ID) + "%s/%s"
 		contextLabel := playLabel
-		contextURL := contextPlayOppositeURL(thisURL, false)
+		contextTitle := fmt.Sprintf("%s (%d)", item.Info.OriginalTitle, item.Info.Year)
+		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
 		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel
 		}
 
-		item.Path = contextPlayURL(thisURL, false)
+		item.Path = contextPlayURL(thisURL, contextTitle, false)
 
 		tmdbID := strconv.Itoa(movie.ID)
 
