@@ -314,23 +314,39 @@ func (s *Service) configure() {
 		settings.SetBool("prefer_rc4", preferRc4)
 	}
 
+	settings.SetInt("proxy_type", ProxyTypeNone)
 	if s.config.ProxyEnabled && s.config.ProxyHost != "" {
 		log.Info("Applying proxy settings...")
-		proxyType := s.config.ProxyType + 1
-		settings.SetInt("proxy_type", proxyType)
+		if s.config.ProxyType == 0 {
+			settings.SetInt("proxy_type", ProxyTypeSocks4)
+		} else if s.config.ProxyType == 1 {
+			settings.SetInt("proxy_type", ProxyTypeSocks5)
+			if s.config.ProxyLogin != "" || s.config.ProxyPassword != "" {
+				settings.SetInt("proxy_type", ProxyTypeSocks5Password)
+			}
+		} else if s.config.ProxyType == 2 {
+			settings.SetInt("proxy_type", ProxyTypeSocksHTTP)
+			if s.config.ProxyLogin != "" || s.config.ProxyPassword != "" {
+				settings.SetInt("proxy_type", ProxyTypeSocksHTTPPassword)
+			}
+		} else if s.config.ProxyType == 3 {
+			settings.SetInt("proxy_type", ProxyTypeI2PSAM)
+			settings.SetInt("i2p_port", s.config.ProxyPort)
+			settings.SetStr("i2p_hostname", s.config.ProxyHost)
+			settings.SetBool("allows_i2p_mixed", true)
+		}
+
 		settings.SetInt("proxy_port", s.config.ProxyPort)
 		settings.SetStr("proxy_hostname", s.config.ProxyHost)
 		settings.SetStr("proxy_username", s.config.ProxyLogin)
 		settings.SetStr("proxy_password", s.config.ProxyPassword)
 
-		if config.Get().ProxyUseDownload {
-			settings.SetBool("proxy_peer_connections", true)
-			settings.SetBool("proxy_hostnames", true)
-			settings.SetBool("force_proxy", true)
-		}
-		if config.Get().ProxyUseTracker {
-			settings.SetBool("proxy_tracker_connections", true)
-		}
+		// Proxy files downloads
+		settings.SetBool("proxy_peer_connections", config.Get().ProxyUseDownload)
+		settings.SetBool("proxy_hostnames", config.Get().ProxyUseDownload)
+
+		// Proxy Tracker connections
+		settings.SetBool("proxy_tracker_connections", config.Get().ProxyUseTracker)
 	}
 
 	// Set alert_mask here so it also applies on reconfigure...
