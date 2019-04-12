@@ -155,10 +155,13 @@ type Configuration struct {
 	PlayResumeBack  int
 	TMDBApiKey      string
 
-	OSDBUser         string
-	OSDBPass         string
-	OSDBLanguage     string
-	OSDBAutoLanguage bool
+	OSDBUser           string
+	OSDBPass           string
+	OSDBLanguage       string
+	OSDBAutoLanguage   bool
+	OSDBAutoLoad       bool
+	OSDBAutoLoadCount  int
+	OSDBAutoLoadDelete bool
 
 	SortingModeMovies           int
 	SortingModeShows            int
@@ -543,16 +546,20 @@ func Reload() *Configuration {
 		TraktCalendarsColorEpisode:     settings["trakt_calendars_color_episode"].(string),
 		TraktCalendarsColorUnaired:     settings["trakt_calendars_color_unaired"].(string),
 
-		UpdateFrequency:  settings["library_update_frequency"].(int),
-		UpdateDelay:      settings["library_update_delay"].(int),
-		UpdateAutoScan:   settings["library_auto_scan"].(bool),
-		PlayResume:       settings["play_resume"].(bool),
-		PlayResumeBack:   settings["play_resume_back"].(int),
-		TMDBApiKey:       settings["tmdb_api_key"].(string),
-		OSDBUser:         settings["osdb_user"].(string),
-		OSDBPass:         settings["osdb_pass"].(string),
-		OSDBLanguage:     settings["osdb_language"].(string),
-		OSDBAutoLanguage: settings["osdb_auto_language"].(bool),
+		UpdateFrequency: settings["library_update_frequency"].(int),
+		UpdateDelay:     settings["library_update_delay"].(int),
+		UpdateAutoScan:  settings["library_auto_scan"].(bool),
+		PlayResume:      settings["play_resume"].(bool),
+		PlayResumeBack:  settings["play_resume_back"].(int),
+		TMDBApiKey:      settings["tmdb_api_key"].(string),
+
+		OSDBUser:           settings["osdb_user"].(string),
+		OSDBPass:           settings["osdb_pass"].(string),
+		OSDBLanguage:       settings["osdb_language"].(string),
+		OSDBAutoLanguage:   settings["osdb_auto_language"].(bool),
+		OSDBAutoLoad:       settings["osdb_auto_load"].(bool),
+		OSDBAutoLoadCount:  settings["osdb_auto_load_count"].(int),
+		OSDBAutoLoadDelete: settings["osdb_auto_load_delete"].(bool),
 
 		SortingModeMovies:           settings["sorting_mode_movies"].(int),
 		SortingModeShows:            settings["sorting_mode_shows"].(int),

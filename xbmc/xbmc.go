@@ -539,3 +539,14 @@ func GetLanguageISO639_1() string {
 	}
 	return language
 }
+
+// SettingsGetSettingValue ...
+func SettingsGetSettingValue(setting string) string {
+	params := map[string]interface{}{
+		"setting": setting,
+	}
+	resp := SettingValue{}
+
+	executeJSONRPCO("Settings.GetSettingValue", &resp, params)
+	return resp.Value
+}

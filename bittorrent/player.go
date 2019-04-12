@@ -24,6 +24,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
 	"github.com/elgatito/elementum/library"
+	"github.com/elgatito/elementum/osdb"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
@@ -53,6 +54,7 @@ type Player struct {
 	overlayStatusEnabled     bool
 	chosenFile               *File
 	subtitlesFile            *File
+	subtitlesLoaded          []string
 	fileSize                 int64
 	fileName                 string
 	extracted                string
@@ -129,6 +131,7 @@ func NewPlayer(bts *Service, params PlayerParams) *Player {
 		notEnoughSpace:       false,
 		closing:              make(chan interface{}),
 		bufferEvents:         broadcast.NewBroadcaster(),
+		subtitlesLoaded:      []string{},
 	}
 	return btp
 }
@@ -217,6 +220,7 @@ func (btp *Player) Buffer() error {
 
 	go btp.waitCheckAvailableSpace()
 	go btp.playerLoop()
+
 	go btp.s.AttachPlayer(btp)
 
 	if err := <-buffered; err != nil {
@@ -542,6 +546,16 @@ func (btp *Player) Close() {
 		return
 	}
 
+	// Cleanup autoloaded subtitles
+	if btp.subtitlesLoaded != nil && len(btp.subtitlesLoaded) > 0 && config.Get().OSDBAutoLoadDelete {
+		for _, f := range btp.subtitlesLoaded {
+			if _, err := os.Stat(f); err == nil {
+				log.Infof("Deleting saved subtitles file at %s", f)
+				defer os.Remove(f)
+			}
+		}
+	}
+
 	defer func() {
 		go btp.s.DetachPlayer(btp)
 		go btp.s.PlayerStop()
@@ -788,6 +802,10 @@ playbackWaitLoop:
 
 	playlistSize := xbmc.PlaylistSize()
 	btp.t.IsPlaying = true
+
+	if config.Get().OSDBAutoLoad {
+		go btp.downloadSubtitles()
+	}
 
 playbackLoop:
 	for {
@@ -1086,4 +1104,36 @@ func (btp *Player) findNextEpisode() {
 	btp.next.progressNeeded = util.Min(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+1)
 
 	log.Debugf("Next episode prepared: %#v", btp.next)
+}
+
+func (btp *Player) downloadSubtitles() {
+	payloads, preferredLanguage := osdb.GetPayloads("", []string{"English"}, xbmc.SettingsGetSettingValue("locale.subtitlelanguage"), btp.p.ShowID, xbmc.PlayerGetPlayingFile())
+	log.Infof("Subtitles payload auto: %+v; %s", payloads, preferredLanguage)
+
+	results, err := osdb.DoSearch(payloads, preferredLanguage)
+	if err != nil || results == nil || len(results) == 0 {
+		return
+	}
+
+	btp.subtitlesLoaded = []string{}
+	for i, sub := range results {
+		if i+1 > config.Get().OSDBAutoLoadCount {
+			break
+		}
+
+		subPath := sub.SubFileName[:len(sub.SubFileName)-3] + sub.IDSubtitleFile + ".srt"
+		_, path, err := osdb.DoDownload(subPath, sub.SubDownloadLink)
+		if err != nil {
+			continue
+		}
+
+		btp.subtitlesLoaded = append(btp.subtitlesLoaded, path)
+	}
+
+	if len(btp.subtitlesLoaded) > 0 {
+		log.Infof("Setting subtitles to Kodi Player: %+v", btp.subtitlesLoaded)
+
+		sort.Sort(sort.Reverse(sort.StringSlice(btp.subtitlesLoaded)))
+		xbmc.PlayerSetSubtitles(btp.subtitlesLoaded)
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
@@ -154,13 +155,19 @@ func (tf *TorrentFSEntry) setSubtitles() {
 	extension := filepath.Ext(filePath)
 
 	if extension != ".srt" {
-		srtPath := filePath[0:len(filePath)-len(extension)] + ".srt"
+		// Let's search for all files that have same beginning and .srt extension
+		// It is possible to have items like 'movie.french.srt'
+		currentPath := filePath[0 : len(filePath)-len(extension)]
+		collected := []string{}
 
 		for _, f := range tf.t.files {
-			if f.Path == srtPath {
-				xbmc.PlayerSetSubtitles(util.GetHTTPHost() + "/files/" + srtPath)
-				return
+			if strings.HasPrefix(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
+				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
 			}
+		}
+
+		if len(collected) > 0 {
+			xbmc.PlayerSetSubtitles(collected)
 		}
 	}
 }

@@ -282,6 +282,11 @@ type AdvancedSettings struct {
 	} `xml:"cache"`
 }
 
+// SettingValue ...
+type SettingValue struct {
+	Value string `json:"value"`
+}
+
 // NewView ...
 func NewView(contentType string, items ListItems) *View {
 	return &View{

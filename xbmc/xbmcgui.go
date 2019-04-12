@@ -239,8 +239,8 @@ func PlayerIsPaused() bool {
 }
 
 // PlayerSetSubtitles ...
-func PlayerSetSubtitles(url string) {
-	executeJSONRPCEx("Player_SetSubtitles", nil, Args{url})
+func PlayerSetSubtitles(urls []string) {
+	executeJSONRPCEx("Player_SetSubtitles", nil, Args{urls})
 }
 
 // GetWatchTimes ...
