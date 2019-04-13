@@ -617,7 +617,11 @@ func Reload() *Configuration {
 			if newConfig.AutoMemorySizeStrategy == 0 {
 				newConfig.MemorySize = 40 * 1024 * 1024
 			} else {
-				pct := uint64(5 + (8 * (newConfig.AutoMemorySizeStrategy - 1)))
+				pct := uint64(8)
+				if newConfig.AutoMemorySizeStrategy == 2 {
+					pct = 15
+				}
+
 				mem := memory.TotalMemory() / 100 * pct
 				if mem > 0 {
 					newConfig.MemorySize = int(mem)

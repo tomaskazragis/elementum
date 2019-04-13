@@ -267,6 +267,7 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 
 		if config.Get().UseLibtorrentDeadlines {
 			// Clearing deadlines to have clean requests
+			tf.t.deadlinedPieces.Clear()
 			tf.t.th.ClearPieceDeadlines()
 		}
 		tf.t.PrioritizePieces()
