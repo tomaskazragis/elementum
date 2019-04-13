@@ -145,7 +145,7 @@ func GetPayloads(searchString string, languages []string, preferredLanguage stri
 			appendLocalFilePayloads(playingFile, &payloads)
 		}
 
-		if labels["VideoPlayer.TVshowtitle"] != "" {
+		if showID != 0 {
 			appendEpisodePayloads(showID, labels, &payloads)
 		} else {
 			appendMoviePayloads(labels, &payloads)
