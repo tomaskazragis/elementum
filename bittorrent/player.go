@@ -1081,7 +1081,7 @@ func (btp *Player) startNextEpisode() {
 }
 
 func (btp *Player) findNextEpisode() {
-	if btp.p.ShowID == 0 || btp.next.done || !config.Get().SmartEpisodeStart {
+	if btp.p.ShowID == 0 || btp.next.done || !config.Get().SmartEpisodeStart || xbmc.PlaylistSize() <= 1 {
 		return
 	}
 

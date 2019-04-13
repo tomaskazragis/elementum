@@ -882,6 +882,14 @@ func (s *Service) alertsConsumer() {
 							t.gotMetainfo.Set()
 						}
 					}
+				case lt.HashFailedAlertAlertType:
+					a := lt.SwigcptrHashFailedAlert(alertPtr)
+					for _, t := range s.q.All() {
+						if t.th != nil && a.GetHandle().Equal(t.th) {
+							// Each failed piece should have priority, so we reset deadline
+							t.deadlinedPieces.Remove(uint32(a.GetPieceIndex()))
+						}
+					}
 				}
 
 				alert := &Alert{
