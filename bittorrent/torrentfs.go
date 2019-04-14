@@ -89,7 +89,6 @@ func (tfs *TorrentFS) Open(uname string) (http.File, error) {
 
 	for _, t := range tfs.s.q.All() {
 		for _, f := range t.files {
-			log.Debugf("File: %#v, name: %#v", f, name[1:])
 			if name[1:] == f.Path {
 				log.Noticef("%s belongs to torrent %s", name, t.Name())
 				return NewTorrentFSEntry(file, tfs, t, f, name)
@@ -307,10 +306,10 @@ func (tf *TorrentFSEntry) waitForPiece(piece int) error {
 	}
 
 	defer perf.ScopeTimer()()
-	log.Infof("Waiting for piece %d", piece)
+	log.Warningf("Waiting for piece %d", piece)
 	now := time.Now()
 	defer func() {
-		log.Infof("Waiting for piece %d finished in %s", piece, time.Since(now))
+		log.Warningf("Waiting for piece %d finished in %s", piece, time.Since(now))
 	}()
 
 	tf.t.PrioritizePiece(piece)

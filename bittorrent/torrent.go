@@ -517,6 +517,16 @@ func (t *Torrent) PrioritizePieces() {
 
 	t.muReaders.Lock()
 
+	priorities := [][]int{
+		[]int{},
+		[]int{},
+		[]int{},
+		[]int{},
+		[]int{},
+		[]int{},
+		[]int{},
+		[]int{},
+	}
 	readerProgress := map[int]float64{}
 	readerPieces := map[int]int{}
 	readerKeys := []int64{}
@@ -558,11 +568,14 @@ func (t *Torrent) PrioritizePieces() {
 			} else {
 				readerPieces[curPiece] = util.Max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
 			}
+			priorities[readerPieces[curPiece]] = append(priorities[readerPieces[curPiece]], curPiece)
 
 			// Non-first reader should have lower priorities
-			if readerPieces[curPiece] > 0 && readerPriority != 0 {
-				readerPieces[curPiece] = util.Max(1, 4-readerPriority-int((curPiece-pr.Begin+2)/3))
-			}
+			// if readerPieces[curPiece] > 0 && readerPriority != 0 {
+			// 	readerPieces[curPiece] = util.Max(1, 4-readerPriority-int((curPiece-pr.Begin+2)/3))
+
+			// 	priorities[readerPieces[curPiece]] = append(priorities[readerPieces[curPiece]], curPiece)
+			// }
 
 			readerProgress[curPiece] = 0
 		}
@@ -642,14 +655,31 @@ func (t *Torrent) PrioritizePieces() {
 		// 		t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
 		// 	}
 		// }
-		for curPiece := 0; curPiece <= numPieces-1; curPiece++ {
-			if priority, ok := readerPieces[curPiece]; ok && !t.hasPiece(curPiece) {
-				if t.awaitingPieces.ContainsInt(curPiece) {
+
+		for curPiece := 0; curPiece < numPieces; curPiece++ {
+			if _, ok := readerPieces[curPiece]; !ok || t.hasPiece(curPiece) {
+				t.th.ResetPieceDeadline(curPiece)
+				t.deadlinedPieces.Remove(uint32(curPiece))
+			}
+		}
+
+		// t.th.ClearPieceDeadlines()
+		counter := 0
+		for priority := len(priorities) - 1; priority >= 0; priority-- {
+			// counter := 0
+			for _, curPiece := range priorities[priority] {
+				// counter++
+
+				if t.hasPiece(curPiece) {
+					// t.th.ResetPieceDeadline(curPiece)
+					continue
+				} else if t.awaitingPieces.ContainsInt(curPiece) {
 					t.deadlinedPieces.AddInt(curPiece)
 					t.th.SetPieceDeadline(curPiece, 0, 0)
-				} else if !t.deadlinedPieces.ContainsInt(curPiece) {
+				} else {
+					counter++
 					t.deadlinedPieces.AddInt(curPiece)
-					t.th.SetPieceDeadline(curPiece, (7-priority)*50, 0)
+					t.th.SetPieceDeadline(curPiece, ((7-priority)*50)+counter, 0)
 				}
 			}
 		}
