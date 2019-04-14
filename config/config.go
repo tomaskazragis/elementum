@@ -797,7 +797,7 @@ func CheckBurst() {
 	xbmc.UpdateLocalAddons()
 	xbmc.UpdateAddonRepos()
 
-	if xbmc.DialogConfirm("Elementum", "LOCALIZE[30271]") {
+	if xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30271]") {
 		log.Infof("Triggering Kodi to check for script.elementum.burst plugin")
 		xbmc.PlayURL("plugin://script.elementum.burst/")
 		time.Sleep(15 * time.Second)

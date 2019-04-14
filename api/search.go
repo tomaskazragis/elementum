@@ -41,7 +41,7 @@ func Search(s *bittorrent.Service) gin.HandlerFunc {
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
 		existingTorrent := s.HasTorrentByQuery(query)
-		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]", xbmc.DialogExpiration.Existing)) {
+		if existingTorrent != "" && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30270]")) {
 			xbmc.PlayURLWithTimeout(URLQuery(
 				URLForXBMC("/play"),
 				"resume", existingTorrent,

@@ -210,7 +210,7 @@ func Init() {
 					}
 					if len(labels) > 0 {
 						label = strings.Join(labels, ", ")
-						if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
+						if xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
 							xbmc.VideoLibraryClean()
 						}
 					}
@@ -221,7 +221,7 @@ func Init() {
 							log.Error(err)
 						}
 					}
-					if xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
+					if xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30278];;%s", label)) {
 						xbmc.VideoLibraryClean()
 					}
 				}
@@ -1436,7 +1436,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Movies list (%s) added", listID)
-		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
+		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
 		}
 	}
@@ -1522,7 +1522,7 @@ func SyncShowsList(listID string, updating bool) (err error) {
 
 	if !updating {
 		log.Noticef("Shows list (%s) added", listID)
-		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirm("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
+		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
 		}
 	}

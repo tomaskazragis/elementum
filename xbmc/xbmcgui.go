@@ -1,5 +1,7 @@
 package xbmc
 
+import "time"
+
 // DialogProgress ...
 type DialogProgress struct {
 	hWnd int64
@@ -180,12 +182,15 @@ func DialogConfirm(title string, message string) bool {
 }
 
 // DialogConfirmFocused ...
-func DialogConfirmFocused(title string, message string, autoclose int) bool {
+func DialogConfirmFocused(title string, message string) bool {
+	// Emulating left click to make "OK predefined"
+	go func() {
+		time.Sleep(time.Millisecond * 50)
+		retVal := 0
+		executeJSONRPC("Input.Left", &retVal, nil)
+	}()
+
 	retVal := 0
-	// TODO: we need to set Yes button to the left, No to the right.
-	//       setting Yes to the right is not "nice" enough.
-	// executeJSONRPCEx("Dialog_Confirm_Focused", &retVal, Args{title, message, autoclose * 1000})
-	// return retVal == 0
 	executeJSONRPCEx("Dialog_Confirm", &retVal, Args{title, message})
 	return retVal != 0
 }
