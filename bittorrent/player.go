@@ -16,6 +16,7 @@ import (
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/sanity-io/litter"
 
@@ -82,6 +83,7 @@ type PlayerParams struct {
 	VideoDuration   float64
 	URI             string
 	FileIndex       int
+	ResumeToken     string
 	ResumeHash      string
 	ResumePlayback  bool
 	ContentType     string
@@ -93,6 +95,7 @@ type PlayerParams struct {
 	Query           string
 	UIDs            *library.UniqueIDs
 	Resume          *library.Resume
+	StoredResume    *library.Resume
 }
 
 // NextEpisode ...
@@ -270,6 +273,7 @@ func (btp *Player) processMetadata() {
 		return
 	}
 
+	btp.p.ResumeToken = strconv.FormatUint(xxhash.Sum64String(btp.t.InfoHash()+btp.chosenFile.Path), 10)
 	btp.hasChosenFile = true
 	btp.fileSize = btp.chosenFile.Size
 	btp.fileName = btp.chosenFile.Name
@@ -277,6 +281,13 @@ func (btp *Player) processMetadata() {
 
 	log.Infof("Chosen file: %s", btp.fileName)
 	log.Infof("Saving torrent to database")
+
+	btp.FetchStoredResume()
+	if btp.p.StoredResume != nil && btp.p.StoredResume.Position > 0 {
+		if !config.Get().StoreResume || config.Get().StoreResumeAction == 0 || !(config.Get().SilentStreamStart || config.Get().StoreResumeAction == 2 || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30535];;%s", btp.p.StoredResume.ToString()))) {
+			btp.p.StoredResume.Reset()
+		}
+	}
 
 	files := []string{}
 	if btp.chosenFile != nil {
@@ -863,6 +874,7 @@ playbackLoop:
 	}
 
 	log.Info("Stopped playback")
+	btp.SaveStoredResume()
 	btp.setRateLimiting(false)
 	go func() {
 		btp.GetIdent()
@@ -1135,5 +1147,33 @@ func (btp *Player) downloadSubtitles() {
 
 		sort.Sort(sort.Reverse(sort.StringSlice(btp.subtitlesLoaded)))
 		xbmc.PlayerSetSubtitles(btp.subtitlesLoaded)
+	}
+}
+
+// FetchStoredResume ...
+func (btp *Player) FetchStoredResume() {
+	key := "stored.resume." + btp.p.ResumeToken
+	if btp.p.StoredResume == nil {
+		btp.p.StoredResume = &library.Resume{}
+	}
+
+	database.GetCache().GetCachedObject(database.CommonBucket, key, btp.p.StoredResume)
+}
+
+// SaveStoredResume ...
+func (btp *Player) SaveStoredResume() {
+	key := "stored.resume." + btp.p.ResumeToken
+
+	if btp.p.StoredResume == nil {
+		btp.p.StoredResume = &library.Resume{}
+	}
+
+	btp.p.StoredResume.Total = btp.p.VideoDuration
+	btp.p.StoredResume.Position = btp.p.WatchedTime
+
+	if btp.IsWatched() || btp.p.StoredResume.Position < 180 {
+		database.GetCache().Delete(database.CommonBucket, key)
+	} else {
+		database.GetCache().SetCachedObject(database.CommonBucket, storedResumeExpiration, key, btp.p.StoredResume)
 	}
 }

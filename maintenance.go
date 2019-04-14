@@ -111,7 +111,21 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			p.Params().Paused = false
 			return
 		}
-		log.Debugf("OnPlay Resume check. KodiPosition: %#v, Resume: %#v", p.Params().KodiPosition, p.Params().Resume)
+
+		log.Debugf("OnPlay Resume check. KodiPosition: %#v, Resume: %#v, StoredResume: %#v", p.Params().KodiPosition, p.Params().Resume, p.Params().StoredResume)
+		if p.Params().StoredResume != nil {
+			pos := p.Params().StoredResume.Position
+			if config.Get().PlayResumeBack > 0 {
+				pos -= float64(config.Get().PlayResumeBack)
+				if pos < 0 {
+					pos = 0
+				}
+			}
+
+			xbmc.PlayerSeek(pos)
+			return
+		}
+
 		if !config.Get().PlayResume || p.Params().KodiPosition == 0 || p.Params().Resume == nil {
 			return
 		}

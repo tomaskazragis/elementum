@@ -1,7 +1,10 @@
 package library
 
 import (
+	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -104,4 +107,23 @@ type removedEpisode struct {
 	ShowName string
 	Season   int
 	Episode  int
+}
+
+// ToString ...
+func (r *Resume) ToString() string {
+	if r.Position == 0 {
+		return ""
+	}
+
+	t1 := time.Now()
+	t2 := t1.Add(time.Duration(int(r.Position)) * time.Second)
+
+	diff := t2.Sub(t1)
+	return fmt.Sprintf("%d:%02d:%02d", int(diff.Hours()), int(math.Mod(diff.Minutes(), 60)), int(math.Mod(diff.Seconds(), 60)))
+}
+
+// Reset ...
+func (r *Resume) Reset() {
+	r.Position = 0
+	r.Total = 0
 }

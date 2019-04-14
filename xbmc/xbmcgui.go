@@ -232,6 +232,10 @@ func PlayerIsPlaying() bool {
 
 // PlayerSeek ...
 func PlayerSeek(position float64) (ret string) {
+	if position <= 0 {
+		return
+	}
+
 	executeJSONRPCEx("Player_Seek", &ret, Args{position})
 	return
 }

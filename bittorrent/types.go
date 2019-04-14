@@ -135,3 +135,7 @@ const (
 	// ProxyTypeI2PSAM ...
 	ProxyTypeI2PSAM
 )
+
+const (
+	storedResumeExpiration = 30 * 60 * 60 * 24
+)

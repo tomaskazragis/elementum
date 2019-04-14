@@ -148,12 +148,14 @@ type Configuration struct {
 	TraktCalendarsColorEpisode     string
 	TraktCalendarsColorUnaired     string
 
-	UpdateFrequency int
-	UpdateDelay     int
-	UpdateAutoScan  bool
-	PlayResume      bool
-	PlayResumeBack  int
-	TMDBApiKey      string
+	UpdateFrequency   int
+	UpdateDelay       int
+	UpdateAutoScan    bool
+	PlayResume        bool
+	PlayResumeBack    int
+	StoreResume       bool
+	StoreResumeAction int
+	TMDBApiKey        string
 
 	OSDBUser           string
 	OSDBPass           string
@@ -546,12 +548,14 @@ func Reload() *Configuration {
 		TraktCalendarsColorEpisode:     settings["trakt_calendars_color_episode"].(string),
 		TraktCalendarsColorUnaired:     settings["trakt_calendars_color_unaired"].(string),
 
-		UpdateFrequency: settings["library_update_frequency"].(int),
-		UpdateDelay:     settings["library_update_delay"].(int),
-		UpdateAutoScan:  settings["library_auto_scan"].(bool),
-		PlayResume:      settings["play_resume"].(bool),
-		PlayResumeBack:  settings["play_resume_back"].(int),
-		TMDBApiKey:      settings["tmdb_api_key"].(string),
+		UpdateFrequency:   settings["library_update_frequency"].(int),
+		UpdateDelay:       settings["library_update_delay"].(int),
+		UpdateAutoScan:    settings["library_auto_scan"].(bool),
+		PlayResume:        settings["play_resume"].(bool),
+		PlayResumeBack:    settings["play_resume_back"].(int),
+		StoreResume:       settings["store_resume"].(bool),
+		StoreResumeAction: settings["store_resume_action"].(int),
+		TMDBApiKey:        settings["tmdb_api_key"].(string),
 
 		OSDBUser:           settings["osdb_user"].(string),
 		OSDBPass:           settings["osdb_pass"].(string),
