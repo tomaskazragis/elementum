@@ -782,6 +782,29 @@ func (t *Torrent) GetProgress() float64 {
 	return float64(ts.GetProgress()) * 100
 }
 
+// DownloadAllFiles ...
+func (t *Torrent) DownloadAllFiles() {
+	selected := []string{}
+	for _, f := range t.files {
+		t.DownloadFile(f)
+		selected = append(selected, f.Path)
+	}
+
+	database.Get().UpdateBTItemFiles(t.infoHash, selected)
+	t.FetchDBItem()
+}
+
+// UnDownloadAllFiles ...
+func (t *Torrent) UnDownloadAllFiles() {
+	selected := []string{}
+	for _, f := range t.ChosenFiles {
+		t.UnDownloadFile(f)
+	}
+
+	database.Get().UpdateBTItemFiles(t.infoHash, selected)
+	t.FetchDBItem()
+}
+
 // DownloadFile ...
 func (t *Torrent) DownloadFile(addFile *File) {
 	t.ChosenFiles = append(t.ChosenFiles, addFile)
@@ -794,6 +817,27 @@ func (t *Torrent) DownloadFile(addFile *File) {
 		log.Debugf("Choosing file for download: %s", f.Path)
 		t.th.FilePriority(f.Index, 1)
 	}
+}
+
+// UnDownloadFile ...
+func (t *Torrent) UnDownloadFile(addFile *File) bool {
+	idx := -1
+	for i, f := range t.ChosenFiles {
+		if f.Index == addFile.Index {
+			idx = i
+			break
+		}
+	}
+
+	if idx == -1 {
+		return false
+	}
+
+	log.Debugf("UnChoosing file for download: %s", addFile.Path)
+	t.th.FilePriority(addFile.Index, 0)
+	t.ChosenFiles = append(t.ChosenFiles[:idx], t.ChosenFiles[idx+1:]...)
+
+	return true
 }
 
 // InfoHash ...
@@ -898,6 +942,12 @@ func (t *Torrent) Resume() {
 
 // GetDBItem ...
 func (t *Torrent) GetDBItem() *database.BTItem {
+	return t.DBItem
+}
+
+// FetchDBItem ...
+func (t *Torrent) FetchDBItem() *database.BTItem {
+	t.DBItem = database.Get().GetBTItem(t.infoHash)
 	return t.DBItem
 }
 
@@ -1129,4 +1179,10 @@ func (t *Torrent) GetNextEpisodeFile(season, episode int) *File {
 	}
 
 	return nil
+}
+
+// HasAvailableFiles ...
+func (t *Torrent) HasAvailableFiles() bool {
+	// Keeping it simple? If not all files are chosen - then true?
+	return len(t.ChosenFiles) < len(t.files)
 }

@@ -244,8 +244,8 @@ func (d *SqliteDatabase) GetBTItem(infoHash string) *BTItem {
 	return item
 }
 
-// UpdateStatusBTItem ...
-func (d *SqliteDatabase) UpdateStatusBTItem(infoHash string, status int) error {
+// UpdateBTItemStatus ...
+func (d *SqliteDatabase) UpdateBTItemStatus(infoHash string, status int) error {
 	_, err := d.Exec(`UPDATE tinfo SET state = ? WHERE infohash = ?`, status, infoHash)
 	return err
 }
@@ -278,6 +278,26 @@ func (d *SqliteDatabase) UpdateBTItem(infoHash string, mediaID int, mediaType st
 	_, err := d.Exec(`INSERT OR REPLACE INTO tinfo (infohash, state, mediaID, mediaType, files, infos) VALUES (?, ?, ?, ?, ?, ?)`, infoHash, StatusActive, mediaID, mediaType, fileStr, infoStr)
 	if err != nil {
 		log.Debugf("UpdateBTItem failed: %s", err)
+	}
+	return err
+}
+
+// UpdateBTItemFiles ...
+func (d *SqliteDatabase) UpdateBTItemFiles(infoHash string, files []string) error {
+	fileStr := ""
+	for _, f := range files {
+		if f != "" {
+			if len(fileStr) > 0 {
+				fileStr += "|"
+			}
+
+			fileStr += f
+		}
+	}
+
+	_, err := d.Exec(`UPDATE tinfo SET files = ? WHERE infohash = ?`, fileStr, infoHash)
+	if err != nil {
+		log.Debugf("UpdateBTItemFiles failed: %s", err)
 	}
 	return err
 }

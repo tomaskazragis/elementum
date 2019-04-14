@@ -151,7 +151,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			torrentName := t.Name()
 			progress := t.GetProgress()
 			status := t.GetStateString()
-			dt := t.GetAddedTime()
+			// dt := t.GetAddedTime()
 
 			torrentAction := []string{"LOCALIZE[30231]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause/%s", t.InfoHash()))}
 			sessionAction := []string{"LOCALIZE[30233]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/pause"))}
@@ -215,9 +215,11 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %s", progress, color, status, torrentName),
 				Path:  playURL,
 				Info: &xbmc.ListItemInfo{
-					Title:     torrentName,
-					Date:      dt.String(),
-					DateAdded: dt.String(),
+					Title: torrentName,
+					// TODO: Looks like Date breaks default sorting.
+					// Probably better to make forced sorting from context menu.
+					// Date:      dt.String(),
+					// DateAdded: dt.String(),
 				},
 			}
 			item.ContextMenu = [][]string{
@@ -228,6 +230,15 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/move/%s", t.InfoHash()))},
 				sessionAction,
 			}
+
+			if !s.IsMemoryStorage() {
+				if t.HasAvailableFiles() {
+					item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30531]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/downloadall/%s", t.InfoHash()))})
+				} else {
+					item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30532]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/undownloadall/%s", t.InfoHash()))})
+				}
+			}
+
 			item.IsPlayable = true
 			items = append(items, &item)
 		}
@@ -466,6 +477,42 @@ func RemoveTorrent(s *bittorrent.Service) gin.HandlerFunc {
 			torrentsLog.Info("Removing the torrent without deleting files from the web ...")
 			s.RemoveTorrent(torrent, false)
 		}
+
+		xbmc.Refresh()
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		ctx.String(200, "")
+	}
+}
+
+// DownloadAllTorrent ...
+func DownloadAllTorrent(s *bittorrent.Service) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(s, torrentID)
+		if err != nil {
+			ctx.Error(fmt.Errorf("Unable to download all files for torrent with index %s", torrentID))
+			return
+		}
+
+		torrent.DownloadAllFiles()
+
+		xbmc.Refresh()
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		ctx.String(200, "")
+	}
+}
+
+// UnDownloadAllTorrent ...
+func UnDownloadAllTorrent(s *bittorrent.Service) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(s, torrentID)
+		if err != nil {
+			ctx.Error(fmt.Errorf("Unable to undownload all files for torrent with index %s", torrentID))
+			return
+		}
+
+		torrent.UnDownloadAllFiles()
 
 		xbmc.Refresh()
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")

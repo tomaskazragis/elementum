@@ -1295,7 +1295,7 @@ func (s *Service) downloadProgress() {
 								log.Warning(fileName, "moved to", dst)
 
 								log.Infof("Marking %s for removal from library and database...", torrentName)
-								database.Get().UpdateStatusBTItem(infoHash, Remove)
+								database.Get().UpdateBTItemStatus(infoHash, Remove)
 							}
 						}()
 					}
