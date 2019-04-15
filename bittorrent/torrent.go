@@ -18,6 +18,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
+	"github.com/fatih/color"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -41,9 +42,7 @@ type Torrent struct {
 	readers        map[int64]*TorrentFSEntry
 	reservedPieces []int
 
-	awaitingPieces  *roaring.Bitmap
-	timedPieces     *roaring.Bitmap
-	deadlinedPieces *roaring.Bitmap
+	awaitingPieces *roaring.Bitmap
 
 	ChosenFiles []*File
 	TorrentPath string
@@ -105,10 +104,7 @@ func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, 
 		readers:        map[int64]*TorrentFSEntry{},
 		reservedPieces: []int{},
 
-		awaitingPieces:  roaring.NewBitmap(),
-		timedPieces:     roaring.NewBitmap(),
-		deadlinedPieces: roaring.NewBitmap(),
-		// readerPieces: roaring.NewBitmap(),
+		awaitingPieces: roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
@@ -140,14 +136,12 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
-	readersTicker := time.NewTicker(10 * time.Second)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
-	defer readersTicker.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -161,8 +155,6 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-readersTicker.C:
-			go t.ResetReaders()
 		case <-sc:
 			t.Closer.Set()
 			return
@@ -332,7 +324,7 @@ func (t *Torrent) Buffer(file *File) {
 				if mem < t.MemorySize || free == 0 {
 					break
 				}
-				if (mem*2)-t.MemorySize < free {
+				if (mem-t.MemorySize)*2 < free {
 					newMemorySize = mem
 					break
 				}
@@ -402,18 +394,12 @@ func (t *Torrent) Buffer(file *File) {
 	}
 	for _ = 0; curPiece <= preBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
-		if config.Get().UseLibtorrentDeadlines {
-			t.th.SetPieceDeadline(curPiece, 0, 0)
-		}
 	}
 	for _ = 0; curPiece < postBufferStart; curPiece++ {
 		piecesPriorities.Add(defaultPriority)
 	}
 	for _ = 0; curPiece <= postBufferEnd; curPiece++ { // get this part
 		piecesPriorities.Add(7)
-		if config.Get().UseLibtorrentDeadlines {
-			t.th.SetPieceDeadline(curPiece, 0, 0)
-		}
 	}
 	numPieces := t.ti.NumPieces()
 	for _ = 0; curPiece < numPieces; curPiece++ {
@@ -493,14 +479,8 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 	t.awaitingPieces.AddInt(piece)
 
-	// if config.Get().UseLibtorrentDeadlines {
-	// 	t.th.ClearPieceDeadlines()
-	// }
 	t.th.PiecePriority(piece, 7)
-
-	if config.Get().UseLibtorrentDeadlines {
-		t.th.SetPieceDeadline(piece, 0, 0)
-	}
+	t.th.SetPieceDeadline(piece, 0, 0)
 }
 
 // PrioritizePieces ...
@@ -538,44 +518,33 @@ func (t *Torrent) PrioritizePieces() {
 		return t.readers[readerKeys[i]].lastUsed.Before(t.readers[readerKeys[j]].lastUsed)
 	})
 
-	t.timedPieces.Clear()
 	lastBonus := 0
 	for _, k := range readerKeys {
 		lastBonus++
 		readerPriority := len(readerKeys) - lastBonus
 
 		pr := t.readers[k].ReaderPiecesRange()
-		log.Debugf("Reader range: %#v, priority: %d", pr, readerPriority)
+		log.Debugf("Reader range: %#v, priority: %d, last: %s", pr, readerPriority, t.readers[k].lastUsed.Format(time.RFC3339))
 
-		bufferLeft := t.BufferLength
 		for curPiece := pr.Begin; curPiece <= pr.End; curPiece++ {
-			// Basically we set priority to each needed piece with this logic:
-			//   Starting from 7 (that is the max), then each next piece has
-			//   lower priority, plus more up to date reader has bigger priority,
-			//   that is because Kodi requests multiple pieces at once, while
-			//   not closing old readers, so we try to first download
-			//   for most recent reader.
-
-			// We should detect first N pieces of each reader,
-			// to make sure we get them with the highest priority.
-			bufferLeft -= t.pieceLength
-			if bufferLeft >= 0 {
-				t.timedPieces.AddInt(curPiece)
-			}
-
 			if t.awaitingPieces.ContainsInt(curPiece) {
 				readerPieces[curPiece] = 7
 			} else {
-				readerPieces[curPiece] = util.Max(2, 7-readerPriority-int((curPiece-pr.Begin+2)/3))
+				pos := curPiece - pr.Begin
+				switch {
+				case pos <= 0:
+					readerPieces[curPiece] = 6
+				case pos <= 2:
+					readerPieces[curPiece] = 5
+				case pos <= 5:
+					readerPieces[curPiece] = 4
+				case pos <= 9:
+					readerPieces[curPiece] = 3
+				default:
+					readerPieces[curPiece] = 2
+				}
 			}
 			priorities[readerPieces[curPiece]] = append(priorities[readerPieces[curPiece]], curPiece)
-
-			// Non-first reader should have lower priorities
-			// if readerPieces[curPiece] > 0 && readerPriority != 0 {
-			// 	readerPieces[curPiece] = util.Max(1, 4-readerPriority-int((curPiece-pr.Begin+2)/3))
-
-			// 	priorities[readerPieces[curPiece]] = append(priorities[readerPieces[curPiece]], curPiece)
-			// }
 
 			readerProgress[curPiece] = 0
 		}
@@ -601,16 +570,27 @@ func (t *Torrent) PrioritizePieces() {
 	}
 	sort.Ints(piecesKeys)
 
-	for _, k := range piecesKeys {
+	for i, k := range piecesKeys {
 		readerVector.Add(k)
 
+		if i > 1 && piecesKeys[i] > piecesKeys[i-1]+1 {
+			piecesStatus = piecesStatus[0:len(piecesStatus)-6] + "]\n["
+		}
+
 		if readerPieces[k] > 0 {
-			piecesStatus += fmt.Sprintf("%d:%d:%d, ", k, readerPieces[k], int(readerProgress[k]*100))
+			progress := int(readerProgress[k] * 100)
+			if progress >= 100 {
+				piecesStatus += color.GreenString("%d:%d:%d, ", k, readerPieces[k], progress)
+			} else if progress > 0 {
+				piecesStatus += color.YellowString("%d:%d:%d, ", k, readerPieces[k], progress)
+			} else {
+				piecesStatus += color.RedString("%d:%d:%d, ", k, readerPieces[k], progress)
+			}
 		}
 	}
 
 	if len(piecesStatus) > 1 {
-		piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+		piecesStatus = piecesStatus[0:len(piecesStatus)-6] + "]"
 		log.Debugf("Priorities: %s", piecesStatus)
 	}
 
@@ -640,7 +620,7 @@ func (t *Torrent) PrioritizePieces() {
 			// t.th.SetPieceDeadline(curPiece, (7-priority)*20, 0)
 		} else {
 			piecesPriorities.Add(defaultPriority)
-			t.deadlinedPieces.Remove(uint32(curPiece))
+			// t.deadlinedPieces.Remove(uint32(curPiece))
 			// if defaultPriority == 0 {
 			// 	t.th.ResetPieceDeadline(curPiece)
 			// }
@@ -649,41 +629,6 @@ func (t *Torrent) PrioritizePieces() {
 
 	t.th.PrioritizePieces(piecesPriorities)
 
-	if config.Get().UseLibtorrentDeadlines {
-		// for curPiece := numPieces - 1; curPiece >= 0; curPiece-- {
-		// 	if priority, ok := readerPieces[curPiece]; ok && !t.hasPiece(curPiece) {
-		// 		t.th.SetPieceDeadline(curPiece, (7-priority)*10, 0)
-		// 	}
-		// }
-
-		for curPiece := 0; curPiece < numPieces; curPiece++ {
-			if _, ok := readerPieces[curPiece]; !ok || t.hasPiece(curPiece) {
-				t.th.ResetPieceDeadline(curPiece)
-				t.deadlinedPieces.Remove(uint32(curPiece))
-			}
-		}
-
-		// t.th.ClearPieceDeadlines()
-		counter := 0
-		for priority := len(priorities) - 1; priority >= 0; priority-- {
-			// counter := 0
-			for _, curPiece := range priorities[priority] {
-				// counter++
-
-				if t.hasPiece(curPiece) {
-					// t.th.ResetPieceDeadline(curPiece)
-					continue
-				} else if t.awaitingPieces.ContainsInt(curPiece) {
-					t.deadlinedPieces.AddInt(curPiece)
-					t.th.SetPieceDeadline(curPiece, 0, 0)
-				} else {
-					counter++
-					t.deadlinedPieces.AddInt(curPiece)
-					t.th.SetPieceDeadline(curPiece, ((7-priority)*50)+counter, 0)
-				}
-			}
-		}
-	}
 }
 
 // GetAddedTime ...
@@ -1024,13 +969,7 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 		return 0
 	}
 
-	// log.Debugf("Size from lt: %d, set: %d, res: %d, pl: %d, pl2: %d", size, t.MemorySize, len(t.reservedPieces), t.ti.PieceLength(), t.pieceLength)
-	base := float64(t.MemorySize - (int64(len(t.reservedPieces)+1))*t.pieceLength)
-	if len(t.readers) == 1 {
-		return int64(base)
-	}
-
-	return int64(base * 0.5)
+	return int64(t.MemorySize - (int64(len(t.reservedPieces)+1))*t.pieceLength)
 }
 
 // CloseReaders ...
@@ -1055,8 +994,39 @@ func (t *Torrent) ResetReaders() {
 	}
 
 	perReaderSize := t.GetReadaheadSize()
+	countActive := float64(0)
+	countIdle := float64(0)
 	for _, r := range t.readers {
-		size := perReaderSize
+		if r.IsActive() {
+			countActive++
+		} else {
+			countIdle++
+		}
+	}
+
+	sizeActive := int64(0)
+	sizeIdle := int64(0)
+	if countIdle > 0 {
+		sizeIdle = int64(float64(perReaderSize) * 0.33)
+		if countActive > 0 {
+			sizeActive = int64((float64(perReaderSize) - (float64(perReaderSize) * 0.33)))
+		}
+	} else if countActive > 0 {
+		sizeActive = int64(float64(perReaderSize) / countActive)
+	}
+
+	if countActive == 0 && countIdle == 0 {
+		return
+	} else if countActive == 0 || countIdle == 0 {
+		sizeActive = perReaderSize
+		sizeIdle = perReaderSize
+	}
+
+	for _, r := range t.readers {
+		size := sizeActive
+		if !r.IsActive() {
+			size = sizeIdle
+		}
 
 		if r.readahead == size {
 			continue

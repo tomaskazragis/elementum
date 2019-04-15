@@ -109,13 +109,13 @@ func (mf *MemoryFile) Seek(off int64, whence int) (ret int64, err error) {
 
 // Readdir ...
 func (mf *MemoryFile) Readdir(count int) (ret []os.FileInfo, err error) {
-	log.Debugf("Memory. Read: %#v", count)
+	// log.Debugf("Memory. Read: %#v", count)
 	return
 }
 
 // Stat ...
 func (mf *MemoryFile) Stat() (ret os.FileInfo, err error) {
-	log.Debugf("Memory. Stat: %#v, F: %#v", mf, mf.f)
+	// log.Debugf("Memory. Stat: %#v, F: %#v", mf, mf.f)
 	return mf, nil
 }
 

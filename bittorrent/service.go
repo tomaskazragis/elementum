@@ -228,7 +228,7 @@ func (s *Service) configure() {
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 
 	// Sizes
-	settings.SetInt("max_out_request_queue", 10000)
+	settings.SetInt("max_out_request_queue", 25000)
 	settings.SetInt("max_allowed_in_request_queue", 10000)
 	// settings.SetInt("listen_queue_size", 2000)
 	// settings.SetInt("unchoke_slots_limit", 20)
@@ -397,7 +397,7 @@ func (s *Service) configure() {
 		settings.SetBool("auto_sequential", false)
 
 		// settings.SetInt("tick_interval", 300)
-		settings.SetBool("strict_end_game_mode", false)
+		// settings.SetBool("strict_end_game_mode", false)
 
 		// settings.SetInt("disk_io_write_mode", 2)
 		// settings.SetInt("disk_io_read_mode", 2)
@@ -880,14 +880,6 @@ func (s *Service) alertsConsumer() {
 					for _, t := range s.q.All() {
 						if t.th != nil && metadataAlert.GetHandle().Equal(t.th) {
 							t.gotMetainfo.Set()
-						}
-					}
-				case lt.HashFailedAlertAlertType:
-					a := lt.SwigcptrHashFailedAlert(alertPtr)
-					for _, t := range s.q.All() {
-						if t.th != nil && a.GetHandle().Equal(t.th) {
-							// Each failed piece should have priority, so we reset deadline
-							t.deadlinedPieces.Remove(uint32(a.GetPieceIndex()))
 						}
 					}
 				}

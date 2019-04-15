@@ -13,7 +13,6 @@ import (
 	lt "github.com/ElementumOrg/libtorrent-go"
 	"github.com/anacrolix/missinggo/perf"
 
-	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -50,6 +49,7 @@ type TorrentFSEntry struct {
 	storageType int
 
 	lastUsed time.Time
+	isActive bool
 }
 
 // PieceRange ...
@@ -118,12 +118,12 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 		id:          time.Now().UTC().UnixNano(),
 
 		lastUsed: time.Now(),
+		isActive: true,
 	}
 	go tf.consumeAlerts()
 
 	t.muReaders.Lock()
 	t.readers[tf.id] = tf
-	log.Debugf("Added reader. Active readers now: %#v", len(t.readers))
 	t.muReaders.Unlock()
 
 	t.ResetReaders()
@@ -184,18 +184,16 @@ func (tf *TorrentFSEntry) Close() error {
 
 	tf.t.muReaders.Lock()
 	delete(tf.t.readers, tf.id)
-	log.Debugf("Removed reader. Active readers left: %#v", len(tf.t.readers))
 	tf.t.muReaders.Unlock()
 
-	tf.t.ResetReaders()
-
+	defer tf.t.ResetReaders()
 	return tf.File.Close()
 }
 
 // Read ...
 func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 	defer perf.ScopeTimer()()
-	tf.lastUsed = time.Now()
+	tf.SetActive(true)
 
 	currentOffset, err := tf.File.Seek(0, io.SeekCurrent)
 	if err != nil {
@@ -256,19 +254,20 @@ func (tf *TorrentFSEntry) Read(data []byte) (n int, err error) {
 // Seek ...
 func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 	defer perf.ScopeTimer()()
-	tf.lastUsed = time.Now()
+	tf.SetActive(true)
 
 	seekingOffset := offset
 
 	switch whence {
 	case io.SeekStart:
-		// tf.seeked.Set()
+		for _, r := range tf.t.readers {
+			if r.id == tf.id {
+				continue
+			}
 
-		if config.Get().UseLibtorrentDeadlines {
-			// Clearing deadlines to have clean requests
-			tf.t.deadlinedPieces.Clear()
-			tf.t.th.ClearPieceDeadlines()
+			r.SetActive(false)
 		}
+
 		tf.t.PrioritizePieces()
 
 		break
@@ -286,18 +285,6 @@ func (tf *TorrentFSEntry) Seek(offset int64, whence int) (int64, error) {
 
 	log.Infof("Seeking at %d... with %d", seekingOffset, whence)
 	return tf.File.Seek(offset, whence)
-
-	// piece, _ := tf.pieceFromOffset(seekingOffset)
-	// if tf.t.hasPiece(piece) == false {
-	// 	log.Infof("We don't have piece %d, setting piece priorities", piece)
-
-	// 	// TODO: Need this? Cleaning all the deadlines and call PrioritizePieces to reorganize priorities
-	// 	// tf.t.th.ClearPieceDeadlines()
-	// 	tf.t.PrioritizePiece(piece)
-	// 	go tf.t.PrioritizePieces()
-	// }
-
-	// return tf.File.Seek(offset, whence)
 }
 
 func (tf *TorrentFSEntry) waitForPiece(piece int) error {
@@ -359,7 +346,6 @@ func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
 	if tf.f.Size > 0 && ra > tf.f.Size-pos {
 		ra = tf.f.Size - pos
 	}
-	// log.Infof("Range: id=%d, pos=%d, ra=%d, orig=%d, size=%d", tf.id, pos, ra, tf.readahead, tf.f.Size)
 
 	return tf.byteRegionPieces(tf.torrentOffset(pos), ra)
 }
@@ -391,4 +377,23 @@ func (tf *TorrentFSEntry) byteRegionPieces(off, size int64) (pr PieceRange) {
 // IsIdle ...
 func (tf *TorrentFSEntry) IsIdle() bool {
 	return tf.lastUsed.Before(time.Now().Add(time.Minute * -1))
+}
+
+// IsActive ...
+func (tf *TorrentFSEntry) IsActive() bool {
+	return tf.isActive
+}
+
+// SetActive ...
+func (tf *TorrentFSEntry) SetActive(is bool) {
+	if is != tf.isActive {
+		defer tf.t.ResetReaders()
+	}
+
+	if is {
+		tf.lastUsed = time.Now()
+		tf.isActive = true
+	} else {
+		tf.isActive = false
+	}
 }
