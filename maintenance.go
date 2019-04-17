@@ -104,11 +104,13 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 
 		// Do not need to seek if it's not starting from the beginning of file
 		if p.Params().WatchedTime > 30 {
+			log.Infof("Skipping seek for already-seeked player")
 			return
 		}
 
 		if p.Params().Paused { // Prevent seeking when simply unpausing
 			p.Params().Paused = false
+			log.Infof("Skipping seek for paused player")
 			return
 		}
 
