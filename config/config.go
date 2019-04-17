@@ -174,7 +174,8 @@ type Configuration struct {
 	CustomProviderTimeoutEnabled bool
 	CustomProviderTimeout        int
 
-	InternalDNSEnabled bool
+	InternalDNSEnabled  bool
+	InternalDNSSkipIPv6 bool
 
 	InternalProxyEnabled bool
 	InternalProxyLogging bool
@@ -574,7 +575,8 @@ func Reload() *Configuration {
 		CustomProviderTimeoutEnabled: settings["custom_provider_timeout_enabled"].(bool),
 		CustomProviderTimeout:        settings["custom_provider_timeout"].(int),
 
-		InternalDNSEnabled: settings["internal_dns_enabled"].(bool),
+		InternalDNSEnabled:  settings["internal_dns_enabled"].(bool),
+		InternalDNSSkipIPv6: settings["internal_dns_skip_ipv6"].(bool),
 
 		InternalProxyEnabled: settings["internal_proxy_enabled"].(bool),
 		InternalProxyLogging: settings["internal_proxy_logging"].(bool),

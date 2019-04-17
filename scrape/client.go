@@ -72,7 +72,16 @@ func CustomDial(network, addr string) (net.Conn, error) {
 	if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
 		if ipTest := net.ParseIP(addrs[0]); ipTest == nil {
 			if ip, err := resolve(addrs[0]); err == nil && len(ip) > 0 {
-				addr = ip[0] + ":" + addrs[1]
+				if !config.Get().InternalDNSSkipIPv6 {
+					addr = ip[0] + ":" + addrs[1]
+				} else {
+					for _, i := range ip {
+						if len(i) == net.IPv4len {
+							addr = i + ":" + addrs[1]
+							break
+						}
+					}
+				}
 			}
 		}
 	}
@@ -90,7 +99,16 @@ func CustomDialContext(ctx context.Context, network, addr string) (net.Conn, err
 	if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
 		if ipTest := net.ParseIP(addrs[0]); ipTest == nil {
 			if ip, err := resolve(addrs[0]); err == nil && len(ip) > 0 {
-				addr = ip[0] + ":" + addrs[1]
+				if !config.Get().InternalDNSSkipIPv6 {
+					addr = ip[0] + ":" + addrs[1]
+				} else {
+					for _, i := range ip {
+						if len(i) == net.IPv4len {
+							addr = i + ":" + addrs[1]
+							break
+						}
+					}
+				}
 			}
 		}
 	}
