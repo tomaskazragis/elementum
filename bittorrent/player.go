@@ -286,6 +286,7 @@ func (btp *Player) processMetadata() {
 	if btp.p.StoredResume != nil && btp.p.StoredResume.Position > 0 {
 		if !config.Get().StoreResume || config.Get().StoreResumeAction == 0 || !(config.Get().SilentStreamStart || config.Get().StoreResumeAction == 2 || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30535];;%s", btp.p.StoredResume.ToString()))) {
 			btp.p.StoredResume.Reset()
+			btp.SaveStoredResume()
 		}
 	}
 
