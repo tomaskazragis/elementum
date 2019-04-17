@@ -1120,7 +1120,7 @@ func (btp *Player) findNextEpisode() {
 
 func (btp *Player) downloadSubtitles() {
 	payloads, preferredLanguage := osdb.GetPayloads("", []string{"English"}, xbmc.SettingsGetSettingValue("locale.subtitlelanguage"), btp.p.ShowID, xbmc.PlayerGetPlayingFile())
-	log.Infof("Subtitles payload auto: %+v; %s", payloads, preferredLanguage)
+	log.Infof("Subtitles payload auto: %#v; %s", payloads, preferredLanguage)
 
 	results, err := osdb.DoSearch(payloads, preferredLanguage)
 	if err != nil || results == nil || len(results) == 0 {

@@ -31,7 +31,7 @@ func SubtitlesIndex(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		payloads, preferredLanguage := osdb.GetPayloads(q.Get("searchstring"), strings.Split(q.Get("languages"), ","), q.Get("preferredlanguage"), s.GetActivePlayer().Params().ShowID, playingFile)
-		subLog.Infof("Subtitles payload: %+v", payloads)
+		subLog.Infof("Subtitles payload: %#v", payloads)
 
 		results, err := osdb.DoSearch(payloads, preferredLanguage)
 		if err != nil {

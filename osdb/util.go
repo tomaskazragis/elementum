@@ -174,11 +174,8 @@ func appendLocalFilePayloads(playingFile string, payloads *[]SearchPayload) erro
 	if s, err := file.Stat(); err == nil {
 		hashPayload.Size = s.Size()
 	}
-
-	*payloads = append(*payloads, []SearchPayload{
-		hashPayload,
-		{Query: strings.Replace(filepath.Base(playingFile), filepath.Ext(playingFile), "", -1)},
-	}...)
+	hashPayload.Query = strings.Replace(filepath.Base(playingFile), filepath.Ext(playingFile), "", -1)
+	*payloads = append(*payloads, hashPayload)
 
 	return nil
 }
