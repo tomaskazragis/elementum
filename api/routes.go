@@ -30,6 +30,13 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 	r.GET("/donate", Donate)
 	r.GET("/status", Status)
 
+	history := r.Group("/history")
+	{
+		history.GET("", History)
+		history.GET("/remove", HistoryRemove)
+		history.GET("/clear", HistoryClear)
+	}
+
 	search := r.Group("/search")
 	{
 		search.GET("", Search(s))

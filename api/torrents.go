@@ -54,7 +54,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	if strings.HasPrefix(torrent.URI, "magnet") {
 		torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
 		if b, err := torrent.MarshalJSON(); err == nil {
-			database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
+			database.Get().AddTorrentLink(tmdbID, torrent.InfoHash, b)
 		}
 
 		return
@@ -66,7 +66,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	}
 
 	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
-	database.Get().AddTorrentHistory(tmdbID, torrent.InfoHash, b)
+	database.Get().AddTorrentLink(tmdbID, torrent.InfoHash, b)
 }
 
 // InTorrentsMap ...
@@ -97,6 +97,31 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 		database.Get().QueryRow(`SELECT COUNT(*) FROM thistory_assign WHERE infohash_id = ?`, infohashID).Scan(&left)
 		if left == 0 {
 			database.Get().Exec(`DELETE FROM thistory_metainfo WHERE rowid = ?`, infohashID)
+		}
+	}
+
+	return nil
+}
+
+// InTorrentsHistory ...
+func InTorrentsHistory(infohash string) *bittorrent.TorrentFile {
+	if !config.Get().UseTorrentHistory {
+		return nil
+	}
+
+	var b []byte
+	database.Get().QueryRow(`SELECT metainfo FROM torrent_history WHERE infohash = ?`, infohash).Scan(&b)
+
+	if len(infohash) > 0 && len(b) > 0 {
+		torrent := &bittorrent.TorrentFile{}
+		if b[0] == '{' {
+			torrent.UnmarshalJSON(b)
+		} else {
+			torrent.LoadFromBytes(b)
+		}
+
+		if len(torrent.URI) > 0 {
+			return torrent
 		}
 	}
 

@@ -178,8 +178,8 @@ func (d *SqliteDatabase) AddSearchHistory(historyType, query string) {
 	d.Exec(`DELETE FROM history_queries WHERE type = ? AND rowid NOT IN (SELECT rowid FROM history_queries WHERE type = ? ORDER BY dt DESC LIMIT ?)`, historyType, historyType, historyMaxSize)
 }
 
-// AddTorrentHistory saves link between torrent file and tmdbID entry
-func (d *SqliteDatabase) AddTorrentHistory(tmdbID, infoHash string, b []byte) {
+// AddTorrentLink saves link between torrent file and tmdbID entry
+func (d *SqliteDatabase) AddTorrentLink(tmdbID, infoHash string, b []byte) {
 	log.Debugf("Saving torrent entry for TMDB %s with infohash %s", tmdbID, infoHash)
 
 	var infohashID int64
@@ -306,4 +306,28 @@ func (d *SqliteDatabase) UpdateBTItemFiles(infoHash string, files []string) erro
 func (d *SqliteDatabase) DeleteBTItem(infoHash string) error {
 	_, err := d.Exec(`DELETE FROM tinfo WHERE infohash = ?`, infoHash)
 	return err
+}
+
+// AddTorrentHistory saves last used torrent
+func (d *SqliteDatabase) AddTorrentHistory(infoHash, name string, b []byte) {
+	if !config.Get().UseTorrentHistory {
+		return
+	}
+
+	log.Debugf("Saving torrent %s with infohash %s to the history", name, infoHash)
+
+	rowid := 0
+	d.QueryRow(`SELECT rowid FROM torrent_history WHERE infohash = ?`, infoHash).Scan(&rowid)
+
+	if rowid > 0 {
+		d.Exec(`UPDATE torrent_history SET dt = ? WHERE rowid = ?`, time.Now().Unix(), rowid)
+		return
+	}
+
+	if _, err := d.Exec(`INSERT INTO torrent_history (infohash, name, dt, metainfo) VALUES(?, ?, ?, ?)`, infoHash, name, time.Now().Unix(), b); err != nil {
+		log.Warningf("Error inserting item to the history: %s", err)
+		return
+	}
+
+	d.Exec(`DELETE FROM torrent_history WHERE rowid NOT IN (SELECT rowid FROM torrent_history ORDER BY dt DESC LIMIT ?)`, config.Get().TorrentHistorySize)
 }

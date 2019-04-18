@@ -43,6 +43,8 @@ type Configuration struct {
 	KeepDownloading           int
 	KeepFilesPlaying          int
 	KeepFilesFinished         int
+	UseTorrentHistory         bool
+	TorrentHistorySize        int
 	UseFanartTv               bool
 	DisableBgProgress         bool
 	DisableBgProgressPlayback bool
@@ -461,6 +463,8 @@ func Reload() *Configuration {
 		KeepDownloading:           settings["keep_downloading"].(int),
 		KeepFilesPlaying:          settings["keep_files_playing"].(int),
 		KeepFilesFinished:         settings["keep_files_finished"].(int),
+		UseTorrentHistory:         settings["use_torrent_history"].(bool),
+		TorrentHistorySize:        settings["torrent_history_size"].(int),
 		UseFanartTv:               settings["use_fanart_tv"].(bool),
 		DisableBgProgress:         settings["disable_bg_progress"].(bool),
 		DisableBgProgressPlayback: settings["disable_bg_progress_playback"].(bool),

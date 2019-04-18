@@ -85,7 +85,7 @@ func migrateDB() bool {
 			return
 		}
 
-		newDB.AddTorrentHistory(string(k), torrent.InfoHash, v)
+		newDB.AddTorrentLink(string(k), torrent.InfoHash, v)
 		oldDB.Delete(database.TorrentHistoryBucket, string(k))
 	})
 	return true

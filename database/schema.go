@@ -2,6 +2,7 @@ package database
 
 var schemaChanges = []schemaChange{
 	schemaV1,
+	schemaV2,
 }
 
 func schemaV1(previousVersion *int, db *SqliteDatabase) (success bool, err error) {
@@ -78,6 +79,37 @@ CREATE TABLE IF NOT EXISTS library_uids (
 CREATE INDEX IF NOT EXISTS library_uids_idx1 ON library_uids (mediaType, kodi);
 CREATE INDEX IF NOT EXISTS library_uids_idx2 ON library_uids (mediaType, tmdb);
 
+`
+
+	// Just run an a bunch of statements
+	// If everything is fine - return success so we won't get in there again
+	if _, err = db.Exec(sql); err == nil {
+		*previousVersion = version
+		success = true
+	}
+
+	return
+}
+
+func schemaV2(previousVersion *int, db *SqliteDatabase) (success bool, err error) {
+	version := 2
+
+	if *previousVersion > version {
+		return
+	}
+
+	sql := `
+
+-- Table for Search queries history
+CREATE TABLE IF NOT EXISTS torrent_history (
+  infohash TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL DEFAULT "",
+  dt INT NOT NULL DEFAULT 0,
+  metainfo BLOB
+);
+CREATE INDEX IF NOT EXISTS torrent_history_idx1 ON torrent_history (dt DESC);
+CREATE INDEX IF NOT EXISTS torrent_history_idx2 ON torrent_history (infohash);
+  
 `
 
 	// Just run an a bunch of statements
