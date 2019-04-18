@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	piecesRefreshDuration = 500 * time.Millisecond
+	piecesRefreshDuration = 350 * time.Millisecond
 )
 
 // TorrentFS ...
@@ -156,11 +156,12 @@ func (tf *TorrentFSEntry) setSubtitles() {
 	if extension != ".srt" {
 		// Let's search for all files that have same beginning and .srt extension
 		// It is possible to have items like 'movie.french.srt'
-		currentPath := filePath[0 : len(filePath)-len(extension)]
+		_, f := filepath.Split(filePath)
+		currentPath := f[0 : len(f)-len(extension)]
 		collected := []string{}
 
 		for _, f := range tf.t.files {
-			if strings.HasPrefix(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
+			if strings.Contains(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
 				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
 			}
 		}
