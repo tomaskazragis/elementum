@@ -33,7 +33,7 @@ type MemoryFile struct {
 
 // NewMemoryFile ...
 func NewMemoryFile(tf *TorrentFS, storage lt.MemoryStorage, file *File, path string) *MemoryFile {
-	log.Debugf("New memory file: %v", path)
+	// log.Debugf("New memory file: %v", path)
 	return &MemoryFile{
 		tf:   tf,
 		s:    storage,
@@ -44,7 +44,7 @@ func NewMemoryFile(tf *TorrentFS, storage lt.MemoryStorage, file *File, path str
 
 // Close ...
 func (mf *MemoryFile) Close() (err error) {
-	log.Debugf("Closing memory file: %#v", mf.path)
+	// log.Debugf("Closing memory file: %#v", mf.path)
 
 	return
 }

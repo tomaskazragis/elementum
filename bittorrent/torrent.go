@@ -19,6 +19,7 @@ import (
 	"github.com/anacrolix/missinggo/perf"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
+	"github.com/valyala/bytebufferpool"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -180,7 +181,10 @@ func (t *Torrent) bufferTickerEvent() {
 		t.muBuffer.Lock()
 		defer t.muBuffer.Unlock()
 
-		piecesStatus := "["
+		piecesStatus := bytebufferpool.Get()
+		defer bytebufferpool.Put(piecesStatus)
+
+		piecesStatus.WriteString("[")
 		piecesKeys := []int{}
 		for k := range t.BufferPiecesProgress {
 			piecesKeys = append(piecesKeys, k)
@@ -188,16 +192,20 @@ func (t *Torrent) bufferTickerEvent() {
 		sort.Ints(piecesKeys)
 
 		for _, k := range piecesKeys {
-			piecesStatus += fmt.Sprintf("%d:%d, ", k, int(t.BufferPiecesProgress[k]*100))
+			if piecesStatus.Len() > 1 {
+				piecesStatus.WriteString(", ")
+			}
+
+			piecesStatus.WriteString(fmt.Sprintf("%d:%d", k, int(t.BufferPiecesProgress[k]*100)))
 		}
 
-		if len(piecesStatus) > 1 {
-			piecesStatus = piecesStatus[0:len(piecesStatus)-2] + "]"
+		if piecesStatus.Len() > 1 {
+			piecesStatus.WriteString("]")
 		}
 
 		seeds, seedsTotal, peers, peersTotal := t.GetConnections()
 		downSpeed, upSpeed := t.GetHumanizedSpeeds()
-		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus)
+		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus.String())
 
 		// thisProgress := float64(t.BufferPiecesLength-progressCount) / float64(t.BufferPiecesLength) * 100
 		if thisProgress > t.BufferProgress {
@@ -497,6 +505,8 @@ func (t *Torrent) PrioritizePieces() {
 
 	t.muReaders.Lock()
 
+	numPieces := t.ti.NumPieces()
+
 	priorities := [][]int{
 		[]int{},
 		[]int{},
@@ -508,23 +518,11 @@ func (t *Torrent) PrioritizePieces() {
 		[]int{},
 	}
 	readerProgress := map[int]float64{}
-	readerPieces := map[int]int{}
-	readerKeys := []int64{}
-	for k := range t.readers {
-		readerKeys = append(readerKeys, k)
-	}
+	readerPieces := make([]int, numPieces)
 
-	sort.Slice(readerKeys, func(i int, j int) bool {
-		return t.readers[readerKeys[i]].lastUsed.Before(t.readers[readerKeys[j]].lastUsed)
-	})
-
-	lastBonus := 0
-	for _, k := range readerKeys {
-		lastBonus++
-		readerPriority := len(readerKeys) - lastBonus
-
-		pr := t.readers[k].ReaderPiecesRange()
-		log.Debugf("Reader range: %#v, priority: %d, last: %s", pr, readerPriority, t.readers[k].lastUsed.Format(time.RFC3339))
+	for _, r := range t.readers {
+		pr := r.ReaderPiecesRange()
+		log.Debugf("Reader range: %+v, last: %s", pr, r.lastUsed.Format(time.RFC3339))
 
 		for curPiece := pr.Begin; curPiece <= pr.End; curPiece++ {
 			if t.awaitingPieces.ContainsInt(curPiece) {
@@ -563,38 +561,44 @@ func (t *Torrent) PrioritizePieces() {
 	reservedVector := lt.NewStdVectorInt()
 	defer lt.DeleteStdVectorInt(reservedVector)
 
-	piecesStatus := "["
+	piecesStatus := bytebufferpool.Get()
+	defer bytebufferpool.Put(piecesStatus)
+
+	piecesStatus.WriteString("[")
 	piecesKeys := []int{}
-	for k := range readerPieces {
-		piecesKeys = append(piecesKeys, k)
+	for k, p := range readerPieces {
+		if p > 0 {
+			piecesKeys = append(piecesKeys, k)
+		}
 	}
 	sort.Ints(piecesKeys)
 
 	for i, k := range piecesKeys {
 		readerVector.Add(k)
 
-		if i > 1 && piecesKeys[i] > piecesKeys[i-1]+1 {
-			piecesStatus = piecesStatus[0:len(piecesStatus)-6] + "]\n["
-		}
-
 		if readerPieces[k] > 0 {
 			progress := int(readerProgress[k] * 100)
+			comma := ""
+			if i > 1 && piecesKeys[i] > piecesKeys[i-1]+1 {
+				piecesStatus.WriteString("]\n[")
+			} else if piecesStatus.Len() > 1 {
+				comma = ", "
+			}
+
 			if progress >= 100 {
-				piecesStatus += color.GreenString("%d:%d:%d, ", k, readerPieces[k], progress)
+				piecesStatus.WriteString(color.GreenString("%s%d:%d:%d", comma, k, readerPieces[k], progress))
 			} else if progress > 0 {
-				piecesStatus += color.YellowString("%d:%d:%d, ", k, readerPieces[k], progress)
+				piecesStatus.WriteString(color.YellowString("%s%d:%d:%d", comma, k, readerPieces[k], progress))
 			} else {
-				piecesStatus += color.RedString("%d:%d:%d, ", k, readerPieces[k], progress)
+				piecesStatus.WriteString(color.RedString("%s%d:%d:%d", comma, k, readerPieces[k], progress))
 			}
 		}
 	}
 
-	if len(piecesStatus) > 1 {
-		piecesStatus = piecesStatus[0:len(piecesStatus)-6] + "]"
-		log.Debugf("Priorities: %s", piecesStatus)
+	if piecesStatus.Len() > 1 {
+		piecesStatus.WriteString("]")
+		log.Debugf("Priorities: %s", piecesStatus.String())
 	}
-
-	numPieces := t.ti.NumPieces()
 
 	for _, piece := range t.reservedPieces {
 		reservedVector.Add(piece)
@@ -605,25 +609,28 @@ func (t *Torrent) PrioritizePieces() {
 		t.ms.UpdateReservedPieces(reservedVector)
 	}
 
-	defaultPriority := 1
-	if t.Service.IsMemoryStorage() {
-		defaultPriority = 0
+	defaultPriority := 0
+	if !t.Service.IsMemoryStorage() {
+		// Getting piece priorities from libtorrent to keep 0 for non-needed pieces
+		priorities := t.th.PiecePriorities()
+		defer lt.DeleteStdVectorInt(priorities)
+
+		var p int
+		for curPiece := 0; curPiece < numPieces; curPiece++ {
+			if p = priorities.Get(curPiece); p == 0 {
+				readerPieces[curPiece] = p
+			}
+		}
 	}
 
 	// Splitting to first set priorities, then deadlines,
 	// so that latest set deadline is the nearest piece number
 	for curPiece := 0; curPiece < numPieces; curPiece++ {
-		if priority, ok := readerPieces[curPiece]; ok {
+		if priority := readerPieces[curPiece]; priority > 0 {
 			readerVector.Add(curPiece)
 			piecesPriorities.Add(priority)
-			// t.th.SetPieceDeadline(curPiece, 0, 0)
-			// t.th.SetPieceDeadline(curPiece, (7-priority)*20, 0)
 		} else {
 			piecesPriorities.Add(defaultPriority)
-			// t.deadlinedPieces.Remove(uint32(curPiece))
-			// if defaultPriority == 0 {
-			// 	t.th.ResetPieceDeadline(curPiece)
-			// }
 		}
 	}
 
@@ -643,7 +650,10 @@ func (t *Torrent) GetStatus() lt.TorrentStatus {
 
 // GetState ...
 func (t *Torrent) GetState() int {
-	return int(t.GetStatus().GetState())
+	st := t.GetStatus()
+	defer lt.DeleteTorrentStatus(st)
+
+	return int(st.GetState())
 }
 
 // GetStateString ...
@@ -714,15 +724,16 @@ func (t *Torrent) piecesProgress(pieces map[int]float64) {
 
 	t.th.GetDownloadQueue(queue)
 	for piece := range pieces {
-		if t.th.HavePiece(piece) == true {
+		if t.hasPiece(piece) {
 			pieces[piece] = 1.0
 		}
 	}
+
 	queueSize := queue.Size()
 	for i := 0; i < int(queueSize); i++ {
 		ppi := queue.Get(i)
 		pieceIndex := ppi.GetPieceIndex()
-		if _, exists := pieces[pieceIndex]; exists {
+		if v, exists := pieces[pieceIndex]; exists && v != 1.0 {
 			blocks := ppi.Blocks()
 			totalBlocks := ppi.GetBlocksInPiece()
 			totalBlockDownloaded := uint(0)
@@ -1006,10 +1017,18 @@ func (t *Torrent) ResetReaders() {
 
 	sizeActive := int64(0)
 	sizeIdle := int64(0)
+
+	if countIdle > 1 {
+		countIdle = 2
+	}
+	if countActive > 1 {
+		countActive = 2
+	}
+
 	if countIdle > 0 {
 		sizeIdle = int64(float64(perReaderSize) * 0.33)
 		if countActive > 0 {
-			sizeActive = int64((float64(perReaderSize) - (float64(perReaderSize) * 0.33)))
+			sizeActive = perReaderSize - sizeIdle
 		}
 	} else if countActive > 0 {
 		sizeActive = int64(float64(perReaderSize) / countActive)
@@ -1017,9 +1036,6 @@ func (t *Torrent) ResetReaders() {
 
 	if countActive == 0 && countIdle == 0 {
 		return
-	} else if countActive == 0 || countIdle == 0 {
-		sizeActive = perReaderSize
-		sizeIdle = perReaderSize
 	}
 
 	for _, r := range t.readers {
@@ -1093,26 +1109,32 @@ func (t *Torrent) updatePieces() error {
 	t.piecesMx.Lock()
 	defer t.piecesMx.Unlock()
 
-	if time.Now().After(t.piecesLastUpdated.Add(piecesRefreshDuration)) {
-		// need to keep a reference to the status or else the pieces bitfield
-		// is at risk of being collected
-		t.lastStatus = t.th.Status(uint(lt.TorrentHandleQueryPieces))
-		// defer lt.DeleteTorrentStatus(t.lastStatus)
-
-		if t.lastStatus.GetState() > lt.TorrentStatusSeeding {
-			return errors.New("Torrent file has invalid state")
-		}
-		piecesBits := t.lastStatus.GetPieces()
-		piecesBitsSize := piecesBits.Size()
-		piecesSliceSize := piecesBitsSize / 8
-		if piecesBitsSize%8 > 0 {
-			// Add +1 to round up the bitfield
-			piecesSliceSize++
-		}
-		data := (*[100000000]byte)(unsafe.Pointer(piecesBits.Bytes()))[:piecesSliceSize]
-		t.pieces = Bitfield(data)
-		t.piecesLastUpdated = time.Now()
+	if time.Now().Before(t.piecesLastUpdated.Add(piecesRefreshDuration)) {
+		return nil
 	}
+
+	// need to keep a reference to the status or else the pieces bitfield
+	// is at risk of being collected
+	t.lastStatus = t.th.Status(uint(lt.TorrentHandleQueryPieces))
+	// defer lt.DeleteTorrentStatus(t.lastStatus)
+
+	if t.lastStatus.GetState() > lt.TorrentStatusSeeding {
+		return errors.New("Torrent file has invalid state")
+	}
+
+	piecesBits := t.lastStatus.GetPieces()
+	piecesBitsSize := piecesBits.Size()
+	piecesSliceSize := piecesBitsSize / 8
+
+	if piecesBitsSize%8 > 0 {
+		// Add +1 to round up the bitfield
+		piecesSliceSize++
+	}
+
+	data := (*[100000000]byte)(unsafe.Pointer(piecesBits.Bytes()))[:piecesSliceSize]
+	t.pieces = Bitfield(data)
+	t.piecesLastUpdated = time.Now()
+
 	return nil
 }
 
