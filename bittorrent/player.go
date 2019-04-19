@@ -77,6 +77,7 @@ type PlayerParams struct {
 	Paused          bool
 	Seeked          bool
 	WasPlaying      bool
+	WasSeeked       bool
 	KodiPosition    int
 	WatchedProgress int
 	WatchedTime     float64

@@ -124,6 +124,7 @@ func (r *Resume) ToString() string {
 
 // Reset ...
 func (r *Resume) Reset() {
+	log.Debugf("Resetting stored resume position")
 	r.Position = 0
 	r.Total = 0
 }

@@ -89,22 +89,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
-		for i := 0; i <= 6; i++ {
-			if p.Params().VideoDuration != 0 {
-				break
-			}
-
-			time.Sleep(500 * time.Millisecond)
-		}
-
-		if p.Params().VideoDuration == 0 {
-			log.Warningf("Cannot get player's VideoDuration")
-			return
-		}
-
-		// Do not need to seek if it's not starting from the beginning of file
-		if p.Params().WatchedTime > 30 {
-			log.Infof("Skipping seek for already-seeked player")
+		if p.Params().WasSeeked {
 			return
 		}
 
@@ -114,44 +99,29 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
-		log.Debugf("OnPlay Resume check. KodiPosition: %#v, Resume: %#v, StoredResume: %#v", p.Params().KodiPosition, p.Params().Resume, p.Params().StoredResume)
-		if p.Params().StoredResume != nil {
-			pos := p.Params().StoredResume.Position
-			if config.Get().PlayResumeBack > 0 {
-				pos -= float64(config.Get().PlayResumeBack)
-				if pos < 0 {
-					pos = 0
-				}
+		log.Infof("OnPlay Resume check. Resume: %#v, StoredResume: %#v", p.Params().Resume, p.Params().StoredResume)
+
+		p.Params().WasSeeked = true
+		resumePosition := float64(0)
+
+		if !config.Get().PlayResume {
+			return
+		} else if config.Get().StoreResume && p.Params().StoredResume != nil && p.Params().StoredResume.Position > 0 {
+			resumePosition = p.Params().StoredResume.Position
+		} else if p.Params().ResumePlayback && p.Params().Resume != nil && p.Params().Resume.Position > 0 {
+			resumePosition = p.Params().Resume.Position
+		}
+
+		if config.Get().PlayResumeBack > 0 {
+			resumePosition -= float64(config.Get().PlayResumeBack)
+			if resumePosition < 0 {
+				resumePosition = 0
 			}
-
-			xbmc.PlayerSeek(pos)
-			return
 		}
 
-		if !config.Get().PlayResume || p.Params().KodiPosition == 0 || p.Params().Resume == nil {
-			return
-		}
-		var started struct {
-			Item struct {
-				ID   int    `json:"id"`
-				Type string `json:"type"`
-			} `json:"item"`
-		}
-		if err := json.Unmarshal(jsonData, &started); err != nil {
-			log.Error(err)
-			return
-		}
-
-		if p.Params().Resume.Position > 0 && p.Params().ResumePlayback {
-			pos := p.Params().Resume.Position
-			if config.Get().PlayResumeBack > 0 {
-				pos -= float64(config.Get().PlayResumeBack)
-				if pos < 0 {
-					pos = 0
-				}
-			}
-
-			xbmc.PlayerSeek(pos)
+		if resumePosition > 0 {
+			log.Infof("Seeking to %v", resumePosition)
+			xbmc.PlayerSeek(resumePosition)
 		}
 
 	case "Player.OnStop":
