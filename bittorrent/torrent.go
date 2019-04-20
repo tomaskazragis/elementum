@@ -72,6 +72,7 @@ type Torrent struct {
 	muReaders *sync.Mutex
 
 	pieceLength int64
+	pieceCount  int
 
 	gotMetainfo    util.Event
 	Closer         util.Event
@@ -445,6 +446,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 	}
 
 	t.pieceLength = int64(t.ti.PieceLength())
+	t.pieceCount = int(t.ti.NumPieces())
 
 	offsetStart := fileOffset + off
 	startPiece = int(offsetStart / t.pieceLength)
@@ -455,12 +457,11 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 	pieceOffsetEnd := offsetEnd % t.pieceLength
 	endPiece = int(math.Ceil(float64(offsetEnd) / float64(t.pieceLength)))
 
-	piecesCount := int(t.ti.NumPieces())
 	if pieceOffsetEnd == 0 {
 		endPiece--
 	}
-	if endPiece >= piecesCount {
-		endPiece = piecesCount - 1
+	if endPiece >= t.pieceCount {
+		endPiece = t.pieceCount - 1
 	}
 
 	size = int64(endPiece-startPiece+1) * t.pieceLength
@@ -611,14 +612,11 @@ func (t *Torrent) PrioritizePieces() {
 
 	defaultPriority := 0
 	if !t.Service.IsMemoryStorage() {
-		// Getting piece priorities from libtorrent to keep 0 for non-needed pieces
-		priorities := t.th.PiecePriorities()
-		defer lt.DeleteStdVectorInt(priorities)
-
-		var p int
-		for curPiece := 0; curPiece < numPieces; curPiece++ {
-			if p = priorities.Get(curPiece); p == 0 {
-				readerPieces[curPiece] = p
+		for _, f := range t.ChosenFiles {
+			for i := f.PieceStart; i <= f.PieceEnd; i++ {
+				if readerPieces[i] == 0 {
+					readerPieces[i] = 1
+				}
 			}
 		}
 	}
@@ -1071,12 +1069,16 @@ func (t *Torrent) MakeFiles() {
 	t.files = []*File{}
 
 	for i := 0; i < numFiles; i++ {
+		pr := t.GetFilePieces(files, i)
+
 		t.files = append(t.files, &File{
-			Index:  i,
-			Name:   files.FileName(i),
-			Size:   files.FileSize(i),
-			Offset: files.FileOffset(i),
-			Path:   files.FilePath(i),
+			Index:      i,
+			Name:       files.FileName(i),
+			Size:       files.FileSize(i),
+			Offset:     files.FileOffset(i),
+			Path:       files.FilePath(i),
+			PieceStart: pr.Begin,
+			PieceEnd:   pr.End,
 		})
 	}
 }
@@ -1207,4 +1209,23 @@ func (t *Torrent) GetNextEpisodeFile(season, episode int) *File {
 func (t *Torrent) HasAvailableFiles() bool {
 	// Keeping it simple? If not all files are chosen - then true?
 	return len(t.ChosenFiles) < len(t.files)
+}
+
+// GetFilePieces ...
+func (t *Torrent) GetFilePieces(files lt.FileStorage, idx int) (ret PieceRange) {
+	ret.Begin, ret.End = t.byteRegionPieces(files.FileOffset(idx), files.FileOffset(idx)+files.FileSize(idx))
+	return
+}
+
+func (t *Torrent) byteRegionPieces(off, size int64) (begin, end int) {
+	if t.pieceLength <= 0 {
+		return
+	}
+
+	begin = int(off / t.pieceLength)
+	end = int((off + size + t.pieceLength - 1) / t.pieceLength)
+	if end > t.pieceCount {
+		end = t.pieceCount
+	}
+	return
 }
