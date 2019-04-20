@@ -4,7 +4,9 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -105,6 +107,7 @@ func GetPayloads(searchString string, languages []string, preferredLanguage stri
 		"VideoPlayer.Episode",
 		"VideoPlayer.IMDBNumber",
 	)
+	log.Debugf("Fetched VideoPlayer labels: %#v", labels)
 
 	for i, lang := range languages {
 		if lang == "Portuguese (Brazil)" {
@@ -141,14 +144,19 @@ func GetPayloads(searchString string, languages []string, preferredLanguage stri
 			}
 		}
 
-		if strings.HasPrefix(playingFile, "http://") == false && strings.HasPrefix(playingFile, "https://") == false {
-			appendLocalFilePayloads(playingFile, &payloads)
+		var err error
+		if showID != 0 {
+			err = appendEpisodePayloads(showID, labels, &payloads)
+		} else if err == nil {
+			err = appendMoviePayloads(labels, &payloads)
 		}
 
-		if showID != 0 {
-			appendEpisodePayloads(showID, labels, &payloads)
-		} else {
-			appendMoviePayloads(labels, &payloads)
+		if err != nil {
+			if strings.HasPrefix(playingFile, "http://") == false && strings.HasPrefix(playingFile, "https://") == false {
+				appendLocalFilePayloads(playingFile, &payloads)
+			} else {
+				appendRemoteFilePayloads(playingFile, &payloads)
+			}
 		}
 	}
 
@@ -175,9 +183,25 @@ func appendLocalFilePayloads(playingFile string, payloads *[]SearchPayload) erro
 		hashPayload.Size = s.Size()
 	}
 	hashPayload.Query = strings.Replace(filepath.Base(playingFile), filepath.Ext(playingFile), "", -1)
-	*payloads = append(*payloads, hashPayload)
+	if hashPayload.Query != "" {
+		*payloads = append(*payloads, hashPayload)
+		return nil
+	}
 
-	return nil
+	return fmt.Errorf("Cannot collect local information")
+}
+
+func appendRemoteFilePayloads(playingFile string, payloads *[]SearchPayload) error {
+	u, _ := url.Parse(playingFile)
+	f := path.Base(u.Path)
+	q := strings.Replace(filepath.Base(f), filepath.Ext(f), "", -1)
+
+	if q != "" {
+		*payloads = append(*payloads, SearchPayload{Query: q})
+		return nil
+	}
+
+	return fmt.Errorf("Cannot collect local information")
 }
 
 func appendMoviePayloads(labels map[string]string, payloads *[]SearchPayload) error {
@@ -185,10 +209,15 @@ func appendMoviePayloads(labels map[string]string, payloads *[]SearchPayload) er
 	if title == "" {
 		title = labels["VideoPlayer.Title"]
 	}
-	*payloads = append(*payloads, SearchPayload{
-		Query: fmt.Sprintf("%s %s", title, labels["VideoPlayer.Year"]),
-	})
-	return nil
+
+	if title != "" {
+		*payloads = append(*payloads, SearchPayload{
+			Query: fmt.Sprintf("%s %s", title, labels["VideoPlayer.Year"]),
+		})
+		return nil
+	}
+
+	return fmt.Errorf("Cannot collect movie information")
 }
 
 func appendEpisodePayloads(showID int, labels map[string]string, payloads *[]SearchPayload) error {
@@ -219,8 +248,10 @@ func appendEpisodePayloads(showID int, labels map[string]string, payloads *[]Sea
 		*payloads = append(*payloads, SearchPayload{
 			Query: searchString,
 		})
+		return nil
 	}
-	return nil
+
+	return fmt.Errorf("Cannot collect episode information")
 }
 
 func contains(s []string, e string) bool {

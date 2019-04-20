@@ -128,7 +128,7 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 
 	t.ResetReaders()
 
-	tf.setSubtitles()
+	go tf.setSubtitles()
 
 	return tf, nil
 }
