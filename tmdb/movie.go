@@ -409,10 +409,14 @@ func MostVotedMovies(genre string, language string, page int) (Movies, int) {
 	return listMovies("discover/movie", "mostvoted", p, page)
 }
 
+// Year returns year of the movie
+func (movie *Movie) Year() int {
+	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])
+	return year
+}
+
 // ToListItem ...
 func (movie *Movie) ToListItem() *xbmc.ListItem {
-	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])
-
 	title := movie.Title
 	if config.Get().UseOriginalTitle && movie.OriginalTitle != "" {
 		title = movie.OriginalTitle
@@ -422,7 +426,7 @@ func (movie *Movie) ToListItem() *xbmc.ListItem {
 		Label:  title,
 		Label2: fmt.Sprintf("%f", movie.VoteAverage),
 		Info: &xbmc.ListItemInfo{
-			Year:          year,
+			Year:          movie.Year(),
 			Count:         rand.Int(),
 			Title:         title,
 			OriginalTitle: movie.OriginalTitle,

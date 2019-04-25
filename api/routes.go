@@ -286,7 +286,9 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 	r.GET("/subtitle/:id", SubtitleGet)
 
 	r.GET("/play", Play(s))
+	r.GET("/play/:ident", Play(s))
 	r.Any("/playuri", PlayURI(s))
+	r.Any("/playuri/:ident", PlayURI(s))
 
 	r.POST("/callbacks/:cid", providers.CallbackHandler)
 

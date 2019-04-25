@@ -495,6 +495,7 @@ func (s *Service) stopServices() {
 	if s.InternalProxy != nil {
 		log.Infof("Stopping internal proxy")
 		s.InternalProxy.Shutdown(nil)
+		s.InternalProxy = nil
 	}
 
 	// TODO: cleanup these messages after windows hang is fixed

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"mime/multipart"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -210,28 +212,35 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			}
 
 			var (
-				tmdb        string
+				tmdbID      string
 				show        string
 				season      string
 				episode     string
 				contentType string
 			)
 
+			toBeAdded := ""
 			if t.DBItem != nil && t.DBItem.Type != "" {
 				contentType = t.DBItem.Type
 				if contentType == movieType {
-					tmdb = strconv.Itoa(t.DBItem.ID)
+					tmdbID = strconv.Itoa(t.DBItem.ID)
+					if movie := tmdb.GetMovie(t.DBItem.ID, config.Get().Language); movie != nil {
+						toBeAdded = fmt.Sprintf("%s (%d)", movie.OriginalTitle, movie.Year())
+					}
 				} else {
 					show = strconv.Itoa(t.DBItem.ShowID)
 					season = strconv.Itoa(t.DBItem.Season)
 					episode = strconv.Itoa(t.DBItem.Episode)
+					if show := tmdb.GetShow(t.DBItem.ShowID, config.Get().Language); show != nil {
+						toBeAdded = fmt.Sprintf("%s S%dE%d", show.OriginalName, t.DBItem.Season, t.DBItem.Episode)
+					}
 				}
 			}
 
-			playURL := URLQuery(URLForXBMC("/play"),
+			playURL := URLQuery(fmt.Sprintf(URLForXBMC("/play")+"/%s", url.PathEscape(toBeAdded)),
 				"resume", t.InfoHash(),
 				"type", contentType,
-				"tmdb", tmdb,
+				"tmdb", tmdbID,
 				"show", show,
 				"season", season,
 				"episode", episode)
@@ -241,12 +250,9 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				Path:  playURL,
 				Info: &xbmc.ListItemInfo{
 					Title: torrentName,
-					// TODO: Looks like Date breaks default sorting.
-					// Probably better to make forced sorting from context menu.
-					// Date:      dt.String(),
-					// DateAdded: dt.String(),
 				},
 			}
+
 			item.ContextMenu = [][]string{
 				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playURL)},
 				torrentAction,
