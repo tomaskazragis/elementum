@@ -616,6 +616,14 @@ func (s *Service) AddTorrent(uri string, paused bool) (*Torrent, error) {
 	var th lt.TorrentHandle
 	var infoHash string
 
+	// Dummy check if torrent file is a file containing a magnet link
+	if _, err := os.Stat(uri); err == nil {
+		dat, err := ioutil.ReadFile(uri)
+		if err == nil && bytes.HasPrefix(dat, []byte("magnet:")) {
+			uri = string(dat)
+		}
+	}
+
 	if strings.HasPrefix(uri, "magnet:") {
 		// Remove all spaces in magnet
 		uri = strings.Replace(uri, " ", "", -1)
