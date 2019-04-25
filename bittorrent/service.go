@@ -389,8 +389,9 @@ func (s *Service) configure() {
 		// settings.SetInt("request_timeout", 10)
 		// settings.SetInt("peer_connect_timeout", 10)
 
-		// settings.SetInt("max_allowed_in_request_queue", 2000)
-		// settings.SetInt("max_out_request_queue", 2000)
+		settings.SetInt("max_out_request_queue", 50000)
+		settings.SetInt("max_allowed_in_request_queue", 50000)
+
 		// settings.SetInt("initial_picker_threshold", 20)
 		// settings.SetInt("share_mode_target", 1)
 		settings.SetBool("use_read_cache", false)
