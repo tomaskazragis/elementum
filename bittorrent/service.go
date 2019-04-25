@@ -941,6 +941,7 @@ func (s *Service) loadTorrentFiles() {
 		return
 	}
 
+	log.Infof("Loading torrents from: %s", s.config.TorrentsPath)
 	files, err := ioutil.ReadDir(s.config.TorrentsPath)
 	if err != nil {
 		log.Infof("Cannot read torrents dir: %s", err)
@@ -970,7 +971,6 @@ func (s *Service) loadTorrentFiles() {
 
 				for _, p := range i.Files {
 					if f := t.GetFileByPath(p); f != nil {
-						t.ChosenFiles = append(t.ChosenFiles, f)
 						t.DownloadFile(f)
 					}
 				}

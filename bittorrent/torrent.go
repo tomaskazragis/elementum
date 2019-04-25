@@ -445,9 +445,6 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 		off = 0
 	}
 
-	t.pieceLength = int64(t.ti.PieceLength())
-	t.pieceCount = int(t.ti.NumPieces())
-
 	offsetStart := fileOffset + off
 	startPiece = int(offsetStart / t.pieceLength)
 	pieceOffset := offsetStart % t.pieceLength
@@ -502,7 +499,7 @@ func (t *Torrent) PrioritizePieces() {
 
 	downSpeed, upSpeed := t.GetHumanizedSpeeds()
 	seeds, seedsTotal, peers, peersTotal := t.GetConnections()
-	log.Debugf("Prioritizing pieces: %s / %s, Con: %d/%d + %d/%d", downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal)
+	log.Debugf("Prioritizing pieces: %v%% / %s / %s, Con: %d/%d + %d/%d", int(t.GetProgress()), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal)
 
 	t.muReaders.Lock()
 
@@ -577,7 +574,7 @@ func (t *Torrent) PrioritizePieces() {
 	for i, k := range piecesKeys {
 		readerVector.Add(k)
 
-		if readerPieces[k] > 0 {
+		if readerPieces[k] > 1 {
 			progress := int(readerProgress[k] * 100)
 			comma := ""
 			if i > 1 && piecesKeys[i] > piecesKeys[i-1]+1 {
@@ -614,7 +611,7 @@ func (t *Torrent) PrioritizePieces() {
 	if !t.Service.IsMemoryStorage() {
 		for _, f := range t.ChosenFiles {
 			for i := f.PieceStart; i <= f.PieceEnd; i++ {
-				if readerPieces[i] == 0 {
+				if len(readerPieces) < i && readerPieces[i] == 0 {
 					readerPieces[i] = 1
 				}
 			}
@@ -633,7 +630,6 @@ func (t *Torrent) PrioritizePieces() {
 	}
 
 	t.th.PrioritizePieces(piecesPriorities)
-
 }
 
 // GetAddedTime ...
@@ -791,7 +787,12 @@ func (t *Torrent) UnDownloadAllFiles() {
 
 // DownloadFile ...
 func (t *Torrent) DownloadFile(addFile *File) {
+	addFile.Selected = true
 	t.ChosenFiles = append(t.ChosenFiles, addFile)
+
+	if t.Service.IsMemoryStorage() {
+		return
+	}
 
 	for _, f := range t.files {
 		if f != addFile {
@@ -805,6 +806,8 @@ func (t *Torrent) DownloadFile(addFile *File) {
 
 // UnDownloadFile ...
 func (t *Torrent) UnDownloadFile(addFile *File) bool {
+	addFile.Selected = false
+
 	idx := -1
 	for i, f := range t.ChosenFiles {
 		if f.Index == addFile.Index {
@@ -818,9 +821,13 @@ func (t *Torrent) UnDownloadFile(addFile *File) bool {
 	}
 
 	log.Debugf("UnChoosing file for download: %s", addFile.Path)
-	t.th.FilePriority(addFile.Index, 0)
 	t.ChosenFiles = append(t.ChosenFiles[:idx], t.ChosenFiles[idx+1:]...)
 
+	if t.Service.IsMemoryStorage() {
+		return true
+	}
+
+	t.th.FilePriority(addFile.Index, 0)
 	return true
 }
 
@@ -951,6 +958,11 @@ func (t *Torrent) SaveMetainfo(path string) error {
 	}
 
 	path = filepath.Join(path, t.InfoHash()+".torrent")
+	// If .torrent file is already created - do not modify it, to avoid breaking the sorting.
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+
 	bEncodedTorrent := t.GetMetadata()
 	ioutil.WriteFile(path, bEncodedTorrent, 0644)
 
@@ -1161,7 +1173,10 @@ func (t *Torrent) onMetadataReceived() {
 	t.gotMetainfo.Set()
 
 	t.ti = t.th.TorrentFile()
+
 	t.pieceLength = int64(t.ti.PieceLength())
+	t.pieceCount = int(t.ti.NumPieces())
+
 	t.MakeFiles()
 
 	// Reset fastResumeFile
@@ -1222,10 +1237,8 @@ func (t *Torrent) byteRegionPieces(off, size int64) (begin, end int) {
 		return
 	}
 
-	begin = int(off / t.pieceLength)
-	end = int((off + size + t.pieceLength - 1) / t.pieceLength)
-	if end > t.pieceCount {
-		end = t.pieceCount
-	}
+	begin = util.Max(0, int(off/t.pieceLength))
+	end = util.Min(t.pieceCount-1, int((off+size-1)/t.pieceLength))
+
 	return
 }

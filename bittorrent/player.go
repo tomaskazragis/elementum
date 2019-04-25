@@ -293,9 +293,11 @@ func (btp *Player) processMetadata() {
 
 	files := []string{}
 	if btp.chosenFile != nil {
+		btp.t.DownloadFile(btp.chosenFile)
 		files = append(files, btp.chosenFile.Path)
 	}
 	if btp.subtitlesFile != nil {
+		btp.t.DownloadFile(btp.subtitlesFile)
 		files = append(files, btp.subtitlesFile.Path)
 	}
 
