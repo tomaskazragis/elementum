@@ -251,7 +251,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				[]string{"LOCALIZE[30230]", fmt.Sprintf("XBMC.PlayMedia(%s)", playURL)},
 				torrentAction,
 				[]string{"LOCALIZE[30232]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s", t.InfoHash()))},
-				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s?files=1", t.InfoHash()))},
+				[]string{"LOCALIZE[30276]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/delete/%s?files=true", t.InfoHash()))},
 				[]string{"LOCALIZE[30308]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/move/%s", t.InfoHash()))},
 				sessionAction,
 			}
@@ -478,10 +478,17 @@ func RemoveTorrent(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		// Delete torrent file
-		torrentsPath := config.Get().TorrentsPath
 		infoHash := torrent.InfoHash()
+		if _, err := os.Stat(torrent.TorrentPath); err == nil {
+			torrentsLog.Infof("Removed torrent file %s", torrent.TorrentPath)
+			defer os.Remove(torrent.TorrentPath)
+		}
+
+		// Delete torrent file, in case it it not 'infohash' + '.torrent'
+		torrentsPath := config.Get().TorrentsPath
 		torrentFile := filepath.Join(torrentsPath, fmt.Sprintf("%s.torrent", infoHash))
 		if _, err := os.Stat(torrentFile); err == nil {
+			torrentsLog.Infof("Removed torrent file %s", torrentFile)
 			defer os.Remove(torrentFile)
 		}
 
