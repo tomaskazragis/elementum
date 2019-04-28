@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -59,7 +60,7 @@ func (p *PacStorage) Update() {
 	PacParser.dn = [][]string{}
 
 	// Find servers for specific cases
-	reUsual := regexp.MustCompile(`(?s)if \(yip === 1 \|\| shost === curarr\[i\]\).*?\{.*?return \"(.*?)\".*?\}`)
+	reUsual := regexp.MustCompile(`(?s)if \(yip === 1 \|\| curarr\.indexOf\(shost\) !== -1\).*?\{.*?return \"(.*?)\".*?\}`)
 	reSpecial := regexp.MustCompile(`(?s)if \(isInNet\(oip, special\[i\]\[0\], special\[i\]\[1\]\)\) \{return "(.*?)";\}`)
 
 	// Find arrays containing domains
@@ -106,7 +107,6 @@ func (p *PacStorage) Update() {
 		PacParser.domains = strings.Split(domains, " ")
 		PacParser.ips = regexp.MustCompile(`.{8}`).FindAllString(ips, -1)
 	}
-
 }
 
 // GetFileData ...
@@ -120,7 +120,10 @@ func (p *PacStorage) GetFileData() string {
 	}
 
 	log.Debugf("Downloading pac file: %s", pacURL)
-	resp, err := directClient.Get(pacURL)
+	req, _ := http.NewRequest("GET", pacURL, nil)
+	req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
+
+	resp, err := directClient.Do(req)
 	if err != nil {
 		return ""
 	}
