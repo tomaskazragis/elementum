@@ -50,12 +50,13 @@ type Torrent struct {
 
 	Service *Service
 
-	BufferLength         int64
-	BufferProgress       float64
-	BufferPiecesLength   int64
-	BufferPiecesProgress map[int]float64
-	BufferEndPieces      []int
-	MemorySize           int64
+	BufferLength           int64
+	BufferProgress         float64
+	BufferProgressPrevious float64
+	BufferPiecesLength     int64
+	BufferPiecesProgress   map[int]float64
+	BufferEndPieces        []int
+	MemorySize             int64
 
 	IsPlaying           bool
 	IsPaused            bool
@@ -217,6 +218,11 @@ func (t *Torrent) bufferTickerEvent() {
 			t.bufferFinished <- struct{}{}
 		} else {
 			t.IsBufferingFinished = false
+			if t.BufferProgressPrevious > t.BufferProgress {
+				t.BufferProgress = t.BufferProgressPrevious
+			} else {
+				t.BufferProgressPrevious = t.BufferProgress
+			}
 		}
 	}
 }
