@@ -427,6 +427,16 @@ func (t *Torrent) Buffer(file *File) {
 	if !config.Get().DisableDHT {
 		t.th.ForceDhtAnnounce()
 	}
+
+	// As long as file storage has many enabled pieces, we make sure buffer pieces are sent immediately
+	if !t.Service.IsMemoryStorage() {
+		for curPiece = preBufferStart; curPiece <= preBufferEnd; curPiece++ { // get this part
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
+		for curPiece = postBufferStart; curPiece <= postBufferEnd; curPiece++ { // get this part
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
+	}
 }
 
 // AdjustMemorySize ...
@@ -611,7 +621,7 @@ func (t *Torrent) PrioritizePieces() {
 	if !t.Service.IsMemoryStorage() {
 		for _, f := range t.ChosenFiles {
 			for i := f.PieceStart; i <= f.PieceEnd; i++ {
-				if len(readerPieces) < i && readerPieces[i] == 0 {
+				if len(readerPieces) > i && readerPieces[i] == 0 {
 					readerPieces[i] = 1
 				}
 			}
