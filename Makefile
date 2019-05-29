@@ -48,7 +48,7 @@ else ifeq ($(TARGET_OS), darwin)
 else ifeq ($(TARGET_OS), linux)
 	EXT =
 	GOOS = linux
-	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-lm"
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-L $(CROSS_ROOT)/lib/ -lm -lstdc++ -static"
 else ifeq ($(TARGET_OS), android)
 	EXT =
 	GOOS = android
@@ -64,8 +64,7 @@ else ifeq ($(TARGET_OS), android)
 	CXX := $(CROSS_ROOT)/bin/$(CROSS_TRIPLE)-clang++
 endif
 
-# PROJECT = elementumorg
-PROJECT = quasarhq
+PROJECT = elementumorg
 NAME = elementum
 GO_PKG = github.com/elgatito/elementum
 GO = go
@@ -94,8 +93,8 @@ PLATFORMS = \
 	linux-x86 \
 	windows-x64 \
 	windows-x86 \
-	darwin-x64
-	# darwin-x86 \
+	darwin-x64 \
+	darwin-x86
 
 .PHONY: $(PLATFORMS)
 
@@ -149,7 +148,7 @@ vendor_libs_windows:
 
 vendor_libs_android:
 	# $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
-	$(CROSS_ROOT)/arm-linux-androideabi/lib/libgnustl_shared.so
+	$(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so
 
 elementum: $(BUILD_PATH)/$(OUTPUT_NAME)
 
@@ -161,11 +160,20 @@ clean:
 distclean:
 	rm -rf build
 
+prepare: force
+	$(DOCKER) run --rm -v $(GOPATH):/go -v $(HOME)/.cache:/root/.cache -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) $(GO) get -u -x ./...
+
+prepare_windows:
+	$(GO) get -u github.com/StackExchange/wmi
+
 build: force
-	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(PROJECT)/$(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) make dist TARGET_OS=$(TARGET_OS) TARGET_ARCH=$(TARGET_ARCH) GIT_VERSION=$(GIT_VERSION)
+ifeq ($(TARGET_OS), windows)
+	GOOS=windows $(GO) get -u github.com/StackExchange/wmi
+endif	
+	$(DOCKER) run --rm -v $(GOPATH):/go -v $(HOME)/.cache:/root/.cache -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH) make dist TARGET_OS=$(TARGET_OS) TARGET_ARCH=$(TARGET_ARCH) GIT_VERSION=$(GIT_VERSION)
 
 docker: force
-	$(DOCKER) run --rm -v $(GOPATH):/go -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(PROJECT)/$(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH)
+	$(DOCKER) run --rm -v $(GOPATH):/go -v $(HOME)/.cache:/root/.cache -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH)
 
 strip: force
 	@find $(BUILD_PATH) -type f ! -name "*.exe" -exec $(STRIP) {} \;
@@ -214,3 +222,8 @@ pull-all:
 pull:
 	docker pull $(PROJECT)/libtorrent-go:$(PLATFORM)
 	docker tag $(PROJECT)/libtorrent-go:$(PLATFORM) libtorrent-go:$(PLATFORM)
+
+prepare-all:
+	for i in $(PLATFORMS); do \
+		$(MAKE) prepare PLATFORM=$(PLATFORM); \
+	done
