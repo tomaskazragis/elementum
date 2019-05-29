@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	maxSingleCoreConnections = 50
+	maxSingleCoreConnections = 40
 )
 
 // On Raspberry Pi, we need to limit the number of active connections
