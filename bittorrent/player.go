@@ -873,7 +873,7 @@ playbackLoop:
 
 			btp.p.WatchedProgress = int(btp.p.WatchedTime / btp.p.VideoDuration * 100)
 
-			if playlistSize > 1 && btp.next.f != nil && btp.p.WatchedProgress > btp.next.progressNeeded {
+			if playlistSize > 1 && btp.next.f != nil && btp.isReadyForNextEpisode() {
 				btp.startNextEpisode()
 			}
 		}
@@ -898,6 +898,14 @@ playbackLoop:
 	}()
 
 	btp.overlayStatus.Close()
+}
+
+func (btp *Player) isReadyForNextEpisode() bool {
+	if btp.s.IsMemoryStorage() {
+		return btp.p.WatchedProgress > btp.next.progressNeeded
+	}
+
+	return btp.p.WatchedProgress > config.Get().PlaybackPercent
 }
 
 // Params returns Params for external use
@@ -1119,7 +1127,7 @@ func (btp *Player) findNextEpisode() {
 	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-EndBufferSize, EndBufferSize)
 
 	btp.next.bufferSize = preBufferSize + postBufferSize
-	btp.next.progressNeeded = util.Min(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+1)
+	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
 
 	log.Debugf("Next episode prepared: %#v", btp.next)
 }
