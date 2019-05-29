@@ -71,15 +71,16 @@ func CustomDial(network, addr string) (net.Conn, error) {
 	addrs := strings.Split(addr, ":")
 	if len(addrs) == 2 && len(addrs[0]) > 2 && strings.Index(addrs[0], ".") > -1 {
 		if ipTest := net.ParseIP(addrs[0]); ipTest == nil {
-			if ip, err := resolve(addrs[0]); err == nil && len(ip) > 0 {
-				if !config.Get().InternalDNSSkipIPv6 {
-					addr = ip[0] + ":" + addrs[1]
-				} else {
-					for _, i := range ip {
-						if len(i) == net.IPv4len {
-							addr = i + ":" + addrs[1]
-							break
+			if ips, err := resolve(addrs[0]); err == nil && len(ips) > 0 {
+				for _, i := range ips {
+					if config.Get().InternalDNSSkipIPv6 {
+						if ip := net.ParseIP(i); ip.To4() == nil {
+							continue
 						}
+					}
+
+					if c, err := dialer.Dial(network, i+":"+addrs[1]); err == nil {
+						return c, err
 					}
 				}
 			}

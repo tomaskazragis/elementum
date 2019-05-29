@@ -196,10 +196,10 @@ func (p *PacStorage) FindProxy(query string) (res string, err error) {
 		}
 	}
 
-	oip := resolveAddr(host)
+	oips := resolveAddr(host)
 	iphex := ""
-	if oip != "" {
-		iphex = strconv.Itoa(ip2int(oip))
+	if oips[0] != "" {
+		iphex = strconv.Itoa(ip2int(oips[0]))
 	}
 
 	if iphex != "" {
@@ -218,7 +218,7 @@ func (p *PacStorage) FindProxy(query string) (res string, err error) {
 	}
 
 	for i := range PacParser.specials {
-		if oip != "" && isInNet(oip, i, PacParser.specials[i]) {
+		if oips[0] != "" && isInNet(oips[0], i, PacParser.specials[i]) {
 			h, t := getServerForRtype(scheme, PacParser.serversSpecial)
 			return fmt.Sprintf("%s://%s", t, h), nil
 		}
@@ -244,7 +244,10 @@ func getServerForRtype(rtype string, servers map[string]string) (string, string)
 func isInNet(host, pattern, mask string) bool {
 	hostIP := host
 	if ip := net.ParseIP(host); ip == nil {
-		hostIP = resolveAddr(host)
+		ips := resolveAddr(host)
+		if len(ips) > 0 {
+			hostIP = ips[0]
+		}
 	}
 
 	if hostIP == "" {

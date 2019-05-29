@@ -119,8 +119,9 @@ func resolve(addr string) ([]string, error) {
 		if ips, err := opennicResolver.LookupHost(context.TODO(), addr); err == nil {
 			return ips, err
 		}
-		if ip := resolveAddr(addr); ip != "" {
-			return []string{ip}, nil
+
+		if ips := resolveAddr(addr); len(ips) > 0 {
+			return ips, nil
 		}
 	}
 
@@ -155,9 +156,9 @@ func isOpennicDomain(zone string) bool {
 // Possibly need to cleanup saved IPs after some time.
 // Each request is going through this workflow:
 // Check saved -> Query Google/Quad9 -> Check saved -> Query Opennic -> Save
-func resolveAddr(host string) (ip string) {
+func resolveAddr(host string) (ips []string) {
 	if cached, ok := dnsCacheResults.Load(host); ok {
-		return cached.(string)
+		return strings.Split(cached.(string), ",")
 	}
 
 	var mu *sync.Mutex
@@ -172,20 +173,23 @@ func resolveAddr(host string) (ip string) {
 
 	defer func() {
 		mu.Unlock()
-		if strings.HasPrefix(ip, "127.") {
+		if strings.HasPrefix(ips[0], "127.") {
 			return
 		}
 
-		dnsCacheResults.Store(host, ip)
+		dnsCacheResults.Store(host, strings.Join(ips, ","))
 	}()
 
 	if cached, ok := dnsCacheResults.Load(host); ok {
-		return cached.(string)
+		return strings.Split(cached.(string), ",")
 	}
 
-	ips, err := resolverOpennic.LookupHost(host)
-	if err == nil && len(ips) > 0 {
-		ip = ips[0].String()
+	ipsResolved, err := resolverOpennic.LookupHost(host)
+	if err == nil && len(ipsResolved) > 0 {
+		for _, i := range ipsResolved {
+			ips = append(ips, i.String())
+		}
+
 		return
 	}
 
