@@ -38,10 +38,11 @@ type Torrent struct {
 	partsFile      string
 	addedTime      time.Time
 
-	name           string
-	infoHash       string
-	readers        map[int64]*TorrentFSEntry
-	reservedPieces []int
+	name               string
+	infoHash           string
+	readers            map[int64]*TorrentFSEntry
+	reservedPieces     []int
+	lastPrioritization string
 
 	awaitingPieces *roaring.Bitmap
 
@@ -634,17 +635,36 @@ func (t *Torrent) PrioritizePieces() {
 		}
 	}
 
+	minPiece, minPriority, maxPiece, maxPriority, countPiece := -1, 0, -1, 0, 0
+
 	// Splitting to first set priorities, then deadlines,
 	// so that latest set deadline is the nearest piece number
 	for curPiece := 0; curPiece < numPieces; curPiece++ {
 		if priority := readerPieces[curPiece]; priority > 0 {
 			readerVector.Add(curPiece)
 			piecesPriorities.Add(priority)
+
+			if curPiece < minPiece || minPiece == -1 {
+				minPiece = curPiece
+				minPriority = priority
+			}
+			if curPiece > maxPiece {
+				maxPiece = curPiece
+				maxPriority = priority
+			}
+			countPiece++
 		} else {
 			piecesPriorities.Add(defaultPriority)
 		}
 	}
 
+	status := fmt.Sprintf("%d:%d;%d:%d;%d", minPiece, minPriority, maxPiece, maxPriority, countPiece)
+	if status == t.lastPrioritization {
+		log.Debugf("Skipping prioritization due to stale priorities")
+		return
+	}
+
+	t.lastPrioritization = status
 	t.th.PrioritizePieces(piecesPriorities)
 }
 
