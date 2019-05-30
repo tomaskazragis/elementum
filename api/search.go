@@ -24,9 +24,9 @@ func Search(s *bittorrent.Service) gin.HandlerFunc {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		query := ctx.Query("q")
 		keyboard := ctx.Query("keyboard")
+		historyType := ""
 
 		if len(query) == 0 {
-			historyType := ""
 			if len(keyboard) > 0 {
 				if query = xbmc.Keyboard("", "LOCALIZE[30206]"); len(query) == 0 {
 					return
@@ -38,6 +38,9 @@ func Search(s *bittorrent.Service) gin.HandlerFunc {
 
 			return
 		}
+
+		// Update query last use date to show it on the top
+		database.Get().AddSearchHistory(historyType, query)
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
 		existingTorrent := s.HasTorrentByQuery(query)

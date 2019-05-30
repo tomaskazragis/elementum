@@ -9,6 +9,7 @@ import (
 
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
+	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/providers"
 	"github.com/elgatito/elementum/tmdb"
@@ -329,9 +330,9 @@ func SearchShows(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	query := ctx.Query("q")
 	keyboard := ctx.Query("keyboard")
+	historyType := "shows"
 
 	if len(query) == 0 {
-		historyType := "shows"
 		if len(keyboard) > 0 {
 			if query = xbmc.Keyboard("", "LOCALIZE[30206]"); len(query) == 0 {
 				return
@@ -343,6 +344,9 @@ func SearchShows(ctx *gin.Context) {
 
 		return
 	}
+
+	// Update query last use date to show it on the top
+	database.Get().AddSearchHistory(historyType, query)
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.SearchShows(query, config.Get().Language, page)
