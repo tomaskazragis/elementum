@@ -432,8 +432,47 @@ func (btp *Player) chooseFile() (*File, error) {
 		}
 	}
 	if isBluRay {
-		log.Info("Skipping file choose, as this is a BluRay stream.")
-		return files[biggestFile], nil
+		candidateFiles = []int{}
+		dirs := map[string]int{}
+
+		for i, f := range files {
+			if idx := strings.Index(f.Path, "BDMV/STREAM/"); idx != -1 {
+				dir := f.Path[0 : idx-1]
+				if _, ok := dirs[dir]; !ok {
+					dirs[dir] = i
+				} else if files[dirs[dir]].Size < files[i].Size {
+					dirs[dir] = i
+				}
+			}
+		}
+
+		if len(dirs) == 1 {
+			log.Info("Skipping file choose, as this is a BluRay stream.")
+			return files[biggestFile], nil
+		}
+
+		choices := make([]*candidateFile, 0, len(candidateFiles))
+		for dir, index := range dirs {
+			candidate := &candidateFile{
+				Index:       index,
+				Filename:    dir,
+				DisplayName: dir,
+			}
+			choices = append(choices, candidate)
+		}
+
+		trimChoices(choices)
+
+		items := make([]string, 0, len(choices))
+		for _, choice := range choices {
+			items = append(items, choice.DisplayName)
+		}
+
+		choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
+		if choice >= 0 {
+			return files[choices[choice].Index], nil
+		}
+		return nil, fmt.Errorf("User cancelled")
 	}
 
 	if len(candidateFiles) > 1 {
@@ -453,25 +492,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			choices = append(choices, candidate)
 		}
 
-		// We are trying to see whether all files belong to the same directory.
-		// If yes - we can remove that directory from printed files list
-		for _, d := range strings.Split(choices[0].DisplayName, "/") {
-			ret := true
-			for _, c := range choices {
-				if !strings.HasPrefix(c.DisplayName, d+"/") {
-					ret = false
-					break
-				}
-			}
-
-			if ret {
-				for _, c := range choices {
-					c.DisplayName = strings.Replace(c.DisplayName, d+"/", "", 1)
-				}
-			} else {
-				break
-			}
-		}
+		trimChoices(choices)
 
 		// Adding sizes to file names
 		for _, c := range choices {
@@ -501,10 +522,6 @@ func (btp *Player) chooseFile() (*File, error) {
 				return files[choices[lastMatched].Index], nil
 			}
 		}
-
-		sort.Slice(choices, func(i, j int) bool {
-			return choices[i].DisplayName < choices[j].DisplayName
-		})
 
 		items := make([]string, 0, len(choices))
 		for _, choice := range choices {
@@ -1190,4 +1207,30 @@ func (btp *Player) SaveStoredResume() {
 	} else {
 		database.GetCache().SetCachedObject(database.CommonBucket, storedResumeExpiration, key, btp.p.StoredResume)
 	}
+}
+
+func trimChoices(choices []*candidateFile) {
+	// We are trying to see whether all files belong to the same directory.
+	// If yes - we can remove that directory from printed files list
+	for _, d := range strings.Split(choices[0].DisplayName, "/") {
+		ret := true
+		for _, c := range choices {
+			if !strings.HasPrefix(c.DisplayName, d+"/") {
+				ret = false
+				break
+			}
+		}
+
+		if ret {
+			for _, c := range choices {
+				c.DisplayName = strings.Replace(c.DisplayName, d+"/", "", 1)
+			}
+		} else {
+			break
+		}
+	}
+
+	sort.Slice(choices, func(i, j int) bool {
+		return choices[i].DisplayName < choices[j].DisplayName
+	})
 }
