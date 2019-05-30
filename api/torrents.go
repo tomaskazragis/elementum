@@ -387,6 +387,7 @@ func AddTorrent(s *bittorrent.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		uri := ctx.Request.FormValue("uri")
 		file, header, fileError := ctx.Request.FormFile("file")
+		allFiles := ctx.Request.FormValue("all")
 
 		if file != nil && header != nil && fileError == nil {
 			t, err := saveTorrentFile(file, header)
@@ -403,13 +404,48 @@ func AddTorrent(s *bittorrent.Service) gin.HandlerFunc {
 		}
 		torrentsLog.Infof("Adding torrent from %s", uri)
 
-		_, err := s.AddTorrent(uri, false)
+		t, err := s.AddTorrent(uri, false)
 		if err != nil {
 			ctx.String(404, err.Error())
 			return
 		}
 
 		torrentsLog.Infof("Downloading %s", uri)
+		if allFiles == "1" {
+			// Selecting all files
+			torrentsLog.Infof("Selecting all files for download")
+			t.DownloadAllFiles()
+		} else {
+			// Asking to select downloaded file
+			files := t.GetFiles()
+			choices := make([]*bittorrent.CandidateFile, 0, len(files))
+			for index, f := range files {
+				fileName := filepath.Base(f.Path)
+				candidate := &bittorrent.CandidateFile{
+					Index:       index,
+					Filename:    fileName,
+					DisplayName: files[index].Path,
+				}
+				choices = append(choices, candidate)
+			}
+
+			bittorrent.TrimChoices(choices)
+
+			// Adding sizes to file names
+			for _, c := range choices {
+				c.DisplayName += " [" + humanize.Bytes(uint64(files[c.Index].Size)) + "]"
+			}
+
+			items := make([]string, 0, len(choices))
+			for _, choice := range choices {
+				items = append(items, choice.DisplayName)
+			}
+
+			choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
+			if choice >= 0 {
+				t.DownloadFile(files[choices[choice].Index])
+			}
+		}
 
 		xbmc.Refresh()
 		ctx.String(200, "")

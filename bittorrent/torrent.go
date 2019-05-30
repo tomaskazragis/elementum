@@ -1278,3 +1278,8 @@ func (t *Torrent) byteRegionPieces(off, size int64) (begin, end int) {
 
 	return
 }
+
+// GetFiles returns all files of a torrent
+func (t *Torrent) GetFiles() []*File {
+	return t.files
+}

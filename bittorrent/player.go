@@ -109,7 +109,8 @@ type NextEpisode struct {
 	progressNeeded int
 }
 
-type candidateFile struct {
+// CandidateFile ...
+type CandidateFile struct {
 	Index       int
 	Filename    string
 	DisplayName string
@@ -431,6 +432,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			return f, nil
 		}
 	}
+
 	if isBluRay {
 		candidateFiles = []int{}
 		dirs := map[string]int{}
@@ -451,9 +453,9 @@ func (btp *Player) chooseFile() (*File, error) {
 			return files[biggestFile], nil
 		}
 
-		choices := make([]*candidateFile, 0, len(candidateFiles))
+		choices := make([]*CandidateFile, 0, len(candidateFiles))
 		for dir, index := range dirs {
-			candidate := &candidateFile{
+			candidate := &CandidateFile{
 				Index:       index,
 				Filename:    dir,
 				DisplayName: dir,
@@ -461,7 +463,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			choices = append(choices, candidate)
 		}
 
-		trimChoices(choices)
+		TrimChoices(choices)
 
 		items := make([]string, 0, len(choices))
 		for _, choice := range choices {
@@ -481,10 +483,10 @@ func (btp *Player) chooseFile() (*File, error) {
 			return files[candidateFiles[btp.p.FileIndex]], nil
 		}
 
-		choices := make([]*candidateFile, 0, len(candidateFiles))
+		choices := make([]*CandidateFile, 0, len(candidateFiles))
 		for _, index := range candidateFiles {
 			fileName := filepath.Base(files[index].Path)
-			candidate := &candidateFile{
+			candidate := &CandidateFile{
 				Index:       index,
 				Filename:    fileName,
 				DisplayName: files[index].Path,
@@ -492,7 +494,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			choices = append(choices, candidate)
 		}
 
-		trimChoices(choices)
+		TrimChoices(choices)
 
 		// Adding sizes to file names
 		for _, c := range choices {
@@ -997,7 +999,7 @@ func (btp *Player) IsWatched() bool {
 	return (100 * btp.p.WatchedTime / btp.p.VideoDuration) > float64(config.Get().PlaybackPercent)
 }
 
-func (btp *Player) smartMatch(choices []*candidateFile) {
+func (btp *Player) smartMatch(choices []*CandidateFile) {
 	if !config.Get().SmartEpisodeMatch {
 		return
 	}
@@ -1209,7 +1211,8 @@ func (btp *Player) SaveStoredResume() {
 	}
 }
 
-func trimChoices(choices []*candidateFile) {
+// TrimChoices clears redundant folder names from files list and sorts remaining records.
+func TrimChoices(choices []*CandidateFile) {
 	// We are trying to see whether all files belong to the same directory.
 	// If yes - we can remove that directory from printed files list
 	for _, d := range strings.Split(choices[0].DisplayName, "/") {
