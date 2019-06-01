@@ -287,6 +287,7 @@ func (btp *Player) processMetadata() {
 	btp.FetchStoredResume()
 	if btp.p.StoredResume != nil && btp.p.StoredResume.Position > 0 {
 		if !config.Get().StoreResume || config.Get().StoreResumeAction == 0 || !(config.Get().SilentStreamStart || config.Get().StoreResumeAction == 2 || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30535];;%s", btp.p.StoredResume.ToString()))) {
+			log.Infof("Resetting stored resume")
 			btp.p.StoredResume.Reset()
 			btp.SaveStoredResume()
 		}
@@ -1204,7 +1205,9 @@ func (btp *Player) SaveStoredResume() {
 	btp.p.StoredResume.Total = btp.p.VideoDuration
 	btp.p.StoredResume.Position = btp.p.WatchedTime
 
-	if btp.IsWatched() || btp.p.StoredResume.Position < 180 {
+	if btp.p.StoredResume.Total == 0 || btp.p.StoredResume.Position == 0 {
+		return
+	} else if btp.IsWatched() || btp.p.StoredResume.Position < 180 {
 		database.GetCache().Delete(database.CommonBucket, key)
 	} else {
 		database.GetCache().SetCachedObject(database.CommonBucket, storedResumeExpiration, key, btp.p.StoredResume)

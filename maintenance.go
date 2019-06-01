@@ -86,20 +86,22 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		time.Sleep(400 * time.Millisecond) // Let player get its WatchedTime and VideoDuration
 		p := s.GetActivePlayer()
 		if p == nil {
+			log.Warningf("OnPlay. No active player found")
 			return
 		}
 
 		if p.Params().WasSeeked {
+			log.Warningf("OnPlay. Player has been seeked already")
 			return
 		}
 
 		if p.Params().Paused { // Prevent seeking when simply unpausing
 			p.Params().Paused = false
-			log.Infof("Skipping seek for paused player")
+			log.Warningf("OnPlay. Skipping seek for paused player")
 			return
 		}
 
-		log.Infof("OnPlay Resume check. Resume: %#v, StoredResume: %#v", p.Params().Resume, p.Params().StoredResume)
+		log.Infof("OnPlay. Resume check. Resume: %#v, StoredResume: %#v", p.Params().Resume, p.Params().StoredResume)
 
 		p.Params().WasSeeked = true
 		resumePosition := float64(0)
@@ -120,7 +122,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 		if resumePosition > 0 {
-			log.Infof("Seeking to %v", resumePosition)
+			log.Infof("OnPlay. Seeking to %v", resumePosition)
 			xbmc.PlayerSeek(resumePosition)
 		}
 
