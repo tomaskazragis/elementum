@@ -232,7 +232,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 					season = strconv.Itoa(t.DBItem.Season)
 					episode = strconv.Itoa(t.DBItem.Episode)
 					if show := tmdb.GetShow(t.DBItem.ShowID, config.Get().Language); show != nil {
-						toBeAdded = fmt.Sprintf("%s S%dE%d", show.OriginalName, t.DBItem.Season, t.DBItem.Episode)
+						toBeAdded = fmt.Sprintf("%s S%02dE%02d", show.OriginalName, t.DBItem.Season, t.DBItem.Episode)
 					}
 				}
 			}

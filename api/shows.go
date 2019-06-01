@@ -371,7 +371,7 @@ func ShowSeasons(ctx *gin.Context) {
 		item := items[i]
 
 		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s/%s"
-		contextTitle := fmt.Sprintf("%s S%d", show.OriginalName, item.Info.Season)
+		contextTitle := fmt.Sprintf("%s S%02d", show.OriginalName, item.Info.Season)
 		contextLabel := playLabel
 		contextOppositeLabel := linksLabel
 		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
@@ -422,7 +422,7 @@ func ShowEpisodes(ctx *gin.Context) {
 			item.Info.Episode,
 		) + "%s/%s"
 		contextLabel := playLabel
-		contextTitle := fmt.Sprintf("%s S%dE%d", show.OriginalName, seasonNumber, item.Info.Episode)
+		contextTitle := fmt.Sprintf("%s S%02dE%02d", show.OriginalName, seasonNumber, item.Info.Episode)
 		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
 		if config.Get().ChooseStreamAuto {
 			contextLabel = linksLabel

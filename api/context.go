@@ -37,7 +37,7 @@ func ContextPlaySelector(s *bittorrent.Service) gin.HandlerFunc {
 			}
 		} else if media == "episode" {
 			if s, e := library.GetLibraryEpisode(kodiID); s != nil && e != nil && e.UIDs.TMDB != 0 {
-				title := fmt.Sprintf("%s S%dE%d", s.Title, e.Season, e.Episode)
+				title := fmt.Sprintf("%s S%02dE%02d", s.Title, e.Season, e.Episode)
 				ctx.Redirect(302, URLQuery(URLForXBMC("/show/%d/season/%d/episode/%d/%s/%s", s.UIDs.TMDB, e.Season, e.Episode, action, url.PathEscape(title))))
 				return
 			}
