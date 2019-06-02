@@ -90,6 +90,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
+		go p.InitSubtitles()
+
 		if p.Params().WasSeeked {
 			log.Warningf("OnPlay. Player has been seeked already")
 			return

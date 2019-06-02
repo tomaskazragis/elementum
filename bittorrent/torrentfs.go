@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/util"
-	"github.com/elgatito/elementum/xbmc"
 )
 
 const (
@@ -128,8 +126,6 @@ func NewTorrentFSEntry(file http.File, tfs *TorrentFS, t *Torrent, f *File, name
 
 	t.ResetReaders()
 
-	go tf.setSubtitles()
-
 	return tf, nil
 }
 
@@ -145,29 +141,6 @@ func (tf *TorrentFSEntry) consumeAlerts() {
 				tf.removed.Set()
 				return
 			}
-		}
-	}
-}
-
-func (tf *TorrentFSEntry) setSubtitles() {
-	filePath := tf.f.Path
-	extension := filepath.Ext(filePath)
-
-	if extension != ".srt" {
-		// Let's search for all files that have same beginning and .srt extension
-		// It is possible to have items like 'movie.french.srt'
-		_, f := filepath.Split(filePath)
-		currentPath := f[0 : len(f)-len(extension)]
-		collected := []string{}
-
-		for _, f := range tf.t.files {
-			if strings.Contains(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
-				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
-			}
-		}
-
-		if len(collected) > 0 {
-			xbmc.PlayerSetSubtitles(collected)
 		}
 	}
 }

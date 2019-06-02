@@ -247,6 +247,12 @@ func PlayerIsPaused() bool {
 	return retVal != 0
 }
 
+// PlayerGetSubtitles ...
+func PlayerGetSubtitles() (ret []string) {
+	executeJSONRPCEx("Player_GetSubtitles", &ret, nil)
+	return
+}
+
 // PlayerSetSubtitles ...
 func PlayerSetSubtitles(urls []string) {
 	executeJSONRPCEx("Player_SetSubtitles", nil, Args{urls})

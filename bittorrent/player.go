@@ -78,6 +78,7 @@ type PlayerParams struct {
 	Seeked          bool
 	WasPlaying      bool
 	WasSeeked       bool
+	DoneSubtitles   bool
 	KodiPosition    int
 	WatchedProgress int
 	WatchedTime     float64
@@ -840,10 +841,6 @@ playbackWaitLoop:
 	playlistSize := xbmc.PlaylistSize()
 	btp.t.IsPlaying = true
 
-	if config.Get().OSDBAutoLoad {
-		go btp.downloadSubtitles()
-	}
-
 playbackLoop:
 	for {
 		if xbmc.PlayerIsPlaying() == false {
@@ -1152,7 +1149,25 @@ func (btp *Player) findNextEpisode() {
 	log.Debugf("Next episode prepared: %#v", btp.next)
 }
 
-func (btp *Player) downloadSubtitles() {
+// InitSubtitles ...
+func (btp *Player) InitSubtitles() {
+	if btp.p.DoneSubtitles {
+		return
+	}
+
+	if config.Get().OSDBIncludedEnabled && (!config.Get().OSDBIncludedSkipExists || len(xbmc.PlayerGetSubtitles()) == 0) {
+		btp.SetSubtitles()
+	}
+
+	if config.Get().OSDBAutoLoad && (!config.Get().OSDBAutoLoadSkipExists || len(xbmc.PlayerGetSubtitles()) == 0) {
+		btp.DownloadSubtitles()
+	}
+
+	btp.p.DoneSubtitles = true
+}
+
+// DownloadSubtitles ...
+func (btp *Player) DownloadSubtitles() {
 	payloads, preferredLanguage := osdb.GetPayloads("", []string{"English"}, xbmc.SettingsGetSettingValue("locale.subtitlelanguage"), btp.p.ShowID, xbmc.PlayerGetPlayingFile())
 	log.Infof("Subtitles payload auto: %#v; %s", payloads, preferredLanguage)
 
@@ -1181,6 +1196,31 @@ func (btp *Player) downloadSubtitles() {
 
 		sort.Sort(sort.Reverse(sort.StringSlice(btp.subtitlesLoaded)))
 		xbmc.PlayerSetSubtitles(btp.subtitlesLoaded)
+	}
+}
+
+// SetSubtitles ...
+func (btp *Player) SetSubtitles() {
+	filePath := btp.chosenFile.Path
+	extension := filepath.Ext(filePath)
+
+	if extension != ".srt" {
+		// Let's search for all files that have same beginning and .srt extension
+		// It is possible to have items like 'movie.french.srt'
+		_, f := filepath.Split(filePath)
+		currentPath := f[0 : len(f)-len(extension)]
+		collected := []string{}
+
+		for _, f := range btp.t.files {
+			if strings.Contains(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
+				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
+			}
+		}
+
+		if len(collected) > 0 {
+			log.Debugf("Adding player subtitles: %#v", collected)
+			xbmc.PlayerSetSubtitles(collected)
+		}
 	}
 }
 

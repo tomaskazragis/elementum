@@ -159,13 +159,16 @@ type Configuration struct {
 	StoreResumeAction int
 	TMDBApiKey        string
 
-	OSDBUser           string
-	OSDBPass           string
-	OSDBLanguage       string
-	OSDBAutoLanguage   bool
-	OSDBAutoLoad       bool
-	OSDBAutoLoadCount  int
-	OSDBAutoLoadDelete bool
+	OSDBUser               string
+	OSDBPass               string
+	OSDBLanguage           string
+	OSDBAutoLanguage       bool
+	OSDBAutoLoad           bool
+	OSDBAutoLoadCount      int
+	OSDBAutoLoadDelete     bool
+	OSDBAutoLoadSkipExists bool
+	OSDBIncludedEnabled    bool
+	OSDBIncludedSkipExists bool
 
 	SortingModeMovies           int
 	SortingModeShows            int
@@ -562,13 +565,16 @@ func Reload() *Configuration {
 		StoreResumeAction: settings["store_resume_action"].(int),
 		TMDBApiKey:        settings["tmdb_api_key"].(string),
 
-		OSDBUser:           settings["osdb_user"].(string),
-		OSDBPass:           settings["osdb_pass"].(string),
-		OSDBLanguage:       settings["osdb_language"].(string),
-		OSDBAutoLanguage:   settings["osdb_auto_language"].(bool),
-		OSDBAutoLoad:       settings["osdb_auto_load"].(bool),
-		OSDBAutoLoadCount:  settings["osdb_auto_load_count"].(int),
-		OSDBAutoLoadDelete: settings["osdb_auto_load_delete"].(bool),
+		OSDBUser:               settings["osdb_user"].(string),
+		OSDBPass:               settings["osdb_pass"].(string),
+		OSDBLanguage:           settings["osdb_language"].(string),
+		OSDBAutoLanguage:       settings["osdb_auto_language"].(bool),
+		OSDBAutoLoad:           settings["osdb_auto_load"].(bool),
+		OSDBAutoLoadCount:      settings["osdb_auto_load_count"].(int),
+		OSDBAutoLoadDelete:     settings["osdb_auto_load_delete"].(bool),
+		OSDBAutoLoadSkipExists: settings["osdb_auto_load_skipexists"].(bool),
+		OSDBIncludedEnabled:    settings["osdb_included_enabled"].(bool),
+		OSDBIncludedSkipExists: settings["osdb_included_skipexists"].(bool),
 
 		SortingModeMovies:           settings["sorting_mode_movies"].(int),
 		SortingModeShows:            settings["sorting_mode_shows"].(int),
