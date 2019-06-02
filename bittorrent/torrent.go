@@ -726,7 +726,6 @@ func (t *Torrent) GetStateString() string {
 func (t *Torrent) GetBufferProgress() float64 {
 	defer perf.ScopeTimer()()
 
-	t.BufferProgress = float64(0)
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
 
