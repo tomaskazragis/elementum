@@ -556,7 +556,7 @@ func (btp *Player) findSubtitlesFile() *File {
 		fileName := file.Path
 		if strings.HasSuffix(fileName, srtFileName) {
 			return file
-		} else if strings.HasSuffix(fileName, ".srt") {
+		} else if util.HasSubtitlesExt(fileName) {
 			lastMatched = file
 			countMatched++
 		}
@@ -1204,7 +1204,7 @@ func (btp *Player) SetSubtitles() {
 	filePath := btp.chosenFile.Path
 	extension := filepath.Ext(filePath)
 
-	if extension != ".srt" {
+	if !util.IsSubtitlesExt(extension) {
 		// Let's search for all files that have same beginning and .srt extension
 		// It is possible to have items like 'movie.french.srt'
 		_, f := filepath.Split(filePath)
@@ -1212,7 +1212,7 @@ func (btp *Player) SetSubtitles() {
 		collected := []string{}
 
 		for _, f := range btp.t.files {
-			if strings.Contains(f.Path, currentPath) && strings.HasSuffix(f.Path, ".srt") {
+			if strings.Contains(f.Path, currentPath) && util.HasSubtitlesExt(f.Path) {
 				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
 			}
 		}
