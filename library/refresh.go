@@ -108,6 +108,7 @@ func Refresh() error {
 	if TraktScanning {
 		return nil
 	}
+	now := time.Now()
 	defer util.FreeMemoryGC()
 
 	if err := RefreshMovies(); err != nil {
@@ -117,8 +118,7 @@ func Refresh() error {
 		log.Debugf("RefreshShows got an error: %v", err)
 	}
 
-	log.Debug("Library refresh finished")
-
+	log.Debugf("Library refresh finished in %s", time.Since(now))
 	return nil
 }
 
@@ -506,6 +506,8 @@ func RefreshEpisode(kodiID, action int) {
 // RefreshUIDs updates unique IDs for each library item
 // This collects already saved UIDs for easier access
 func RefreshUIDs() error {
+	now := time.Now()
+
 	l.mu.UIDs.Lock()
 	defer l.mu.UIDs.Unlock()
 
@@ -563,7 +565,7 @@ func RefreshUIDs() error {
 		}
 	}
 
-	log.Debugf("UIDs refresh finished")
+	log.Debugf("UIDs refresh finished in %s", time.Since(now))
 	return nil
 }
 
