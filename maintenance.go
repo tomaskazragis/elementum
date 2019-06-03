@@ -112,7 +112,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		} else if config.Get().StoreResume && p.Params().StoredResume != nil && p.Params().StoredResume.Position > 0 {
 			resumePosition = p.Params().StoredResume.Position
-		} else if p.Params().ResumePlayback && p.Params().Resume != nil && p.Params().Resume.Position > 0 {
+		} else if p.Params().Resume != nil && p.Params().Resume.Position > 0 {
 			resumePosition = p.Params().Resume.Position
 		}
 
