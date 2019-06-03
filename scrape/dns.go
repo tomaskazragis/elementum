@@ -173,7 +173,7 @@ func resolveAddr(host string) (ips []string) {
 
 	defer func() {
 		mu.Unlock()
-		if strings.HasPrefix(ips[0], "127.") {
+		if len(ips) == 0 || strings.HasPrefix(ips[0], "127.") {
 			return
 		}
 
