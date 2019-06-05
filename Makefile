@@ -176,7 +176,8 @@ docker: force
 	$(DOCKER) run --rm -v $(GOPATH):/go -v -e GOPATH=/go -v $(shell pwd):/go/src/$(GO_PKG) -w /go/src/$(GO_PKG) $(DOCKER_IMAGE):$(TARGET_OS)-$(TARGET_ARCH)
 
 strip: force
-	@find $(BUILD_PATH) -type f ! -name "*.exe" -exec $(STRIP) {} \;
+	# Temporary disable strip
+	# @find $(BUILD_PATH) -type f ! -name "*.exe" -exec $(STRIP) {} \;
 
 upx-all:
 	@find build/ -type f ! -name "*.exe" -a ! -name "*.so" -exec $(UPX) --lzma {} \;

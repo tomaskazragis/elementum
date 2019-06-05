@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	maxSingleCoreConnections = 40
+	maxSingleCoreConnections = 30
 )
 
 // On Raspberry Pi, we need to limit the number of active connections
@@ -20,5 +20,5 @@ func getPlatformSpecificConnectionLimit() int {
 		return maxSingleCoreConnections
 	}
 
-	return 200
+	return 75
 }
