@@ -4,7 +4,7 @@ Elementum daemon [![Build Status](https://travis-ci.org/elgatito/elementum.svg?b
 Fork of the great [Pulsar daemon](https://github.com/steeve/pulsar) and [Quasar daemon](https://github.com/scakemyer/quasar)
 
 1. Build the [cross-compiler](https://github.com/ElementumOrg/cross-compiler) images,
-    or alternatively, pull the cross-compiler images from [Docker Hub](https://hub.docker.com/r/ElementumOrg/cross-compiler):
+    or alternatively, pull the cross-compiler images from [Docker Hub](https://hub.docker.com/r/elementumorg/cross-compiler):
 
     ```
     make pull-all
