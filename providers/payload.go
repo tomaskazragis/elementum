@@ -18,7 +18,8 @@ type GeneralSearchObject struct {
 	InternalProxyURL string `json:"internal_proxy_url"`
 	ElementumURL     string `json:"elementum_url"`
 
-	Silent bool `json:"silent"`
+	Silent   bool `json:"silent"`
+	SkipAuth bool `json:"skip_auth"`
 }
 
 // QuerySearchObject ...
