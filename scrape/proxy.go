@@ -172,6 +172,9 @@ func solveCloudFlare(resp *http.Response, ctx *goproxy.ProxyCtx) (*http.Response
 	}
 	buff := bytes.NewBuffer(body)
 	dom, err := goquery.NewDocumentFromReader(buff)
+	if err != nil {
+		return nil, false
+	}
 
 	host := strings.Replace(rurl.Host, ":443", "", -1)
 
@@ -229,7 +232,12 @@ func solveCloudFlare(resp *http.Response, ctx *goproxy.ProxyCtx) (*http.Response
 	re4 := regexp.MustCompile(";\\s*\\d+\\s*$")
 	re5 := regexp.MustCompile("a\\.value\\s*\\=")
 
-	js = re1.FindAllStringSubmatch(js, -1)[0][1]
+	res := re1.FindAllStringSubmatch(js, -1)
+	if len(res) == 0 || len(res[0]) == 0 {
+		return nil, false
+	}
+
+	js = res[0][1]
 	js = strings.Replace(js, "s,t,o,p,b,r,e,a,k,i,n,g,f,", "s,t = \""+host+"\",o,p,b,r,e,a,k,i,n,g,f,", 1)
 	js = re2.ReplaceAllString(js, "")
 	js = re3.ReplaceAllString(js, "")
