@@ -9,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/boltdb/bolt"
 
 	"github.com/elgatito/elementum/config"
@@ -164,6 +164,16 @@ func (d *BoltDatabase) CheckBucket(bucket []byte) error {
 	})
 }
 
+// BucketExists checks if bucket already exists in the database
+func (d *BoltDatabase) BucketExists(bucket []byte) (res bool) {
+	d.db.View(func(tx *bolt.Tx) error {
+		res = tx.Bucket(bucket) != nil
+		return nil
+	})
+
+	return
+}
+
 // RecreateBucket ...
 func (d *BoltDatabase) RecreateBucket(bucket []byte) error {
 	return d.db.Update(func(tx *bolt.Tx) error {
@@ -182,8 +192,7 @@ func (d *BoltDatabase) MaintenanceRefreshHandler() {
 	backupPath := filepath.Join(config.Get().Info.Profile, d.backupFileName)
 
 	d.CreateBackup(backupPath)
-
-	// database.CacheCleanup()
+	d.CacheCleanup()
 
 	tickerBackup := time.NewTicker(2 * time.Hour)
 
@@ -263,16 +272,18 @@ func (d *BoltDatabase) CreateBackup(backupPath string) {
 
 // CacheCleanup ...
 func (d *BoltDatabase) CacheCleanup() {
+	defer perf.ScopeTimer()()
+
 	now := util.NowInt()
-	for _, bucket := range Buckets {
-		if !strings.Contains(string(bucket), "Cache") {
+	for _, bucket := range CacheBuckets {
+		if !d.BucketExists(bucket) {
 			continue
 		}
 
 		toRemove := []string{}
 		d.ForEach(bucket, func(key []byte, value []byte) error {
 			expire, _ := ParseCacheItem(value)
-			if expire > 0 && expire < now {
+			if (expire > 0 && expire < now) || expire == 0 {
 				toRemove = append(toRemove, string(key))
 			}
 
@@ -280,6 +291,7 @@ func (d *BoltDatabase) CacheCleanup() {
 		})
 
 		if len(toRemove) > 0 {
+			log.Debugf("Removing %d invalidated items from cache", len(toRemove))
 			d.BatchDelete(bucket, toRemove)
 		}
 	}
@@ -332,6 +344,10 @@ func (d *BoltDatabase) ForEach(bucket []byte, callback callBackWithError) error 
 
 // ParseCacheItem ...
 func ParseCacheItem(item []byte) (int, []byte) {
+	if len(item) < 11 {
+		return 0, nil
+	}
+	
 	expire, _ := strconv.Atoi(string(item[0:10]))
 	return expire, item[11:]
 }
@@ -352,6 +368,9 @@ func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []b
 	if expire > 0 && expire < util.NowInt() {
 		d.Delete(bucket, key)
 		return nil, errors.New("Key Expired")
+	} else if expire == 0 {
+		d.Delete(bucket, key)
+		return nil, errors.New("Invalid Key")
 	}
 
 	return v, nil

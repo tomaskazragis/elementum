@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/cespare/xxhash"
 	"github.com/op/go-logging"
 
@@ -1079,6 +1080,8 @@ func RefreshTrakt() error {
 	if err := checkShowsPath(); err != nil {
 		return err
 	}
+
+	defer perf.ScopeTimer()()
 
 	log.Debugf("TraktSync: Watched")
 	if changes, err := SyncTraktWatched(); err != nil {
