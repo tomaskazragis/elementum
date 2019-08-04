@@ -71,6 +71,7 @@ type Configuration struct {
 	LibraryNFOShows           bool
 	PlaybackPercent           int
 	DownloadStorage           int
+	SkipBurstSearch           bool
 	AutoMemorySize            bool
 	AutoKodiBufferSize        bool
 	AutoAdjustMemorySize      bool
@@ -454,6 +455,7 @@ func Reload() *Configuration {
 		HomePath:                  info.Home,
 		XbmcPath:                  info.Xbmc,
 		DownloadStorage:           settings["download_storage"].(int),
+		SkipBurstSearch:           settings["skip_burst_search"].(bool),
 		AutoMemorySize:            settings["auto_memory_size"].(bool),
 		AutoAdjustMemorySize:      settings["auto_adjust_memory_size"].(bool),
 		AutoMemorySizeStrategy:    settings["auto_memory_size_strategy"].(int),
@@ -827,7 +829,7 @@ func CheckBurst() {
 	xbmc.UpdateLocalAddons()
 	xbmc.UpdateAddonRepos()
 
-	if xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30271]") {
+	if !Get().SkipBurstSearch && xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30271]") {
 		log.Infof("Triggering Kodi to check for script.elementum.burst plugin")
 		xbmc.PlayURL("plugin://script.elementum.burst/")
 		time.Sleep(15 * time.Second)
