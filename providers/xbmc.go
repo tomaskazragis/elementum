@@ -13,7 +13,6 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/tmdb"
-	"github.com/elgatito/elementum/tvdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/gin-gonic/gin"
@@ -252,19 +251,14 @@ func (as *AddonSearcher) GetEpisodeSearchObject(show *tmdb.Show, episode *tmdb.E
 
 	// Is this an Anime?
 	absoluteNumber := 0
-	if tvdbID > 0 {
-		if show.IsAnime() {
-			tvdbShow, err := tvdb.GetShow(tvdbID, config.Get().Language)
-			if err == nil && len(tvdbShow.Seasons) >= episode.SeasonNumber+1 {
-				tvdbSeason := tvdbShow.Seasons[episode.SeasonNumber]
-				if len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
-					tvdbEpisode := tvdbSeason.Episodes[episode.EpisodeNumber-1]
-					if tvdbEpisode.AbsoluteNumber > 0 {
-						absoluteNumber = tvdbEpisode.AbsoluteNumber
-					}
-					title = tvdbShow.SeriesName
-				}
-			}
+	if tvdbID > 0 && show.IsAnime() {
+		an, st := show.AnimeInfo(episode)
+
+		if an != 0 {
+			absoluteNumber = an
+		}
+		if st != "" {
+			title = st
 		}
 	}
 

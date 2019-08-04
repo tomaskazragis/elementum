@@ -34,8 +34,9 @@ import (
 
 const (
 	// EndBufferSize ...
-	EndBufferSize     int64 = 5400276 // ~5.5mb
-	episodeMatchRegex       = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
+	EndBufferSize           int64 = 5400276 // ~5.5mb
+	episodeMatchRegex             = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
+	singleEpisodeMatchRegex       = `(?i)(^|\W|_)(E0*%[1]d|0*%[1]d)(\W|_)`
 )
 
 // Player ...
@@ -94,6 +95,7 @@ type PlayerParams struct {
 	ShowID          int
 	Season          int
 	Episode         int
+	AbsoluteNumber  int
 	Query           string
 	UIDs            *library.UniqueIDs
 	Resume          *library.Resume
@@ -525,6 +527,28 @@ func (btp *Player) chooseFile() (*File, error) {
 			if foundMatches == 1 {
 				return files[choices[lastMatched].Index], nil
 			}
+
+			if s := tmdb.GetShow(btp.p.ShowID, config.Get().Language); s != nil && s.IsAnime() {
+				season := tmdb.GetSeason(btp.p.ShowID, btp.p.Season, config.Get().Language)
+				if season != nil {
+					an, _ := s.AnimeInfo(season.Episodes[btp.p.Episode-1])
+					if an != 0 {
+						btp.p.AbsoluteNumber = an
+
+						re := regexp.MustCompile(fmt.Sprintf(singleEpisodeMatchRegex, btp.p.AbsoluteNumber))
+						for index, choice := range choices {
+							if re.MatchString(choice.Filename) {
+								lastMatched = index
+								foundMatches++
+							}
+						}
+
+						if foundMatches == 1 {
+							return files[choices[lastMatched].Index], nil
+						}
+					}
+				}
+			}
 		}
 
 		items := make([]string, 0, len(choices))
@@ -532,7 +556,16 @@ func (btp *Player) chooseFile() (*File, error) {
 			items = append(items, choice.DisplayName)
 		}
 
-		choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
+		searchTitle := ""
+		if btp.p.AbsoluteNumber > 0 {
+			searchTitle = fmt.Sprintf("E%d", btp.p.AbsoluteNumber)
+		} else if btp.p.Episode > 0 {
+			searchTitle = fmt.Sprintf("S%dE%d", btp.p.Season, btp.p.Episode)
+		} else if m := tmdb.GetMovieByID(strconv.Itoa(btp.p.TMDBId), config.Get().Language); m != nil {
+			searchTitle = m.Title
+		}
+
+		choice := xbmc.ListDialog("LOCALIZE[30560];;"+searchTitle, items...)
 		if choice >= 0 {
 			return files[choices[choice].Index], nil
 		}
@@ -1012,7 +1045,12 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 		if season == nil || season.EpisodeCount == 0 {
 			continue
 		}
-		episodes := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language).Episodes
+		tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language)
+		if tmdbSeason == nil {
+			continue
+		}
+
+		episodes := tmdbSeason.Episodes
 
 		for _, episode := range episodes {
 			if episode == nil {

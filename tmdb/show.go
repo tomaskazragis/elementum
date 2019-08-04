@@ -14,6 +14,7 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/fanart"
 	"github.com/elgatito/elementum/playcount"
+	"github.com/elgatito/elementum/tvdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 	"github.com/jmcvetta/napping"
@@ -461,6 +462,22 @@ func (show *Show) IsAnime() bool {
 	}
 
 	return countryIsJP && genreIsAnim
+}
+
+// AnimeInfo returns absolute episode number and show title
+func (show *Show) AnimeInfo(episode *Episode) (an int, st string) {
+	tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
+
+	if tvdbShow, err := tvdb.GetShow(tvdbID, config.Get().Language); err == nil && len(tvdbShow.Seasons) >= episode.SeasonNumber+1 {
+		if tvdbSeason := tvdbShow.Seasons[episode.SeasonNumber]; len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
+			if tvdbEpisode := tvdbSeason.Episodes[episode.EpisodeNumber-1]; tvdbEpisode.AbsoluteNumber > 0 {
+				an = tvdbEpisode.AbsoluteNumber
+			}
+			st = tvdbShow.SeriesName
+		}
+	}
+
+	return
 }
 
 // ToListItem ...
