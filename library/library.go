@@ -848,6 +848,7 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 func IsDuplicateMovie(tmdbID string) error {
 	l.mu.UIDs.Lock()
 	defer l.mu.UIDs.Unlock()
+	defer perf.ScopeTimer()()
 
 	query, _ := strconv.Atoi(tmdbID)
 	for _, u := range l.UIDs {
@@ -861,6 +862,8 @@ func IsDuplicateMovie(tmdbID string) error {
 
 // IsDuplicateShow checks if show exists in the library
 func IsDuplicateShow(tmdbID string) error {
+	defer perf.ScopeTimer()()
+
 	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
 	if show == nil {
 		return errors.New("Can't resolve show")
@@ -883,6 +886,7 @@ func IsDuplicateShow(tmdbID string) error {
 func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) (err error) {
 	l.mu.Shows.Lock()
 	defer l.mu.Shows.Unlock()
+	defer perf.ScopeTimer()()
 
 	for _, s := range l.Shows {
 		if tmdbShowID != s.UIDs.TMDB {
@@ -901,6 +905,8 @@ func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) (er
 
 // IsAddedToLibrary checks if specific TMDB exists in the library
 func IsAddedToLibrary(id string, mediaType int) (isAdded bool) {
+	defer perf.ScopeTimer()()
+
 	count := 0
 	database.Get().QueryRow("SELECT COUNT(*) FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ?", id, mediaType, StateActive).Scan(&count)
 

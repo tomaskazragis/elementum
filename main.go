@@ -23,6 +23,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/lockfile"
+	"github.com/elgatito/elementum/scrape"
 	"github.com/elgatito/elementum/trakt"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -203,11 +204,12 @@ func main() {
 		xbmc.DialogProgressBGCleanup()
 		xbmc.ResetRPC()
 	}()
-	
+
 	go library.Init()
 	go trakt.TokenRefreshHandler()
 	go db.MaintenanceRefreshHandler()
 	go cacheDb.MaintenanceRefreshHandler()
+	go scrape.Start()
 
 	log.Infof("Prepared in %s", time.Since(now))
 	log.Infof("Starting HTTP server")

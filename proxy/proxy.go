@@ -1,4 +1,4 @@
-package scrape
+package proxy
 
 import (
 	"bytes"

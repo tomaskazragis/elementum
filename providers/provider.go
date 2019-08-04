@@ -13,6 +13,7 @@ type Searcher interface {
 // MovieSearcher ...
 type MovieSearcher interface {
 	SearchMovieLinks(movie *tmdb.Movie) []*bittorrent.TorrentFile
+	SearchMovieLinksSilent(movie *tmdb.Movie, withAuth bool) []*bittorrent.TorrentFile
 }
 
 // SeasonSearcher ...

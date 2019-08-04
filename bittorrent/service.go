@@ -31,7 +31,7 @@ import (
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/diskusage"
-	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/proxy"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
@@ -145,13 +145,13 @@ func (s *Service) Reconfigure() {
 	s.stopServices()
 
 	config.Reload()
-	scrape.Reload()
+	proxy.Reload()
 
 	s.config = config.Get()
 	s.configure()
 
 	if config.Get().AntizapretEnabled {
-		go scrape.PacParser.Update()
+		go proxy.PacParser.Update()
 	}
 
 	s.startServices()
@@ -163,7 +163,7 @@ func (s *Service) configure() {
 
 	if s.config.InternalProxyEnabled {
 		log.Infof("Starting internal proxy")
-		s.InternalProxy = scrape.StartProxy()
+		s.InternalProxy = proxy.StartProxy()
 	}
 
 	if _, err := os.Stat(s.config.TorrentsPath); os.IsNotExist(err) {

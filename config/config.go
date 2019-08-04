@@ -115,6 +115,13 @@ type Configuration struct {
 	MagnetTrackers            int
 	Scrobble                  bool
 
+	AutoScrapeEnabled        bool
+	AutoScrapeLibraryEnabled bool
+	AutoScrapeStrategy       int
+	AutoScrapeStrategyExpect int
+	AutoScrapePerHours       int
+	AutoScrapeLimitMovies    int
+
 	TraktUsername                  string
 	TraktToken                     string
 	TraktRefreshToken              string
@@ -520,6 +527,13 @@ func Reload() *Configuration {
 		ConnTrackerLimitAuto:      settings["conntracker_limit_auto"].(bool),
 		SessionSave:               settings["session_save"].(int),
 		Scrobble:                  settings["trakt_scrobble"].(bool),
+
+		AutoScrapeEnabled:        settings["autoscrape_enabled"].(bool),
+		AutoScrapeLibraryEnabled: settings["autoscrape_library_enabled"].(bool),
+		AutoScrapeStrategy:       settings["autoscrape_strategy"].(int),
+		AutoScrapeStrategyExpect: settings["autoscrape_strategy_expect"].(int),
+		AutoScrapePerHours:       settings["autoscrape_per_hours"].(int),
+		AutoScrapeLimitMovies:    settings["autoscrape_limit_movies"].(int),
 
 		TraktUsername:                  settings["trakt_username"].(string),
 		TraktToken:                     settings["trakt_token"].(string),

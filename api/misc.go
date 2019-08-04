@@ -9,7 +9,7 @@ import (
 
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/library"
-	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/proxy"
 	"github.com/elgatito/elementum/tmdb"
 
 	"github.com/dustin/go-humanize"
@@ -100,7 +100,7 @@ func Status(ctx *gin.Context) {
 		util.GetVersion(),
 		ip,
 		port,
-		scrape.ProxyPort,
+		proxy.ProxyPort,
 
 		webAddress,
 		infoAddress,

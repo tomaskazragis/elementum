@@ -21,7 +21,7 @@ import (
 	"github.com/zeebo/bencode"
 
 	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/proxy"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -461,7 +461,7 @@ func (t *TorrentFile) Resolve() error {
 		}
 	}
 
-	resp, err := scrape.GetClient().Do(req)
+	resp, err := proxy.GetClient().Do(req)
 	if err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {

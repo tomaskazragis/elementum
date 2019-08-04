@@ -140,6 +140,15 @@ func (as *AddonSearcher) GetQuerySearchObject(query string) *QuerySearchObject {
 	return sObject
 }
 
+// GetMovieSearchSilentObject ...
+func (as *AddonSearcher) GetMovieSearchSilentObject(movie *tmdb.Movie, withAuth bool) *MovieSearchObject {
+	o := as.GetMovieSearchObject(movie)
+	o.Silent = true
+	o.SkipAuth = !withAuth
+
+	return o
+}
+
 // GetMovieSearchObject ...
 func (as *AddonSearcher) GetMovieSearchObject(movie *tmdb.Movie) *MovieSearchObject {
 	year, _ := strconv.Atoi(strings.Split(movie.ReleaseDate, "-")[0])
@@ -341,6 +350,11 @@ func (as *AddonSearcher) SearchLinks(query string) []*bittorrent.TorrentFile {
 // SearchMovieLinks ...
 func (as *AddonSearcher) SearchMovieLinks(movie *tmdb.Movie) []*bittorrent.TorrentFile {
 	return as.call("search_movie", as.GetMovieSearchObject(movie))
+}
+
+// SearchMovieLinksSilent ...
+func (as *AddonSearcher) SearchMovieLinksSilent(movie *tmdb.Movie, withAuth bool) []*bittorrent.TorrentFile {
+	return as.call("search_movie", as.GetMovieSearchSilentObject(movie, withAuth))
 }
 
 // SearchSeasonLinks ...

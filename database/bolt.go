@@ -347,7 +347,7 @@ func ParseCacheItem(item []byte) (int, []byte) {
 	if len(item) < 11 {
 		return 0, nil
 	}
-	
+
 	expire, _ := strconv.Atoi(string(item[0:10]))
 	return expire, item[11:]
 }
@@ -380,6 +380,16 @@ func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []b
 func (d *BoltDatabase) GetCached(bucket []byte, key string) (string, error) {
 	value, err := d.GetCachedBytes(bucket, key)
 	return string(value), err
+}
+
+// GetCachedBool ...
+func (d *BoltDatabase) GetCachedBool(bucket []byte, key string) (bool, error) {
+	value, err := d.GetCachedBytes(bucket, key)
+	if err != nil {
+		return false, err
+	}
+
+	return strconv.ParseBool(string(value))
 }
 
 // GetCachedObject ...
@@ -459,6 +469,11 @@ func (d *BoltDatabase) SetCachedBytes(bucket []byte, seconds int, key string, va
 // SetCached ...
 func (d *BoltDatabase) SetCached(bucket []byte, seconds int, key string, value string) error {
 	return d.SetCachedBytes(bucket, seconds, key, []byte(value))
+}
+
+// SetCachedBool ...
+func (d *BoltDatabase) SetCachedBool(bucket []byte, seconds int, key string, value bool) error {
+	return d.SetCachedBytes(bucket, seconds, key, []byte(strconv.FormatBool(value)))
 }
 
 // SetCachedObject ...

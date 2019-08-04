@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/util"
@@ -27,9 +28,13 @@ func filterListItems(l xbmc.ListItems) xbmc.ListItems {
 
 	ret := make(xbmc.ListItems, 0)
 	for _, i := range l {
-		if !i.TraktAuth || t {
-			ret = append(ret, i)
+		if i.TraktAuth && !t {
+			continue
+		} else if !config.Get().AutoScrapeEnabled && strings.Contains(i.Path, "autoscraped") {
+			continue
 		}
+
+		ret = append(ret, i)
 	}
 
 	return ret

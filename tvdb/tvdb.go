@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elgatito/elementum/cache"
-	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/proxy"
 )
 
 //go:generate msgp -o msgp.go -io=false -tests=false
@@ -133,7 +133,7 @@ func getShow(tvdbID int, language string) (*Show, error) {
 		Actors []*Actor `xml:"Actor"`
 	}
 
-	resp, err := scrape.GetClient().Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
+	resp, err := proxy.GetClient().Get(fmt.Sprintf("%s/%s/series/%d/all/%s.zip", tvdbEndpoint, apiKey, tvdbID, language))
 	if err != nil {
 		return nil, err
 	}

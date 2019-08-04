@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elgatito/elementum/scrape"
+	"github.com/elgatito/elementum/proxy"
 )
 
 // A Subtitle with its many OSDB attributes...
@@ -84,7 +84,7 @@ func (subs Subtitles) Best() *Subtitle {
 
 // NewSubtitleReader ...
 func NewSubtitleReader(s *Subtitle) (io.Reader, error) {
-	resp, err := scrape.GetClient().Get(s.SubDownloadLink)
+	resp, err := proxy.GetClient().Get(s.SubDownloadLink)
 	if err != nil {
 		return nil, err
 	}
