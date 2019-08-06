@@ -160,7 +160,7 @@ func runUpdater() {
 		addMovieToLibrary(m.Movie)
 
 		// Just sleep a little
-		time.Sleep(time.Duration(rand.Intn(5)+5) * time.Second)
+		time.Sleep(time.Duration(rand.Intn(5)+config.Get().AutoScrapeInterval) * time.Second)
 	}
 }
 

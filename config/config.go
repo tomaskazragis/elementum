@@ -122,6 +122,7 @@ type Configuration struct {
 	AutoScrapeStrategyExpect int
 	AutoScrapePerHours       int
 	AutoScrapeLimitMovies    int
+	AutoScrapeInterval       int
 
 	TraktUsername                  string
 	TraktToken                     string
@@ -530,12 +531,13 @@ func Reload() *Configuration {
 		SessionSave:               settings["session_save"].(int),
 		Scrobble:                  settings["trakt_scrobble"].(bool),
 
-		AutoScrapeEnabled:        settings["autoscrape_enabled"].(bool),
+		AutoScrapeEnabled:        settings["autoscrape_is_enabled"].(bool),
 		AutoScrapeLibraryEnabled: settings["autoscrape_library_enabled"].(bool),
 		AutoScrapeStrategy:       settings["autoscrape_strategy"].(int),
 		AutoScrapeStrategyExpect: settings["autoscrape_strategy_expect"].(int),
 		AutoScrapePerHours:       settings["autoscrape_per_hours"].(int),
 		AutoScrapeLimitMovies:    settings["autoscrape_limit_movies"].(int),
+		AutoScrapeInterval:       settings["autoscrape_interval"].(int),
 
 		TraktUsername:                  settings["trakt_username"].(string),
 		TraktToken:                     settings["trakt_token"].(string),
