@@ -201,6 +201,36 @@ func getShow(tvdbID int, language string) (*Show, error) {
 	return show, nil
 }
 
+// GetSeason ...
+func (s *Show) GetSeason(number int) *Season {
+	if len(s.Seasons) == 0 {
+		return nil
+	}
+
+	for _, season := range s.Seasons {
+		if season.Season == number {
+			return season
+		}
+	}
+
+	return nil
+}
+
+// GetEpisode ...
+func (s *Season) GetEpisode(number int) *Episode {
+	if len(s.Episodes) == 0 {
+		return nil
+	}
+
+	for _, episode := range s.Episodes {
+		if episode.EpisodeNumber == number {
+			return episode
+		}
+	}
+
+	return nil
+}
+
 // GetShow ...
 func GetShow(tvdbID int, language string) (*Show, error) {
 	var show *Show

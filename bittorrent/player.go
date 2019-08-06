@@ -28,6 +28,7 @@ import (
 	"github.com/elgatito/elementum/osdb"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
+	"github.com/elgatito/elementum/tvdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -1041,6 +1042,13 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 		return
 	}
 
+	var tvdbShow *tvdb.Show
+	// If show is Anime, we will need Tvdb Show entry for getting absolute numbers for episodes
+	if show.IsAnime() {
+		tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
+		tvdbShow, _ = tvdb.GetShow(tvdbID, config.Get().Language)
+	}
+
 	for _, season := range show.Seasons {
 		if season == nil || season.EpisodeCount == 0 {
 			continue
@@ -1061,6 +1069,17 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 			for _, choice := range choices {
 				if re.MatchString(choice.Filename) {
 					database.Get().AddTorrentLink(strconv.Itoa(episode.ID), btp.t.InfoHash(), b)
+				}
+			}
+
+			if show.IsAnime() {
+				if an, _ := show.AnimeInfoWithShow(episode, tvdbShow); an != 0 {
+					re := regexp.MustCompile(fmt.Sprintf(singleEpisodeMatchRegex, an))
+					for _, choice := range choices {
+						if re.MatchString(choice.Filename) {
+							database.Get().AddTorrentLink(strconv.Itoa(episode.ID), btp.t.InfoHash(), b)
+						}
+					}
 				}
 			}
 		}

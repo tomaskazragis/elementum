@@ -467,12 +467,23 @@ func (show *Show) IsAnime() bool {
 // AnimeInfo returns absolute episode number and show title
 func (show *Show) AnimeInfo(episode *Episode) (an int, st string) {
 	tvdbID := util.StrInterfaceToInt(show.ExternalIDs.TVDBID)
+	if tvdbShow, err := tvdb.GetShow(tvdbID, config.Get().Language); err == nil {
+		return show.AnimeInfoWithShow(episode, tvdbShow)
+	}
 
-	if tvdbShow, err := tvdb.GetShow(tvdbID, config.Get().Language); err == nil && len(tvdbShow.Seasons) >= episode.SeasonNumber+1 {
-		if tvdbSeason := tvdbShow.Seasons[episode.SeasonNumber]; len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
-			if tvdbEpisode := tvdbSeason.Episodes[episode.EpisodeNumber-1]; tvdbEpisode.AbsoluteNumber > 0 {
+	return
+}
+
+// AnimeInfoWithShow ...
+func (show *Show) AnimeInfoWithShow(episode *Episode, tvdbShow *tvdb.Show) (an int, st string) {
+	if tvdbShow != nil && episode.SeasonNumber > 0 && len(tvdbShow.Seasons) >= episode.SeasonNumber {
+		if tvdbSeason := tvdbShow.GetSeason(episode.SeasonNumber); tvdbSeason != nil && len(tvdbSeason.Episodes) >= episode.EpisodeNumber {
+			if tvdbEpisode := tvdbSeason.GetEpisode(episode.EpisodeNumber); tvdbEpisode != nil && tvdbEpisode.AbsoluteNumber > 0 {
 				an = tvdbEpisode.AbsoluteNumber
+			} else if episode.SeasonNumber == 1 {
+				an = episode.EpisodeNumber
 			}
+
 			st = tvdbShow.SeriesName
 		}
 	}
