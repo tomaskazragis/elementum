@@ -228,8 +228,8 @@ func (s *Service) configure() {
 	settings.SetInt("seed_choking_algorithm", int(lt.SettingsPackFastestUpload))
 
 	// Sizes
-	settings.SetInt("max_out_request_queue", 30000)
-	settings.SetInt("max_allowed_in_request_queue", 20000)
+	settings.SetInt("max_out_request_queue", 60000)
+	settings.SetInt("max_allowed_in_request_queue", 25000)
 	// settings.SetInt("listen_queue_size", 2000)
 	// settings.SetInt("unchoke_slots_limit", 20)
 	settings.SetInt("max_peerlist_size", 50000)
