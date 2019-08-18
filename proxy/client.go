@@ -62,6 +62,11 @@ func GetClient() *http.Client {
 	return proxyClient
 }
 
+// GetDirectClient ...
+func GetDirectClient() *http.Client {
+	return directClient
+}
+
 // CustomDial ...
 func CustomDial(network, addr string) (net.Conn, error) {
 	if !config.Get().InternalDNSEnabled {
