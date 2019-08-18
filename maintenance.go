@@ -125,6 +125,7 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 
 		if resumePosition > 0 {
 			log.Infof("OnPlay. Seeking to %v", resumePosition)
+			time.Sleep(500 * time.Millisecond)
 			xbmc.PlayerSeek(resumePosition)
 		}
 
