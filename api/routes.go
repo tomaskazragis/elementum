@@ -306,6 +306,7 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 
 		cmd.GET("/reset_path", ResetPath)
 		cmd.GET("/reset_path/:path", ResetCustomPath)
+		cmd.GET("/open_path/:path", OpenCustomPath)
 
 		cmd.GET("/paste/:type", Pastebin)
 

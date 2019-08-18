@@ -90,7 +90,17 @@ func ResetCustomPath(ctx *gin.Context) {
 	path := ctx.Params.ByName("path")
 
 	if path != "" {
-		xbmc.SetSetting(path + "_path", "/")
+		xbmc.SetSetting(path+"_path", "/")
+	}
+}
+
+// OpenCustomPath ...
+func OpenCustomPath(ctx *gin.Context) {
+	path := ctx.Params.ByName("path")
+
+	if path == "library" {
+		log.Debugf("Opening %s in Kodi browser", config.Get().LibraryPath)
+		xbmc.OpenDirectory(config.Get().LibraryPath)
 	}
 }
 

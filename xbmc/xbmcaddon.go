@@ -103,3 +103,9 @@ func GetCurrentView() (viewMode string) {
 	executeJSONRPCEx("GetCurrentView", &viewMode, nil)
 	return
 }
+
+// OpenDirectory ...
+func OpenDirectory(path string) {
+	retVal := 0
+	executeJSONRPCEx("OpenDirectory", &retVal, Args{path})
+}
