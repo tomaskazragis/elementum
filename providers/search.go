@@ -70,7 +70,7 @@ func Search(searchers []Searcher, query string) []*bittorrent.TorrentFile {
 		close(torrentsChan)
 	}()
 
-	return processLinks(torrentsChan, SortMovies)
+	return processLinks(torrentsChan, SortMovies, false)
 }
 
 // SearchMovie ...
@@ -91,7 +91,7 @@ func SearchMovie(searchers []MovieSearcher, movie *tmdb.Movie) []*bittorrent.Tor
 		close(torrentsChan)
 	}()
 
-	return processLinks(torrentsChan, SortMovies)
+	return processLinks(torrentsChan, SortMovies, false)
 }
 
 // SearchMovieSilent ...
@@ -112,7 +112,7 @@ func SearchMovieSilent(searchers []MovieSearcher, movie *tmdb.Movie, withAuth bo
 		close(torrentsChan)
 	}()
 
-	return processLinks(torrentsChan, SortMovies)
+	return processLinks(torrentsChan, SortMovies, true)
 }
 
 // SearchSeason ...
@@ -133,7 +133,7 @@ func SearchSeason(searchers []SeasonSearcher, show *tmdb.Show, season *tmdb.Seas
 		close(torrentsChan)
 	}()
 
-	return processLinks(torrentsChan, SortShows)
+	return processLinks(torrentsChan, SortShows, false)
 }
 
 // SearchEpisode ...
@@ -154,10 +154,10 @@ func SearchEpisode(searchers []EpisodeSearcher, show *tmdb.Show, episode *tmdb.E
 		close(torrentsChan)
 	}()
 
-	return processLinks(torrentsChan, SortShows)
+	return processLinks(torrentsChan, SortShows, false)
 }
 
-func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bittorrent.TorrentFile {
+func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int, isSilent bool) []*bittorrent.TorrentFile {
 	trackers := map[string]*bittorrent.Tracker{}
 	torrentsMap := map[string]*bittorrent.TorrentFile{}
 
@@ -220,30 +220,35 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 		}(torrent)
 	}
 
-	dialogProgressBG := xbmc.NewDialogProgressBG("Elementum", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
-	go func() {
-		for {
-			select {
-			case <-time.After(trackerTimeout * 2):
-				return
-			case msg, ok := <-progressUpdate:
-				if !ok {
+	var dialogProgressBG *xbmc.DialogProgressBG
+	if !isSilent {
+		dialogProgressBG = xbmc.NewDialogProgressBG("Elementum", "LOCALIZE[30117]", "LOCALIZE[30117]", "LOCALIZE[30118]")
+		go func() {
+			for {
+				select {
+				case <-time.After(trackerTimeout * 2):
 					return
-				}
-				if dialogProgressBG != nil {
-					if msg != "skip" {
-						dialogProgressBG.Update(progress*100/progressTotal, "Elementum", msg)
+				case msg, ok := <-progressUpdate:
+					if !ok {
+						return
 					}
-				} else {
-					return
+					if dialogProgressBG != nil {
+						if msg != "skip" {
+							dialogProgressBG.Update(progress*100/progressTotal, "Elementum", msg)
+						}
+					} else {
+						return
+					}
 				}
 			}
-		}
-	}()
+		}()
+	}
 
 	wg.Wait()
 
-	dialogProgressBG.Update(100, "Elementum", "LOCALIZE[30117]")
+	if !isSilent {
+		dialogProgressBG.Update(100, "Elementum", "LOCALIZE[30117]")
+	}
 
 	for _, torrent := range torrents {
 		if torrent.InfoHash == "" {
@@ -311,7 +316,9 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	log.Infof("Received %d unique links.", len(torrents))
 
 	if len(torrents) == 0 {
-		dialogProgressBG.Close()
+		if !isSilent {
+			dialogProgressBG.Close()
+		}
 		return torrents
 	}
 
@@ -414,8 +421,10 @@ func processLinks(torrentsChan chan *bittorrent.TorrentFile, sortType int) []*bi
 	// }
 	// log.Notice("Finished comparing seeds/peers of results to trackers...")
 
-	dialogProgressBG.Close()
-	dialogProgressBG = nil
+	if !isSilent {
+		dialogProgressBG.Close()
+		dialogProgressBG = nil
+	}
 
 	for _, t := range torrents {
 		if _, err := os.Stat(t.URI); err != nil {
