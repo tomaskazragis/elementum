@@ -2,14 +2,13 @@ package proxy
 
 import (
 	"context"
-	"crypto/tls"
-	"math/rand"
-	"net"
 	"strings"
 	"sync"
-	"time"
 
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/bogdanovich/dns_resolver"
+	"github.com/likexian/doh-go"
+	"github.com/likexian/doh-go/dns"
 )
 
 var (
@@ -44,92 +43,32 @@ var (
 		"uu",
 	}
 
-	cloudflareResolver = CloudflareResolver()
-	googleResolver     = GoogleResolver()
-	opennicResolver    = OpennicResolver()
-
-	resolverOpennic = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
+	commonResolver  = doh.Use(doh.CloudflareProvider, doh.GoogleProvider)
+	opennicResolver = dns_resolver.New([]string{"193.183.98.66", "172.104.136.243", "89.18.27.167"})
 
 	dnsCacheResults sync.Map
 	dnsCacheLocks   sync.Map
 )
 
-// CloudflareResolver returns Resolver that uses Cloudflare service on 1.1.1.1 and
-// 1.0.0.1 on port 853.
-//
-// See https://developers.cloudflare.com/1.1.1.1/dns-over-tls/ for details.
-func CloudflareResolver() *net.Resolver {
-	return newResolver("cloudflare-dns.com", "1.1.1.1:853", "1.0.0.1:853")
-}
-
-// Quad9Resolver returns Resolver that uses Quad9 service on 9.9.9.9 and 149.112.112.112
-// on port 853.
-//
-// See https://quad9.net/faq/ for details.
-func Quad9Resolver() *net.Resolver {
-	return newResolver("dns.quad9.net", "9.9.9.9:853", "149.112.112.112:853")
-}
-
-// GoogleResolver returns Resolver that uses Google Public DNS service on 8.8.8.8 and
-// 8.8.4.4 on port 853.
-//
-// See https://developers.google.com/speed/public-dns/ for details.
-func GoogleResolver() *net.Resolver {
-	return newResolver("dns.google", "8.8.8.8:853", "8.8.4.4:853")
-}
-
-// OpennicResolver returns Resolver that uses Opennic Public DNS service on port 853.
-//
-// See https://servers.opennicproject.org/ for details.
-func OpennicResolver() *net.Resolver {
-	return newResolver("dot-de.blahdns.com", "159.69.198.101:853")
-}
-
-func newResolver(serverName string, addrs ...string) *net.Resolver {
-	if serverName == "" {
-		panic("dot: server name cannot be empty")
-	}
-	if len(addrs) == 0 {
-		panic("dot: addrs cannot be empty")
-	}
-	var d net.Dialer
-	cfg := &tls.Config{
-		ServerName:         serverName,
-		ClientSessionCache: tls.NewLRUClientSessionCache(0),
-	}
-	return &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			conn, err := d.DialContext(ctx, "tcp", addrs[rand.Intn(len(addrs))])
-			if err != nil {
-				return nil, err
-			}
-			conn.(*net.TCPConn).SetKeepAlive(true)
-			conn.(*net.TCPConn).SetKeepAlivePeriod(5 * time.Minute)
-			return tls.Client(conn, cfg), nil
-		},
-	}
-}
-
 func resolve(addr string) ([]string, error) {
-	// now := time.Now()
-	// defer log.Debugf("Resolved %s in %s", addr, time.Since(now))
+	defer perf.ScopeTimer()()
 
 	if isOpennicDomain(getZone(addr)) {
-		if ips, err := opennicResolver.LookupHost(context.TODO(), addr); err == nil {
-			return ips, err
-		}
-
 		if ips := resolveAddr(addr); len(ips) > 0 {
 			return ips, nil
 		}
 	}
 
-	if ips, err := cloudflareResolver.LookupHost(context.TODO(), addr); err == nil {
-		return ips, err
+	resp, err := commonResolver.Query(context.TODO(), dns.Domain(addr), dns.TypeA)
+	if err == nil && resp != nil && resp.Answer != nil {
+		ips := make([]string, 0, len(resp.Answer))
+		for _, a := range resp.Answer {
+			ips = append(ips, a.Data)
+		}
+		return ips, nil
 	}
 
-	return googleResolver.LookupHost(context.TODO(), addr)
+	return nil, err
 }
 
 func getZone(addr string) string {
@@ -161,6 +100,8 @@ func resolveAddr(host string) (ips []string) {
 		return strings.Split(cached.(string), ",")
 	}
 
+	defer perf.ScopeTimer()()
+
 	var mu *sync.Mutex
 	if m, ok := dnsCacheLocks.Load(host); ok {
 		mu = m.(*sync.Mutex)
@@ -184,7 +125,7 @@ func resolveAddr(host string) (ips []string) {
 		return strings.Split(cached.(string), ",")
 	}
 
-	ipsResolved, err := resolverOpennic.LookupHost(host)
+	ipsResolved, err := opennicResolver.LookupHost(host)
 	if err == nil && len(ipsResolved) > 0 {
 		for _, i := range ipsResolved {
 			ips = append(ips, i.String())

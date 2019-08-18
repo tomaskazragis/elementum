@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/proxy"
 	"github.com/elgatito/elementum/xbmc"
@@ -38,6 +39,8 @@ func getGithubClient() *github.Client {
 }
 
 func getLastRelease(user string, repository string) string {
+	defer perf.ScopeTimer()()
+
 	resp, err := proxy.GetClient().Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/release")
 	if err != nil || resp == nil {
 		return ""
@@ -51,6 +54,8 @@ func getLastRelease(user string, repository string) string {
 }
 
 func getReleaseByTag(user string, repository string, tagName string) *github.RepositoryRelease {
+	defer perf.ScopeTimer()()
+
 	client := getGithubClient()
 	releases, _, err := client.Repositories.ListReleases(context.TODO(), user, repository, nil)
 	if err != nil {
@@ -66,6 +71,8 @@ func getReleaseByTag(user string, repository string, tagName string) *github.Rep
 }
 
 func getAddonXML(user string, repository string) (string, error) {
+	defer perf.ScopeTimer()()
+
 	resp, err := proxy.GetClient().Get(fmt.Sprintf(githubUserContentURL, user, repository) + "/addon.xml")
 	if resp == nil {
 		return "", errors.New("Not found")
@@ -79,6 +86,7 @@ func getAddonXML(user string, repository string) (string, error) {
 }
 
 func getAddons(user string, repository string) (*xbmc.AddonList, error) {
+	defer perf.ScopeTimer()()
 	var addons []xbmc.Addon
 
 	for _, repo := range []string{"plugin.video.elementum", "script.elementum.burst", "context.elementum"} {
@@ -170,6 +178,7 @@ func GetAddonFilesHead(ctx *gin.Context) {
 }
 
 func addonZip(ctx *gin.Context, user string, repository string, lastReleaseTag string) {
+	defer perf.ScopeTimer()()
 	release := getReleaseByTag(user, repository, lastReleaseTag)
 	// if there a release with an asset that matches a addon zip, use it
 	if release == nil {
