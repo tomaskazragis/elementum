@@ -59,6 +59,18 @@ func resolve(addr string) ([]string, error) {
 		}
 	}
 
+	// TODO: Remoev if there are no synchronous hash writes panics
+	// var mu *sync.Mutex
+	// if m, ok := dnsCacheLocks.Load(addr); ok {
+	// 	mu = m.(*sync.Mutex)
+	// } else {
+	// 	mu = &sync.Mutex{}
+	// 	dnsCacheLocks.Store(addr, mu)
+	// }
+
+	// mu.Lock()
+	// defer mu.Unlock()
+
 	resp, err := commonResolver.Query(context.TODO(), dns.Domain(addr), dns.TypeA)
 	if err == nil && resp != nil && resp.Answer != nil {
 		ips := make([]string, 0, len(resp.Answer))
