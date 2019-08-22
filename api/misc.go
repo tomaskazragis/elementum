@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/elgatito/elementum/database"
-	"github.com/elgatito/elementum/library"
 	"github.com/elgatito/elementum/proxy"
 	"github.com/elgatito/elementum/tmdb"
 
@@ -83,18 +82,16 @@ func Status(ctx *gin.Context) {
 	debugBundleAddress := fmt.Sprintf("http://%s:%d/debug/bundle", ip, port)
 	infoAddress := fmt.Sprintf("http://%s:%d/info", ip, port)
 
-	appSize := fileSize(filepath.Join(config.Get().Info.Profile, database.Get().GetFilename()))
+	appSize := fileSize(filepath.Join(config.Get().Info.Profile, database.GetStorm().GetFilename()))
 	cacheSize := fileSize(filepath.Join(config.Get().Info.Profile, database.GetCache().GetFilename()))
 
-	torrentsCount := 0
-	queriesCount := 0
+	torrentsCount, _ := database.GetStormDB().Count(database.TorrentAssignMetadataBucket)
+	queriesCount, _ := database.GetStormDB().Count(database.QueryHistoryBucket)
 	deletedMoviesCount := 0
 	deletedShowsCount := 0
 
-	database.Get().QueryRow("SELECT COUNT(1) FROM thistory_metainfo").Scan(&torrentsCount)
-	database.Get().QueryRow("SELECT COUNT(1) FROM history_queries").Scan(&queriesCount)
-	database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType).Scan(&deletedMoviesCount)
-	database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType).Scan(&deletedShowsCount)
+	// database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType).Scan(&deletedMoviesCount)
+	// database.Get().QueryRow("SELECT COUNT(1) FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType).Scan(&deletedShowsCount)
 
 	text = fmt.Sprintf(text,
 		util.GetVersion(),

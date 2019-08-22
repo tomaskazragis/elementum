@@ -93,7 +93,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := database.InitSqliteDB(conf)
+	db, err := database.InitStormDB(conf)
 	if err != nil {
 		log.Error(err)
 		return
@@ -104,9 +104,6 @@ func main() {
 		log.Error(errCache)
 		return
 	}
-
-	// Do database migration if needed
-	migrateDB()
 
 	s := bittorrent.NewService()
 

@@ -279,8 +279,6 @@ func Routes(s *bittorrent.Service) *gin.Engine {
 		trakt.GET("/update", UpdateTrakt)
 	}
 
-	r.GET("/migrate/:plugin", MigratePlugin)
-
 	r.GET("/setviewmode/:content_type", SetViewMode)
 
 	r.GET("/subtitles", SubtitlesIndex(s))

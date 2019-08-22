@@ -19,61 +19,6 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
-var (
-	// LibraryBucket ...
-	LibraryBucket = []byte("Library")
-	// BitTorrentBucket ...
-	BitTorrentBucket = []byte("BitTorrent")
-	// HistoryBucket ...
-	HistoryBucket = []byte("History")
-	// TorrentHistoryBucket ...
-	TorrentHistoryBucket = []byte("TorrentHistory")
-	// SearchCacheBucket ...
-	SearchCacheBucket = []byte("SearchCache")
-
-	// CommonBucket ...
-	CommonBucket = []byte("Common")
-)
-
-// Buckets ...
-var Buckets = [][]byte{
-	LibraryBucket,
-	BitTorrentBucket,
-	HistoryBucket,
-	TorrentHistoryBucket,
-	SearchCacheBucket,
-}
-
-// CacheBuckets represents buckets in Cache database
-var CacheBuckets = [][]byte{
-	CommonBucket,
-}
-
-// InitBoltDB ...
-func InitBoltDB(conf *config.Configuration) (*BoltDatabase, error) {
-	db, err := CreateBoltDB(conf, boltFileName, backupBoltFileName)
-	if err != nil || db == nil {
-		return nil, errors.New("database not created")
-	}
-
-	boltDatabase = &BoltDatabase{
-		db:             db,
-		quit:           make(chan struct{}, 2),
-		fileName:       boltFileName,
-		backupFileName: backupBoltFileName,
-	}
-
-	for _, bucket := range Buckets {
-		if err = boltDatabase.CheckBucket(bucket); err != nil {
-			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
-			log.Error(err)
-			return boltDatabase, err
-		}
-	}
-
-	return boltDatabase, nil
-}
-
 // InitCacheDB ...
 func InitCacheDB(conf *config.Configuration) (*BoltDatabase, error) {
 	db, err := CreateBoltDB(conf, cacheFileName, backupCacheFileName)
@@ -123,15 +68,6 @@ func CreateBoltDB(conf *config.Configuration, fileName string, backupFileName st
 	db.NoSync = true
 
 	return db, nil
-}
-
-// NewBoltDB ...
-func NewBoltDB() (*BoltDatabase, error) {
-	if boltDatabase == nil {
-		return InitBoltDB(config.Reload())
-	}
-
-	return boltDatabase, nil
 }
 
 // GetBolt returns common database
@@ -259,10 +195,6 @@ func RestoreBackup(databasePath string, backupPath string) {
 
 // CreateBackup ...
 func (d *BoltDatabase) CreateBackup(backupPath string) {
-	if err := d.CheckBucket(LibraryBucket); err != nil {
-		return
-	}
-
 	d.db.View(func(tx *bolt.Tx) error {
 		tx.CopyFile(backupPath, 0600)
 		log.Debugf("Database backup saved at: %s", backupPath)

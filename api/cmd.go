@@ -120,7 +120,7 @@ func SetViewMode(ctx *gin.Context) {
 func ClearDatabaseMovies(ctx *gin.Context) {
 	log.Debug("Removing deleted movies from database")
 
-	database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType)
+	// database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.MovieType)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -133,7 +133,7 @@ func ClearDatabaseMovies(ctx *gin.Context) {
 func ClearDatabaseShows(ctx *gin.Context) {
 	log.Debug("Removing deleted shows from database")
 
-	database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType)
+	// database.Get().Exec("DELETE FROM library_items WHERE state = ? AND mediaType = ?", library.StateDeleted, library.ShowType)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -146,9 +146,8 @@ func ClearDatabaseShows(ctx *gin.Context) {
 func ClearDatabaseTorrentHistory(ctx *gin.Context) {
 	log.Debug("Removing torrent history from database")
 
-	database.Get().Exec("DELETE FROM thistory_assign")
-	database.Get().Exec("DELETE FROM thistory_metainfo")
-	database.Get().Exec("DELETE FROM tinfo")
+	database.GetStormDB().Drop(database.TorrentAssignMetadataBucket)
+	database.GetStormDB().Drop(database.TorrentAssignItemBucket)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -161,7 +160,7 @@ func ClearDatabaseTorrentHistory(ctx *gin.Context) {
 func ClearDatabaseSearchHistory(ctx *gin.Context) {
 	log.Debug("Removing search history from database")
 
-	database.Get().Exec("DELETE FROM history_queries")
+	database.GetStormDB().Drop(database.QueryHistoryBucket)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -179,12 +178,11 @@ func ClearDatabase(ctx *gin.Context) {
 		return
 	}
 
-	database.Get().Exec("DELETE FROM history_queries")
-	database.Get().Exec("DELETE FROM library_items")
-	database.Get().Exec("DELETE FROM library_uids")
-	database.Get().Exec("DELETE FROM thistory_assign")
-	database.Get().Exec("DELETE FROM thistory_metainfo")
-	database.Get().Exec("DELETE FROM tinfo")
+	database.GetStormDB().Drop(database.BTItemBucket)
+	database.GetStormDB().Drop(database.TorrentHistoryBucket)
+	database.GetStormDB().Drop(database.TorrentAssignMetadataBucket)
+	database.GetStormDB().Drop(database.TorrentAssignItemBucket)
+	database.GetStormDB().Drop(database.QueryHistoryBucket)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 

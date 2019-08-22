@@ -21,27 +21,23 @@ func History(ctx *gin.Context) {
 		return
 	}
 
-	rows, err := database.Get().Query(`SELECT name, infohash FROM torrent_history ORDER BY dt DESC`)
-	if err != nil {
-		ctx.Error(err)
-		return
+	items := []*xbmc.ListItem{}
+	var ths []database.TorrentHistory
+	if err := database.GetStormDB().All(&ths); err != nil {
+		log.Infof("Could not get list of history items: %s", err)
+	}
+	if err := database.GetStormDB().AllByIndex("Dt", &ths); err != nil {
+		log.Infof("Could not get list of history items: %s", err)
 	}
 
-	defer rows.Close()
-
-	name := ""
-	infohash = ""
-	items := []*xbmc.ListItem{}
-	for rows.Next() {
-		rows.Scan(&name, &infohash)
-
+	for _, th := range ths {
 		items = append(items, &xbmc.ListItem{
-			Label: name,
-			Path:  torrentHistoryGetXbmcURL(infohash),
+			Label: th.Name,
+			Path:  torrentHistoryGetXbmcURL(th.InfoHash),
 			ContextMenu: [][]string{
 				[]string{"LOCALIZE[30406]", fmt.Sprintf("XBMC.RunPlugin(%s)",
 					URLQuery(URLForXBMC("/history/remove"),
-						"infohash", infohash,
+						"infohash", th.InfoHash,
 					))},
 			},
 		})
@@ -51,8 +47,10 @@ func History(ctx *gin.Context) {
 }
 
 func torrentHistoryEmpty() bool {
-	count := 0
-	err := database.Get().QueryRow("SELECT COUNT(*) FROM torrent_history").Scan(&count)
+	count, err := database.GetStormDB().Count(database.TorrentHistoryBucket)
+	if err != nil {
+		log.Infof("Could not get count for torrent history: %s", err)
+	}
 
 	return err != nil || count == 0
 }
@@ -66,7 +64,7 @@ func HistoryRemove(ctx *gin.Context) {
 	}
 
 	log.Debugf("Removing infohash '%s' with torrent history", infohash)
-	database.Get().Exec("DELETE FROM torrent_history WHERE infohash = ?", infohash)
+	database.GetStormDB().Delete(database.TorrentHistoryBucket, infohash)
 	xbmc.Refresh()
 
 	ctx.String(200, "")
@@ -76,7 +74,9 @@ func HistoryRemove(ctx *gin.Context) {
 // HistoryClear ...
 func HistoryClear(ctx *gin.Context) {
 	log.Debugf("Cleaning queries with torrent history")
-	database.Get().Exec("DELETE FROM torrent_history")
+	if err := database.GetStormDB().Drop(database.TorrentHistoryBucket); err != nil {
+		log.Infof("Could not clean torrent history: %s", err)
+	}
 	xbmc.Refresh()
 
 	ctx.String(200, "")

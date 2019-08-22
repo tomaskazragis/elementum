@@ -59,7 +59,7 @@ func resolve(addr string) ([]string, error) {
 		}
 	}
 
-	// TODO: Remoev if there are no synchronous hash writes panics
+	// TODO: Remove if there are no synchronous hash writes panics
 	// var mu *sync.Mutex
 	// if m, ok := dnsCacheLocks.Load(addr); ok {
 	// 	mu = m.(*sync.Mutex)

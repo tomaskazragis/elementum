@@ -739,7 +739,7 @@ func (s *Service) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
 	}
 
 	defer func() {
-		database.Get().DeleteBTItem(torrent.InfoHash())
+		database.GetStorm().DeleteBTItem(torrent.InfoHash())
 	}()
 
 	if t := s.q.FindByHash(torrent.InfoHash()); t != nil {
@@ -975,7 +975,7 @@ func (s *Service) loadTorrentFiles() {
 
 		t, _ := s.AddTorrent(filePath, s.config.AutoloadTorrentsPaused)
 		if t != nil {
-			i := database.Get().GetBTItem(t.InfoHash())
+			i := database.GetStorm().GetBTItem(t.InfoHash())
 			if i != nil {
 				t.DBItem = i
 
@@ -1159,7 +1159,7 @@ func (s *Service) downloadProgress() {
 				}
 
 				func() error {
-					item := database.Get().GetBTItem(infoHash)
+					item := database.GetStorm().GetBTItem(infoHash)
 					if item == nil {
 						warnedMissing[infoHash] = true
 						return fmt.Errorf("Torrent not found with infohash: %s", infoHash)
@@ -1297,7 +1297,7 @@ func (s *Service) downloadProgress() {
 								log.Warning(fileName, "moved to", dst)
 
 								log.Infof("Marking %s for removal from library and database...", torrentName)
-								database.Get().UpdateBTItemStatus(infoHash, Remove)
+								database.GetStorm().UpdateBTItemStatus(infoHash, Remove)
 							}
 						}()
 					}

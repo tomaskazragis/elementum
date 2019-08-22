@@ -1,13 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
-	"strconv"
-
-	"github.com/elgatito/elementum/bittorrent"
-	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/repository"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -39,54 +32,5 @@ func checkRepository() bool {
 	xbmc.UpdateLocalAddons()
 	xbmc.UpdateAddonRepos()
 
-	return true
-}
-
-func migrateDB() bool {
-	firstRun := filepath.Join(config.Get().Info.Profile, ".dbfirstrun")
-	if _, err := os.Stat(firstRun); err == nil {
-		return false
-	}
-	file, _ := os.Create(firstRun)
-	defer file.Close()
-
-	log.Info("Migrating old bolt DB to Sqlite ...")
-	defer func() {
-		log.Info("... migration finished")
-	}()
-
-	newDB := database.Get()
-	oldDB, err := database.NewBoltDB()
-	if err != nil {
-		return false
-	}
-
-	for _, t := range []string{"", "movies", "shows"} {
-		list := []string{}
-		if err := oldDB.GetObject(database.HistoryBucket, "list"+t, &list); err != nil {
-			continue
-		}
-		for i := len(list) - 1; i >= 0; i-- {
-			newDB.AddSearchHistory(t, list[i])
-		}
-
-		oldDB.Delete(database.HistoryBucket, "list"+t)
-	}
-
-	oldDB.Seek(database.TorrentHistoryBucket, "", func(k, v []byte) {
-		_, err := strconv.Atoi(string(k))
-		if err != nil || len(v) <= 0 {
-			return
-		}
-
-		torrent := &bittorrent.TorrentFile{}
-		err = torrent.LoadFromBytes(v)
-		if err != nil || len(v) <= 0 || torrent.InfoHash == "" {
-			return
-		}
-
-		newDB.AddTorrentLink(string(k), torrent.InfoHash, v)
-		oldDB.Delete(database.TorrentHistoryBucket, string(k))
-	})
 	return true
 }

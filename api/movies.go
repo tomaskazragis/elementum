@@ -438,7 +438,7 @@ func SearchMovies(ctx *gin.Context) {
 	}
 
 	// Update query last use date to show it on the top
-	database.Get().AddSearchHistory(historyType, query)
+	database.GetStorm().AddSearchHistory(historyType, query)
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	movies, total := tmdb.SearchMovies(query, config.Get().Language, page)

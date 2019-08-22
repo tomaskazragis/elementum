@@ -56,7 +56,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	if strings.HasPrefix(torrent.URI, "magnet") {
 		torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
 		if b, err := torrent.MarshalJSON(); err == nil {
-			database.Get().AddTorrentLink(tmdbID, torrent.InfoHash, b)
+			database.GetStorm().AddTorrentLink(tmdbID, torrent.InfoHash, b)
 		}
 
 		return
@@ -68,7 +68,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 	}
 
 	torrentsLog.Debugf("Saving torrent entry for TMDB: %#v", tmdbID)
-	database.Get().AddTorrentLink(tmdbID, torrent.InfoHash, b)
+	database.GetStorm().AddTorrentLink(tmdbID, torrent.InfoHash, b)
 }
 
 // InTorrentsMap ...
@@ -77,30 +77,29 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 		return nil
 	}
 
-	var infohash string
-	var infohashID int64
-	var b []byte
-	database.Get().QueryRow(`SELECT l.infohash_id, i.infohash, i.metainfo FROM thistory_assign l LEFT JOIN thistory_metainfo i ON i.rowid = l.infohash_id WHERE l.item_id = ?`, tmdbID).Scan(&infohashID, &infohash, &b)
-
-	if len(infohash) > 0 && len(b) > 0 {
-		torrent := &bittorrent.TorrentFile{}
-		if b[0] == '{' {
-			torrent.UnmarshalJSON(b)
-		} else {
-			torrent.LoadFromBytes(b)
-		}
-
-		if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR gold]%s[/COLOR]", torrent.Title))) {
-			return torrent
-		}
-
-		database.Get().Exec(`DELETE FROM thistory_assign WHERE item_id = ?`, tmdbID)
-		var left int
-		database.Get().QueryRow(`SELECT COUNT(*) FROM thistory_assign WHERE infohash_id = ?`, infohashID).Scan(&left)
-		if left == 0 {
-			database.Get().Exec(`DELETE FROM thistory_metainfo WHERE rowid = ?`, infohashID)
-		}
+	tmdbInt, _ := strconv.Atoi(tmdbID)
+	var ti database.TorrentAssignItem
+	var tm database.TorrentAssignMetadata
+	if err := database.GetStormDB().One("TmdbID", tmdbInt, &ti); err != nil {
+		return nil
 	}
+	if err := database.GetStormDB().One("InfoHash", ti.InfoHash, &tm); err != nil {
+		return nil
+	}
+
+	torrent := &bittorrent.TorrentFile{}
+	if tm.Metadata[0] == '{' {
+		torrent.UnmarshalJSON(tm.Metadata)
+	} else {
+		torrent.LoadFromBytes(tm.Metadata)
+	}
+
+	if len(torrent.URI) > 0 && (config.Get().SilentStreamStart || xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30260];;[COLOR gold]%s[/COLOR]", torrent.Title))) {
+		return torrent
+	}
+
+	database.GetStormDB().DeleteStruct(&ti)
+	database.GetStorm().CleanupTorrentLink(ti.InfoHash)
 
 	return nil
 }
@@ -111,15 +110,17 @@ func InTorrentsHistory(infohash string) *bittorrent.TorrentFile {
 		return nil
 	}
 
-	var b []byte
-	database.Get().QueryRow(`SELECT metainfo FROM torrent_history WHERE infohash = ?`, infohash).Scan(&b)
+	var th database.TorrentHistory
+	if err := database.GetStormDB().One("InfoHash", infohash, &th); err != nil {
+		return nil
+	}
 
-	if len(infohash) > 0 && len(b) > 0 {
+	if len(infohash) > 0 && len(th.Metadata) > 0 {
 		torrent := &bittorrent.TorrentFile{}
-		if b[0] == '{' {
-			torrent.UnmarshalJSON(b)
+		if th.Metadata[0] == '{' {
+			torrent.UnmarshalJSON(th.Metadata)
 		} else {
-			torrent.LoadFromBytes(b)
+			torrent.LoadFromBytes(th.Metadata)
 		}
 
 		if len(torrent.URI) > 0 {

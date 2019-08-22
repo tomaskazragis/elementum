@@ -346,7 +346,7 @@ func SearchShows(ctx *gin.Context) {
 	}
 
 	// Update query last use date to show it on the top
-	database.Get().AddSearchHistory(historyType, query)
+	database.GetStorm().AddSearchHistory(historyType, query)
 
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	shows, total := tmdb.SearchShows(query, config.Get().Language, page)

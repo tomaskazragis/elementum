@@ -143,7 +143,7 @@ func PlayURI(s *bittorrent.Service) gin.HandlerFunc {
 
 			if t != nil {
 				infoHash := t.InfoHash()
-				dbItem := database.Get().GetBTItem(infoHash)
+				dbItem := database.GetStorm().GetBTItem(infoHash)
 				if dbItem != nil && dbItem.Type != "" {
 					contentType = dbItem.Type
 					if contentType == movieType {

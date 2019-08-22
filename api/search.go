@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/asdine/storm/q"
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
@@ -40,7 +41,7 @@ func Search(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		// Update query last use date to show it on the top
-		database.Get().AddSearchHistory(historyType, query)
+		database.GetStorm().AddSearchHistory(historyType, query)
 
 		fakeTmdbID := strconv.FormatUint(xxhash.Sum64String(query), 10)
 		existingTorrent := s.HasTorrentByQuery(query)
@@ -136,15 +137,8 @@ func Search(s *bittorrent.Service) gin.HandlerFunc {
 	}
 }
 
-func searchHistoryEmpty(historyType string) bool {
-	count := 0
-	err := database.Get().QueryRow("SELECT COUNT(*) FROM history_queries WHERE type = ?", historyType).Scan(&count)
-
-	return err != nil || count == 0
-}
-
 func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
-	database.Get().AddSearchHistory(historyType, query)
+	database.GetStorm().AddSearchHistory(historyType, query)
 
 	go xbmc.UpdatePath(searchHistoryGetXbmcURL(historyType, query))
 	ctx.String(200, "")
@@ -153,18 +147,11 @@ func searchHistoryAppend(ctx *gin.Context, historyType string, query string) {
 
 func searchHistoryList(ctx *gin.Context, historyType string) {
 	historyList := []string{}
-	rows, err := database.Get().Query(`SELECT query FROM history_queries WHERE type = ? ORDER BY dt DESC`, historyType)
-	if err != nil {
-		ctx.Error(err)
-		return
+	var qs []database.QueryHistory
+	database.GetStormDB().Select(q.Eq("Type", historyType)).OrderBy("Dt").Reverse().Find(&qs)
+	for _, q := range qs {
+		historyList = append(historyList, q.Query)
 	}
-
-	query := ""
-	for rows.Next() {
-		rows.Scan(&query)
-		historyList = append(historyList, query)
-	}
-	rows.Close()
 
 	urlPrefix := ""
 	if len(historyType) > 0 {
@@ -206,7 +193,7 @@ func SearchRemove(ctx *gin.Context) {
 	}
 
 	log.Debugf("Removing query '%s' with history type '%s'", query, historyType)
-	database.Get().Exec("DELETE FROM history_queries WHERE query = ? AND type = ?", query, historyType)
+	database.GetStorm().RemoveSearchHistory(historyType, query)
 	xbmc.Refresh()
 
 	ctx.String(200, "")
@@ -218,7 +205,7 @@ func SearchClear(ctx *gin.Context) {
 	historyType := ctx.DefaultQuery("type", "")
 
 	log.Debugf("Cleaning queries with history type %s", historyType)
-	database.Get().Exec("DELETE FROM history_queries WHERE type = ?", historyType)
+	database.GetStorm().CleanSearchHistory(historyType)
 	xbmc.Refresh()
 
 	ctx.String(200, "")

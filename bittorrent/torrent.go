@@ -805,7 +805,7 @@ func (t *Torrent) DownloadAllFiles() {
 		selected = append(selected, f.Path)
 	}
 
-	database.Get().UpdateBTItemFiles(t.infoHash, selected)
+	database.GetStorm().UpdateBTItemFiles(t.infoHash, selected)
 	t.FetchDBItem()
 }
 
@@ -816,7 +816,7 @@ func (t *Torrent) UnDownloadAllFiles() {
 		t.UnDownloadFile(f)
 	}
 
-	database.Get().UpdateBTItemFiles(t.infoHash, selected)
+	database.GetStorm().UpdateBTItemFiles(t.infoHash, selected)
 	t.FetchDBItem()
 }
 
@@ -973,7 +973,7 @@ func (t *Torrent) GetDBItem() *database.BTItem {
 
 // FetchDBItem ...
 func (t *Torrent) FetchDBItem() *database.BTItem {
-	t.DBItem = database.Get().GetBTItem(t.infoHash)
+	t.DBItem = database.GetStorm().GetBTItem(t.infoHash)
 	return t.DBItem
 }
 
