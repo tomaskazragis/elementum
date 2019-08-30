@@ -6,12 +6,17 @@ import (
 
 // NowInt ...
 func NowInt() int {
-	return int(time.Now().Unix())
+	return int(time.Now().UTC().Unix())
+}
+
+// NowInt64 ...
+func NowInt64() int64 {
+	return time.Now().UTC().Unix()
 }
 
 // NowPlusSecondsInt ..
 func NowPlusSecondsInt(seconds int) int {
-	return int(time.Now().Add(time.Duration(seconds) * time.Second).Unix())
+	return int(time.Now().UTC().Add(time.Duration(seconds) * time.Second).Unix())
 }
 
 // Bod returns the start of a day for specific date
