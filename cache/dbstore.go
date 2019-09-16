@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/util"
 )
 
 //go:generate msgp -o msgp.go -io=false -tests=false
@@ -19,10 +21,10 @@ type DBStore struct {
 	db *database.BoltDatabase
 }
 
-type dbStoreItem struct {
-	Key     string      `json:"key"`
-	Value   interface{} `json:"value"`
-	Expires time.Time   `json:"expires"`
+// DBStoreItem ...
+type DBStoreItem struct {
+	Key   string      `json:"key"`
+	Value interface{} `json:"value"`
 }
 
 var (
@@ -49,10 +51,9 @@ func NewDBStore() *DBStore {
 
 // Set ...
 func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err error) {
-	item := dbStoreItem{
-		Key:     key,
-		Value:   value,
-		Expires: time.Now().UTC().Add(expires),
+	item := DBStoreItem{
+		Key:   key,
+		Value: value,
 	}
 
 	// Recover from marshal errors
@@ -67,7 +68,7 @@ func (c *DBStore) Set(key string, value interface{}, expires time.Duration) (err
 		return err
 	}
 
-	return c.db.SetBytes(database.CommonBucket, key, b)
+	return c.db.SetBytes(database.CommonBucket, key, append([]byte(strconv.FormatInt(time.Now().UTC().Add(expires).Unix(), 10)), b...))
 }
 
 // Add ...
@@ -100,18 +101,18 @@ func (c *DBStore) Get(key string, value interface{}) (err error) {
 		return err
 	}
 
-	item := dbStoreItem{
+	item := DBStoreItem{
 		Value: value,
 	}
-
-	if errDecode := msgpack.Unmarshal(data, &item); errDecode != nil {
-		return errDecode
-	}
-
-	if item.Expires.Before(time.Now().UTC()) {
+	if expires, _ := database.ParseCacheItem(data); expires > 0 && expires < util.NowInt64() {
 		go c.db.Delete(database.CommonBucket, key)
 		return errors.New("key is expired")
 	}
+
+	if errDecode := msgpack.Unmarshal(data[10:], &item); errDecode != nil {
+		return errDecode
+	}
+
 	return nil
 }
 
