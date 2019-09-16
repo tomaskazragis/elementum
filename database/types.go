@@ -59,6 +59,14 @@ type BTItem struct {
 	Query    string   `json:"query"`
 }
 
+// LibraryItem ...
+type LibraryItem struct {
+	TmdbID    string `storm:"id"`
+	MediaType int    `storm:"index"`
+	State     int    `storm:"index"`
+	ShowID    int    `storm:"index"`
+}
+
 // QueryHistory ...
 type QueryHistory struct {
 	ID    string    `storm:"id"`

@@ -166,6 +166,7 @@ type VideoLibraryMovieItem struct {
 	PlayCount  int       `json:"playcount"`
 	File       string    `json:"file"`
 	Year       int       `json:"year"`
+	DateAdded  string    `json:"dateadded"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 	Resume     *Resume
 }
@@ -184,6 +185,7 @@ type VideoLibraryShowItem struct {
 	PlayCount  int       `json:"playcount"`
 	Year       int       `json:"year"`
 	Episodes   int       `json:"episode"`
+	DateAdded  string    `json:"dateadded"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 }
 
@@ -227,6 +229,7 @@ type VideoLibraryEpisodeItem struct {
 	TVShowID  int       `json:"tvshowid"`
 	PlayCount int       `json:"playcount"`
 	File      string    `json:"file"`
+	DateAdded string    `json:"dateadded"`
 	UniqueIDs UniqueIDs `json:"uniqueid"`
 	Resume    *Resume
 }

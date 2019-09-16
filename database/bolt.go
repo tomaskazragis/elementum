@@ -206,7 +206,7 @@ func (d *BoltDatabase) CreateBackup(backupPath string) {
 func (d *BoltDatabase) CacheCleanup() {
 	defer perf.ScopeTimer()()
 
-	now := util.NowInt()
+	now := util.NowInt64()
 	for _, bucket := range CacheBuckets {
 		if !d.BucketExists(bucket) {
 			continue
@@ -275,13 +275,13 @@ func (d *BoltDatabase) ForEach(bucket []byte, callback callBackWithError) error 
 //
 
 // ParseCacheItem ...
-func ParseCacheItem(item []byte) (int, []byte) {
+func ParseCacheItem(item []byte) (int64, []byte) {
 	if len(item) < 11 {
 		return 0, nil
 	}
 
-	expire, _ := strconv.Atoi(string(item[0:10]))
-	return expire, item[11:]
+	expire, _ := strconv.ParseInt(string(item[0:10]), 10, 64)
+	return expire, item[10:]
 }
 
 // GetCachedBytes ...
@@ -297,7 +297,7 @@ func (d *BoltDatabase) GetCachedBytes(bucket []byte, key string) (cacheValue []b
 	}
 
 	expire, v := ParseCacheItem(value)
-	if expire > 0 && expire < util.NowInt() {
+	if expire > 0 && expire < util.NowInt64() {
 		d.Delete(bucket, key)
 		return nil, errors.New("Key Expired")
 	} else if expire == 0 {
