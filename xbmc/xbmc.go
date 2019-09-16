@@ -3,6 +3,8 @@ package xbmc
 import (
 	"strings"
 	"time"
+
+	"github.com/anacrolix/missinggo/perf"
 )
 
 // UpdateAddonRepos ...
@@ -43,29 +45,44 @@ func VideoLibraryClean() (retVal string) {
 
 // VideoLibraryGetMovies ...
 func VideoLibraryGetMovies() (movies *VideoLibraryMovies, err error) {
+	defer perf.ScopeTimer()()
+
 	list := []interface{}{
 		"imdbnumber",
 		"playcount",
 		"file",
+		"dateadded",
 		"resume",
 	}
 	if KodiVersion > 16 {
 		list = append(list, "uniqueid", "year")
 	}
 	params := map[string]interface{}{"properties": list}
-	err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
-	if err != nil && !strings.Contains(err.Error(), "invalid error") {
-		log.Errorf("Error getting movies: %#v", err)
+
+	for tries := 1; tries <= 3; tries++ {
+		var err error
+
+		err = executeJSONRPCO("VideoLibrary.GetMovies", &movies, params)
+		if movies == nil || (err != nil && !strings.Contains(err.Error(), "invalid error")) {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+
+		break
 	}
+
 	return
 }
 
 // VideoLibraryGetElementumMovies ...
 func VideoLibraryGetElementumMovies() (movies *VideoLibraryMovies, err error) {
+	defer perf.ScopeTimer()()
+
 	list := []interface{}{
 		"imdbnumber",
 		"playcount",
 		"file",
+		"dateadded",
 		"resume",
 	}
 	sorts := map[string]interface{}{
@@ -130,27 +147,39 @@ func PlayerGetItem(playerid int) (item *PlayerItemInfo) {
 
 // VideoLibraryGetShows ...
 func VideoLibraryGetShows() (shows *VideoLibraryShows, err error) {
+	defer perf.ScopeTimer()()
+
 	list := []interface{}{
 		"imdbnumber",
 		"episode",
+		"dateadded",
 		"playcount",
 	}
 	if KodiVersion > 16 {
 		list = append(list, "uniqueid", "year")
 	}
 	params := map[string]interface{}{"properties": list}
-	err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
-	if err != nil {
-		log.Errorf("Error getting tvshows: %#v", err)
+
+	for tries := 1; tries <= 3; tries++ {
+		err = executeJSONRPCO("VideoLibrary.GetTVShows", &shows, params)
+		if err != nil {
+			time.Sleep(time.Duration(tries*500) * time.Millisecond)
+			continue
+		}
+		break
 	}
+
 	return
 }
 
 // VideoLibraryGetElementumShows returns shows added by Elementum
 func VideoLibraryGetElementumShows() (shows *VideoLibraryShows, err error) {
+	defer perf.ScopeTimer()()
+
 	list := []interface{}{
 		"imdbnumber",
 		"episode",
+		"dateadded",
 		"playcount",
 	}
 	sorts := map[string]interface{}{
@@ -192,6 +221,8 @@ func VideoLibraryGetElementumShows() (shows *VideoLibraryShows, err error) {
 
 // VideoLibraryGetSeasons ...
 func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err error) {
+	defer perf.ScopeTimer()()
+
 	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
 		"tvshowid",
 		"season",
@@ -207,6 +238,8 @@ func VideoLibraryGetSeasons(tvshowID int) (seasons *VideoLibrarySeasons, err err
 
 // VideoLibraryGetAllSeasons ...
 func VideoLibraryGetAllSeasons(shows []int) (seasons *VideoLibrarySeasons, err error) {
+	defer perf.ScopeTimer()()
+
 	if KodiVersion > 16 {
 		params := map[string]interface{}{"properties": []interface{}{
 			"tvshowid",
@@ -214,10 +247,16 @@ func VideoLibraryGetAllSeasons(shows []int) (seasons *VideoLibrarySeasons, err e
 			"episode",
 			"playcount",
 		}}
-		err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
-		if err != nil {
-			log.Errorf("Error getting seasons: %#v", err)
+
+		for tries := 1; tries <= 3; tries++ {
+			err = executeJSONRPCO("VideoLibrary.GetSeasons", &seasons, params)
+			if seasons == nil || err != nil {
+				time.Sleep(time.Duration(tries*500) * time.Millisecond)
+				continue
+			}
+			break
 		}
+
 		return
 	}
 
@@ -234,6 +273,8 @@ func VideoLibraryGetAllSeasons(shows []int) (seasons *VideoLibrarySeasons, err e
 
 // VideoLibraryGetEpisodes ...
 func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err error) {
+	defer perf.ScopeTimer()()
+
 	params := map[string]interface{}{"tvshowid": tvshowID, "properties": []interface{}{
 		"tvshowid",
 		"uniqueid",
@@ -241,6 +282,7 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 		"episode",
 		"playcount",
 		"file",
+		"dateadded",
 		"resume",
 	}}
 	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
@@ -252,19 +294,32 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 
 // VideoLibraryGetAllEpisodes ...
 func VideoLibraryGetAllEpisodes() (episodes *VideoLibraryEpisodes, err error) {
+	defer perf.ScopeTimer()()
+
 	list := []interface{}{
 		"tvshowid",
 		"season",
 		"episode",
 		"playcount",
 		"file",
+		"dateadded",
 		"resume",
 	}
 	if KodiVersion > 16 {
 		list = append(list, "uniqueid")
 	}
 	params := map[string]interface{}{"properties": list}
-	err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+
+	for tries := 1; tries <= 3; tries++ {
+		err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
+		if episodes == nil || err != nil {
+			time.Sleep(time.Duration(tries*2) * time.Second)
+			continue
+		}
+
+		break
+	}
+
 	if err != nil {
 		log.Error(err)
 	}
@@ -310,6 +365,20 @@ func SetMovieProgress(movieID int, position int, total int) (ret string) {
 			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetMovieDetails", &ret, params)
+	return
+}
+
+// SetMovieProgressWithDate ...
+func SetMovieProgressWithDate(movieID int, position int, total int, dt time.Time) (ret string) {
+	params := map[string]interface{}{
+		"movieid": movieID,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total":    total,
+		},
+		"lastplayed": dt.Format("2006-01-02 15:04:05"),
 	}
 	executeJSONRPCO("VideoLibrary.SetMovieDetails", &ret, params)
 	return
@@ -386,6 +455,20 @@ func SetEpisodeProgress(episodeID int, position int, total int) (ret string) {
 			"total":    total,
 		},
 		"lastplayed": time.Now().Format("2006-01-02 15:04:05"),
+	}
+	executeJSONRPCO("VideoLibrary.SetEpisodeDetails", &ret, params)
+	return
+}
+
+// SetEpisodeProgressWithDate ...
+func SetEpisodeProgressWithDate(episodeID int, position int, total int, dt time.Time) (ret string) {
+	params := map[string]interface{}{
+		"episodeid": episodeID,
+		"resume": map[string]interface{}{
+			"position": position,
+			"total":    total,
+		},
+		"lastplayed": dt.Format("2006-01-02 15:04:05"),
 	}
 	executeJSONRPCO("VideoLibrary.SetEpisodeDetails", &ret, params)
 	return

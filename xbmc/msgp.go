@@ -1880,9 +1880,9 @@ func (z *VideoLibraryEpisode) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *VideoLibraryEpisodeItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 9
+	// map header, size 10
 	// string "ID"
-	o = append(o, 0x89, 0xa2, 0x49, 0x44)
+	o = append(o, 0x8a, 0xa2, 0x49, 0x44)
 	o = msgp.AppendInt(o, z.ID)
 	// string "Title"
 	o = append(o, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
@@ -1902,6 +1902,9 @@ func (z *VideoLibraryEpisodeItem) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "File"
 	o = append(o, 0xa4, 0x46, 0x69, 0x6c, 0x65)
 	o = msgp.AppendString(o, z.File)
+	// string "DateAdded"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
+	o = msgp.AppendString(o, z.DateAdded)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -1975,6 +1978,11 @@ func (z *VideoLibraryEpisodeItem) UnmarshalMsg(bts []byte) (o []byte, err error)
 			if err != nil {
 				return
 			}
+		case "DateAdded":
+			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
 			if err != nil {
@@ -2034,7 +2042,7 @@ func (z *VideoLibraryEpisodeItem) UnmarshalMsg(bts []byte) (o []byte, err error)
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryEpisodeItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 7 + msgp.IntSize + 8 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 10 + z.UniqueIDs.Msgsize() + 7
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 7 + msgp.IntSize + 8 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize() + 7
 	if z.Resume == nil {
 		s += msgp.NilSize
 	} else {
@@ -2198,9 +2206,9 @@ func (z VideoLibraryLimits) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *VideoLibraryMovieItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 8
+	// map header, size 9
 	// string "ID"
-	o = append(o, 0x88, 0xa2, 0x49, 0x44)
+	o = append(o, 0x89, 0xa2, 0x49, 0x44)
 	o = msgp.AppendInt(o, z.ID)
 	// string "Title"
 	o = append(o, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
@@ -2217,6 +2225,9 @@ func (z *VideoLibraryMovieItem) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Year"
 	o = append(o, 0xa4, 0x59, 0x65, 0x61, 0x72)
 	o = msgp.AppendInt(o, z.Year)
+	// string "DateAdded"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
+	o = msgp.AppendString(o, z.DateAdded)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -2285,6 +2296,11 @@ func (z *VideoLibraryMovieItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "DateAdded":
+			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
 			if err != nil {
@@ -2344,7 +2360,7 @@ func (z *VideoLibraryMovieItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryMovieItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 5 + msgp.IntSize + 10 + z.UniqueIDs.Msgsize() + 7
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 5 + msgp.IntSize + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize() + 7
 	if z.Resume == nil {
 		s += msgp.NilSize
 	} else {
@@ -2770,9 +2786,9 @@ func (z *VideoLibrarySeasons) Msgsize() (s int) {
 // MarshalMsg implements msgp.Marshaler
 func (z *VideoLibraryShowItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 7
+	// map header, size 8
 	// string "ID"
-	o = append(o, 0x87, 0xa2, 0x49, 0x44)
+	o = append(o, 0x88, 0xa2, 0x49, 0x44)
 	o = msgp.AppendInt(o, z.ID)
 	// string "Title"
 	o = append(o, 0xa5, 0x54, 0x69, 0x74, 0x6c, 0x65)
@@ -2789,6 +2805,9 @@ func (z *VideoLibraryShowItem) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Episodes"
 	o = append(o, 0xa8, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x73)
 	o = msgp.AppendInt(o, z.Episodes)
+	// string "DateAdded"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
+	o = msgp.AppendString(o, z.DateAdded)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -2844,6 +2863,11 @@ func (z *VideoLibraryShowItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "DateAdded":
+			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
 			if err != nil {
@@ -2862,7 +2886,7 @@ func (z *VideoLibraryShowItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryShowItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.IntSize + 9 + msgp.IntSize + 10 + z.UniqueIDs.Msgsize()
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize()
 	return
 }
 
