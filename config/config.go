@@ -128,10 +128,12 @@ type Configuration struct {
 	TraktToken                     string
 	TraktRefreshToken              string
 	TraktTokenExpiry               int
-	TraktSyncFrequency             int
+	TraktSyncFrequencyMin          int
 	TraktSyncCollections           bool
 	TraktSyncWatchlist             bool
 	TraktSyncUserlists             bool
+	TraktSyncPlaybackProgress      bool
+	TraktSyncHidden                bool
 	TraktSyncWatched               bool
 	TraktSyncWatchedBack           bool
 	TraktSyncAddedMovies           bool
@@ -543,10 +545,12 @@ func Reload() *Configuration {
 		TraktToken:                     settings["trakt_token"].(string),
 		TraktRefreshToken:              settings["trakt_refresh_token"].(string),
 		TraktTokenExpiry:               settings["trakt_token_expiry"].(int),
-		TraktSyncFrequency:             settings["trakt_sync"].(int),
+		TraktSyncFrequencyMin:          settings["trakt_sync_frequency_min"].(int),
 		TraktSyncCollections:           settings["trakt_sync_collections"].(bool),
 		TraktSyncWatchlist:             settings["trakt_sync_watchlist"].(bool),
 		TraktSyncUserlists:             settings["trakt_sync_userlists"].(bool),
+		TraktSyncPlaybackProgress:      settings["trakt_sync_playback_progress"].(bool),
+		TraktSyncHidden:                settings["trakt_sync_hidden"].(bool),
 		TraktSyncWatched:               settings["trakt_sync_watched"].(bool),
 		TraktSyncWatchedBack:           settings["trakt_sync_watchedback"].(bool),
 		TraktSyncAddedMovies:           settings["trakt_sync_added_movies"].(bool),
@@ -671,8 +675,8 @@ func Reload() *Configuration {
 	}
 
 	// Set default Trakt Frequency
-	if newConfig.TraktToken != "" && newConfig.TraktSyncFrequency == 0 {
-		newConfig.TraktSyncFrequency = 6
+	if newConfig.TraktToken != "" && newConfig.TraktSyncFrequencyMin == 0 {
+		newConfig.TraktSyncFrequencyMin = 5
 	}
 
 	// Setup OSDB language
