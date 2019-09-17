@@ -32,6 +32,8 @@ import (
 var log = logging.MustGetLogger("main")
 
 func init() {
+	// TODO: does this really work in this manner, without setting it before program starts?
+	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",madvdontneed=1")
 	sync.Enable()
 }
 
