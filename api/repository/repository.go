@@ -121,7 +121,6 @@ type Release struct {
 const (
 	githubUserContentURL   = "http://elementum.surge.sh/packages/%s/%s"
 	githubLatestReleaseURL = "https://api.github.com/repos/%s/%s/releases/latest"
-	githubReleasesURL      = "https://api.github.com/repos/%s/%s/releases"
 
 	releaseChangelog = "[B]%s[/B] - %s\n%s\n\n"
 )
@@ -151,6 +150,10 @@ func getLatestRelease(user string, repository string) *Release {
 	defer perf.ScopeTimer()()
 
 	res, _ := http.Get(fmt.Sprintf(githubLatestReleaseURL, user, repository))
+	if res == nil {
+		return nil
+	}
+	defer res.Body.Close()
 	var release Release
 	json.NewDecoder(res.Body).Decode(&release)
 	return &release
@@ -160,6 +163,11 @@ func getReleases(user string, repository string) []Release {
 	defer perf.ScopeTimer()()
 
 	res, _ := http.Get(fmt.Sprintf(githubLatestReleaseURL, user, repository))
+	if res == nil {
+		return nil
+	}
+	defer res.Body.Close()
+
 	var releases []Release
 	json.NewDecoder(res.Body).Decode(&releases)
 	return releases
