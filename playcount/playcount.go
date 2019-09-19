@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/cespare/xxhash"
-	"github.com/op/go-logging"
 )
 
 const (
@@ -36,120 +35,83 @@ var (
 	Mu = sync.RWMutex{}
 
 	// Watched contains uint64 hashed bools
-	Watched = map[uint64]bool{}
-
-	log = logging.MustGetLogger("playcount")
+	Watched = []uint64{}
 )
 
 // WatchedState just a simple bool with Int() conversion
 type WatchedState bool
 
-// GetWatchedMovieByTMDB checks whether item is watched
-func GetWatchedMovieByTMDB(id int) (ret WatchedState) {
+func searchForKey(k uint64) WatchedState {
 	Mu.RLock()
 	defer Mu.RUnlock()
 
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, id))]
-	return
+	for _, v := range Watched {
+		if v == k {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetWatchedMovieByTMDB checks whether item is watched
+func GetWatchedMovieByTMDB(id int) (ret WatchedState) {
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, id)))
 }
 
 // GetWatchedMovieByIMDB checks whether item is watched
 func GetWatchedMovieByIMDB(id string) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, id))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, id)))
 }
 
 // GetWatchedMovieByTrakt checks whether item is watched
 func GetWatchedMovieByTrakt(id int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, id))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, id)))
 }
 
 // GetWatchedShowByTMDB checks whether item is watched
 func GetWatchedShowByTMDB(id int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, id))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, id)))
 }
 
 // GetWatchedShowByTVDB checks whether item is watched
 func GetWatchedShowByTVDB(id int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TVDBScraper, id))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TVDBScraper, id)))
 }
 
 // GetWatchedShowByTrakt checks whether item is watched
 func GetWatchedShowByTrakt(id int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, id))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, id)))
 }
 
 // GetWatchedSeasonByTMDB checks whether item is watched
 func GetWatchedSeasonByTMDB(id int, season int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, id, season))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, id, season)))
 }
 
 // GetWatchedSeasonByTVDB checks whether item is watched
 func GetWatchedSeasonByTVDB(id int, season, episode int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TVDBScraper, id, season))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TVDBScraper, id, season)))
 }
 
 // GetWatchedSeasonByTrakt checks whether item is watched
 func GetWatchedSeasonByTrakt(id int, season int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, id, season))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, id, season)))
 }
 
 // GetWatchedEpisodeByTMDB checks whether item is watched
 func GetWatchedEpisodeByTMDB(id int, season, episode int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, id, season, episode))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, id, season, episode)))
 }
 
 // GetWatchedEpisodeByTVDB checks whether item is watched
 func GetWatchedEpisodeByTVDB(id int, season, episode int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TVDBScraper, id, season, episode))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TVDBScraper, id, season, episode)))
 }
 
 // GetWatchedEpisodeByTrakt checks whether item is watched
 func GetWatchedEpisodeByTrakt(id int, season, episode int) (ret WatchedState) {
-	Mu.RLock()
-	defer Mu.RUnlock()
-
-	_, ret = Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, id, season, episode))]
-	return
+	return searchForKey(xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, id, season, episode)))
 }
 
 // Int converts bool to int
