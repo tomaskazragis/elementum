@@ -146,8 +146,8 @@ func ClearDatabaseShows(ctx *gin.Context) {
 func ClearDatabaseTorrentHistory(ctx *gin.Context) {
 	log.Debug("Removing torrent history from database")
 
-	database.GetStormDB().Drop(database.TorrentAssignMetadataBucket)
-	database.GetStormDB().Drop(database.TorrentAssignItemBucket)
+	database.GetStormDB().Drop(&database.TorrentAssignMetadata{})
+	database.GetStormDB().Drop(&database.TorrentAssignItem{})
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -160,7 +160,7 @@ func ClearDatabaseTorrentHistory(ctx *gin.Context) {
 func ClearDatabaseSearchHistory(ctx *gin.Context) {
 	log.Debug("Removing search history from database")
 
-	database.GetStormDB().Drop(database.QueryHistoryBucket)
+	database.GetStormDB().Drop(&database.QueryHistory{})
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
@@ -178,11 +178,11 @@ func ClearDatabase(ctx *gin.Context) {
 		return
 	}
 
-	database.GetStormDB().Drop(database.BTItemBucket)
-	database.GetStormDB().Drop(database.TorrentHistoryBucket)
-	database.GetStormDB().Drop(database.TorrentAssignMetadataBucket)
-	database.GetStormDB().Drop(database.TorrentAssignItemBucket)
-	database.GetStormDB().Drop(database.QueryHistoryBucket)
+	database.GetStormDB().Drop(&database.BTItem{})
+	database.GetStormDB().Drop(&database.TorrentHistory{})
+	database.GetStormDB().Drop(&database.TorrentAssignMetadata{})
+	database.GetStormDB().Drop(&database.TorrentAssignItem{})
+	database.GetStormDB().Drop(&database.QueryHistory{})
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 

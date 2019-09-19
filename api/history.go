@@ -47,7 +47,7 @@ func History(ctx *gin.Context) {
 }
 
 func torrentHistoryEmpty() bool {
-	count, err := database.GetStormDB().Count(database.TorrentHistoryBucket)
+	count, err := database.GetStormDB().Count(&database.TorrentHistory{})
 	if err != nil {
 		log.Infof("Could not get count for torrent history: %s", err)
 	}
@@ -74,7 +74,7 @@ func HistoryRemove(ctx *gin.Context) {
 // HistoryClear ...
 func HistoryClear(ctx *gin.Context) {
 	log.Debugf("Cleaning queries with torrent history")
-	if err := database.GetStormDB().Drop(database.TorrentHistoryBucket); err != nil {
+	if err := database.GetStormDB().Drop(&database.TorrentHistory{}); err != nil {
 		log.Infof("Could not clean torrent history: %s", err)
 	}
 	xbmc.Refresh()
