@@ -29,7 +29,7 @@ func inMoviesWatchlist(tmdbID int) bool {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.watchlist.movies")
 	if err := cacheStore.Get(key, &movies); err != nil {
-		movies, _ = trakt.WatchlistMovies()
+		movies, _ = trakt.WatchlistMovies(false)
 		cacheStore.Set(key, movies, 30*time.Second)
 	}
 
@@ -51,7 +51,7 @@ func inShowsWatchlist(tmdbID int) bool {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.watchlist.shows")
 	if err := cacheStore.Get(key, &shows); err != nil {
-		shows, _ = trakt.WatchlistShows()
+		shows, _ = trakt.WatchlistShows(false)
 		cacheStore.Set(key, shows, 30*time.Second)
 	}
 
@@ -73,7 +73,7 @@ func inMoviesCollection(tmdbID int) bool {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.collection.movies")
 	if err := cacheStore.Get(key, &movies); err != nil {
-		movies, _ = trakt.CollectionMovies()
+		movies, _ = trakt.CollectionMovies(false)
 		cacheStore.Set(key, movies, 30*time.Second)
 	}
 
@@ -98,7 +98,7 @@ func inShowsCollection(tmdbID int) bool {
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.collection.shows")
 	if err := cacheStore.Get(key, &shows); err != nil {
-		shows, _ = trakt.CollectionShows()
+		shows, _ = trakt.CollectionShows(false)
 		cacheStore.Set(key, shows, 30*time.Second)
 	}
 
@@ -134,7 +134,7 @@ func AuthorizeTrakt(ctx *gin.Context) {
 
 // WatchlistMovies ...
 func WatchlistMovies(ctx *gin.Context) {
-	movies, err := trakt.WatchlistMovies()
+	movies, err := trakt.WatchlistMovies(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -143,7 +143,7 @@ func WatchlistMovies(ctx *gin.Context) {
 
 // WatchlistShows ...
 func WatchlistShows(ctx *gin.Context) {
-	shows, err := trakt.WatchlistShows()
+	shows, err := trakt.WatchlistShows(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -152,7 +152,7 @@ func WatchlistShows(ctx *gin.Context) {
 
 // CollectionMovies ...
 func CollectionMovies(ctx *gin.Context) {
-	movies, err := trakt.CollectionMovies()
+	movies, err := trakt.CollectionMovies(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -161,7 +161,7 @@ func CollectionMovies(ctx *gin.Context) {
 
 // CollectionShows ...
 func CollectionShows(ctx *gin.Context) {
-	shows, err := trakt.CollectionShows()
+	shows, err := trakt.CollectionShows(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -174,7 +174,7 @@ func UserlistMovies(ctx *gin.Context) {
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	movies, err := trakt.ListItemsMovies(user, listID)
+	movies, err := trakt.ListItemsMovies(user, listID, false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -186,7 +186,7 @@ func UserlistShows(ctx *gin.Context) {
 	listID := ctx.Params.ByName("listId")
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
-	shows, err := trakt.ListItemsShows(listID)
+	shows, err := trakt.ListItemsShows(listID, false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -405,6 +405,12 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 			}
 
 			item := movieListing.Movie.ToListItem()
+
+			// Example of adding UTF8 char into title,
+			// list: https://www.utf8-chartable.de/unicode-utf8-table.pl?start=9728&number=1024&names=2&utf8=string-literal
+			// item.Label += " \xe2\x98\x85"
+			// item.Info.Title += " \xe2\x98\x85"
+
 			tmdbID := strconv.Itoa(movieListing.Movie.IDs.TMDB)
 
 			thisURL := URLForXBMC("/movie/%d/", movieListing.Movie.IDs.TMDB) + "%s/%s"
@@ -421,7 +427,7 @@ func renderTraktMovies(ctx *gin.Context, movies []*trakt.Movies, total int, page
 			libraryActions := [][]string{
 				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			}
-			if err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
+			if library.IsDuplicateMovie(tmdbID) || library.IsAddedToLibrary(tmdbID, library.MovieType) {
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d?force=true", movieListing.Movie.IDs.TMDB))})
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movieListing.Movie.IDs.TMDB))})
 			} else {
@@ -562,7 +568,7 @@ func TraktHistoryMovies(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 
-	watchedMovies, err := trakt.WatchedMovies()
+	watchedMovies, err := trakt.WatchedMovies(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -582,7 +588,7 @@ func TraktHistoryShows(ctx *gin.Context) {
 	pageParam := ctx.DefaultQuery("page", "1")
 	page, _ := strconv.Atoi(pageParam)
 
-	watchedShows, err := trakt.WatchedShows()
+	watchedShows, err := trakt.WatchedShows(false)
 	if err != nil {
 		xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
 	}
@@ -645,7 +651,7 @@ func renderTraktShows(ctx *gin.Context, shows []*trakt.Shows, total int, page in
 		item.Path = URLForXBMC("/show/%d/seasons", showListing.Show.IDs.TMDB)
 
 		libraryActions := [][]string{}
-		if err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
+		if library.IsDuplicateShow(tmdbID) || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 			libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
 			libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
 		} else {
@@ -967,7 +973,7 @@ func renderCalendarMovies(ctx *gin.Context, movies []*trakt.CalendarMovie, total
 			libraryActions := [][]string{
 				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
 			}
-			if err := library.IsDuplicateMovie(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.MovieType) {
+			if library.IsDuplicateMovie(tmdbID) || library.IsAddedToLibrary(tmdbID, library.MovieType) {
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/add/%d?force=true", movieListing.Movie.IDs.TMDB))})
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/movie/remove/%d", movieListing.Movie.IDs.TMDB))})
 			} else {
@@ -1082,7 +1088,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 
 			if !config.Get().ForceUseTrakt && showListing.Show.IDs.TMDB != 0 {
 				show = tmdb.GetShow(showListing.Show.IDs.TMDB, language)
-				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language)
+				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, len(show.Seasons))
 				episode = tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
 
 				if episode != nil {
@@ -1142,7 +1148,7 @@ func renderCalendarShows(ctx *gin.Context, shows []*trakt.CalendarShow, total in
 			item.Path = itemPath
 
 			libraryActions := [][]string{}
-			if err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
+			if library.IsDuplicateShow(tmdbID) || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", showListing.Show.IDs.TMDB))})
 				libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", showListing.Show.IDs.TMDB))})
 			} else {
@@ -1232,7 +1238,7 @@ func renderProgressShows(ctx *gin.Context, shows []*trakt.ProgressShow, total in
 
 			if !config.Get().ForceUseTrakt && showListing.Show.IDs.TMDB != 0 {
 				show = tmdb.GetShow(showListing.Show.IDs.TMDB, language)
-				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language)
+				season = tmdb.GetSeason(showListing.Show.IDs.TMDB, epi.Season, language, len(show.Seasons))
 				episode = tmdb.GetEpisode(showListing.Show.IDs.TMDB, epi.Season, epi.Number, language)
 
 				if episode != nil {

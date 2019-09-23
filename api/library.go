@@ -75,7 +75,7 @@ func AddMoviesList(ctx *gin.Context) {
 		updating = true
 	}
 
-	library.SyncMoviesList(listID, updating)
+	library.SyncMoviesList(listID, updating, updating)
 }
 
 // RemoveMovie ...
@@ -144,7 +144,7 @@ func AddShowsList(ctx *gin.Context) {
 		updating = true
 	}
 
-	library.SyncShowsList(listID, updating)
+	library.SyncShowsList(listID, updating, updating)
 }
 
 // RemoveShow ...

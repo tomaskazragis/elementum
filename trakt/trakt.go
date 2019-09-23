@@ -35,7 +35,9 @@ const (
 var log = logging.MustGetLogger("trakt")
 
 var (
-	Cookies   = ""
+	// Cookies ...
+	Cookies = ""
+	// UserAgent ...
 	UserAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.21 Safari/537.36"
 )
 
@@ -53,6 +55,15 @@ var (
 	watchedLongExpiration   = 7 * 24 * time.Hour
 	activitiesExpiration    = 7 * 24 * time.Hour
 	progressExpiration      = 7 * 24 * time.Hour
+
+	watchedMoviesKey    = "com.trakt.movies.watched.list"
+	watchedShowsKey     = "com.trakt.shows.watched.list"
+	pausedMoviesKey     = "com.trakt.movies.playback.list"
+	pausedShowsKey      = "com.trakt.shows.playback.list"
+	watchlistMoviesKey  = "com.trakt.movies.watchlist.list"
+	watchlistShowsKey   = "com.trakt.shows.watchlist.list"
+	collectionMoviesKey = "com.trakt.movies.collection.list"
+	collectionShowsKey  = "com.trakt.shows.collection.list"
 )
 
 const (
@@ -70,9 +81,10 @@ var rl = util.NewRateLimiter(burstRate, burstTime, simultaneousConnections)
 
 // Object ...
 type Object struct {
-	Title string `json:"title"`
-	Year  int    `json:"year"`
-	IDs   *IDs   `json:"ids"`
+	Title     string    `json:"title"`
+	Year      int       `json:"year"`
+	IDs       *IDs      `json:"ids"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // MovieSearchResults ...
@@ -167,8 +179,9 @@ type Episode struct {
 	FirstAired   string   `json:"first_aired"`
 	Translations []string `json:"available_translations"`
 
-	Rating float32 `json:"rating"`
-	Votes  int     `json:"votes"`
+	Runtime int     `json:"runtime"`
+	Rating  float32 `json:"rating"`
+	Votes   int     `json:"votes"`
 
 	Images *Images `json:"images"`
 	IDs    *IDs    `json:"ids"`
@@ -232,13 +245,13 @@ type WatchlistEpisode struct {
 
 // CollectionMovie ...
 type CollectionMovie struct {
-	CollectedAt string `json:"collected_at"`
-	Movie       *Movie `json:"movie"`
+	CollectedAt time.Time `json:"collected_at"`
+	Movie       *Movie    `json:"movie"`
 }
 
 // CollectionShow ...
 type CollectionShow struct {
-	CollectedAt string             `json:"last_collected_at"`
+	CollectedAt time.Time          `json:"last_collected_at"`
 	Show        *Show              `json:"show"`
 	Seasons     []*CollectedSeason `json:"seasons"`
 }
@@ -379,6 +392,25 @@ type User struct {
 type UserSettings struct {
 	User    User     `json:"user"`
 	Account struct{} `json:"account"`
+}
+
+// PausedMovie represents paused movie
+type PausedMovie struct {
+	Progress float64   `json:"progress"`
+	PausedAt time.Time `json:"paused_at"`
+	ID       int       `json:"id"`
+	Type     string    `json:"type"`
+	Movie    *Movie    `json:"movie"`
+}
+
+// PausedEpisode represents paused episode with show information
+type PausedEpisode struct {
+	Progress float64   `json:"progress"`
+	PausedAt time.Time `json:"paused_at"`
+	ID       int       `json:"id"`
+	Type     string    `json:"type"`
+	Episode  *Episode  `json:"episode"`
+	Show     *Show     `json:"show"`
 }
 
 // WatchedItem represents possible watched add/delete item
@@ -920,6 +952,44 @@ func Authorized() error {
 	return nil
 }
 
+// Request is a general proxy for making requests
+func Request(endPoint string, params napping.Params, isWithAuth bool, isUpdateNeeded bool, cacheKey string, cacheExpiration time.Duration, ret interface{}) error {
+	if isWithAuth {
+		if err := Authorized(); err != nil {
+			return err
+		}
+	}
+
+	cacheStore := cache.NewDBStore()
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(cacheKey, &ret); err == nil {
+			return nil
+		}
+	}
+
+	var err error
+	var resp *napping.Response
+
+	if isWithAuth {
+		resp, err = GetWithAuth(endPoint, params.AsUrlValues())
+	} else {
+		resp, err = Get(endPoint, params.AsUrlValues())
+	}
+
+	if err != nil {
+		return err
+	} else if resp.Status() != 200 {
+		return fmt.Errorf("Bad status getting %s: %d", endPoint, resp.Status())
+	}
+
+	if err := resp.Unmarshal(&ret); err != nil {
+		log.Warning(err)
+	}
+
+	cacheStore.Set(cacheKey, &ret, cacheExpiration)
+	return nil
+}
+
 // SyncAddedItem adds item (movie/show) to watchlist or collection
 func SyncAddedItem(itemType string, tmdbID string, location int) (resp *napping.Response, err error) {
 	list := config.Get().TraktSyncAddedMoviesList
@@ -1153,4 +1223,170 @@ func Scrobble(action string, contentType string, tmdbID int, watched float64, ru
 	} else if resp.Status() != 201 {
 		log.Errorf("Failed to scrobble %s #%d to %s at %f: %d", contentType, tmdbID, action, progress, resp.Status())
 	}
+}
+
+// GetLastActivities ...
+func GetLastActivities() (a *UserActivities, err error) {
+	if err := Authorized(); err != nil {
+		return nil, fmt.Errorf("Not authorized")
+	}
+
+	endPoint := "sync/last_activities"
+
+	params := napping.Params{}.AsUrlValues()
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return nil, err
+	} else if resp.Status() != 200 {
+		return nil, fmt.Errorf("Bad status getting Trakt activities: %d", resp.Status())
+	}
+
+	if err := resp.Unmarshal(&a); err != nil {
+		log.Warning(err)
+	}
+
+	return
+}
+
+// DiffWatchedShows ...
+func DiffWatchedShows(current, previous []*WatchedShow) (diff []*WatchedShow) {
+	if current == nil || previous == nil || len(previous) == 0 || len(current) == 0 {
+		return
+	}
+
+	foundShow := false
+	foundSeason := false
+	foundEpisode := false
+
+	var show *WatchedShow
+	var season *WatchedSeason
+
+	for _, previousShow := range previous {
+		foundShow = false
+		foundSeason = false
+		foundEpisode = false
+
+		show = nil
+
+		for _, currentShow := range current {
+			season = nil
+
+			if previousShow.Show.IDs.Trakt == currentShow.Show.IDs.Trakt {
+				foundShow = true
+
+				for _, previousSeason := range previousShow.Seasons {
+					foundSeason = false
+					foundEpisode = false
+
+					for _, currentSeason := range currentShow.Seasons {
+						if previousSeason.Number == currentSeason.Number {
+							foundSeason = true
+
+							for _, previousEpisode := range previousSeason.Episodes {
+								foundEpisode = false
+
+								for _, currentEpisode := range currentSeason.Episodes {
+									if previousEpisode.Number == currentEpisode.Number {
+										foundEpisode = true
+									}
+								}
+
+								if !foundEpisode {
+									if season == nil {
+										season = &WatchedSeason{Number: previousSeason.Number}
+									}
+
+									season.Episodes = append(season.Episodes, previousEpisode)
+								}
+							}
+						}
+					}
+
+					if !foundSeason {
+						season = previousSeason
+					}
+					if season != nil {
+						if show == nil {
+							show = &WatchedShow{Show: previousShow.Show}
+						}
+
+						show.Seasons = append(show.Seasons, season)
+					}
+				}
+			}
+		}
+
+		if !foundShow {
+			diff = append(diff, previousShow)
+		}
+		if show != nil {
+			diff = append(diff, show)
+		}
+	}
+
+	return
+}
+
+// DiffShows ...
+func DiffShows(previous, current []*Shows) []*Shows {
+	ret := make([]*Shows, 0, len(current))
+	found := false
+	for _, ce := range current {
+		found = false
+		for _, pr := range previous {
+			if pr.Show.IDs.Trakt == ce.Show.IDs.Trakt {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			ret = append(ret, ce)
+		}
+	}
+
+	return ret
+}
+
+// DiffWatchedMovies ...
+func DiffWatchedMovies(previous, current []*WatchedMovie) []*WatchedMovie {
+	ret := make([]*WatchedMovie, 0, len(current))
+	found := false
+	for _, ce := range current {
+		found = false
+		for _, pr := range previous {
+			if pr.Movie.IDs.Trakt == ce.Movie.IDs.Trakt {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			ret = append(ret, ce)
+		}
+	}
+
+	return ret
+}
+
+// DiffMovies ...
+func DiffMovies(previous, current []*Movies) []*Movies {
+	ret := make([]*Movies, 0, len(current))
+	found := false
+	for _, ce := range current {
+		found = false
+		for _, pr := range previous {
+			if pr.Movie.IDs.Trakt == ce.Movie.IDs.Trakt {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			ret = append(ret, ce)
+		}
+	}
+
+	return ret
 }

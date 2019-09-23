@@ -218,7 +218,7 @@ func renderShows(ctx *gin.Context, shows tmdb.Shows, page int, total int, query 
 
 		tmdbID := strconv.Itoa(show.ID)
 		libraryActions := [][]string{}
-		if err := library.IsDuplicateShow(tmdbID); err != nil || library.IsAddedToLibrary(tmdbID, library.ShowType) {
+		if library.IsDuplicateShow(tmdbID) || library.IsAddedToLibrary(tmdbID, library.ShowType) {
 			libraryActions = append(libraryActions, []string{"LOCALIZE[30283]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/add/%d?force=true", show.ID))})
 			libraryActions = append(libraryActions, []string{"LOCALIZE[30253]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/library/show/remove/%d", show.ID))})
 		} else {
@@ -407,7 +407,7 @@ func ShowEpisodes(ctx *gin.Context) {
 		return
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, language)
+	season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons))
 	if season == nil {
 		ctx.Error(errors.New("Unable to find season"))
 		return
@@ -457,7 +457,7 @@ func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, e
 		return nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
 	if season == nil {
 		return nil, errors.New("Unable to find season")
 	}
@@ -487,7 +487,7 @@ func ShowSeasonLinks(s *bittorrent.Service) gin.HandlerFunc {
 			return
 		}
 
-		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -613,7 +613,7 @@ func ShowSeasonPlay(s *bittorrent.Service) gin.HandlerFunc {
 			return
 		}
 
-		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+		season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
 		if season == nil {
 			ctx.Error(errors.New("Unable to find season"))
 			return
@@ -696,7 +696,7 @@ func showEpisodeLinks(showID int, seasonNumber int, episodeNumber int) ([]*bitto
 		return nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
 	if season == nil || len(season.Episodes) < episodeNumber {
 		return nil, errors.New("Unable to find season")
 	}
