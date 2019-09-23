@@ -530,7 +530,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			}
 
 			if s := tmdb.GetShow(btp.p.ShowID, config.Get().Language); s != nil && s.IsAnime() {
-				season := tmdb.GetSeason(btp.p.ShowID, btp.p.Season, config.Get().Language)
+				season := tmdb.GetSeason(btp.p.ShowID, btp.p.Season, config.Get().Language, len(s.Seasons))
 				if season != nil {
 					an, _ := s.AnimeInfo(season.Episodes[btp.p.Episode-1])
 					if an != 0 {
@@ -1053,7 +1053,7 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 		if season == nil || season.EpisodeCount == 0 {
 			continue
 		}
-		tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language)
+		tmdbSeason := tmdb.GetSeason(btp.p.ShowID, season.Season, config.Get().Language, len(show.Seasons))
 		if tmdbSeason == nil {
 			continue
 		}

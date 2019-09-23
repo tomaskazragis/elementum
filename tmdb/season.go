@@ -15,9 +15,20 @@ import (
 )
 
 // GetSeason ...
-func GetSeason(showID int, seasonNumber int, language string) *Season {
+func GetSeason(showID int, seasonNumber int, language string, seasonsCount int) *Season {
 	var season *Season
 	cacheStore := cache.NewDBStore()
+	updateFrequency := config.Get().UpdateFrequency * 60
+	if updateFrequency == 0 {
+		updateFrequency = 1440
+	} else {
+		updateFrequency = updateFrequency - 1
+	}
+	// Last season should not be savedfor too long
+	if seasonNumber == seasonsCount {
+		updateFrequency = 1440
+	}
+
 	key := fmt.Sprintf("com.tmdb.season.%d.%d.%s", showID, seasonNumber, language)
 	if err := cacheStore.Get(key, &season); err != nil {
 		err = MakeRequest(APIRequest{
@@ -32,7 +43,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 		})
 
 		if season == nil && err != nil && err == util.ErrNotFound {
-			cacheStore.Set(key, season, cacheHalfExpiration)
+			cacheStore.Set(key, &season, cacheHalfExpiration)
 		}
 		if season == nil {
 			return nil
@@ -53,16 +64,7 @@ func GetSeason(showID int, seasonNumber int, language string) *Season {
 			}
 		}
 
-		updateFrequency := config.Get().UpdateFrequency * 60
-		traktFrequency := config.Get().TraktSyncFrequency * 60
-		if updateFrequency == 0 && traktFrequency == 0 {
-			updateFrequency = 1440
-		} else if updateFrequency > traktFrequency && traktFrequency != 0 {
-			updateFrequency = traktFrequency - 1
-		} else {
-			updateFrequency = updateFrequency - 1
-		}
-		cacheStore.Set(key, season, time.Duration(updateFrequency)*time.Minute)
+		cacheStore.Set(key, &season, time.Duration(updateFrequency)*time.Minute)
 	}
 	return season
 }

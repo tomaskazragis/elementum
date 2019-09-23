@@ -123,13 +123,13 @@ func GetShow(showID int, language string) (show *Show) {
 		})
 
 		if show == nil && err != nil && err == util.ErrNotFound {
-			cacheStore.Set(key, show, cacheHalfExpiration)
+			cacheStore.Set(key, &show, cacheHalfExpiration)
 		}
 		if show == nil {
 			return nil
 		}
 
-		cacheStore.Set(key, show, cacheExpiration)
+		cacheStore.Set(key, &show, cacheExpiration)
 	}
 	if show == nil {
 		return nil
@@ -438,6 +438,21 @@ func GetTVGenres(language string) []*Genre {
 		}
 	}
 	return genres.Genres
+}
+
+// GetSeasonEpisodes ...
+func (show *Show) GetSeasonEpisodes(season int) int {
+	if len(show.Seasons) == 0 {
+		return 0
+	}
+
+	for _, s := range show.Seasons {
+		if s.Season == season {
+			return s.EpisodeCount
+		}
+	}
+
+	return 0
 }
 
 // IsAnime ...

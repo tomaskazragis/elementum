@@ -146,7 +146,7 @@ func GetEpisodeLabels(showID, seasonNumber, episodeNumber int) (item *xbmc.ListI
 		return nil, errors.New("Unable to find show")
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language)
+	season := tmdb.GetSeason(showID, seasonNumber, config.Get().Language, len(show.Seasons))
 	if season == nil {
 		return nil, errors.New("Unable to find season")
 	}
