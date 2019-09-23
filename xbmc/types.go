@@ -1,5 +1,7 @@
 package xbmc
 
+import "time"
+
 //go:generate msgp -o msgp.go -io=false -tests=false
 
 // View ...
@@ -166,7 +168,7 @@ type VideoLibraryMovieItem struct {
 	PlayCount  int       `json:"playcount"`
 	File       string    `json:"file"`
 	Year       int       `json:"year"`
-	DateAdded  string    `json:"dateadded"`
+	DateAdded  KodiTime  `json:"dateadded"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 	Resume     *Resume
 }
@@ -185,7 +187,7 @@ type VideoLibraryShowItem struct {
 	PlayCount  int       `json:"playcount"`
 	Year       int       `json:"year"`
 	Episodes   int       `json:"episode"`
-	DateAdded  string    `json:"dateadded"`
+	DateAdded  KodiTime  `json:"dateadded"`
 	UniqueIDs  UniqueIDs `json:"uniqueid"`
 }
 
@@ -229,7 +231,7 @@ type VideoLibraryEpisodeItem struct {
 	TVShowID  int       `json:"tvshowid"`
 	PlayCount int       `json:"playcount"`
 	File      string    `json:"file"`
-	DateAdded string    `json:"dateadded"`
+	DateAdded KodiTime  `json:"dateadded"`
 	UniqueIDs UniqueIDs `json:"uniqueid"`
 	Resume    *Resume
 }
@@ -288,6 +290,27 @@ type AdvancedSettings struct {
 // SettingValue ...
 type SettingValue struct {
 	Value string `json:"value"`
+}
+
+// KodiTime ...
+type KodiTime struct {
+	time.Time
+}
+
+// UnmarshalJSON ...
+func (s *KodiTime) UnmarshalJSON(b []byte) (err error) {
+	str := string(b[1 : len(b)-1])
+	if len(str) == 0 {
+		return
+	}
+
+	t, err := time.Parse("2006-01-02 15:04:05", str)
+	if err != nil {
+		log.Debugf("Error parsing date '%s': %s", str, err)
+	}
+	s.Time = t
+
+	return
 }
 
 // NewView ...

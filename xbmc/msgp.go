@@ -366,6 +366,54 @@ func (z GUIIconOverlay) Msgsize() (s int) {
 }
 
 // MarshalMsg implements msgp.Marshaler
+func (z KodiTime) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "Time"
+	o = append(o, 0x81, 0xa4, 0x54, 0x69, 0x6d, 0x65)
+	o = msgp.AppendTime(o, z.Time)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *KodiTime) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Time":
+			z.Time, bts, err = msgp.ReadTimeBytes(bts)
+			if err != nil {
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z KodiTime) Msgsize() (s int) {
+	s = 1 + 5 + msgp.TimeSize
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
 func (z *ListItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 12
@@ -1903,8 +1951,10 @@ func (z *VideoLibraryEpisodeItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0xa4, 0x46, 0x69, 0x6c, 0x65)
 	o = msgp.AppendString(o, z.File)
 	// string "DateAdded"
-	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
-	o = msgp.AppendString(o, z.DateAdded)
+	// map header, size 1
+	// string "Time"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64, 0x81, 0xa4, 0x54, 0x69, 0x6d, 0x65)
+	o = msgp.AppendTime(o, z.DateAdded.Time)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -1979,9 +2029,29 @@ func (z *VideoLibraryEpisodeItem) UnmarshalMsg(bts []byte) (o []byte, err error)
 				return
 			}
 		case "DateAdded":
-			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {
 				return
+			}
+			for zb0002 > 0 {
+				zb0002--
+				field, bts, err = msgp.ReadMapKeyZC(bts)
+				if err != nil {
+					return
+				}
+				switch msgp.UnsafeString(field) {
+				case "Time":
+					z.DateAdded.Time, bts, err = msgp.ReadTimeBytes(bts)
+					if err != nil {
+						return
+					}
+				default:
+					bts, err = msgp.Skip(bts)
+					if err != nil {
+						return
+					}
+				}
 			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
@@ -1999,13 +2069,13 @@ func (z *VideoLibraryEpisodeItem) UnmarshalMsg(bts []byte) (o []byte, err error)
 				if z.Resume == nil {
 					z.Resume = new(Resume)
 				}
-				var zb0002 uint32
-				zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0003 uint32
+				zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0002 > 0 {
-					zb0002--
+				for zb0003 > 0 {
+					zb0003--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
@@ -2042,7 +2112,7 @@ func (z *VideoLibraryEpisodeItem) UnmarshalMsg(bts []byte) (o []byte, err error)
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryEpisodeItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 7 + msgp.IntSize + 8 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize() + 7
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 7 + msgp.IntSize + 8 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 10 + 1 + 5 + msgp.TimeSize + 10 + z.UniqueIDs.Msgsize() + 7
 	if z.Resume == nil {
 		s += msgp.NilSize
 	} else {
@@ -2226,8 +2296,10 @@ func (z *VideoLibraryMovieItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0xa4, 0x59, 0x65, 0x61, 0x72)
 	o = msgp.AppendInt(o, z.Year)
 	// string "DateAdded"
-	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
-	o = msgp.AppendString(o, z.DateAdded)
+	// map header, size 1
+	// string "Time"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64, 0x81, 0xa4, 0x54, 0x69, 0x6d, 0x65)
+	o = msgp.AppendTime(o, z.DateAdded.Time)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -2297,9 +2369,29 @@ func (z *VideoLibraryMovieItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "DateAdded":
-			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {
 				return
+			}
+			for zb0002 > 0 {
+				zb0002--
+				field, bts, err = msgp.ReadMapKeyZC(bts)
+				if err != nil {
+					return
+				}
+				switch msgp.UnsafeString(field) {
+				case "Time":
+					z.DateAdded.Time, bts, err = msgp.ReadTimeBytes(bts)
+					if err != nil {
+						return
+					}
+				default:
+					bts, err = msgp.Skip(bts)
+					if err != nil {
+						return
+					}
+				}
 			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
@@ -2317,13 +2409,13 @@ func (z *VideoLibraryMovieItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				if z.Resume == nil {
 					z.Resume = new(Resume)
 				}
-				var zb0002 uint32
-				zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
+				var zb0003 uint32
+				zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
 				if err != nil {
 					return
 				}
-				for zb0002 > 0 {
-					zb0002--
+				for zb0003 > 0 {
+					zb0003--
 					field, bts, err = msgp.ReadMapKeyZC(bts)
 					if err != nil {
 						return
@@ -2360,7 +2452,7 @@ func (z *VideoLibraryMovieItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryMovieItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 5 + msgp.IntSize + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize() + 7
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.File) + 5 + msgp.IntSize + 10 + 1 + 5 + msgp.TimeSize + 10 + z.UniqueIDs.Msgsize() + 7
 	if z.Resume == nil {
 		s += msgp.NilSize
 	} else {
@@ -2806,8 +2898,10 @@ func (z *VideoLibraryShowItem) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0xa8, 0x45, 0x70, 0x69, 0x73, 0x6f, 0x64, 0x65, 0x73)
 	o = msgp.AppendInt(o, z.Episodes)
 	// string "DateAdded"
-	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64)
-	o = msgp.AppendString(o, z.DateAdded)
+	// map header, size 1
+	// string "Time"
+	o = append(o, 0xa9, 0x44, 0x61, 0x74, 0x65, 0x41, 0x64, 0x64, 0x65, 0x64, 0x81, 0xa4, 0x54, 0x69, 0x6d, 0x65)
+	o = msgp.AppendTime(o, z.DateAdded.Time)
 	// string "UniqueIDs"
 	o = append(o, 0xa9, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x49, 0x44, 0x73)
 	o, err = z.UniqueIDs.MarshalMsg(o)
@@ -2864,9 +2958,29 @@ func (z *VideoLibraryShowItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "DateAdded":
-			z.DateAdded, bts, err = msgp.ReadStringBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {
 				return
+			}
+			for zb0002 > 0 {
+				zb0002--
+				field, bts, err = msgp.ReadMapKeyZC(bts)
+				if err != nil {
+					return
+				}
+				switch msgp.UnsafeString(field) {
+				case "Time":
+					z.DateAdded.Time, bts, err = msgp.ReadTimeBytes(bts)
+					if err != nil {
+						return
+					}
+				default:
+					bts, err = msgp.Skip(bts)
+					if err != nil {
+						return
+					}
+				}
 			}
 		case "UniqueIDs":
 			bts, err = z.UniqueIDs.UnmarshalMsg(bts)
@@ -2886,7 +3000,7 @@ func (z *VideoLibraryShowItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *VideoLibraryShowItem) Msgsize() (s int) {
-	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.IntSize + 9 + msgp.IntSize + 10 + msgp.StringPrefixSize + len(z.DateAdded) + 10 + z.UniqueIDs.Msgsize()
+	s = 1 + 3 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Title) + 11 + msgp.StringPrefixSize + len(z.IMDBNumber) + 10 + msgp.IntSize + 5 + msgp.IntSize + 9 + msgp.IntSize + 10 + 1 + 5 + msgp.TimeSize + 10 + z.UniqueIDs.Msgsize()
 	return
 }
 
