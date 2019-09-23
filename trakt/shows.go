@@ -414,7 +414,7 @@ func TopShows(topCategory string, page string) (shows []*Shows, total int, err e
 }
 
 // WatchlistShows ...
-func WatchlistShows() (shows []*Shows, err error) {
+func WatchlistShows(isUpdateNeeded bool) (shows []*Shows, err error) {
 	if err := Authorized(); err != nil {
 		return shows, err
 	}
@@ -426,39 +426,51 @@ func WatchlistShows() (shows []*Shows, err error) {
 	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
-	key := "com.trakt.shows.watchlist"
-	if err := cacheStore.Get(key, &shows); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
 
-		if err != nil {
-			return shows, err
-		} else if resp.Status() != 200 {
-			log.Error(err)
-			return shows, fmt.Errorf("Bad status getting Trakt watchlist for shows: %d", resp.Status())
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(watchlistShowsKey, &shows); err == nil {
+			return shows, nil
 		}
-
-		var watchlist []*WatchlistShow
-		if err := resp.Unmarshal(&watchlist); err != nil {
-			log.Warning(err)
-		}
-
-		showListing := make([]*Shows, 0)
-		for _, show := range watchlist {
-			showItem := Shows{
-				Show: show.Show,
-			}
-			showListing = append(showListing, &showItem)
-		}
-		shows = showListing
-
-		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return shows, err
+	} else if resp.Status() != 200 {
+		log.Error(err)
+		return shows, fmt.Errorf("Bad status getting Trakt watchlist for shows: %d", resp.Status())
+	}
+
+	var watchlist []*WatchlistShow
+	if err := resp.Unmarshal(&watchlist); err != nil {
+		log.Warning(err)
+	}
+
+	showListing := make([]*Shows, 0)
+	for _, show := range watchlist {
+		showItem := Shows{
+			Show: show.Show,
+		}
+		showListing = append(showListing, &showItem)
+	}
+	shows = showListing
+
+	cacheStore.Set(watchlistShowsKey, &shows, progressExpiration)
 	return
 }
 
+// PreviousWatchlistShows ...
+func PreviousWatchlistShows() (shows []*Shows, err error) {
+	err = cache.
+		NewDBStore().
+		Get(watchlistShowsKey, &shows)
+
+	return shows, err
+}
+
 // CollectionShows ...
-func CollectionShows() (shows []*Shows, err error) {
+func CollectionShows(isUpdateNeeded bool) (shows []*Shows, err error) {
 	if err := Authorized(); err != nil {
 		return shows, err
 	}
@@ -470,38 +482,49 @@ func CollectionShows() (shows []*Shows, err error) {
 	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
-	key := "com.trakt.shows.collection"
-	if err := cacheStore.Get(key, &shows); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
 
-		if err != nil {
-			return shows, err
-		} else if resp.Status() != 200 {
-			return shows, fmt.Errorf("Bad status getting Trakt collection for shows: %d", resp.Status())
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(collectionShowsKey, &shows); err == nil {
+			return shows, nil
 		}
-
-		var collection []*WatchlistShow
-		if err := resp.Unmarshal(&collection); err != nil {
-			log.Warning(err)
-		}
-
-		showListing := make([]*Shows, 0)
-		for _, show := range collection {
-			showItem := Shows{
-				Show: show.Show,
-			}
-			showListing = append(showListing, &showItem)
-		}
-		shows = showListing
-
-		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
-	return
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return shows, err
+	} else if resp.Status() != 200 {
+		return shows, fmt.Errorf("Bad status getting Trakt collection for shows: %d", resp.Status())
+	}
+
+	var collection []*WatchlistShow
+	if err := resp.Unmarshal(&collection); err != nil {
+		log.Warning(err)
+	}
+
+	showListing := make([]*Shows, 0, len(collection))
+	for _, show := range collection {
+		showItem := Shows{
+			Show: show.Show,
+		}
+		showListing = append(showListing, &showItem)
+	}
+
+	cacheStore.Set(collectionShowsKey, &showListing, progressExpiration)
+	return showListing, err
+}
+
+// PreviousCollectionShows ...
+func PreviousCollectionShows() (shows []*Shows, err error) {
+	err = cache.
+		NewDBStore().
+		Get(collectionShowsKey, &shows)
+
+	return shows, err
 }
 
 // ListItemsShows ...
-func ListItemsShows(listID string) (shows []*Shows, err error) {
+func ListItemsShows(listID string, isUpdateNeeded bool) (shows []*Shows, err error) {
 	endPoint := fmt.Sprintf("users/%s/lists/%s/items/shows", config.Get().TraktUsername, listID)
 
 	params := napping.Params{}.AsUrlValues()
@@ -510,38 +533,52 @@ func ListItemsShows(listID string) (shows []*Shows, err error) {
 
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.shows.list.%s", listID)
-	if errGet := cacheStore.Get(key, &shows); errGet != nil {
-		if config.Get().TraktToken == "" {
-			resp, errGet = Get(endPoint, params)
-		} else {
-			resp, errGet = GetWithAuth(endPoint, params)
-		}
 
-		if errGet != nil || resp.Status() != 200 {
-			return shows, errGet
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(key, &shows); err == nil {
+			return shows, nil
 		}
-
-		var list []*ListItem
-		if err = resp.Unmarshal(&list); err != nil {
-			log.Warning(err)
-		}
-
-		showListing := make([]*Shows, 0)
-		for _, show := range list {
-			if show.Show == nil {
-				continue
-			}
-			showItem := Shows{
-				Show: show.Show,
-			}
-			showListing = append(showListing, &showItem)
-		}
-		shows = showListing
-
-		cacheStore.Set(key, shows, 1*time.Minute)
 	}
 
+	var errGet error
+	if config.Get().TraktToken == "" {
+		resp, errGet = Get(endPoint, params)
+	} else {
+		resp, errGet = GetWithAuth(endPoint, params)
+	}
+
+	if errGet != nil || resp.Status() != 200 {
+		return shows, errGet
+	}
+
+	var list []*ListItem
+	if err = resp.Unmarshal(&list); err != nil {
+		log.Warning(err)
+	}
+
+	showListing := make([]*Shows, 0)
+	for _, show := range list {
+		if show.Show == nil {
+			continue
+		}
+		showItem := Shows{
+			Show: show.Show,
+		}
+		showListing = append(showListing, &showItem)
+	}
+	shows = showListing
+
+	cacheStore.Set(key, &shows, 1*time.Minute)
 	return shows, err
+}
+
+// PreviousListItemsShows ...
+func PreviousListItemsShows(listID string) (shows []*Shows, err error) {
+	cacheStore := cache.NewDBStore()
+	key := fmt.Sprintf("com.trakt.shows.list.%s", listID)
+	err = cacheStore.Get(key, &shows)
+
+	return
 }
 
 // CalendarShows ...
@@ -584,7 +621,7 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 			cacheStore.Set(totalKey, total, recentExpiration)
 		}
 
-		cacheStore.Set(key, shows, recentExpiration)
+		cacheStore.Set(key, &shows, recentExpiration)
 	} else {
 		if err := cacheStore.Get(totalKey, &total); err != nil {
 			total = -1
@@ -594,87 +631,51 @@ func CalendarShows(endPoint string, page string) (shows []*CalendarShow, total i
 	return
 }
 
-// GetLastActivities ...
-func GetLastActivities() (a *UserActivities, err error) {
-	if err := Authorized(); err != nil {
-		return nil, fmt.Errorf("Not authorized")
-	}
-
-	endPoint := "sync/last_activities"
-
-	params := napping.Params{}.AsUrlValues()
-	resp, err := GetWithAuth(endPoint, params)
-
-	if err != nil {
-		return nil, err
-	} else if resp.Status() != 200 {
-		return nil, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
-	}
-
-	if err := resp.Unmarshal(&a); err != nil {
-		log.Warning(err)
-	}
-
-	return
-}
-
 // WatchedShows ...
-func WatchedShows() (shows []*WatchedShow, err error) {
-	if err := Authorized(); err != nil {
-		return shows, nil
-	}
+func WatchedShows(isUpdateNeeded bool) ([]*WatchedShow, error) {
+	var shows []*WatchedShow
+	err := Request(
+		"sync/watched/shows",
+		napping.Params{"extended": "full,images"},
+		true,
+		isUpdateNeeded,
+		watchedShowsKey,
+		cacheExpiration,
+		&shows,
+	)
 
-	lastActivities, errAct := GetLastActivities()
-	if errAct != nil {
-		return shows, errAct
-	}
+	cache.
+		NewDBStore().
+		Set(watchedShowsKey, &shows, cacheExpiration)
 
-	cacheStore := cache.NewDBStore()
-
-	key := "com.trakt.show.episodes.watched"
-	keyLong := "com.trakt.show.episodes.watched.previous"
-	watchedKey := "com.trakt.progress.show.episodes.watched"
-
-	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
-
-	var cachedWatchedAt time.Time
-	cacheStore.Get(watchedKey, &cachedWatchedAt)
-	if err := cacheStore.Get(watchedKey, &cachedWatchedAt); err == nil && !lastActivities.Episodes.WatchedAt.After(cachedWatchedAt) {
-		if err := cacheStore.Get(key, &shows); err == nil {
-			return shows, nil
-		}
-	}
-
-	endPoint := "sync/watched/shows"
-	params := napping.Params{
-		"extended": "full,images",
-	}.AsUrlValues()
-
-	resp, err := GetWithAuth(endPoint, params)
-
-	if err != nil {
-		return shows, err
-	} else if resp.Status() != 200 {
-		return shows, fmt.Errorf("Bad status getting Trakt watched for shows: %d", resp.Status())
-	}
-
-	if err := resp.Unmarshal(&shows); err != nil {
-		log.Warning(err)
-	}
-
-	cacheStore.Set(key, shows, progressExpiration)
-	cacheStore.Set(keyLong, shows, watchedLongExpiration)
-
-	return
+	return shows, err
 }
 
 // PreviousWatchedShows ...
 func PreviousWatchedShows() (shows []*WatchedShow, err error) {
-	cacheStore := cache.NewDBStore()
-	keyLong := "com.trakt.show.episodes.watched.previous"
-	err = cacheStore.Get(keyLong, &shows)
+	err = cache.
+		NewDBStore().
+		Get(watchedShowsKey, &shows)
 
 	return
+}
+
+// PausedShows ...
+func PausedShows(isUpdateNeeded bool) ([]*PausedEpisode, error) {
+	var shows []*PausedEpisode
+	err := Request(
+		"sync/playback/episodes",
+		napping.Params{
+			"extended": "full",
+		},
+		true,
+		isUpdateNeeded,
+		pausedShowsKey,
+		cacheExpiration,
+		&shows,
+	)
+
+	return shows, err
 }
 
 // WatchedShowsProgress ...
@@ -683,7 +684,7 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 		return nil, errAuth
 	}
 
-	watchedShows, errWatched := WatchedShows()
+	watchedShows, errWatched := WatchedShows(false)
 	if errWatched != nil {
 		log.Errorf("Error getting the watched shows: %v", errWatched)
 		return nil, errWatched

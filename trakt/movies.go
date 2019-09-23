@@ -263,7 +263,7 @@ func TopMovies(topCategory string, page string) (movies []*Movies, total int, er
 }
 
 // WatchlistMovies ...
-func WatchlistMovies() (movies []*Movies, err error) {
+func WatchlistMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 	if err := Authorized(); err != nil {
 		return movies, err
 	}
@@ -275,38 +275,41 @@ func WatchlistMovies() (movies []*Movies, err error) {
 	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
-	key := "com.trakt.movies.watchlist"
-	if err := cacheStore.Get(key, &movies); err != nil {
-		resp, err := GetWithAuth(endPoint, params)
 
-		if err != nil {
-			return movies, err
-		} else if resp.Status() != 200 {
-			return movies, fmt.Errorf("Bad status getting Trakt watchlist for movies: %d", resp.Status())
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(watchlistMoviesKey, &movies); err == nil {
+			return movies, nil
 		}
-
-		var watchlist []*WatchlistMovie
-		if err := resp.Unmarshal(&watchlist); err != nil {
-			log.Warning(err)
-		}
-
-		movieListing := make([]*Movies, 0)
-		for _, movie := range watchlist {
-			movieItem := Movies{
-				Movie: movie.Movie,
-			}
-			movieListing = append(movieListing, &movieItem)
-		}
-		movies = movieListing
-
-		cacheStore.Set(key, movies, userlistExpiration)
 	}
 
+	resp, err := GetWithAuth(endPoint, params)
+
+	if err != nil {
+		return movies, err
+	} else if resp.Status() != 200 {
+		return movies, fmt.Errorf("Bad status getting Trakt watchlist for movies: %d", resp.Status())
+	}
+
+	var watchlist []*WatchlistMovie
+	if err := resp.Unmarshal(&watchlist); err != nil {
+		log.Warning(err)
+	}
+
+	movieListing := make([]*Movies, 0)
+	for _, movie := range watchlist {
+		movieItem := Movies{
+			Movie: movie.Movie,
+		}
+		movieListing = append(movieListing, &movieItem)
+	}
+	movies = movieListing
+
+	cacheStore.Set(watchlistMoviesKey, &movies, userlistExpiration)
 	return
 }
 
 // CollectionMovies ...
-func CollectionMovies() (movies []*Movies, err error) {
+func CollectionMovies(isUpdateNeeded bool) (movies []*Movies, err error) {
 	if errAuth := Authorized(); errAuth != nil {
 		return movies, errAuth
 	}
@@ -318,31 +321,34 @@ func CollectionMovies() (movies []*Movies, err error) {
 	}.AsUrlValues()
 
 	cacheStore := cache.NewDBStore()
-	key := "com.trakt.movies.collection"
-	if errGet := cacheStore.Get(key, &movies); errGet != nil {
-		resp, errGet := GetWithAuth(endPoint, params)
 
-		if errGet != nil {
-			return movies, errGet
-		} else if resp.Status() != 200 {
-			return movies, fmt.Errorf("Bad status getting Trakt collection for movies: %d", resp.Status())
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(collectionMoviesKey, &movies); err == nil {
+			return movies, nil
 		}
-
-		var collection []*CollectionMovie
-		resp.Unmarshal(&collection)
-
-		movieListing := make([]*Movies, 0)
-		for _, movie := range collection {
-			movieItem := Movies{
-				Movie: movie.Movie,
-			}
-			movieListing = append(movieListing, &movieItem)
-		}
-		movies = movieListing
-
-		cacheStore.Set(key, movies, userlistExpiration)
 	}
 
+	resp, errGet := GetWithAuth(endPoint, params)
+
+	if errGet != nil {
+		return movies, errGet
+	} else if resp.Status() != 200 {
+		return movies, fmt.Errorf("Bad status getting Trakt collection for movies: %d", resp.Status())
+	}
+
+	var collection []*CollectionMovie
+	resp.Unmarshal(&collection)
+
+	movieListing := make([]*Movies, 0)
+	for _, movie := range collection {
+		movieItem := Movies{
+			Movie: movie.Movie,
+		}
+		movieListing = append(movieListing, &movieItem)
+	}
+	movies = movieListing
+
+	cacheStore.Set(collectionMoviesKey, &movies, userlistExpiration)
 	return movies, err
 }
 
@@ -482,7 +488,7 @@ func TopLists(page string) (lists []*ListContainer, hasNext bool) {
 }
 
 // ListItemsMovies ...
-func ListItemsMovies(user string, listID string) (movies []*Movies, err error) {
+func ListItemsMovies(user string, listID string, isUpdateNeeded bool) (movies []*Movies, err error) {
 	if user == "" || user == "id" {
 		user = config.Get().TraktUsername
 	}
@@ -495,37 +501,42 @@ func ListItemsMovies(user string, listID string) (movies []*Movies, err error) {
 
 	cacheStore := cache.NewDBStore()
 	key := fmt.Sprintf("com.trakt.movies.list.%s", listID)
-	if errGet := cacheStore.Get(key, &movies); errGet != nil {
-		if config.Get().TraktToken == "" {
-			resp, errGet = Get(endPoint, params)
-		} else {
-			resp, errGet = GetWithAuth(endPoint, params)
-		}
 
-		if errGet != nil || resp.Status() != 200 {
-			return movies, errGet
+	if !isUpdateNeeded {
+		if err := cacheStore.Get(key, &movies); err == nil {
+			return movies, nil
 		}
-
-		var list []*ListItem
-		if err = resp.Unmarshal(&list); err != nil {
-			log.Warning(err)
-		}
-
-		movieListing := make([]*Movies, 0)
-		for _, movie := range list {
-			if movie.Movie == nil {
-				continue
-			}
-			movieItem := Movies{
-				Movie: movie.Movie,
-			}
-			movieListing = append(movieListing, &movieItem)
-		}
-		movies = movieListing
-
-		cacheStore.Set(key, movies, 1*time.Minute)
 	}
 
+	var errGet error
+	if config.Get().TraktToken == "" {
+		resp, errGet = Get(endPoint, params)
+	} else {
+		resp, errGet = GetWithAuth(endPoint, params)
+	}
+
+	if errGet != nil || resp.Status() != 200 {
+		return movies, errGet
+	}
+
+	var list []*ListItem
+	if err = resp.Unmarshal(&list); err != nil {
+		log.Warning(err)
+	}
+
+	movieListing := make([]*Movies, 0)
+	for _, movie := range list {
+		if movie.Movie == nil {
+			continue
+		}
+		movieItem := Movies{
+			Movie: movie.Movie,
+		}
+		movieListing = append(movieListing, &movieItem)
+	}
+	movies = movieListing
+
+	cacheStore.Set(key, &movies, 1*time.Minute)
 	return movies, err
 }
 
@@ -571,7 +582,7 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 			cacheStore.Set(totalKey, total, recentExpiration)
 		}
 
-		cacheStore.Set(key, movies, recentExpiration)
+		cacheStore.Set(key, &movies, recentExpiration)
 	} else {
 		if err := cacheStore.Get(totalKey, &total); err != nil {
 			total = -1
@@ -582,62 +593,54 @@ func CalendarMovies(endPoint string, page string) (movies []*CalendarMovie, tota
 }
 
 // WatchedMovies ...
-func WatchedMovies() (movies []*WatchedMovie, err error) {
-	if err := Authorized(); err != nil {
-		return movies, nil
-	}
-
-	lastActivities, errAct := GetLastActivities()
-	if errAct != nil {
-		return movies, errAct
-	}
-
-	cacheStore := cache.NewDBStore()
-	key := "com.trakt.movies.watched"
-	keyLong := "com.trakt.movies.watched.previous"
-	watchedKey := "com.trakt.progress.movies.watched"
-
-	defer cacheStore.Set(watchedKey, lastActivities.Episodes.WatchedAt, activitiesExpiration)
-
-	var cachedWatchedAt time.Time
-	cacheStore.Get(watchedKey, &cachedWatchedAt)
-	if err := cacheStore.Get(watchedKey, &cachedWatchedAt); err == nil && !lastActivities.Movies.WatchedAt.After(cachedWatchedAt) {
-		if err := cacheStore.Get(key, &movies); err == nil {
-			return movies, nil
-		}
-	}
-
-	endPoint := "sync/watched/movies"
-	params := napping.Params{}.AsUrlValues()
-
-	resp, err := GetWithAuth(endPoint, params)
-
-	if err != nil {
-		return movies, err
-	} else if resp.Status() != 200 {
-		return movies, fmt.Errorf("Bad status getting Trakt watched for movies: %d", resp.Status())
-	}
-
-	if err := resp.Unmarshal(&movies); err != nil {
-		log.Warning(err)
-	}
+func WatchedMovies(isUpdateNeeded bool) ([]*WatchedMovie, error) {
+	var movies []*WatchedMovie
+	err := Request(
+		"sync/watched/movies",
+		napping.Params{},
+		true,
+		isUpdateNeeded,
+		watchedMoviesKey,
+		cacheExpiration,
+		&movies,
+	)
 
 	sort.Slice(movies, func(i int, j int) bool {
 		return movies[i].LastWatchedAt.Unix() > movies[j].LastWatchedAt.Unix()
 	})
 
-	cacheStore.Set(key, movies, progressExpiration)
-	cacheStore.Set(keyLong, movies, watchedLongExpiration)
+	cache.
+		NewDBStore().
+		Set(watchedMoviesKey, &movies, cacheExpiration)
 
-	return
+	return movies, err
 }
 
 // PreviousWatchedMovies ...
 func PreviousWatchedMovies() (movies []*WatchedMovie, err error) {
-	cacheStore := cache.NewDBStore()
-	keyLong := "com.trakt.movies.watched.previous"
-	err = cacheStore.Get(keyLong, &movies)
+	err = cache.
+		NewDBStore().
+		Get(watchedMoviesKey, &movies)
+
 	return
+}
+
+// PausedMovies ...
+func PausedMovies(isUpdateNeeded bool) ([]*PausedMovie, error) {
+	var movies []*PausedMovie
+	err := Request(
+		"sync/playback/movies",
+		napping.Params{
+			"extended": "full",
+		},
+		true,
+		isUpdateNeeded,
+		pausedMoviesKey,
+		cacheExpiration,
+		&movies,
+	)
+
+	return movies, err
 }
 
 // ToListItem ...
