@@ -2,7 +2,6 @@ package library
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -16,7 +15,6 @@ import (
 	"github.com/karrick/godirwalk"
 
 	"github.com/elgatito/elementum/config"
-	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/playcount"
 	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/trakt"
@@ -31,83 +29,38 @@ var (
 
 // RefreshOnScan is launched when scan is finished
 func RefreshOnScan() error {
+	l.Pending.IsOverall = true
+	l.Running.IsKodi = false
+
 	return nil
 }
 
-// RefreshOnClean is launched when clear is finished
-func RefreshOnClean() error {
-	if !tmdb.WarmingUp.IsSet() || !initialized {
+// RefreshKodi runs Kodi library refresh
+func RefreshKodi() error {
+	if l.Running.IsKodi {
 		return nil
 	}
 
-	ClearResolveCache()
-
-	rows, err := database.Get().Query(`SELECT tmdbId, mediaType, showID FROM library_items WHERE state = ?`, StateActive)
-	if err != nil {
-		log.Errorf("Cannot fetch library items: %s", err)
-		return err
-	}
-
-	qMovies := []int{}
-	qShows := []int{}
-
-	tmdbID := 0
-	showID := 0
-	mediaType := 0
-	for rows.Next() {
-		rows.Scan(&tmdbID, &mediaType, &showID)
-
-		if mediaType == MovieType {
-			if _, err := GetMovieByTMDB(tmdbID); err != nil {
-				qMovies = append(qMovies, tmdbID)
-			}
-		} else if mediaType == ShowType {
-			if _, err := GetShowByTMDB(tmdbID); err != nil {
-				qShows = append(qShows, tmdbID)
-			}
-		}
-	}
-	rows.Close()
-
-	if len(qMovies) > 0 && len(qShows) > 0 {
-		tx, err := database.Get().Begin()
-		if err != nil {
-			log.Debugf("Cannot start transaction: %s", err)
-		}
-		for _, id := range qMovies {
-			_, err := tx.Exec(`UPDATE library_items SET state = ? WHERE tmdbId = ? AND mediaType = ?`, StateDeleted, id, MovieType)
-			if err != nil {
-				log.Debugf("updateDBItem failed: %s", err)
-				tx.Rollback()
-				break
-			}
-		}
-		for _, id := range qShows {
-			_, err := tx.Exec(`UPDATE library_items SET state = ? WHERE tmdbId = ? AND mediaType = ?`, StateDeleted, id, ShowType)
-			if err != nil {
-				log.Debugf("updateDBItem failed: %s", err)
-				tx.Rollback()
-				break
-			}
-		}
-
-		tx.Commit()
-		log.Debugf("Finished cleaning up %d movies and %d shows", len(qMovies), len(qShows))
-	}
-
-	Refresh()
-	ClearPageCache()
-
-	xbmc.Refresh()
+	l.Running.IsKodi = true
+	l.Pending.IsKodi = false
+	xbmc.VideoLibraryScan()
+	l.Running.IsKodi = false
 
 	return nil
 }
 
 // Refresh is updating library from Kodi
 func Refresh() error {
-	if TraktScanning {
+	if l.Running.IsTrakt {
 		return nil
 	}
+
+	l.Pending.IsOverall = false
+	l.Running.IsOverall = true
+	defer func() {
+		l.Running.IsOverall = false
+	}()
+
 	now := time.Now()
 	defer util.FreeMemoryGC()
 
@@ -124,35 +77,25 @@ func Refresh() error {
 
 // RefreshMovies updates movies in the library
 func RefreshMovies() error {
-	started := time.Now()
-
-	if Scanning {
+	if l.Running.IsMovies || l.Running.IsKodi {
 		return nil
 	}
 
-	Scanning = true
+	l.Pending.IsMovies = false
+	l.Running.IsMovies = true
+
 	defer func() {
-		Scanning = false
+		l.Running.IsMovies = false
 		RefreshUIDs()
 	}()
 
-	var movies *xbmc.VideoLibraryMovies
-	for tries := 1; tries <= 3; tries++ {
-		var err error
-		movies, err = xbmc.VideoLibraryGetMovies()
-		if movies == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
-		}
-
-		break
-	}
-
-	if movies != nil && movies.Limits != nil && movies.Limits.Total == 0 {
+	started := time.Now()
+	movies, err := xbmc.VideoLibraryGetMovies()
+	if err != nil {
+		return err
+	} else if movies != nil && movies.Limits != nil && movies.Limits.Total == 0 {
 		return nil
-	}
-
-	if movies == nil || movies.Movies == nil {
+	} else if movies == nil || movies.Movies == nil {
 		return errors.New("Could not fetch Movies from Kodi")
 	}
 
@@ -163,38 +106,34 @@ func RefreshMovies() error {
 	l.mu.Movies.Lock()
 	defer l.mu.Movies.Unlock()
 
-	l.Movies = map[int]*Movie{}
+	l.Movies = make([]*Movie, 0, len(movies.Movies))
 	for _, m := range movies.Movies {
 		m.UniqueIDs.Kodi = m.ID
 		if m.UniqueIDs.IMDB == "" && m.IMDBNumber != "" && strings.HasPrefix(m.IMDBNumber, "tt") {
 			m.UniqueIDs.IMDB = m.IMDBNumber
 		}
 
-		l.Movies[m.ID] = &Movie{
-			ID:       m.ID,
-			Title:    m.Title,
-			File:     m.File,
-			Year:     m.Year,
-			Resume:   &Resume{},
-			UIDs:     &UniqueIDs{Kodi: m.ID, Playcount: m.PlayCount},
-			XbmcUIDs: &m.UniqueIDs,
+		lm := &Movie{
+			ID:        m.ID,
+			Title:     m.Title,
+			File:      m.File,
+			Year:      m.Year,
+			DateAdded: m.DateAdded.Time,
+			Resume:    &Resume{},
+			UIDs:      &UniqueIDs{Kodi: m.ID, Playcount: m.PlayCount},
+			XbmcUIDs:  &m.UniqueIDs,
 		}
 
 		if m.Resume != nil {
-			l.Movies[m.ID].Resume.Position = m.Resume.Position
-			l.Movies[m.ID].Resume.Total = m.Resume.Total
+			lm.Resume.Position = m.Resume.Position
+			lm.Resume.Total = m.Resume.Total
 		}
-	}
 
-	if err := database.Get().Ping(); err != nil {
-		return err
+		l.Movies = append(l.Movies, lm)
 	}
-
-	getUIDsStmt, _ := database.Get().Prepare(`SELECT kodi, tmdb, tvdb, imdb, trakt FROM library_uids WHERE mediaType = ? AND kodi = ? LIMIT 1`)
-	setUIDsStmt, _ := database.Get().Prepare(`INSERT OR REPLACE INTO library_uids (mediaType, kodi, tmdb, tvdb, imdb, trakt, playcount) VALUES (?, ?, ?, ?, ?, ?, ?)`)
 
 	for _, m := range l.Movies {
-		parseUniqueID(MovieType, m.UIDs, m.XbmcUIDs, m.File, m.Year, getUIDsStmt, setUIDsStmt)
+		parseUniqueID(MovieType, m.UIDs, m.XbmcUIDs, m.File, m.Year)
 	}
 
 	return nil
@@ -202,34 +141,25 @@ func RefreshMovies() error {
 
 // RefreshShows updates shows in the library
 func RefreshShows() error {
-	started := time.Now()
-
-	if Scanning {
+	if l.Running.IsShows || l.Running.IsKodi {
 		return nil
 	}
 
-	Scanning = true
+	l.Pending.IsShows = false
+	l.Running.IsShows = true
+
 	defer func() {
-		Scanning = false
+		l.Running.IsShows = false
 		RefreshUIDs()
 	}()
 
-	var shows *xbmc.VideoLibraryShows
-	for tries := 1; tries <= 3; tries++ {
-		var err error
-		shows, err = xbmc.VideoLibraryGetShows()
-		if err != nil {
-			time.Sleep(time.Duration(tries*500) * time.Millisecond)
-			continue
-		}
-		break
-	}
-
-	if shows != nil && shows.Limits != nil && shows.Limits.Total == 0 {
+	started := time.Now()
+	shows, err := xbmc.VideoLibraryGetShows()
+	if err != nil {
+		return err
+	} else if shows != nil && shows.Limits != nil && shows.Limits.Total == 0 {
 		return nil
-	}
-
-	if shows == nil || shows.Shows == nil {
+	} else if shows == nil || shows.Shows == nil {
 		return errors.New("Could not fetch Shows from Kodi")
 	}
 
@@ -240,22 +170,25 @@ func RefreshShows() error {
 	l.mu.Shows.Lock()
 	defer l.mu.Shows.Unlock()
 
-	l.Shows = map[int]*Show{}
+	l.Shows = make([]*Show, 0, len(shows.Shows))
 	for _, s := range shows.Shows {
 		s.UniqueIDs.Kodi = s.ID
 		if s.UniqueIDs.IMDB == "" && s.IMDBNumber != "" && strings.HasPrefix(s.IMDBNumber, "tt") {
 			s.UniqueIDs.IMDB = s.IMDBNumber
 		}
 
-		l.Shows[s.ID] = &Show{
-			ID:       s.ID,
-			Title:    s.Title,
-			Seasons:  map[int]*Season{},
-			Episodes: map[int]*Episode{},
-			Year:     s.Year,
-			UIDs:     &UniqueIDs{Kodi: s.ID, Playcount: s.PlayCount},
-			XbmcUIDs: &s.UniqueIDs,
-		}
+		l.Shows = append(l.Shows, &Show{
+			ID:        s.ID,
+			Title:     s.Title,
+			Seasons:   map[int]*Season{},
+			Episodes:  map[int]*Episode{},
+			Year:      s.Year,
+			DateAdded: s.DateAdded.Time,
+			UIDs:      &UniqueIDs{Kodi: s.ID, Playcount: s.PlayCount},
+			XbmcUIDs:  &s.UniqueIDs,
+		})
+
+		parseUniqueID(ShowType, l.Shows[len(l.Shows)-1].UIDs, l.Shows[len(l.Shows)-1].XbmcUIDs, "", l.Shows[len(l.Shows)-1].Year)
 	}
 
 	if err := RefreshSeasons(); err != nil {
@@ -265,18 +198,11 @@ func RefreshShows() error {
 		log.Debugf("RefreshEpisodes got an error: %v", err)
 	}
 
-	if err := database.Get().Ping(); err != nil {
-		return err
-	}
-
-	getUIDsStmt, _ := database.Get().Prepare(`SELECT kodi, tmdb, tvdb, imdb, trakt FROM library_uids WHERE mediaType = ? AND kodi = ? LIMIT 1`)
-	setUIDsStmt, _ := database.Get().Prepare(`INSERT OR REPLACE INTO library_uids (mediaType, kodi, tmdb, tvdb, imdb, trakt, playcount) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-
 	// TODO: This needs refactor to avoid setting global Lock on processing,
 	// should use temporary container to process and then sync to Shows
 	for _, show := range l.Shows {
 		// Step 1: try to get information from what we get from Kodi
-		parseUniqueID(ShowType, show.UIDs, show.XbmcUIDs, "", show.Year, getUIDsStmt, setUIDsStmt)
+		parseUniqueID(ShowType, show.UIDs, show.XbmcUIDs, "", show.Year)
 
 		// Step 2: if TMDB not found - try to find it from episodes
 		if show.UIDs.TMDB == 0 {
@@ -286,7 +212,7 @@ func RefreshShows() error {
 				}
 
 				u := &UniqueIDs{}
-				parseUniqueID(EpisodeType, u, e.XbmcUIDs, e.File, 0, getUIDsStmt, setUIDsStmt)
+				parseUniqueID(EpisodeType, u, e.XbmcUIDs, e.File, 0)
 				if u.TMDB != 0 {
 					show.UIDs.TMDB = u.TMDB
 					break
@@ -303,14 +229,14 @@ func RefreshShows() error {
 			s.UIDs.TVDB = show.UIDs.TVDB
 			s.UIDs.IMDB = show.UIDs.IMDB
 
-			parseUniqueID(SeasonType, s.UIDs, s.XbmcUIDs, "", 0, getUIDsStmt, setUIDsStmt)
+			parseUniqueID(SeasonType, s.UIDs, s.XbmcUIDs, "", 0)
 		}
 		for _, e := range show.Episodes {
 			e.UIDs.TMDB = show.UIDs.TMDB
 			e.UIDs.TVDB = show.UIDs.TVDB
 			e.UIDs.IMDB = show.UIDs.IMDB
 
-			parseUniqueID(EpisodeType, e.UIDs, e.XbmcUIDs, "", 0, getUIDsStmt, setUIDsStmt)
+			parseUniqueID(EpisodeType, e.UIDs, e.XbmcUIDs, "", 0)
 		}
 	}
 
@@ -321,45 +247,38 @@ func RefreshShows() error {
 func RefreshSeasons() error {
 	started := time.Now()
 
-	var seasons *xbmc.VideoLibrarySeasons
-
 	// Collect all shows IDs for possibly doing one-by-one calls to Kodi
-	shows := []int{}
+	shows := make([]int, 0, len(l.Shows))
 	for _, s := range l.Shows {
 		shows = append(shows, s.ID)
 	}
 
-	for tries := 1; tries <= 3; tries++ {
-		var err error
-		seasons, err = xbmc.VideoLibraryGetAllSeasons(shows)
-		if seasons == nil || err != nil {
-			time.Sleep(time.Duration(tries*500) * time.Millisecond)
-			continue
-		}
-		break
-	}
-
-	if seasons == nil || seasons.Seasons == nil {
+	seasons, err := xbmc.VideoLibraryGetAllSeasons(shows)
+	if err != nil {
+		return err
+	} else if seasons == nil || seasons.Seasons == nil {
 		return errors.New("Could not fetch Seasons from Kodi")
 	}
+
 	defer func() {
 		log.Debugf("Fetched %d seasons from Kodi Library in %s", len(seasons.Seasons), time.Since(started))
 	}()
 
 	cleanupCheck := map[int]bool{}
 	for _, s := range seasons.Seasons {
-		if c, ok := l.Shows[s.TVShowID]; !ok || c == nil || c.Seasons == nil {
+		c, err := findShowByKodi(s.TVShowID)
+		if err != nil || c == nil || c.Seasons == nil {
 			continue
 		}
 
 		if _, ok := cleanupCheck[s.TVShowID]; !ok {
-			l.Shows[s.TVShowID].Seasons = map[int]*Season{}
+			c.Seasons = map[int]*Season{}
 			cleanupCheck[s.TVShowID] = true
 		}
 
 		s.UniqueIDs.Kodi = s.ID
 
-		l.Shows[s.TVShowID].Seasons[s.ID] = &Season{
+		c.Seasons[s.ID] = &Season{
 			ID:       s.ID,
 			Title:    s.Title,
 			Season:   s.Season,
@@ -376,18 +295,10 @@ func RefreshSeasons() error {
 func RefreshEpisodes() error {
 	started := time.Now()
 
-	var episodes *xbmc.VideoLibraryEpisodes
-	for tries := 1; tries <= 3; tries++ {
-		var err error
-		episodes, err = xbmc.VideoLibraryGetAllEpisodes()
-		if episodes == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
-		}
-		break
-	}
-
-	if episodes == nil || episodes.Episodes == nil {
+	episodes, err := xbmc.VideoLibraryGetAllEpisodes()
+	if err != nil {
+		return err
+	} else if episodes == nil || episodes.Episodes == nil {
 		return errors.New("Could not fetch Episodes from Kodi")
 	}
 
@@ -397,12 +308,13 @@ func RefreshEpisodes() error {
 
 	cleanupCheck := map[int]bool{}
 	for _, e := range episodes.Episodes {
-		if c, ok := l.Shows[e.TVShowID]; !ok || c == nil || c.Episodes == nil {
+		c, err := findShowByKodi(e.TVShowID)
+		if err != nil || c == nil || c.Episodes == nil {
 			continue
 		}
 
 		if _, ok := cleanupCheck[e.TVShowID]; !ok {
-			l.Shows[e.TVShowID].Episodes = map[int]*Episode{}
+			c.Episodes = map[int]*Episode{}
 			cleanupCheck[e.TVShowID] = true
 		}
 
@@ -412,20 +324,21 @@ func RefreshEpisodes() error {
 		e.UniqueIDs.Trakt = ""
 		e.UniqueIDs.Unknown = ""
 
-		l.Shows[e.TVShowID].Episodes[e.ID] = &Episode{
-			ID:       e.ID,
-			Title:    e.Title,
-			Season:   e.Season,
-			Episode:  e.Episode,
-			File:     e.File,
-			Resume:   &Resume{},
-			UIDs:     &UniqueIDs{Kodi: e.ID, Playcount: e.PlayCount},
-			XbmcUIDs: &e.UniqueIDs,
+		c.Episodes[e.ID] = &Episode{
+			ID:        e.ID,
+			Title:     e.Title,
+			Season:    e.Season,
+			Episode:   e.Episode,
+			File:      e.File,
+			DateAdded: e.DateAdded.Time,
+			Resume:    &Resume{},
+			UIDs:      &UniqueIDs{Kodi: e.ID, Playcount: e.PlayCount},
+			XbmcUIDs:  &e.UniqueIDs,
 		}
 
 		if e.Resume != nil {
-			l.Shows[e.TVShowID].Episodes[e.ID].Resume.Position = e.Resume.Position
-			l.Shows[e.TVShowID].Episodes[e.ID].Resume.Total = e.Resume.Total
+			c.Episodes[e.ID].Resume.Position = e.Resume.Position
+			c.Episodes[e.ID].Resume.Total = e.Resume.Total
 		}
 	}
 
@@ -447,10 +360,17 @@ func RefreshMovie(kodiID, action int) {
 		}
 
 		l.mu.Movies.Lock()
-		delete(l.Movies, kodiID)
+		foundIndex := -1
+		for i, m := range l.Movies {
+			if m.UIDs.Kodi == kodiID {
+				foundIndex = i
+				break
+			}
+		}
+		if foundIndex != -1 {
+			l.Movies = append(l.Movies[:foundIndex], l.Movies[foundIndex+1:]...)
+		}
 		l.mu.Movies.Unlock()
-	} else {
-		RefreshMovies()
 	}
 
 	RefreshUIDs()
@@ -472,10 +392,17 @@ func RefreshShow(kodiID, action int) {
 		}
 
 		l.mu.Shows.Lock()
-		delete(l.Shows, kodiID)
+		foundIndex := -1
+		for i, s := range l.Shows {
+			if s.UIDs.Kodi == kodiID {
+				foundIndex = i
+				break
+			}
+		}
+		if foundIndex != -1 {
+			l.Shows = append(l.Shows[:foundIndex], l.Shows[foundIndex+1:]...)
+		}
 		l.mu.Shows.Unlock()
-	} else {
-		RefreshShows()
 	}
 
 	RefreshUIDs()
@@ -506,6 +433,10 @@ func RefreshEpisode(kodiID, action int) {
 // RefreshUIDs updates unique IDs for each library item
 // This collects already saved UIDs for easier access
 func RefreshUIDs() error {
+	if l.Running.IsTrakt || l.Running.IsKodi {
+		return nil
+	}
+
 	now := time.Now()
 
 	l.mu.UIDs.Lock()
@@ -513,54 +444,55 @@ func RefreshUIDs() error {
 
 	playcount.Mu.Lock()
 	defer playcount.Mu.Unlock()
-	playcount.Watched = map[uint64]bool{}
-	l.UIDs = map[uint64]*UniqueIDs{}
-	for k, v := range l.WatchedTrakt {
-		playcount.Watched[k] = v
+	playcount.Watched = []uint64{}
+	l.UIDs = []*UniqueIDs{}
+	for _, v := range l.WatchedTrakt {
+		playcount.Watched = append(playcount.Watched, v)
 	}
 
 	for _, m := range l.Movies {
 		m.UIDs.MediaType = MovieType
-		id := xxhash.Sum64String(fmt.Sprintf("%d_%d", MovieType, m.UIDs.Kodi))
-		l.UIDs[id] = m.UIDs
+		l.UIDs = append(l.UIDs, m.UIDs)
 
 		if m.UIDs.Playcount > 0 {
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.UIDs.TMDB))] = true
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.UIDs.Trakt))] = true
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.UIDs.IMDB))] = true
+			playcount.Watched = append(playcount.Watched,
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.UIDs.TMDB)),
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.UIDs.Trakt)),
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.UIDs.IMDB)))
 		}
 	}
 	for _, s := range l.Shows {
 		s.UIDs.MediaType = ShowType
-		id := xxhash.Sum64String(fmt.Sprintf("%d_%d", ShowType, s.UIDs.Kodi))
-		l.UIDs[id] = s.UIDs
+		l.UIDs = append(l.UIDs, s.UIDs)
 
 		if s.UIDs.Playcount > 0 {
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.UIDs.TMDB))] = true
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.UIDs.Trakt))] = true
-			playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TVDBScraper, s.UIDs.TVDB))] = true
+			playcount.Watched = append(playcount.Watched,
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.UIDs.TMDB)),
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.UIDs.Trakt)),
+				xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TVDBScraper, s.UIDs.TVDB)))
 		}
 
-		for _, e := range l.Shows[s.ID].Seasons {
+		for _, e := range s.Seasons {
 			e.UIDs.MediaType = SeasonType
-			id := xxhash.Sum64String(fmt.Sprintf("%d_%d", SeasonType, e.UIDs.Kodi))
-			l.UIDs[id] = e.UIDs
+			l.UIDs = append(l.UIDs, e.UIDs)
 
 			if e.UIDs.Playcount > 0 {
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.UIDs.TMDB, e.Season))] = true
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.UIDs.Trakt, e.Season))] = true
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TVDBScraper, s.UIDs.TVDB, e.Season))] = true
+				playcount.Watched = append(playcount.Watched,
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.UIDs.TMDB, e.Season)),
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.UIDs.Trakt, e.Season)),
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TVDBScraper, s.UIDs.TVDB, e.Season)))
 			}
 		}
-		for _, e := range l.Shows[s.ID].Episodes {
+
+		for _, e := range s.Episodes {
 			e.UIDs.MediaType = EpisodeType
-			id := xxhash.Sum64String(fmt.Sprintf("%d_%d", EpisodeType, e.UIDs.Kodi))
-			l.UIDs[id] = e.UIDs
+			l.UIDs = append(l.UIDs, e.UIDs)
 
 			if e.UIDs.Playcount > 0 {
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.UIDs.TMDB, e.Season, e.Episode))] = true
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.UIDs.Trakt, e.Season, e.Episode))] = true
-				playcount.Watched[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TVDBScraper, s.UIDs.TVDB, e.Season, e.Episode))] = true
+				playcount.Watched = append(playcount.Watched,
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.UIDs.TMDB, e.Season, e.Episode)),
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.UIDs.Trakt, e.Season, e.Episode)),
+					xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TVDBScraper, s.UIDs.TVDB, e.Season, e.Episode)))
 			}
 		}
 	}
@@ -569,24 +501,7 @@ func RefreshUIDs() error {
 	return nil
 }
 
-func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, entityYear int, getUIDsStmt, setUIDsStmt *sql.Stmt) {
-	err := getUIDsStmt.QueryRow(entityType, xbmcIDs.Kodi).Scan(&i.Kodi, &i.TMDB, &i.TVDB, &i.IMDB, &i.Trakt)
-	if err != nil && err != sql.ErrNoRows {
-		log.Debugf("Error getting UIDs from database: %s", err)
-		return
-	} else if err == nil && i.Kodi != 0 {
-		tid := &UniqueIDs{}
-		convertKodiIDsToLibrary(tid, xbmcIDs)
-
-		if tid.TMDB != 0 && tid.TMDB == i.TMDB {
-			return
-		}
-	}
-
-	defer func() {
-		setUIDsStmt.Exec(entityType, i.Kodi, i.TMDB, i.TVDB, i.IMDB, i.Trakt, i.Playcount)
-	}()
-
+func parseUniqueID(entityType int, i *UniqueIDs, xbmcIDs *xbmc.UniqueIDs, fileName string, entityYear int) {
 	i.MediaType = entityType
 
 	convertKodiIDsToLibrary(i, xbmcIDs)
@@ -829,14 +744,9 @@ func findTraktIDs(entityType int, source int, id string) (ids *trakt.IDs) {
 
 // RefreshLocal checks media directory to save up-to-date strm library
 func RefreshLocal() error {
-	if Scanning {
+	if l.Running.IsOverall {
 		return nil
 	}
-
-	Scanning = true
-	defer func() {
-		Scanning = false
-	}()
 
 	refreshLocalMovies()
 	refreshLocalShows()
@@ -870,14 +780,6 @@ func refreshLocalMovies() {
 		return
 	}
 
-	getStmt, _ := database.Get().Prepare(`SELECT 1 FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ? LIMIT 1`)
-	setStmt, _ := database.Get().Prepare(`INSERT OR IGNORE INTO library_items (tmdbId, mediaType, state) VALUES (?, ?, ?)`)
-	rid := 0
-	for _, id := range IDs {
-		if err := getStmt.QueryRow(id, MovieType, StateActive).Scan(&rid); err != nil && err == sql.ErrNoRows {
-			setStmt.Exec(id, MovieType, StateActive)
-		}
-	}
 	log.Debugf("Finished updating %d local movies in %s", len(IDs), time.Since(begin))
 
 	return
@@ -909,13 +811,8 @@ func refreshLocalShows() {
 		return
 	}
 
-	getStmt, _ := database.Get().Prepare(`SELECT 1 FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ? LIMIT 1`)
-	setStmt, _ := database.Get().Prepare(`INSERT OR IGNORE INTO library_items (tmdbId, mediaType, state) VALUES (?, ?, ?)`)
-	rid := 0
 	for id := range IDs {
-		if err := getStmt.QueryRow(id, ShowType, StateActive).Scan(&rid); err != nil && err == sql.ErrNoRows {
-			setStmt.Exec(id, ShowType, StateActive)
-		}
+		updateDBItem(id, StateActive, ShowType, id)
 	}
 	log.Debugf("Finished updating %d local shows in %s", len(IDs), time.Since(begin))
 
@@ -936,4 +833,39 @@ func searchStrm(dir string) []string {
 	})
 
 	return ret
+}
+
+// MarkKodiRefresh ...
+func MarkKodiRefresh() {
+	l.Running.IsKodi = true
+}
+
+// MarkKodiUpdated ...
+func MarkKodiUpdated() {
+	isKodiUpdated = true
+}
+
+// PlanOverallUpdate ...
+func PlanOverallUpdate() {
+	l.Pending.IsOverall = true
+}
+
+// PlanKodiUpdate ...
+func PlanKodiUpdate() {
+	l.Pending.IsKodi = true
+}
+
+// PlanTraktUpdate ...
+func PlanTraktUpdate() {
+	l.Pending.IsTrakt = true
+}
+
+// PlanMoviesUpdate ...
+func PlanMoviesUpdate() {
+	l.Pending.IsMovies = true
+}
+
+// PlanShowsUpdate ...
+func PlanShowsUpdate() {
+	l.Pending.IsShows = true
 }

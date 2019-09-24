@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/anacrolix/missinggo/perf"
-	"github.com/cespare/xxhash"
+	"github.com/asdine/storm"
+	"github.com/asdine/storm/q"
 	"github.com/op/go-logging"
 
 	"github.com/elgatito/elementum/cache"
@@ -102,22 +103,17 @@ var (
 
 	cacheStore *cache.DBStore
 
-	// Scanning shows if Kodi library Scan is in progress
-	Scanning = false
-	// TraktScanning shows if Trakt is working
-	TraktScanning = false
-
 	initialized = false
 
 	resolveRegexp = regexp.MustCompile(`^plugin://plugin.video.elementum.*?(\d+)(\W|$)`)
 )
 
 var l = &Library{
-	UIDs:   map[uint64]*UniqueIDs{},
-	Movies: map[int]*Movie{},
-	Shows:  map[int]*Show{},
+	UIDs:   []*UniqueIDs{},
+	Movies: []*Movie{},
+	Shows:  []*Show{},
 
-	WatchedTrakt: map[uint64]bool{},
+	WatchedTrakt: []uint64{},
 }
 
 // InitDB ...
@@ -252,29 +248,8 @@ func Init() {
 			case <-closing:
 				return
 			default:
-				go func() {
-					if config.Get().UpdateFrequency > 0 {
-						if err := doUpdateLibrary(); err != nil {
-							log.Warning(err)
-						}
-						if config.Get().UpdateAutoScan && Scanning == false {
-							Scanning = true
-							xbmc.VideoLibraryScan()
-							Scanning = false
-						}
-					}
-
-					if config.Get().TraktSyncFrequency > 0 && config.Get().TraktToken != "" {
-						if err := RefreshTrakt(); err != nil {
-							log.Warning(err)
-						}
-						if config.Get().UpdateAutoScan && Scanning == false {
-							Scanning = true
-							xbmc.VideoLibraryScan()
-							Scanning = false
-						}
-					}
-				}()
+				PlanTraktUpdate()
+				updateLibraryShows()
 			}
 		}()
 	}
@@ -306,81 +281,72 @@ func Init() {
 	log.Noticef("Caches warmed up in %s", took)
 
 	updateFrequency := util.Max(1, config.Get().UpdateFrequency)
-	traktFrequency := util.Max(1, config.Get().TraktSyncFrequency)
+	traktFrequency := util.Max(1, config.Get().TraktSyncFrequencyMin)
 
 	updateTicker := time.NewTicker(time.Duration(updateFrequency) * time.Hour)
-	traktSyncTicker := time.NewTicker(time.Duration(traktFrequency) * time.Hour)
+	traktSyncTicker := time.NewTicker(time.Duration(traktFrequency) * time.Minute)
 	markedForRemovalTicker := time.NewTicker(30 * time.Second)
+	watcherTicker := time.NewTicker(1 * time.Second)
 
 	defer updateTicker.Stop()
 	defer traktSyncTicker.Stop()
 	defer markedForRemovalTicker.Stop()
+	defer watcherTicker.Stop()
 
 	closing := closer.C()
 
 	for {
 		select {
+		case <-watcherTicker.C:
+			if l.Running.IsOverall || l.Running.IsMovies || l.Running.IsShows || l.Running.IsKodi || l.Running.IsTrakt {
+				continue
+			} else if l.Pending.IsKodi {
+				go RefreshKodi()
+			} else if l.Pending.IsTrakt {
+				go RefreshTrakt()
+			} else if l.Pending.IsMovies {
+				go RefreshMovies()
+			} else if l.Pending.IsShows {
+				go RefreshShows()
+			} else if l.Pending.IsOverall {
+				go Refresh()
+			}
 		case <-updateTicker.C:
 			if config.Get().UpdateFrequency > 0 {
 				go func() {
-					if err := doUpdateLibrary(); err != nil {
+					if err := updateLibraryShows(); err != nil {
 						log.Warning(err)
+						return
 					}
-					if config.Get().UpdateAutoScan && Scanning == false && updateFrequency != traktFrequency {
-						Scanning = true
-						xbmc.VideoLibraryScan()
-						Scanning = false
-					}
+					PlanKodiUpdate()
 				}()
 			}
 		case <-traktSyncTicker.C:
-			if config.Get().TraktSyncFrequency > 0 && config.Get().TraktToken != "" {
-				go func() {
-					if err := RefreshTrakt(); err != nil {
-						log.Warning(err)
-					}
-					if config.Get().UpdateAutoScan && Scanning == false {
-						Scanning = true
-						xbmc.VideoLibraryScan()
-						Scanning = false
-					}
-				}()
-			}
+			PlanTraktUpdate()
 		case <-markedForRemovalTicker.C:
-			rows, err := database.Get().Query(`SELECT infohash FROM tinfo WHERE state = 0`)
-			if err != nil {
-				log.Errorf("Cannot fetch existing torrents: %s", err)
-				return
-			}
+			var items []database.BTItem
+			database.GetStormDB().Select(q.Eq("State", database.StatusRemove)).Find(&items)
 
 			infoHash := ""
-			for rows.Next() {
-				rows.Scan(&infoHash)
-				item := database.Get().GetBTItem(infoHash)
-
-				if item == nil || item.State > 0 {
-					continue
-				}
-
+			for _, item := range items {
 				// Remove from Elementum's library to prevent duplicates
 				if item.Type == movieType {
-					if err := IsDuplicateMovie(strconv.Itoa(item.ID)); err != nil {
+					if IsDuplicateMovie(strconv.Itoa(item.ID)) {
 						if _, err := RemoveMovie(item.ID); err != nil {
 							log.Warning("Nothing left to remove from Elementum")
 						}
 					}
 				} else {
-					if err := IsDuplicateEpisode(item.ShowID, item.Season, item.Episode); err != nil {
+					if IsDuplicateEpisode(item.ShowID, item.Season, item.Episode) {
 						if err := RemoveEpisode(item.ID, item.ShowID, item.Season, item.Episode); err != nil {
 							log.Warning(err)
 						}
 					}
 				}
 
-				database.Get().DeleteBTItem(infoHash)
+				database.GetStormDB().DeleteStruct(&item)
 				log.Infof("Removed %s from database", infoHash)
 			}
-			rows.Close()
 		case <-closing:
 			return
 		}
@@ -400,37 +366,26 @@ func ShowsLibraryPath() string {
 //
 // Library updates
 //
-func doUpdateLibrary() error {
+func updateLibraryShows() error {
 	if err := checkShowsPath(); err != nil {
 		return err
 	}
 
 	begin := time.Now()
-	rows, err := database.Get().Query(`SELECT tmdbId, state, mediaType, showId FROM library_items WHERE mediaType = ? AND state = ?`, ShowType, StateActive)
-	if err != nil {
-		log.Errorf("Cannot fetch library shows: %s", err)
-		return err
+
+	var lis []database.LibraryItem
+	if err := database.GetStormDB().Select(q.Eq("MediaType", ShowType), q.Eq("State", StateActive)).Find(&lis); err != nil && err != storm.ErrNotFound {
+		log.Infof("Could not get list of library items: %s", err)
 	}
 
-	items := []*DBItem{}
-	for rows.Next() {
-		item := &DBItem{}
-		rows.Scan(&item.ID, &item.State, &item.Type, &item.TVShowID)
-
-		if item.ID == 0 {
-			continue
-		}
-		items = append(items, item)
-	}
-	rows.Close()
-
-	for _, item := range items {
-		if _, err := writeShowStrm(item.ID, false, false); err != nil {
+	for _, i := range lis {
+		if _, err := writeShowStrm(i.ShowID, false, false); err != nil {
 			log.Errorf("Error updating show: %s", err)
 		}
 	}
 
-	log.Noticef("Library updated in %s", time.Since(begin))
+	log.Infof("Library updated in %s", time.Since(begin))
+	PlanKodiUpdate()
 	return nil
 }
 
@@ -596,7 +551,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 	now := util.UTCBod()
 	addSpecials := config.Get().AddSpecials
 
-	for i, season := range show.Seasons {
+	for _, season := range show.Seasons {
 		if season.EpisodeCount == 0 {
 			continue
 		}
@@ -610,13 +565,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 			continue
 		}
 
-		// Deleting last season from cache to always get the up-to-date data
-		//  about last episodes
-		if i == len(show.Seasons)-1 {
-			cacheStore.Delete(fmt.Sprintf("com.tmdb.season.%d.%d.%s", showID, season.Season, config.Get().Language))
-		}
-
-		seasonTMDB := tmdb.GetSeason(showID, season.Season, config.Get().Language)
+		seasonTMDB := tmdb.GetSeason(showID, season.Season, config.Get().Language, len(show.Seasons))
 		if seasonTMDB == nil {
 			continue
 		}
@@ -647,7 +596,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 				}
 			}
 
-			if err := IsDuplicateEpisode(showID, season.Season, episode.EpisodeNumber); !force && err != nil {
+			if !force && IsDuplicateEpisode(showID, season.Season, episode.EpisodeNumber) {
 				continue
 			}
 
@@ -845,7 +794,7 @@ func RemoveEpisode(tmdbID int, showID int, seasonNumber int, episodeNumber int) 
 //
 
 // IsDuplicateMovie checks if movie exists in the library
-func IsDuplicateMovie(tmdbID string) error {
+func IsDuplicateMovie(tmdbID string) bool {
 	l.mu.UIDs.Lock()
 	defer l.mu.UIDs.Unlock()
 	defer perf.ScopeTimer()()
@@ -853,21 +802,16 @@ func IsDuplicateMovie(tmdbID string) error {
 	query, _ := strconv.Atoi(tmdbID)
 	for _, u := range l.UIDs {
 		if u.TMDB != 0 && u.MediaType == MovieType && u.TMDB == query {
-			return fmt.Errorf("%s already in library", tmdbID)
+			return true
 		}
 	}
 
-	return nil
+	return false
 }
 
 // IsDuplicateShow checks if show exists in the library
-func IsDuplicateShow(tmdbID string) error {
+func IsDuplicateShow(tmdbID string) bool {
 	defer perf.ScopeTimer()()
-
-	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
-	if show == nil {
-		return errors.New("Can't resolve show")
-	}
 
 	l.mu.UIDs.Lock()
 	defer l.mu.UIDs.Unlock()
@@ -875,17 +819,17 @@ func IsDuplicateShow(tmdbID string) error {
 	query, _ := strconv.Atoi(tmdbID)
 	for _, u := range l.UIDs {
 		if u.TMDB != 0 && u.MediaType == ShowType && u.TMDB == query {
-			return fmt.Errorf("%s already in library", show.Title)
+			return true
 		}
 	}
 
-	return nil
+	return false
 }
 
 // IsDuplicateEpisode checks if episode exists in the library
-func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) (err error) {
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
+func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) bool {
+	l.mu.Shows.RLock()
+	defer l.mu.Shows.RUnlock()
 	defer perf.ScopeTimer()()
 
 	for _, s := range l.Shows {
@@ -895,22 +839,25 @@ func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) (er
 
 		for _, e := range s.Episodes {
 			if e.Season == seasonNumber && e.Episode == episodeNumber {
-				return fmt.Errorf("S%02dE%02d already in library", seasonNumber, episodeNumber)
+				return true
 			}
 		}
 	}
 
-	return
+	return false
 }
 
 // IsAddedToLibrary checks if specific TMDB exists in the library
 func IsAddedToLibrary(id string, mediaType int) (isAdded bool) {
 	defer perf.ScopeTimer()()
 
-	count := 0
-	database.Get().QueryRow("SELECT COUNT(*) FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ?", id, mediaType, StateActive).Scan(&count)
+	if mediaType == MovieType {
+		return IsDuplicateMovie(id)
+	} else if mediaType == ShowType {
+		return IsDuplicateShow(id)
+	}
 
-	return count > 0
+	return false
 }
 
 //
@@ -918,64 +865,79 @@ func IsAddedToLibrary(id string, mediaType int) (isAdded bool) {
 //
 
 func updateDBItem(tmdbID int, state int, mediaType int, showID int) error {
-	_, err := database.Get().Exec(`INSERT OR REPLACE INTO library_items (tmdbId, state, mediaType, showId) VALUES (?, ?, ?, ?)`, tmdbID, state, mediaType, showID)
-	if err != nil {
-		log.Debugf("updateDBItem failed: %s", err)
+	li := database.LibraryItem{
+		TmdbID:    strconv.Itoa(tmdbID),
+		MediaType: mediaType,
+		ShowID:    showID,
+		State:     state,
 	}
-	return err
+	if err := database.GetStormDB().Save(&li); err != nil {
+		log.Debugf("updateDBItem failed: %s", err)
+		return err
+	}
+	return nil
 }
 
 func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) error {
-	tx, err := database.Get().Begin()
+	tx, err := database.GetStormDB().Begin(true)
 	if err != nil {
-		log.Debugf("Cannot start transaction: %s", err)
 		return err
 	}
+	defer tx.Rollback()
+
 	for _, id := range tmdbIds {
-		_, err := tx.Exec(`INSERT OR REPLACE INTO library_items (tmdbId, state, mediaType, showId) VALUES (?, ?, ?, ?)`, id, state, mediaType, showID)
+		li := database.LibraryItem{
+			TmdbID:    strconv.Itoa(id),
+			MediaType: mediaType,
+			ShowID:    showID,
+			State:     state,
+		}
+		err = tx.Save(&li)
 		if err != nil {
-			log.Debugf("updateDBItem failed: %s", err)
-			tx.Rollback()
 			return err
 		}
 	}
-	tx.Commit()
 
-	return nil
+	return tx.Commit()
 }
 
 func deleteDBItem(tmdbID int, mediaType int) error {
-	_, err := database.Get().Exec(`UPDATE library_items SET state = ? WHERE tmdbId = ? AND mediaType = ?`, StateDeleted, tmdbID, mediaType)
-	if err != nil {
-		log.Debugf("deleteDBItem failed: %s", err)
-	}
-	return err
-}
-
-func deleteBatchDBItem(tmdbIds []int, mediaType int) error {
-	tx, err := database.Get().Begin()
-	if err != nil {
-		log.Debugf("Cannot start transaction: %s", err)
+	var li database.LibraryItem
+	if err := database.GetStormDB().One("TmdbID", strconv.Itoa(tmdbID), &li); err != nil {
 		return err
 	}
-	for _, id := range tmdbIds {
-		_, err := tx.Exec(`UPDATE library_items SET state = ? WHERE tmdbId = ? AND mediaType = ?`, StateDeleted, id, mediaType)
-		if err != nil {
-			log.Debugf("deleteDBItem failed: %s", err)
-			tx.Rollback()
-			return err
-		}
-	}
-	tx.Commit()
 
+	li.State = StateDeleted
+	database.GetStormDB().Update(&li)
 	return nil
 }
 
-func wasRemoved(id int, mediaType int) (wasRemoved bool) {
-	count := 0
-	database.Get().QueryRow("SELECT COUNT(*) FROM library_items WHERE tmdbId = ? AND mediaType = ? AND state = ?", id, mediaType, StateDeleted).Scan(&count)
+// func deleteBatchDBItem(tmdbIds []int, mediaType int) error {
+// 	// tx, err := database.Get().Begin()
+// 	// if err != nil {
+// 	// 	log.Debugf("Cannot start transaction: %s", err)
+// 	// 	return err
+// 	// }
+// 	// for _, id := range tmdbIds {
+// 	// 	_, err := tx.Exec(`UPDATE library_items SET state = ? WHERE tmdbId = ? AND mediaType = ?`, StateDeleted, id, mediaType)
+// 	// 	if err != nil {
+// 	// 		log.Debugf("deleteDBItem failed: %s", err)
+// 	// 		tx.Rollback()
+// 	// 		return err
+// 	// 	}
+// 	// }
+// 	// tx.Commit()
 
-	return count > 0
+// 	return nil
+// }
+
+func wasRemoved(id int, mediaType int) (wasRemoved bool) {
+	var li database.LibraryItem
+	if err := database.GetStormDB().Select(q.Eq("MediaType", mediaType), q.Eq("TmdbID", id), q.Eq("State", StateDeleted)).First(&li); err != nil && li.TmdbID != "" {
+		return true
+	}
+
+	return false
 }
 
 //
@@ -1060,344 +1022,32 @@ func URLQuery(route string, query ...string) string {
 }
 
 //
-// Trakt syncs
-//
-
-// RefreshTrakt starts a trakt sync
-func RefreshTrakt() error {
-	if config.Get().TraktToken == "" {
-		return nil
-	}
-
-	if Scanning {
-		log.Debugf("TraktSync: already in scanning")
-		return nil
-	}
-
-	Scanning = true
-	defer func() {
-		util.FreeMemoryGC()
-		Scanning = false
-	}()
-
-	if err := checkMoviesPath(); err != nil {
-		return err
-	}
-	if err := checkShowsPath(); err != nil {
-		return err
-	}
-
-	defer perf.ScopeTimer()()
-
-	log.Debugf("TraktSync: Watched")
-	if changes, err := SyncTraktWatched(); err != nil {
-		log.Debugf("TraktSync: Got error from SyncTraktWatched: %#v", err)
-		// return err
-	} else if changes {
-		Refresh()
-		xbmc.Refresh()
-	}
-	if config.Get().TraktSyncWatchlist {
-		log.Debugf("TraktSync: Movies Watchlist")
-		if err := SyncMoviesList("watchlist", true); err != nil {
-			log.Debugf("TraktSync: Got error from SyncMoviesList: %#v", err)
-			// return err
-		}
-		log.Debugf("TraktSync: Shows Watchlist")
-		if err := SyncShowsList("watchlist", true); err != nil {
-			log.Debugf("TraktSync: Got error from SyncShowsList: %#v", err)
-			// return err
-		}
-	}
-	if config.Get().TraktSyncCollections {
-		log.Debugf("TraktSync: Movies Collections")
-		if err := SyncMoviesList("collection", true); err != nil {
-			log.Debugf("TraktSync: Got error from SyncMoviesList: %#v", err)
-			// return err
-		}
-		log.Debugf("TraktSync: Shows Collections")
-		if err := SyncShowsList("collection", true); err != nil {
-			log.Debugf("TraktSync: Got error from SyncShowsList: %#v", err)
-			// return err
-		}
-	}
-
-	if config.Get().TraktSyncUserlists {
-		log.Debugf("TraktSync: Userlists")
-		lists := trakt.Userlists()
-		for _, list := range lists {
-			if err := SyncMoviesList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
-				continue
-			}
-			if err := SyncShowsList(strconv.Itoa(list.IDs.Trakt), true); err != nil {
-				continue
-			}
-		}
-	}
-
-	log.Debugf("TraktSync: Finished")
-
-	return nil
-}
-
-// SyncTraktWatched gets watched list and updates watched status in the library
-func SyncTraktWatched() (haveChanges bool, err error) {
-	if config.Get().TraktToken == "" || !config.Get().TraktSyncWatched {
-		return
-	}
-
-	started := time.Now()
-	TraktScanning = true
-	defer func() {
-		log.Debugf("Trakt sync watched finished in %s", time.Since(started))
-		TraktScanning = false
-		RefreshUIDs()
-	}()
-
-	previousMovies, _ := trakt.PreviousWatchedMovies()
-	movies, errMovies := trakt.WatchedMovies()
-	if errMovies != nil {
-		return false, errMovies
-	}
-
-	diffMovies, _ := getUnwatchedMovies(movies, previousMovies)
-	if len(diffMovies) > 0 {
-		log.Infof("Unwatching %v movies", len(diffMovies))
-	}
-
-	for _, m := range diffMovies {
-		var r *Movie
-		if r == nil && m.Movie.IDs.TMDB != 0 {
-			r, _ = GetMovieByTMDB(m.Movie.IDs.TMDB)
-		}
-		if r == nil && m.Movie.IDs.IMDB != "" {
-			r, _ = GetMovieByIMDB(m.Movie.IDs.IMDB)
-		}
-
-		if r == nil {
-			continue
-		} else if r != nil && r.UIDs.Playcount > 0 {
-			xbmc.SetMovieWatched(r.UIDs.Kodi, 0, 0, 0)
-		}
-	}
-
-	l.mu.Trakt.Lock()
-
-	l.WatchedTrakt = map[uint64]bool{}
-	watchedMovies := map[int]bool{}
-	for _, m := range movies {
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TraktScraper, m.Movie.IDs.Trakt))] = true
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", MovieType, TMDBScraper, m.Movie.IDs.TMDB))] = true
-		l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.Movie.IDs.IMDB))] = true
-
-		var r *Movie
-		if r == nil && m.Movie.IDs.TMDB != 0 {
-			r, _ = GetMovieByTMDB(m.Movie.IDs.TMDB)
-		}
-		if r == nil && m.Movie.IDs.IMDB != "" {
-			r, _ = GetMovieByIMDB(m.Movie.IDs.IMDB)
-		}
-
-		if r == nil {
-			continue
-		} else if r != nil {
-			watchedMovies[r.UIDs.TMDB] = true
-
-			if r.UIDs.Playcount == 0 {
-				haveChanges = true
-				xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total), m.LastWatchedAt)
-			}
-		}
-	}
-	l.mu.Trakt.Unlock()
-
-	previousShows, _ := trakt.PreviousWatchedShows()
-	shows, errShows := trakt.WatchedShows()
-	if errShows != nil {
-		return false, errShows
-	}
-
-	diffShows, _ := getUnwatchedShows(shows, previousShows)
-	if len(diffShows) > 0 {
-		log.Infof("Unwatching %v shows", len(diffShows))
-	}
-
-	for _, s := range diffShows {
-		var r *Show
-		if r == nil && s.Show.IDs.TMDB != 0 {
-			r, _ = GetShowByTMDB(s.Show.IDs.TMDB)
-		}
-		if r == nil && s.Show.IDs.IMDB != "" {
-			r, _ = GetShowByIMDB(s.Show.IDs.IMDB)
-		}
-
-		if r == nil {
-			continue
-		} else if r != nil {
-			for _, season := range s.Seasons {
-				for _, episode := range season.Episodes {
-					if e := r.GetEpisode(season.Number, episode.Number); e != nil && e.UIDs.Playcount > 0 {
-						xbmc.SetEpisodeWatched(e.UIDs.Kodi, 0, 0, 0)
-					}
-				}
-			}
-		}
-	}
-
-	l.mu.Trakt.Lock()
-
-	watchedShows := map[int]bool{}
-	for _, s := range shows {
-		tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.IDs.TMDB), config.Get().Language)
-		completedSeasons := 0
-		for _, season := range s.Seasons {
-			if tmdbShow != nil {
-				tmdbSeason := tmdb.GetSeason(s.Show.IDs.TMDB, season.Number, config.Get().Language)
-				if tmdbSeason != nil && tmdbSeason.EpisodeCount == len(season.Episodes) {
-					completedSeasons++
-
-					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TMDBScraper, s.Show.IDs.TMDB, season.Number))] = true
-					l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d", SeasonType, TraktScraper, s.Show.IDs.Trakt, season.Number))] = true
-				}
-			}
-
-			for _, episode := range season.Episodes {
-				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.IDs.TMDB, season.Number, episode.Number))] = true
-				l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.IDs.Trakt, season.Number, episode.Number))] = true
-			}
-		}
-
-		if tmdbShow != nil && completedSeasons == len(tmdbShow.Seasons) {
-			s.Watched = true
-			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TMDBScraper, s.Show.IDs.TMDB))] = true
-			l.WatchedTrakt[xxhash.Sum64String(fmt.Sprintf("%d_%d_%d", ShowType, TraktScraper, s.Show.IDs.Trakt))] = true
-		}
-
-		var r *Show
-		if r == nil && s.Show.IDs.TMDB != 0 {
-			r, _ = GetShowByTMDB(s.Show.IDs.TMDB)
-		}
-		if r == nil && s.Show.IDs.IMDB != "" {
-			r, _ = GetShowByIMDB(s.Show.IDs.IMDB)
-		}
-
-		if r == nil {
-			continue
-		} else if r != nil {
-			if s.Watched {
-				watchedShows[r.UIDs.Kodi] = true
-				xbmc.SetShowWatchedWithDate(r.UIDs.Kodi, 1, s.LastWatchedAt)
-			}
-
-			for _, season := range s.Seasons {
-				for _, episode := range season.Episodes {
-					e := r.GetEpisode(season.Number, episode.Number)
-					if e != nil {
-						watchedShows[e.UIDs.Kodi] = true
-
-						if e.UIDs.Playcount == 0 {
-							haveChanges = true
-							xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total), episode.LastWatchedAt)
-						}
-					}
-				}
-			}
-		}
-	}
-	l.mu.Trakt.Unlock()
-
-	if !config.Get().TraktSyncWatchedBack {
-		return
-	}
-
-	// Now, when we know what is marked Watched on Trakt - we are
-	// looking at Kodi library and sync back to Trakt items,
-	// watched in Kodi and not marked on Trakt
-	syncMovies := []*trakt.WatchedItem{}
-	syncShows := []*trakt.WatchedItem{}
-
-	l.mu.Movies.Lock()
-	for _, m := range l.Movies {
-		if m.UIDs.TMDB == 0 {
-			continue
-		}
-		cacheKey := fmt.Sprintf("Synced_%d_%d", MovieType, m.UIDs.TMDB)
-		if _, ok := watchedMovies[m.UIDs.TMDB]; ok || m.UIDs.Playcount == 0 || database.GetCache().Has(database.CommonBucket, cacheKey) {
-			continue
-		}
-		database.GetCache().Set(database.CommonBucket, cacheKey, "1")
-
-		syncMovies = append(syncMovies, &trakt.WatchedItem{
-			MediaType: "movie",
-			Movie:     m.UIDs.TMDB,
-			Watched:   true,
-		})
-	}
-	l.mu.Movies.Unlock()
-
-	l.mu.Shows.Lock()
-	for _, s := range l.Shows {
-		if s.UIDs.TMDB == 0 {
-			continue
-		}
-		if _, ok := watchedShows[s.UIDs.Kodi]; ok {
-			continue
-		}
-
-		for _, e := range s.Episodes {
-			if _, ok := watchedShows[e.UIDs.Kodi]; ok || e.UIDs.Playcount == 0 {
-				continue
-			}
-
-			cacheKey := fmt.Sprintf("Synced_%d_%d", EpisodeType, e.UIDs.Kodi)
-			if database.GetCache().Has(database.CommonBucket, cacheKey) {
-				continue
-			}
-			database.GetCache().Set(database.CommonBucket, cacheKey, "1")
-
-			syncShows = append(syncShows, &trakt.WatchedItem{
-				MediaType: "episode",
-				Show:      s.UIDs.TMDB,
-				Season:    e.Season,
-				Episode:   e.Episode,
-				Watched:   true,
-			})
-		}
-	}
-	l.mu.Shows.Unlock()
-
-	if len(syncMovies) > 0 {
-		trakt.SetMultipleWatched(syncMovies)
-	}
-	if len(syncShows) > 0 {
-		trakt.SetMultipleWatched(syncShows)
-	}
-
-	return
-}
-
-//
 // Movie internals
 //
 
 // SyncMoviesList updates trakt movie collections in cache
-func SyncMoviesList(listID string, updating bool) (err error) {
+func SyncMoviesList(listID string, updating bool, isUpdateNeeded bool) (err error) {
 	if err = checkMoviesPath(); err != nil {
 		return
 	}
+
+	started := time.Now()
+	defer func() {
+		log.Debugf("Trakt sync movies %s finished in %s", listID, time.Since(started))
+	}()
 
 	var label string
 	var movies []*trakt.Movies
 
 	switch listID {
 	case "watchlist":
-		movies, err = trakt.WatchlistMovies()
+		movies, err = trakt.WatchlistMovies(isUpdateNeeded)
 		label = "LOCALIZE[30254]"
 	case "collection":
-		movies, err = trakt.CollectionMovies()
+		movies, err = trakt.CollectionMovies(isUpdateNeeded)
 		label = "LOCALIZE[30257]"
 	default:
-		movies, err = trakt.ListItemsMovies("", listID)
+		movies, err = trakt.ListItemsMovies("", listID, isUpdateNeeded)
 		label = "LOCALIZE[30263]"
 	}
 
@@ -1428,7 +1078,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 			continue
 		}
 
-		if err := IsDuplicateMovie(tmdbID); err != nil {
+		if IsDuplicateMovie(tmdbID) {
 			continue
 		}
 
@@ -1443,7 +1093,7 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 		return err
 	}
 
-	if !updating {
+	if !updating && len(movieIDs) > 0 {
 		log.Noticef("Movies list (%s) added", listID)
 		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
@@ -1457,23 +1107,37 @@ func SyncMoviesList(listID string, updating bool) (err error) {
 //
 
 // SyncShowsList updates trakt collections in cache
-func SyncShowsList(listID string, updating bool) (err error) {
+func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error) {
 	if err = checkShowsPath(); err != nil {
 		return err
 	}
+
+	started := time.Now()
+	defer func() {
+		log.Debugf("Trakt sync shows %s finished in %s", listID, time.Since(started))
+	}()
 
 	var label string
 	var shows []*trakt.Shows
 
 	switch listID {
 	case "watchlist":
-		shows, err = trakt.WatchlistShows()
+		previous, _ := trakt.PreviousWatchlistShows()
+		current, _ := trakt.WatchlistShows(isUpdateNeeded)
+		shows = trakt.DiffShows(previous, current)
+
 		label = "LOCALIZE[30254]"
 	case "collection":
-		shows, err = trakt.CollectionShows()
+		previous, _ := trakt.PreviousCollectionShows()
+		current, _ := trakt.CollectionShows(isUpdateNeeded)
+		shows = trakt.DiffShows(previous, current)
+
 		label = "LOCALIZE[30257]"
 	default:
-		shows, err = trakt.ListItemsShows(listID)
+		previous, _ := trakt.PreviousListItemsShows(listID)
+		current, _ := trakt.ListItemsShows(listID, isUpdateNeeded)
+		shows = trakt.DiffShows(previous, current)
+
 		label = "LOCALIZE[30263]"
 	}
 
@@ -1481,6 +1145,15 @@ func SyncShowsList(listID string, updating bool) (err error) {
 		log.Error(err)
 		return
 	}
+
+	cacheStore := cache.NewDBStore()
+	showsLastUpdates := map[int]time.Time{}
+
+	// Keep tracking of processed shows to avoid re-writing and checking all of them again.
+	cacheStore.Get("showsLastUpdates", &showsLastUpdates)
+	defer func() {
+		cacheStore.Set("showsLastUpdates", &showsLastUpdates, 7*24*time.Hour)
+	}()
 
 	var showIDs []int
 	for _, show := range shows {
@@ -1507,15 +1180,17 @@ func SyncShowsList(listID string, updating bool) (err error) {
 		}
 
 		tmdbID := strconv.Itoa(show.Show.IDs.TMDB)
+		if t, ok := showsLastUpdates[show.Show.IDs.Trakt]; ok && IsDuplicateShow(tmdbID) && !t.Before(show.Show.UpdatedAt) {
+			continue
+		}
+		showsLastUpdates[show.Show.IDs.Trakt] = show.Show.UpdatedAt
 
 		if updating && wasRemoved(show.Show.IDs.TMDB, ShowType) {
 			continue
 		}
 
-		if !updating {
-			if err := IsDuplicateShow(tmdbID); err != nil {
-				continue
-			}
+		if !updating && !isUpdateNeeded && IsDuplicateShow(tmdbID) {
+			continue
 		}
 
 		if _, err := writeShowStrm(show.Show.IDs.TMDB, false, false); err != nil {
@@ -1525,11 +1200,27 @@ func SyncShowsList(listID string, updating bool) (err error) {
 		showIDs = append(showIDs, show.Show.IDs.TMDB)
 	}
 
+	// Cleanup unused map items
+	found := false
+	for k := range showsLastUpdates {
+		found = false
+		for _, s := range shows {
+			if s.Show.IDs.Trakt == k {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			delete(showsLastUpdates, k)
+		}
+	}
+
 	if err := updateBatchDBItem(showIDs, StateActive, ShowType, 0); err != nil {
 		return err
 	}
 
-	if !updating {
+	if !updating && len(showIDs) > 0 {
 		log.Noticef("Shows list (%s) added", listID)
 		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirmFocused("Elementum", fmt.Sprintf("LOCALIZE[30277];;%s", label))) {
 			xbmc.VideoLibraryScan()
@@ -1553,17 +1244,16 @@ func AddMovie(tmdbID string, force bool) (*tmdb.Movie, error) {
 		return nil, fmt.Errorf("Movie with TMDB %s not found", tmdbID)
 	}
 
-	ID, _ := strconv.Atoi(tmdbID)
-	if err := IsDuplicateMovie(tmdbID); !force && err != nil {
-		log.Warningf("Error from duplicate movie: %s", err)
+	if !force && IsDuplicateMovie(tmdbID) {
 		xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", movie.Title), config.AddonIcon())
-		return nil, err
+		return nil, fmt.Errorf("Movie already added")
 	}
 
 	if _, err := writeMovieStrm(tmdbID, force); err != nil {
 		return movie, err
 	}
 
+	ID, _ := strconv.Atoi(tmdbID)
 	if err := updateDBItem(ID, StateActive, MovieType, 0); err != nil {
 		return movie, err
 	}
@@ -1581,10 +1271,9 @@ func AddShow(tmdbID string, force bool) (*tmdb.Show, error) {
 	ID, _ := strconv.Atoi(tmdbID)
 	show := tmdb.GetShowByID(tmdbID, config.Get().Language)
 
-	if err := IsDuplicateShow(tmdbID); !force && err != nil {
-		log.Warning(err)
+	if !force && IsDuplicateShow(tmdbID) {
 		xbmc.Notify("Elementum", fmt.Sprintf("LOCALIZE[30287];;%s", show.Name), config.AddonIcon())
-		return show, err
+		return show, fmt.Errorf("Show already added")
 	}
 
 	if _, err := writeShowStrm(ID, true, force); err != nil {
@@ -1653,8 +1342,8 @@ func GetShowForEpisode(kodiID int) (*Show, *Episode) {
 		return nil, nil
 	}
 
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
+	l.mu.Shows.RLock()
+	defer l.mu.Shows.RUnlock()
 
 	for _, s := range l.Shows {
 		for _, e := range s.Episodes {
@@ -1665,104 +1354,4 @@ func GetShowForEpisode(kodiID int) (*Show, *Episode) {
 	}
 
 	return nil, nil
-}
-
-func getUnwatchedMovies(current, previous []*trakt.WatchedMovie) (diff []*trakt.WatchedMovie, err error) {
-	if current == nil || previous == nil || len(previous) == 0 || len(current) == 0 {
-		return
-	}
-
-	found := false
-	for _, previousMovie := range previous {
-		found = false
-		for _, currentMovie := range current {
-			if currentMovie.Movie.IDs.Trakt == previousMovie.Movie.IDs.Trakt {
-				found = true
-			}
-		}
-
-		if !found {
-			diff = append(diff, previousMovie)
-		}
-	}
-
-	return
-}
-
-func getUnwatchedShows(current, previous []*trakt.WatchedShow) (diff []*trakt.WatchedShow, err error) {
-	if current == nil || previous == nil || len(previous) == 0 || len(current) == 0 {
-		return
-	}
-
-	foundShow := false
-	foundSeason := false
-	foundEpisode := false
-
-	var show *trakt.WatchedShow
-	var season *trakt.WatchedSeason
-
-	for _, previousShow := range previous {
-		foundShow = false
-		foundSeason = false
-		foundEpisode = false
-
-		show = nil
-
-		for _, currentShow := range current {
-			season = nil
-
-			if previousShow.Show.IDs.Trakt == currentShow.Show.IDs.Trakt {
-				foundShow = true
-
-				for _, previousSeason := range previousShow.Seasons {
-					foundSeason = false
-					foundEpisode = false
-
-					for _, currentSeason := range currentShow.Seasons {
-						if previousSeason.Number == currentSeason.Number {
-							foundSeason = true
-
-							for _, previousEpisode := range previousSeason.Episodes {
-								foundEpisode = false
-
-								for _, currentEpisode := range currentSeason.Episodes {
-									if previousEpisode.Number == currentEpisode.Number {
-										foundEpisode = true
-									}
-								}
-
-								if !foundEpisode {
-									if season == nil {
-										season = &trakt.WatchedSeason{Number: previousSeason.Number}
-									}
-
-									season.Episodes = append(season.Episodes, previousEpisode)
-								}
-							}
-						}
-					}
-
-					if !foundSeason {
-						season = previousSeason
-					}
-					if season != nil {
-						if show == nil {
-							show = &trakt.WatchedShow{Show: previousShow.Show}
-						}
-
-						show.Seasons = append(show.Seasons, season)
-					}
-				}
-			}
-		}
-
-		if !foundShow {
-			diff = append(diff, previousShow)
-		}
-		if show != nil {
-			diff = append(diff, show)
-		}
-	}
-
-	return
 }

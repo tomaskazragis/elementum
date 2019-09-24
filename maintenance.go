@@ -155,17 +155,14 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		// TODO: Do we need this endpoint?
 
 	case "VideoLibrary.OnUpdate":
-		if library.Scanning {
-			return
-		}
-
 		time.Sleep(300 * time.Millisecond) // Because Kodi...
 		var request struct {
 			Item struct {
 				ID   int    `json:"id"`
 				Type string `json:"type"`
 			} `json:"item"`
-			Playcount int `json:"playcount"`
+			Added     bool `json:"added"`
+			Playcount int  `json:"playcount"`
 		}
 		request.Playcount = -1
 		if err := json.Unmarshal(jsonData, &request); err != nil {
@@ -173,12 +170,19 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
+		if request.Added || request.Playcount != -1 {
+			library.MarkKodiUpdated()
+		}
+
 		if request.Item.Type == movieType {
 			library.RefreshMovie(request.Item.ID, library.ActionUpdate)
+			library.PlanMoviesUpdate()
 		} else if request.Item.Type == showType {
 			library.RefreshShow(request.Item.ID, library.ActionUpdate)
+			library.PlanShowsUpdate()
 		} else if request.Item.Type == episodeType {
 			library.RefreshEpisode(request.Item.ID, library.ActionUpdate)
+			library.PlanShowsUpdate()
 		}
 
 	case "VideoLibrary.OnRemove":
@@ -199,10 +203,13 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			library.RefreshEpisode(item.ID, library.ActionSafeDelete)
 		}
 
+	case "VideoLibrary.OnScanStarted":
+		go library.MarkKodiRefresh()
+
 	case "VideoLibrary.OnScanFinished":
 		go library.RefreshOnScan()
 
 	case "VideoLibrary.OnCleanFinished":
-		go library.RefreshOnClean()
+		go library.PlanOverallUpdate()
 	}
 }

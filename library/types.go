@@ -9,20 +9,29 @@ import (
 	"github.com/elgatito/elementum/xbmc"
 )
 
+// Status represents library bool statuses
+type Status struct {
+	IsOverall bool
+	IsMovies  bool
+	IsShows   bool
+	IsTrakt   bool
+	IsKodi    bool
+}
+
 // Library represents library
 type Library struct {
 	mu lMutex
 
 	// Stores all the unique IDs collected
-	UIDs map[uint64]*UniqueIDs
+	UIDs []*UniqueIDs
 
-	// Stores Library Movies
-	Movies map[int]*Movie
+	Movies []*Movie
+	Shows  []*Show
 
-	// Stored Library Shows
-	Shows map[int]*Show
+	WatchedTrakt []uint64
 
-	WatchedTrakt map[uint64]bool
+	Pending Status
+	Running Status
 }
 
 type lMutex struct {
@@ -45,24 +54,26 @@ type UniqueIDs struct {
 
 // Movie represents Movie content type
 type Movie struct {
-	ID       int
-	Title    string
-	File     string
-	Year     int
-	UIDs     *UniqueIDs
-	XbmcUIDs *xbmc.UniqueIDs
-	Resume   *Resume
+	ID        int
+	Title     string
+	File      string
+	Year      int
+	DateAdded time.Time
+	UIDs      *UniqueIDs
+	XbmcUIDs  *xbmc.UniqueIDs
+	Resume    *Resume
 }
 
 // Show represents Show content type
 type Show struct {
-	ID       int
-	Title    string
-	Year     int
-	Seasons  map[int]*Season
-	Episodes map[int]*Episode
-	UIDs     *UniqueIDs
-	XbmcUIDs *xbmc.UniqueIDs
+	ID        int
+	Title     string
+	Year      int
+	DateAdded time.Time
+	Seasons   map[int]*Season
+	Episodes  map[int]*Episode
+	UIDs      *UniqueIDs
+	XbmcUIDs  *xbmc.UniqueIDs
 }
 
 // Season represents Season content type
@@ -77,14 +88,15 @@ type Season struct {
 
 // Episode represents Episode content type
 type Episode struct {
-	ID       int
-	Title    string
-	Season   int
-	Episode  int
-	File     string
-	UIDs     *UniqueIDs
-	XbmcUIDs *xbmc.UniqueIDs
-	Resume   *Resume
+	ID        int
+	Title     string
+	Season    int
+	Episode   int
+	File      string
+	DateAdded time.Time
+	UIDs      *UniqueIDs
+	XbmcUIDs  *xbmc.UniqueIDs
+	Resume    *Resume
 }
 
 // Resume shows watched progress information
