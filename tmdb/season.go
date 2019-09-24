@@ -3,6 +3,7 @@ package tmdb
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/elgatito/elementum/cache"
@@ -72,6 +73,7 @@ func GetSeason(showID int, seasonNumber int, language string, seasonsCount int) 
 // ToListItems ...
 func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	items := make([]*xbmc.ListItem, 0, len(seasons))
+	specials := make(xbmc.ListItems, 0)
 
 	fanarts := make([]string, 0)
 	for _, backdrop := range show.Images.Backdrops {
@@ -79,6 +81,13 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 	}
 
 	now := util.UTCBod()
+
+	if config.Get().ShowSeasonsOrder == 0 {
+		sort.Slice(seasons, func(i, j int) bool { return seasons[i].Season < seasons[j].Season })
+	} else {
+		sort.Slice(seasons, func(i, j int) bool { return seasons[i].Season > seasons[j].Season })
+	}
+
 	for _, season := range seasons {
 		if season.EpisodeCount == 0 {
 			continue
@@ -96,9 +105,14 @@ func (seasons SeasonList) ToListItems(show *Show) []*xbmc.ListItem {
 			item.Art.FanArt = fanarts[rand.Intn(len(fanarts))]
 		}
 
-		items = append(items, item)
+		if season.Season <= 0 {
+			specials = append(specials, item)
+		} else {
+			items = append(items, item)
+		}
 	}
-	return items
+
+	return append(items, specials...)
 }
 
 func (seasons SeasonList) Len() int           { return len(seasons) }

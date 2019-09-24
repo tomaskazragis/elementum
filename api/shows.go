@@ -367,9 +367,7 @@ func ShowSeasons(ctx *gin.Context) {
 
 	items := show.Seasons.ToListItems(show)
 	reversedItems := make(xbmc.ListItems, 0)
-	for i := len(items) - 1; i >= 0; i-- {
-		item := items[i]
-
+	for _, item := range items {
 		thisURL := URLForXBMC("/show/%d/season/%d/", show.ID, item.Info.Season) + "%s/%s"
 		contextTitle := fmt.Sprintf("%s S%02d", show.OriginalName, item.Info.Season)
 		contextLabel := playLabel
@@ -387,8 +385,22 @@ func ShowSeasons(ctx *gin.Context) {
 			[]string{contextOppositeLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextOppositeURL)},
 			[]string{"LOCALIZE[30036]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/seasons"))},
 		}
+
 		reversedItems = append(reversedItems, item)
 	}
+
+	if config.Get().ShowSeasonsAll {
+		item := &xbmc.ListItem{
+			Label: "LOCALIZE[30571]",
+			Path:  URLForXBMC("/show/%d/season/all/episodes", show.ID),
+			ContextMenu: [][]string{
+				[]string{"LOCALIZE[30036]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/seasons"))},
+			},
+		}
+
+		reversedItems = append(xbmc.ListItems{item}, reversedItems...)
+	}
+
 	// xbmc.ListItems always returns false to Less() so that order is unchanged
 
 	ctx.JSON(200, xbmc.NewView("seasons", filterListItems(reversedItems)))
@@ -398,7 +410,8 @@ func ShowSeasons(ctx *gin.Context) {
 func ShowEpisodes(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	showID, _ := strconv.Atoi(ctx.Params.ByName("showId"))
-	seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
+	seasonParam := ctx.Params.ByName("season")
+	seasonNumber, _ := strconv.Atoi(seasonParam)
 	language := config.Get().Language
 
 	show := tmdb.GetShow(showID, language)
@@ -407,46 +420,66 @@ func ShowEpisodes(ctx *gin.Context) {
 		return
 	}
 
-	season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons))
-	if season == nil {
-		ctx.Error(errors.New("Unable to find season"))
-		return
-	}
-
-	items := season.Episodes.ToListItems(show, season)
-
-	for _, item := range items {
-		thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
-			show.ID,
-			seasonNumber,
-			item.Info.Episode,
-		) + "%s/%s"
-		contextLabel := playLabel
-		contextTitle := fmt.Sprintf("%s S%02dE%02d", show.OriginalName, seasonNumber, item.Info.Episode)
-		contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
-		if config.Get().ChooseStreamAuto {
-			contextLabel = linksLabel
+	seasonsToShow := []int{seasonNumber}
+	if seasonParam == "all" {
+		seasonsToShow = []int{}
+		for _, s := range show.Seasons {
+			seasonsToShow = append(seasonsToShow, s.Season)
 		}
 
-		item.Path = contextPlayURL(thisURL, contextTitle, false)
-
-		if config.Get().Platform.Kodi < 17 {
-			item.ContextMenu = [][]string{
-				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
-				[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
-				[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
-				[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
-			}
-		} else {
-			item.ContextMenu = [][]string{
-				[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
-				[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
-			}
+		sort.Slice(seasonsToShow, func(i, j int) bool {
+			return seasonsToShow[i] < seasonsToShow[j]
+		})
+		if seasonsToShow[0] == 0 {
+			seasonsToShow = append(seasonsToShow[1:], seasonsToShow[0])
 		}
-		item.IsPlayable = true
 	}
 
-	ctx.JSON(200, xbmc.NewView("episodes", filterListItems(items)))
+	episodes := make(xbmc.ListItems, 0)
+	for _, seasonNumber := range seasonsToShow {
+		season := tmdb.GetSeason(showID, seasonNumber, language, len(show.Seasons))
+		if season == nil {
+			ctx.Error(errors.New("Unable to find season"))
+			return
+		}
+
+		items := season.Episodes.ToListItems(show, season)
+
+		for _, item := range items {
+			thisURL := URLForXBMC("/show/%d/season/%d/episode/%d/",
+				show.ID,
+				seasonNumber,
+				item.Info.Episode,
+			) + "%s/%s"
+			contextLabel := playLabel
+			contextTitle := fmt.Sprintf("%s S%02dE%02d", show.OriginalName, seasonNumber, item.Info.Episode)
+			contextURL := contextPlayOppositeURL(thisURL, contextTitle, false)
+			if config.Get().ChooseStreamAuto {
+				contextLabel = linksLabel
+			}
+
+			item.Path = contextPlayURL(thisURL, contextTitle, false)
+
+			if config.Get().Platform.Kodi < 17 {
+				item.ContextMenu = [][]string{
+					[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+					[]string{"LOCALIZE[30203]", "XBMC.Action(Info)"},
+					[]string{"LOCALIZE[30268]", "XBMC.Action(ToggleWatched)"},
+					[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
+				}
+			} else {
+				item.ContextMenu = [][]string{
+					[]string{contextLabel, fmt.Sprintf("XBMC.PlayMedia(%s)", contextURL)},
+					[]string{"LOCALIZE[30037]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/setviewmode/episodes"))},
+				}
+			}
+			item.IsPlayable = true
+		}
+
+		episodes = append(episodes, items...)
+	}
+
+	ctx.JSON(200, xbmc.NewView("episodes", filterListItems(episodes)))
 }
 
 func showSeasonLinks(showID int, seasonNumber int) ([]*bittorrent.TorrentFile, error) {
