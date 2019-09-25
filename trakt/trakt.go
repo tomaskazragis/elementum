@@ -1164,7 +1164,7 @@ func SetMultipleWatched(items []*WatchedItem) (resp *napping.Response, err error
 }
 
 func (item *WatchedItem) String() (query string) {
-	watchedAt := fmt.Sprintf(`"watched_at": "%s",`, time.Now().Format("20060102-15:04:05.000"))
+	watchedAt := fmt.Sprintf(`"watched_at": "%s",`, time.Now().UTC().Format("20060102-15:04:05.000"))
 
 	if item.Movie != 0 {
 		query = fmt.Sprintf(`{ %s "ids": {"tmdb": %d }}`, watchedAt, item.Movie)
