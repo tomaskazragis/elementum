@@ -90,6 +90,7 @@ type PlayerParams struct {
 	ResumeToken     string
 	ResumeHash      string
 	ResumePlayback  bool
+	TraktScrobbled  bool
 	ContentType     string
 	KodiID          int
 	TMDBId          int
@@ -870,6 +871,7 @@ playbackWaitLoop:
 	log.Infof("Got playback: %fs / %fs", btp.p.WatchedTime, btp.p.VideoDuration)
 	if btp.scrobble {
 		trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
+		btp.p.TraktScrobbled = true
 	}
 
 	playlistSize := xbmc.PlaylistSize()
@@ -1005,7 +1007,7 @@ func (btp *Player) UpdateWatched() {
 		// We set Trakt watched only if it's not in Kodi library
 		// to track items that are started from Elementum lists
 		// otherwise we will get Watched items set twice in Trakt
-		if config.Get().TraktToken != "" && watched != nil && btp.p.KodiID == 0 {
+		if config.Get().TraktToken != "" && watched != nil && btp.p.KodiID == 0 && btp.p.TraktScrobbled {
 			log.Debugf("Setting Trakt watched for: %#v", watched)
 			go trakt.SetWatched(watched)
 		}
