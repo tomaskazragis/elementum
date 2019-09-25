@@ -50,6 +50,10 @@ var (
 	dnsCacheLocks   sync.Map
 )
 
+func init() {
+	commonResolver.EnableCache(true)
+}
+
 func resolve(addr string) ([]string, error) {
 	defer perf.ScopeTimer()()
 
