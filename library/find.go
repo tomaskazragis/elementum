@@ -113,6 +113,16 @@ func GetShowByTMDB(id int) (*Show, error) {
 
 // findShowByKodi ...
 func findShowByKodi(id int) (*Show, error) {
+	if len(l.Shows) == 0 {
+		for _, s := range l.tempShows {
+			if s != nil && s.UIDs.Kodi == id {
+				return s, nil
+			}
+		}
+
+		return nil, errors.New("Not found")
+	}
+
 	for _, s := range l.Shows {
 		if s != nil && s.UIDs.Kodi == id {
 			return s, nil
@@ -124,6 +134,16 @@ func findShowByKodi(id int) (*Show, error) {
 
 // findShowByTMDB ...
 func findShowByTMDB(id int) (*Show, error) {
+	if len(l.Shows) == 0 {
+		for _, s := range l.tempShows {
+			if s != nil && s.UIDs.TMDB == id {
+				return s, nil
+			}
+		}
+
+		return nil, errors.New("Not found")
+	}
+
 	for _, s := range l.Shows {
 		if s != nil && s.UIDs.TMDB == id {
 			return s, nil
@@ -135,6 +155,16 @@ func findShowByTMDB(id int) (*Show, error) {
 
 // findShowByIMDB ...
 func findShowByIMDB(id string) (*Show, error) {
+	if len(l.Shows) == 0 {
+		for _, s := range l.tempShows {
+			if s != nil && s.UIDs.IMDB == id {
+				return s, nil
+			}
+		}
+
+		return nil, errors.New("Not found")
+	}
+
 	for _, s := range l.Shows {
 		if s != nil && s.UIDs.IMDB == id {
 			return s, nil

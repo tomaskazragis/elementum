@@ -167,17 +167,21 @@ func RefreshShows() error {
 		log.Debugf("Fetched %d shows from Kodi Library in %s", len(shows.Shows), time.Since(started))
 	}()
 
-	l.mu.Shows.Lock()
-	defer l.mu.Shows.Unlock()
+	if len(l.Shows) == 0 {
+		l.mu.Shows.Lock()
+	}
 
-	l.Shows = make([]*Show, 0, len(shows.Shows))
+	l.mu.tempShows.Lock()
+	defer l.mu.tempShows.Unlock()
+
+	l.tempShows = make([]*Show, 0, len(shows.Shows))
 	for _, s := range shows.Shows {
 		s.UniqueIDs.Kodi = s.ID
 		if s.UniqueIDs.IMDB == "" && s.IMDBNumber != "" && strings.HasPrefix(s.IMDBNumber, "tt") {
 			s.UniqueIDs.IMDB = s.IMDBNumber
 		}
 
-		l.Shows = append(l.Shows, &Show{
+		l.tempShows = append(l.tempShows, &Show{
 			ID:        s.ID,
 			Title:     s.Title,
 			Seasons:   map[int]*Season{},
@@ -188,7 +192,7 @@ func RefreshShows() error {
 			XbmcUIDs:  &s.UniqueIDs,
 		})
 
-		parseUniqueID(ShowType, l.Shows[len(l.Shows)-1].UIDs, l.Shows[len(l.Shows)-1].XbmcUIDs, "", l.Shows[len(l.Shows)-1].Year)
+		parseUniqueID(ShowType, l.tempShows[len(l.tempShows)-1].UIDs, l.tempShows[len(l.tempShows)-1].XbmcUIDs, "", l.tempShows[len(l.tempShows)-1].Year)
 	}
 
 	if err := RefreshSeasons(); err != nil {
@@ -200,7 +204,7 @@ func RefreshShows() error {
 
 	// TODO: This needs refactor to avoid setting global Lock on processing,
 	// should use temporary container to process and then sync to Shows
-	for _, show := range l.Shows {
+	for _, show := range l.tempShows {
 		// Step 1: try to get information from what we get from Kodi
 		parseUniqueID(ShowType, show.UIDs, show.XbmcUIDs, "", show.Year)
 
@@ -240,6 +244,15 @@ func RefreshShows() error {
 		}
 	}
 
+	if len(l.Shows) == 0 {
+		l.mu.Shows.Unlock()
+	}
+
+	l.mu.Shows.Lock()
+	l.Shows = l.tempShows
+	l.tempShows = nil
+	l.mu.Shows.Unlock()
+
 	return nil
 }
 
@@ -248,8 +261,8 @@ func RefreshSeasons() error {
 	started := time.Now()
 
 	// Collect all shows IDs for possibly doing one-by-one calls to Kodi
-	shows := make([]int, 0, len(l.Shows))
-	for _, s := range l.Shows {
+	shows := make([]int, 0, len(l.tempShows))
+	for _, s := range l.tempShows {
 		shows = append(shows, s.ID)
 	}
 
@@ -393,14 +406,14 @@ func RefreshShow(kodiID, action int) {
 
 		l.mu.Shows.Lock()
 		foundIndex := -1
-		for i, s := range l.Shows {
+		for i, s := range l.tempShows {
 			if s.UIDs.Kodi == kodiID {
 				foundIndex = i
 				break
 			}
 		}
 		if foundIndex != -1 {
-			l.Shows = append(l.Shows[:foundIndex], l.Shows[foundIndex+1:]...)
+			l.tempShows = append(l.tempShows[:foundIndex], l.tempShows[foundIndex+1:]...)
 		}
 		l.mu.Shows.Unlock()
 	}

@@ -514,7 +514,7 @@ func ShowSeasonLinks(s *bittorrent.Service) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		external := ctx.Query("external")
 
-		show := tmdb.GetShow(showID, "")
+		show := tmdb.GetShow(showID, config.Get().Language)
 		if show == nil {
 			ctx.Error(errors.New("Unable to find show"))
 			return
@@ -640,7 +640,7 @@ func ShowSeasonPlay(s *bittorrent.Service) gin.HandlerFunc {
 		seasonNumber, _ := strconv.Atoi(ctx.Params.ByName("season"))
 		external := ctx.Query("external")
 
-		show := tmdb.GetShow(showID, "")
+		show := tmdb.GetShow(showID, config.Get().Language)
 		if show == nil {
 			ctx.Error(errors.New("Unable to find show"))
 			return
@@ -776,7 +776,7 @@ func ShowEpisodeLinks(s *bittorrent.Service) gin.HandlerFunc {
 		external := ctx.Query("external")
 		doresume := ctx.DefaultQuery("doresume", "true")
 
-		show := tmdb.GetShow(showID, "")
+		show := tmdb.GetShow(showID, config.Get().Language)
 		if show == nil {
 			ctx.Error(errors.New("Unable to find show"))
 			return
@@ -919,7 +919,7 @@ func ShowEpisodePlay(s *bittorrent.Service) gin.HandlerFunc {
 		external := ctx.Query("external")
 		doresume := ctx.DefaultQuery("doresume", "true")
 
-		show := tmdb.GetShow(showID, "")
+		show := tmdb.GetShow(showID, config.Get().Language)
 		if show == nil {
 			ctx.Error(errors.New("Unable to find show"))
 			return

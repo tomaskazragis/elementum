@@ -25,8 +25,9 @@ type Library struct {
 	// Stores all the unique IDs collected
 	UIDs []*UniqueIDs
 
-	Movies []*Movie
-	Shows  []*Show
+	Movies    []*Movie
+	Shows     []*Show
+	tempShows []*Show
 
 	WatchedTrakt []uint64
 
@@ -35,10 +36,11 @@ type Library struct {
 }
 
 type lMutex struct {
-	UIDs   sync.RWMutex
-	Movies sync.RWMutex
-	Shows  sync.RWMutex
-	Trakt  sync.RWMutex
+	UIDs      sync.RWMutex
+	Movies    sync.RWMutex
+	Shows     sync.RWMutex
+	tempShows sync.RWMutex
+	Trakt     sync.RWMutex
 }
 
 // UniqueIDs represents all IDs for a library item
