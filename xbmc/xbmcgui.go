@@ -185,7 +185,7 @@ func DialogConfirm(title string, message string) bool {
 func DialogConfirmFocused(title string, message string) bool {
 	// Emulating left click to make "OK predefined"
 	go func() {
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 		retVal := 0
 		executeJSONRPC("Input.Left", &retVal, nil)
 	}()
