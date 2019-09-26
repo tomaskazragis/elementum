@@ -1004,10 +1004,7 @@ func (btp *Player) UpdateWatched() {
 			}
 		}
 
-		// We set Trakt watched only if it's not in Kodi library
-		// to track items that are started from Elementum lists
-		// otherwise we will get Watched items set twice in Trakt
-		if config.Get().TraktToken != "" && watched != nil && btp.p.KodiID == 0 && btp.p.TraktScrobbled {
+		if config.Get().TraktToken != "" && watched != nil && !btp.p.TraktScrobbled {
 			log.Debugf("Setting Trakt watched for: %#v", watched)
 			go trakt.SetWatched(watched)
 		}
