@@ -36,7 +36,7 @@ import (
 const (
 	// EndBufferSize ...
 	EndBufferSize           int64 = 5400276 // ~5.5mb
-	episodeMatchRegex             = `(?i)(^|\W|_)(S0*?%[1]d\W?E0*?%[2]d|%[1]dx0*?%[2]d)(\W|_)`
+	episodeMatchRegex             = `(?i)(^|\W|_)(S0*%[1]d\W?E0*%[2]d|0*%[1]dx0*%[2]d)(\W|_)`
 	singleEpisodeMatchRegex       = `(?i)(^|\W|_)(E0*%[1]d|0*%[1]d)(\W|_)`
 )
 
