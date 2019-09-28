@@ -40,7 +40,7 @@ var goproxySignerVersion = ":goroxy1"
 func CustomTLS(ca *tls.Certificate) func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
 	return func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
 		config := &tls.Config{
-			PreferServerCipherSuites: true,
+			PreferServerCipherSuites: false,
 			Certificates:             []tls.Certificate{*ca},
 			InsecureSkipVerify:       true,
 		}
