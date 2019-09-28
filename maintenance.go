@@ -20,6 +20,8 @@ const (
 	episodeType = "episode"
 )
 
+var seekCatched = false
+
 // Notification serves callbacks from Kodi
 func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service) {
 	sender := r.URL.Query().Get("sender")
@@ -64,6 +66,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		p.Params().KodiPosition = request.Position
 
 	case "Player.OnSeek":
+		seekCatched = true
+
 		p := s.GetActivePlayer()
 		if p == nil || p.Params().VideoDuration == 0 {
 			return
@@ -83,6 +87,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 	case "Player.OnPlay":
+		seekCatched = false
+
 		time.Sleep(400 * time.Millisecond) // Let player get its WatchedTime and VideoDuration
 		p := s.GetActivePlayer()
 		if p == nil {
@@ -124,9 +130,20 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 		if resumePosition > 0 {
-			log.Infof("OnPlay. Seeking to %v", resumePosition)
-			time.Sleep(500 * time.Millisecond)
-			xbmc.PlayerSeek(resumePosition)
+			go func(resume float64) {
+				log.Infof("OnPlay. Seeking to %v", resume)
+
+				for i := 1; i <= 3; i++ {
+					time.Sleep(time.Duration(i*500) * time.Millisecond)
+					if seekCatched {
+						log.Infof("OnPlay. Seek completed")
+						return
+					}
+
+					log.Infof("OnPlay. Triggering Seek to %v", resume)
+					xbmc.PlayerSeek(resume)
+				}
+			}(resumePosition)
 		}
 
 	case "Player.OnStop":

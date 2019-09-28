@@ -228,6 +228,7 @@ func (btp *Player) Buffer() error {
 
 	btp.overlayStatus = xbmc.NewOverlayStatus()
 
+	btp.GetIdent()
 	go btp.waitCheckAvailableSpace()
 	go btp.playerLoop()
 
@@ -865,7 +866,6 @@ playbackWaitLoop:
 	playing := true
 
 	btp.updateWatchTimes()
-	btp.GetIdent()
 	btp.findNextEpisode()
 
 	log.Infof("Got playback: %fs / %fs", btp.p.WatchedTime, btp.p.VideoDuration)
