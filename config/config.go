@@ -195,8 +195,9 @@ type Configuration struct {
 	InternalDNSEnabled  bool
 	InternalDNSSkipIPv6 bool
 
-	InternalProxyEnabled bool
-	InternalProxyLogging bool
+	InternalProxyEnabled     bool
+	InternalProxyLogging     bool
+	InternalProxyLoggingBody bool
 
 	AntizapretEnabled bool
 
@@ -614,8 +615,9 @@ func Reload() *Configuration {
 		InternalDNSEnabled:  settings["internal_dns_enabled"].(bool),
 		InternalDNSSkipIPv6: settings["internal_dns_skip_ipv6"].(bool),
 
-		InternalProxyEnabled: settings["internal_proxy_enabled"].(bool),
-		InternalProxyLogging: settings["internal_proxy_logging"].(bool),
+		InternalProxyEnabled:     settings["internal_proxy_enabled"].(bool),
+		InternalProxyLogging:     settings["internal_proxy_logging"].(bool),
+		InternalProxyLoggingBody: settings["internal_proxy_logging_body"].(bool),
 
 		AntizapretEnabled: settings["antizapret_enabled"].(bool),
 

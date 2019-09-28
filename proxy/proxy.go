@@ -76,7 +76,7 @@ func handleResponse(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 	defer ctx.Req.Body.Close()
 
 	if config.Get().InternalProxyLogging {
-		dumpResponse(resp, ctx, true, false)
+		dumpResponse(resp, ctx, true, config.Get().InternalProxyLoggingBody)
 	} else {
 		dumpResponse(resp, ctx, false, false)
 	}
@@ -155,6 +155,7 @@ func StartProxy() *http.Server {
 	}
 
 	cfbypass.LogEnabled = config.Get().InternalProxyLogging
+	cfbypass.LogBodyEnabled = config.Get().InternalProxyLoggingBody
 
 	srv := &http.Server{
 		Addr:    ":" + strconv.Itoa(ProxyPort),
