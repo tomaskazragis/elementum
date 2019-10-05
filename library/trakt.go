@@ -134,7 +134,7 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 	started := time.Now()
 	defer func() {
 		log.Debugf("Trakt sync watched for '%d' finished in %s", itemType, time.Since(started))
-		RefreshUIDs()
+		RefreshUIDsRunner(true)
 	}()
 
 	cacheStore := cache.NewDBStore()

@@ -72,8 +72,8 @@ type Show struct {
 	Title     string
 	Year      int
 	DateAdded time.Time
-	Seasons   map[int]*Season
-	Episodes  map[int]*Episode
+	Seasons   []*Season
+	Episodes  []*Episode
 	UIDs      *UniqueIDs
 	XbmcUIDs  *xbmc.UniqueIDs
 }

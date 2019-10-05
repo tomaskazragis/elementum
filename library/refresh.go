@@ -184,8 +184,8 @@ func RefreshShows() error {
 		l.tempShows = append(l.tempShows, &Show{
 			ID:        s.ID,
 			Title:     s.Title,
-			Seasons:   map[int]*Season{},
-			Episodes:  map[int]*Episode{},
+			Seasons:   []*Season{},
+			Episodes:  []*Episode{},
 			Year:      s.Year,
 			DateAdded: s.DateAdded.Time,
 			UIDs:      &UniqueIDs{Kodi: s.ID, Playcount: s.PlayCount},
@@ -285,20 +285,20 @@ func RefreshSeasons() error {
 		}
 
 		if _, ok := cleanupCheck[s.TVShowID]; !ok {
-			c.Seasons = map[int]*Season{}
+			c.Seasons = []*Season{}
 			cleanupCheck[s.TVShowID] = true
 		}
 
 		s.UniqueIDs.Kodi = s.ID
 
-		c.Seasons[s.ID] = &Season{
+		c.Seasons = append(c.Seasons, &Season{
 			ID:       s.ID,
 			Title:    s.Title,
 			Season:   s.Season,
 			Episodes: s.Episodes,
 			UIDs:     &UniqueIDs{Kodi: s.ID, Playcount: s.PlayCount},
 			XbmcUIDs: &s.UniqueIDs,
-		}
+		})
 	}
 
 	return nil
@@ -327,7 +327,7 @@ func RefreshEpisodes() error {
 		}
 
 		if _, ok := cleanupCheck[e.TVShowID]; !ok {
-			c.Episodes = map[int]*Episode{}
+			c.Episodes = []*Episode{}
 			cleanupCheck[e.TVShowID] = true
 		}
 
@@ -337,7 +337,7 @@ func RefreshEpisodes() error {
 		e.UniqueIDs.Trakt = ""
 		e.UniqueIDs.Unknown = ""
 
-		c.Episodes[e.ID] = &Episode{
+		c.Episodes = append(c.Episodes, &Episode{
 			ID:        e.ID,
 			Title:     e.Title,
 			Season:    e.Season,
@@ -347,11 +347,11 @@ func RefreshEpisodes() error {
 			Resume:    &Resume{},
 			UIDs:      &UniqueIDs{Kodi: e.ID, Playcount: e.PlayCount},
 			XbmcUIDs:  &e.UniqueIDs,
-		}
+		})
 
 		if e.Resume != nil {
-			c.Episodes[e.ID].Resume.Position = e.Resume.Position
-			c.Episodes[e.ID].Resume.Total = e.Resume.Total
+			c.Episodes[len(c.Episodes)-1].Resume.Position = e.Resume.Position
+			c.Episodes[len(c.Episodes)-1].Resume.Total = e.Resume.Total
 		}
 	}
 
@@ -437,7 +437,24 @@ func RefreshEpisode(kodiID, action int) {
 	}
 
 	l.mu.Shows.Lock()
-	delete(l.Shows[s.UIDs.Kodi].Episodes, kodiID)
+	sIndex := -1
+	eIndex := -1
+	for i, sh := range l.Shows {
+		if sh.ID == s.UIDs.Kodi {
+			sIndex = i
+			break
+		}
+	}
+
+	for i, e := range l.Shows[sIndex].Episodes {
+		if e.ID == kodiID {
+			eIndex = i
+			break
+		}
+	}
+	if eIndex != -1 {
+		l.Shows[sIndex].Episodes = append(l.Shows[sIndex].Episodes[:eIndex], l.Shows[sIndex].Episodes[eIndex+1:]...)
+	}
 	l.mu.Shows.Unlock()
 
 	RefreshUIDs()
@@ -446,7 +463,12 @@ func RefreshEpisode(kodiID, action int) {
 // RefreshUIDs updates unique IDs for each library item
 // This collects already saved UIDs for easier access
 func RefreshUIDs() error {
-	if l.Running.IsTrakt || l.Running.IsKodi {
+	return RefreshUIDsRunner(false)
+}
+
+// RefreshUIDsRunner completes RefreshUIDs target
+func RefreshUIDsRunner(force bool) error {
+	if !force && (l.Running.IsTrakt || l.Running.IsKodi) {
 		return nil
 	}
 
@@ -474,6 +496,7 @@ func RefreshUIDs() error {
 				xxhash.Sum64String(fmt.Sprintf("%d_%d_%s", MovieType, IMDBScraper, m.UIDs.IMDB)))
 		}
 	}
+
 	for _, s := range l.Shows {
 		s.UIDs.MediaType = ShowType
 		l.UIDs = append(l.UIDs, s.UIDs)
