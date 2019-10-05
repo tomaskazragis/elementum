@@ -406,14 +406,14 @@ func RefreshShow(kodiID, action int) {
 
 		l.mu.Shows.Lock()
 		foundIndex := -1
-		for i, s := range l.tempShows {
+		for i, s := range l.Shows {
 			if s.UIDs.Kodi == kodiID {
 				foundIndex = i
 				break
 			}
 		}
 		if foundIndex != -1 {
-			l.tempShows = append(l.tempShows[:foundIndex], l.tempShows[foundIndex+1:]...)
+			l.Shows = append(l.Shows[:foundIndex], l.Shows[foundIndex+1:]...)
 		}
 		l.mu.Shows.Unlock()
 	}

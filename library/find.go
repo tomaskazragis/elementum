@@ -113,7 +113,7 @@ func GetShowByTMDB(id int) (*Show, error) {
 
 // findShowByKodi ...
 func findShowByKodi(id int) (*Show, error) {
-	if len(l.Shows) == 0 {
+	if len(l.tempShows) != 0 {
 		for _, s := range l.tempShows {
 			if s != nil && s.UIDs.Kodi == id {
 				return s, nil
