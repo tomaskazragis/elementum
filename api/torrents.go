@@ -106,7 +106,7 @@ func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
 
 // InTorrentsHistory ...
 func InTorrentsHistory(infohash string) *bittorrent.TorrentFile {
-	if !config.Get().UseTorrentHistory {
+	if !config.Get().UseTorrentHistory || infohash == "" {
 		return nil
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/elgatito/elementum/database"
 	"github.com/elgatito/elementum/xbmc"
 
+	"github.com/asdine/storm"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,10 +24,7 @@ func History(ctx *gin.Context) {
 
 	items := []*xbmc.ListItem{}
 	var ths []database.TorrentHistory
-	if err := database.GetStormDB().All(&ths); err != nil {
-		log.Infof("Could not get list of history items: %s", err)
-	}
-	if err := database.GetStormDB().AllByIndex("Dt", &ths); err != nil {
+	if err := database.GetStormDB().AllByIndex("Dt", &ths, storm.Reverse()); err != nil {
 		log.Infof("Could not get list of history items: %s", err)
 	}
 
