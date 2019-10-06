@@ -97,10 +97,19 @@ func ResetCustomPath(ctx *gin.Context) {
 // OpenCustomPath ...
 func OpenCustomPath(ctx *gin.Context) {
 	path := ctx.Params.ByName("path")
+	loc := ""
 
 	if path == "library" {
-		log.Debugf("Opening %s in Kodi browser", config.Get().LibraryPath)
-		xbmc.OpenDirectory(config.Get().LibraryPath)
+		loc = config.Get().LibraryPath
+	} else if path == "torrents" {
+		loc = config.Get().TorrentsPath
+	} else if path == "download" {
+		loc = config.Get().DownloadPath
+	}
+
+	if loc != "" {
+		log.Debugf("Opening %s in Kodi browser", loc)
+		xbmc.OpenDirectory(loc)
 	}
 }
 
