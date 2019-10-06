@@ -684,13 +684,19 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 		return nil, errAuth
 	}
 
-	watchedShows, errWatched := WatchedShows(false)
+	cacheStore := cache.NewDBStore()
+
+	lastActivities, err := GetLastActivities()
+	var previousActivities UserActivities
+	_ = cacheStore.Get("com.trakt.last_activities", &previousActivities)
+
+	// If last watched time was changed - we should get fresh Watched shows list
+	isRefresh := !lastActivities.Episodes.WatchedAt.Equal(previousActivities.Episodes.WatchedAt)
+	watchedShows, errWatched := WatchedShows(isRefresh)
 	if errWatched != nil {
 		log.Errorf("Error getting the watched shows: %v", errWatched)
 		return nil, errWatched
 	}
-
-	cacheStore := cache.NewDBStore()
 
 	key := "com.trakt.episodes.watched.%d"
 	watchedKey := "com.trakt.progress.episodes.watched.%d"
@@ -725,14 +731,13 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 				wg.Done()
 			}()
 
-			if err := cacheStore.Get(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), &cachedWatchedAt); err == nil && !show.LastWatchedAt.After(cachedWatchedAt) {
+			if err := cacheStore.Get(fmt.Sprintf(watchedKey, show.Show.IDs.Trakt), &cachedWatchedAt); err == nil && show.LastWatchedAt.Equal(cachedWatchedAt) {
 				if err := cacheStore.Get(fmt.Sprintf(key, show.Show.IDs.Trakt), &watchedProgressShow); err == nil {
 					return
 				}
 			}
 
 			endPoint := fmt.Sprintf("shows/%d/progress/watched", show.Show.IDs.Trakt)
-
 			resp, err := GetWithAuth(endPoint, params)
 			if err != nil {
 				log.Errorf("Error getting endpoint %s for show '%d': %#v", endPoint, show.Show.IDs.Trakt, err)
@@ -745,7 +750,7 @@ func WatchedShowsProgress() (shows []*ProgressShow, err error) {
 				log.Warningf("Can't unmarshal response: %#v", err)
 			}
 
-			cacheStore.Set(fmt.Sprintf(key, show.Show.IDs.Trakt), watchedProgressShow, progressExpiration)
+			cacheStore.Set(fmt.Sprintf(key, show.Show.IDs.Trakt), &watchedProgressShow, progressExpiration)
 		}(i, show)
 	}
 	wg.Wait()
