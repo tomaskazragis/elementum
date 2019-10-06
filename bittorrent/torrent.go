@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 	"unsafe"
@@ -23,7 +25,9 @@ import (
 
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
+	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
+	"github.com/elgatito/elementum/xbmc"
 )
 
 // Torrent ...
@@ -820,6 +824,19 @@ func (t *Torrent) UnDownloadAllFiles() {
 	t.FetchDBItem()
 }
 
+// SaveDBFiles ...
+func (t *Torrent) SaveDBFiles() {
+	selected := []string{}
+	for _, f := range t.files {
+		if f.Selected {
+			selected = append(selected, f.Path)
+		}
+	}
+
+	database.GetStorm().UpdateBTItemFiles(t.infoHash, selected)
+	t.FetchDBItem()
+}
+
 // DownloadFile ...
 func (t *Torrent) DownloadFile(addFile *File) {
 	addFile.Selected = true
@@ -1281,4 +1298,78 @@ func (t *Torrent) byteRegionPieces(off, size int64) (begin, end int) {
 // GetFiles returns all files of a torrent
 func (t *Torrent) GetFiles() []*File {
 	return t.files
+}
+
+// ChooseFile asks user to select file
+func (t *Torrent) ChooseFile() (int, *File) {
+	files := t.GetFiles()
+	choices := make([]*CandidateFile, 0, len(files))
+	for index, f := range files {
+		fileName := filepath.Base(f.Path)
+		candidate := &CandidateFile{
+			Index:       index,
+			Filename:    fileName,
+			DisplayName: files[index].Path,
+		}
+		choices = append(choices, candidate)
+	}
+
+	TrimChoices(choices)
+
+	// Adding sizes to file names
+	for _, c := range choices {
+		c.DisplayName += " [" + humanize.Bytes(uint64(files[c.Index].Size)) + "]"
+	}
+
+	items := make([]string, 0, len(choices))
+	for _, choice := range choices {
+		items = append(items, choice.DisplayName)
+	}
+
+	choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
+	if choice >= 0 {
+		t.DownloadFile(files[choices[choice].Index])
+		t.SaveDBFiles()
+		return choice, files[choices[choice].Index]
+	}
+
+	return -1, nil
+}
+
+// GetPlayURL returns url ready for Kodi
+func (t *Torrent) GetPlayURL(fileIndex string) string {
+	var (
+		tmdbID      string
+		show        string
+		season      string
+		episode     string
+		contentType string
+	)
+
+	toBeAdded := ""
+	if t.DBItem != nil && t.DBItem.Type != "" {
+		contentType = t.DBItem.Type
+		if contentType == movieType {
+			tmdbID = strconv.Itoa(t.DBItem.ID)
+			if movie := tmdb.GetMovie(t.DBItem.ID, config.Get().Language); movie != nil {
+				toBeAdded = fmt.Sprintf("%s (%d)", movie.OriginalTitle, movie.Year())
+			}
+		} else {
+			show = strconv.Itoa(t.DBItem.ShowID)
+			season = strconv.Itoa(t.DBItem.Season)
+			episode = strconv.Itoa(t.DBItem.Episode)
+			if show := tmdb.GetShow(t.DBItem.ShowID, config.Get().Language); show != nil {
+				toBeAdded = fmt.Sprintf("%s S%02dE%02d", show.OriginalName, t.DBItem.Season, t.DBItem.Episode)
+			}
+		}
+	}
+
+	return URLQuery(fmt.Sprintf(URLForXBMC("/play")+"/%s", url.PathEscape(toBeAdded)),
+		"resume", t.InfoHash(),
+		"type", contentType,
+		"index", fileIndex,
+		"tmdb", tmdbID,
+		"show", show,
+		"season", season,
+		"episode", episode)
 }

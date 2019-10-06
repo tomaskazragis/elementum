@@ -1007,9 +1007,9 @@ func (s *Service) cleanStaleFiles(dir string, ext string) {
 		}
 
 		if err := os.Remove(staleFile); err != nil {
-			log.Error(err)
+			log.Errorf("Error removing file %s: %s", staleFile, err)
 		} else {
-			log.Info("Removed", staleFile)
+			log.Infof("Removed stale file %s", staleFile)
 		}
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"mime/multipart"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,7 +20,6 @@ import (
 	"github.com/elgatito/elementum/bittorrent"
 	"github.com/elgatito/elementum/config"
 	"github.com/elgatito/elementum/database"
-	"github.com/elgatito/elementum/tmdb"
 	"github.com/elgatito/elementum/util"
 	"github.com/elgatito/elementum/xbmc"
 )
@@ -73,7 +71,7 @@ func AddToTorrentsMap(tmdbID string, torrent *bittorrent.TorrentFile) {
 
 // InTorrentsMap ...
 func InTorrentsMap(tmdbID string) *bittorrent.TorrentFile {
-	if !config.Get().UseCacheSelection {
+	if !config.Get().UseCacheSelection || tmdbID == "" {
 		return nil
 	}
 
@@ -212,39 +210,7 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 				color = "red"
 			}
 
-			var (
-				tmdbID      string
-				show        string
-				season      string
-				episode     string
-				contentType string
-			)
-
-			toBeAdded := ""
-			if t.DBItem != nil && t.DBItem.Type != "" {
-				contentType = t.DBItem.Type
-				if contentType == movieType {
-					tmdbID = strconv.Itoa(t.DBItem.ID)
-					if movie := tmdb.GetMovie(t.DBItem.ID, config.Get().Language); movie != nil {
-						toBeAdded = fmt.Sprintf("%s (%d)", movie.OriginalTitle, movie.Year())
-					}
-				} else {
-					show = strconv.Itoa(t.DBItem.ShowID)
-					season = strconv.Itoa(t.DBItem.Season)
-					episode = strconv.Itoa(t.DBItem.Episode)
-					if show := tmdb.GetShow(t.DBItem.ShowID, config.Get().Language); show != nil {
-						toBeAdded = fmt.Sprintf("%s S%02dE%02d", show.OriginalName, t.DBItem.Season, t.DBItem.Episode)
-					}
-				}
-			}
-
-			playURL := URLQuery(fmt.Sprintf(URLForXBMC("/play")+"/%s", url.PathEscape(toBeAdded)),
-				"resume", t.InfoHash(),
-				"type", contentType,
-				"tmdb", tmdbID,
-				"show", show,
-				"season", season,
-				"episode", episode)
+			playURL := t.GetPlayURL("")
 
 			item := xbmc.ListItem{
 				Label: fmt.Sprintf("%.2f%% - [COLOR %s]%s[/COLOR] - %s", progress, color, status, torrentName),
@@ -264,6 +230,8 @@ func ListTorrents(s *bittorrent.Service) gin.HandlerFunc {
 			}
 
 			if !s.IsMemoryStorage() {
+				item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30573]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/selectfile/%s", t.InfoHash()))})
+
 				if t.HasAvailableFiles() {
 					item.ContextMenu = append(item.ContextMenu, []string{"LOCALIZE[30531]", fmt.Sprintf("XBMC.RunPlugin(%s)", URLForXBMC("/torrents/downloadall/%s", t.InfoHash()))})
 				} else {
@@ -417,34 +385,9 @@ func AddTorrent(s *bittorrent.Service) gin.HandlerFunc {
 			torrentsLog.Infof("Selecting all files for download")
 			t.DownloadAllFiles()
 		} else {
-			// Asking to select downloaded file
-			files := t.GetFiles()
-			choices := make([]*bittorrent.CandidateFile, 0, len(files))
-			for index, f := range files {
-				fileName := filepath.Base(f.Path)
-				candidate := &bittorrent.CandidateFile{
-					Index:       index,
-					Filename:    fileName,
-					DisplayName: files[index].Path,
-				}
-				choices = append(choices, candidate)
-			}
-
-			bittorrent.TrimChoices(choices)
-
-			// Adding sizes to file names
-			for _, c := range choices {
-				c.DisplayName += " [" + humanize.Bytes(uint64(files[c.Index].Size)) + "]"
-			}
-
-			items := make([]string, 0, len(choices))
-			for _, choice := range choices {
-				items = append(items, choice.DisplayName)
-			}
-
-			choice := xbmc.ListDialog("LOCALIZE[30223]", items...)
-			if choice >= 0 {
-				t.DownloadFile(files[choices[choice].Index])
+			choice, file := t.ChooseFile()
+			if choice >= 0 && file != nil {
+				t.DownloadFile(file)
 			}
 		}
 
@@ -588,6 +531,30 @@ func UnDownloadAllTorrent(s *bittorrent.Service) gin.HandlerFunc {
 		}
 
 		torrent.UnDownloadAllFiles()
+
+		xbmc.Refresh()
+		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		ctx.String(200, "")
+	}
+}
+
+// SelectFileTorrent ...
+func SelectFileTorrent(s *bittorrent.Service) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		torrentID := ctx.Params.ByName("torrentId")
+		torrent, err := GetTorrentFromParam(s, torrentID)
+		if err != nil {
+			ctx.Error(fmt.Errorf("Unable to select files for torrent with index %s", torrentID))
+			return
+		}
+
+		choice, file := torrent.ChooseFile()
+		if choice >= 0 && file != nil {
+			url := torrent.GetPlayURL(strconv.Itoa(choice))
+			log.Debugf("Triggering play for: %s", url)
+			xbmc.PlayURL(url)
+			return
+		}
 
 		xbmc.Refresh()
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
