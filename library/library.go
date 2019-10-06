@@ -904,11 +904,15 @@ func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) erro
 func deleteDBItem(tmdbID int, mediaType int) error {
 	var li database.LibraryItem
 	if err := database.GetStormDB().One("TmdbID", strconv.Itoa(tmdbID), &li); err != nil {
+		log.Debugf("Cannot find deleted item: %s", err)
 		return err
 	}
 
 	li.State = StateDeleted
-	database.GetStormDB().Update(&li)
+	if err := database.GetStormDB().Update(&li); err != nil {
+		log.Debugf("Cannot update deleted item: %s", err)
+		return err
+	}
 	return nil
 }
 
