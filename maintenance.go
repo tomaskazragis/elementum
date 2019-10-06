@@ -172,7 +172,6 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		// TODO: Do we need this endpoint?
 
 	case "VideoLibrary.OnUpdate":
-		time.Sleep(300 * time.Millisecond) // Because Kodi...
 		var request struct {
 			Item struct {
 				ID   int    `json:"id"`
@@ -187,20 +186,22 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
-		if request.Added || request.Playcount != -1 {
-			library.MarkKodiUpdated()
-		}
+		go func() {
+			if request.Added || request.Playcount != -1 {
+				library.MarkKodiUpdated()
+			}
 
-		if request.Item.Type == movieType {
-			library.RefreshMovie(request.Item.ID, library.ActionUpdate)
-			library.PlanMoviesUpdate()
-		} else if request.Item.Type == showType {
-			library.RefreshShow(request.Item.ID, library.ActionUpdate)
-			library.PlanShowsUpdate()
-		} else if request.Item.Type == episodeType {
-			library.RefreshEpisode(request.Item.ID, library.ActionUpdate)
-			library.PlanShowsUpdate()
-		}
+			if request.Item.Type == movieType {
+				library.RefreshMovie(request.Item.ID, library.ActionUpdate)
+				library.PlanMoviesUpdate()
+			} else if request.Item.Type == showType {
+				library.RefreshShow(request.Item.ID, library.ActionUpdate)
+				library.PlanShowsUpdate()
+			} else if request.Item.Type == episodeType {
+				library.RefreshEpisode(request.Item.ID, library.ActionUpdate)
+				library.PlanShowsUpdate()
+			}
+		}()
 
 	case "VideoLibrary.OnRemove":
 		var item struct {
@@ -212,13 +213,15 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 			return
 		}
 
-		if item.Type == movieType {
-			library.RefreshMovie(item.ID, library.ActionSafeDelete)
-		} else if item.Type == showType {
-			library.RefreshShow(item.ID, library.ActionSafeDelete)
-		} else if item.Type == episodeType {
-			library.RefreshEpisode(item.ID, library.ActionSafeDelete)
-		}
+		go func() {
+			if item.Type == movieType {
+				library.RefreshMovie(item.ID, library.ActionSafeDelete)
+			} else if item.Type == showType {
+				library.RefreshShow(item.ID, library.ActionSafeDelete)
+			} else if item.Type == episodeType {
+				library.RefreshEpisode(item.ID, library.ActionSafeDelete)
+			}
+		}()
 
 	case "VideoLibrary.OnScanStarted":
 		go library.MarkKodiRefresh()
