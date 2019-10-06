@@ -1,6 +1,8 @@
 package xbmc
 
-import "time"
+import (
+	"time"
+)
 
 // DialogProgress ...
 type DialogProgress struct {
@@ -176,23 +178,38 @@ func Dialog(title string, message string) bool {
 
 // DialogConfirm ...
 func DialogConfirm(title string, message string) bool {
-	retVal := 0
-	executeJSONRPCEx("Dialog_Confirm", &retVal, Args{title, message})
-	return retVal != 0
+	return dialogConfirmRunner(title, message, false)
 }
 
 // DialogConfirmFocused ...
 func DialogConfirmFocused(title string, message string) bool {
-	// Emulating left click to make "OK predefined"
+	return dialogConfirmRunner(title, message, true)
+}
+
+func dialogConfirmRunner(title, message string, focused bool) bool {
+	c1 := make(chan bool, 1)
 	go func() {
-		time.Sleep(time.Millisecond * 200)
+		// Emulating left click to make "OK predefined"
+		if focused {
+			go func() {
+				time.Sleep(time.Millisecond * 200)
+				retVal := 0
+				executeJSONRPC("Input.Left", &retVal, nil)
+			}()
+		}
+
 		retVal := 0
-		executeJSONRPC("Input.Left", &retVal, nil)
+		executeJSONRPCEx("Dialog_Confirm", &retVal, Args{title, message})
+		c1 <- retVal != 0
 	}()
 
-	retVal := 0
-	executeJSONRPCEx("Dialog_Confirm", &retVal, Args{title, message})
-	return retVal != 0
+	select {
+	case res := <-c1:
+		return res
+	case <-time.After(time.Duration(DialogAutoclose) * time.Second):
+		CloseAllDialogs()
+		return focused
+	}
 }
 
 // DialogText ...

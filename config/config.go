@@ -55,6 +55,8 @@ type Configuration struct {
 	ResultsPerPage            int
 	EnableOverlayStatus       bool
 	SilentStreamStart         bool
+	AutoYesEnabled            bool
+	AutoYesTimeout            int
 	ChooseStreamAuto          bool
 	ForceLinkType             bool
 	UseOriginalTitle          bool
@@ -493,6 +495,8 @@ func Reload() *Configuration {
 		ResultsPerPage:            settings["results_per_page"].(int),
 		EnableOverlayStatus:       settings["enable_overlay_status"].(bool),
 		SilentStreamStart:         settings["silent_stream_start"].(bool),
+		AutoYesEnabled:            settings["autoyes_enabled"].(bool),
+		AutoYesTimeout:            settings["autoyes_timeout"].(int),
 		ChooseStreamAuto:          settings["choose_stream_auto"].(bool),
 		ForceLinkType:             settings["force_link_type"].(bool),
 		UseOriginalTitle:          settings["use_original_title"].(bool),
@@ -722,6 +726,12 @@ func Reload() *Configuration {
 
 	if newConfig.SessionSave == 0 {
 		newConfig.SessionSave = 10
+	}
+
+	if newConfig.AutoYesEnabled {
+		xbmc.DialogAutoclose = newConfig.AutoYesTimeout
+	} else {
+		xbmc.DialogAutoclose = 1200
 	}
 
 	lock.Lock()

@@ -32,8 +32,14 @@ const (
 	IconOverlayHD
 )
 
-// KodiVersion saves Kodi platform
-var KodiVersion = 0
+var (
+	// KodiVersion saves Kodi platform
+	KodiVersion = 0
+
+	// DialogAutoclose determines number of seconds to wait
+	// until DialogConfirm should be automatically closed
+	DialogAutoclose = 0
+)
 
 // ListItems ...
 type ListItems []*ListItem
