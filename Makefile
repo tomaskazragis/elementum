@@ -48,8 +48,7 @@ else ifeq ($(TARGET_OS), darwin)
 else ifeq ($(TARGET_OS), linux)
 	EXT =
 	GOOS = linux
-	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-L $(CROSS_ROOT)/lib/ -lm -lstdc++ -static -flto=auto"
-	CFLAGS += -flto=auto
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-L $(CROSS_ROOT)/lib/ -lm -lstdc++ -static"
 else ifeq ($(TARGET_OS), android)
 	EXT =
 	GOOS = android
@@ -140,16 +139,16 @@ vendor_windows:
 	find $(shell go env GOPATH)/pkg/$(GOOS)_$(GOARCH) -name *.dll -exec cp -f {} $(BUILD_PATH) \;
 
 vendor_android:
-	# cp $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so $(BUILD_PATH)
-	# chmod +rx $(BUILD_PATH)/libc++_shared.so
-	cp $(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so $(BUILD_PATH)
-	chmod +rx $(BUILD_PATH)/libgnustl_shared.so
+	cp $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so $(BUILD_PATH)
+	chmod +rx $(BUILD_PATH)/libc++_shared.so
+	# cp $(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so $(BUILD_PATH)
+	# chmod +rx $(BUILD_PATH)/libgnustl_shared.so
 
 vendor_libs_windows:
 
 vendor_libs_android:
-	# $(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
-	$(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so
+	$(CROSS_ROOT)/sysroot/usr/lib/$(CROSS_TRIPLE)/libc++_shared.so
+	# $(CROSS_ROOT)/$(CROSS_TRIPLE)/lib/libgnustl_shared.so
 
 elementum: $(BUILD_PATH)/$(OUTPUT_NAME)
 
