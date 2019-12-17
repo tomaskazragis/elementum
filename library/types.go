@@ -26,8 +26,8 @@ type Library struct {
 	// Stores all the unique IDs collected
 	UIDs []*UniqueIDs
 
-	Movies    []*Movie
-	Shows     []*Show
+	Movies []*Movie
+	Shows  []*Show
 
 	WatchedTrakt []uint64
 
@@ -36,10 +36,10 @@ type Library struct {
 }
 
 type lMutex struct {
-	UIDs      sync.RWMutex
-	Movies    sync.RWMutex
-	Shows     sync.RWMutex
-	Trakt     sync.RWMutex
+	UIDs   sync.RWMutex
+	Movies sync.RWMutex
+	Shows  sync.RWMutex
+	Trakt  sync.RWMutex
 }
 
 // UniqueIDs represents all IDs for a library item
@@ -140,4 +140,19 @@ func (r *Resume) Reset() {
 	log.Debugf("Resetting stored resume position")
 	r.Position = 0
 	r.Total = 0
+}
+
+// IsWatched returns watched state
+func (e *Episode) IsWatched() bool {
+	return e.UIDs != nil && e.UIDs.Playcount != 0
+}
+
+// IsWatched returns watched state
+func (s *Show) IsWatched() bool {
+	return s.UIDs != nil && s.UIDs.Playcount != 0
+}
+
+// IsWatched returns watched state
+func (m *Movie) IsWatched() bool {
+	return m.UIDs != nil && m.UIDs.Playcount != 0
 }

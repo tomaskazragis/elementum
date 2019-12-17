@@ -166,13 +166,13 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 			if r := getKodiMovieByTraktIDs(m.Movie.IDs); r != nil {
 				watchedTraktMovies = append(watchedTraktMovies, r.UIDs.TMDB)
 
-				if _, ok := lastPlaycount[xxhash.Sum64String(r.File)]; ok && r.UIDs.Playcount == 0 {
+				if _, ok := lastPlaycount[xxhash.Sum64String(r.File)]; ok && !r.IsWatched() {
 					delete(lastPlaycount, xxhash.Sum64String(r.File))
 					continue
 				}
 				lastPlaycount[xxhash.Sum64String(r.File)] = true
 
-				if r.UIDs.Playcount == 0 || r.DateAdded.After(m.LastWatchedAt) {
+				if !r.IsWatched() || r.DateAdded.After(m.LastWatchedAt) {
 					updateMovieWatched(m, true)
 				}
 			}
@@ -203,14 +203,14 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 			}
 
 			has := hasItem(watchedTraktMovies, m.UIDs.TMDB)
-			if (has && m.UIDs.Playcount != 0) || (!has && m.UIDs.Playcount == 0) {
+			if (has && m.IsWatched()) || (!has && !m.IsWatched()) {
 				continue
 			}
 
 			syncMovies = append(syncMovies, &trakt.WatchedItem{
 				MediaType: "movie",
 				Movie:     m.UIDs.TMDB,
-				Watched:   !has && m.UIDs.Playcount != 0,
+				Watched:   !has && m.IsWatched(),
 			})
 		}
 		l.mu.Movies.Unlock()
@@ -239,7 +239,6 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		watchedTraktEpisodes := []int{}
 
 		cacheStore.Get(cacheKey, &lastPlaycount)
-
 		for _, s := range current {
 			tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.IDs.TMDB), config.Get().Language)
 			completedSeasons := 0
@@ -280,13 +279,13 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 						if e := r.GetEpisode(season.Number, episode.Number); e != nil {
 							watchedTraktEpisodes = append(watchedTraktEpisodes, e.UIDs.Kodi)
 
-							if _, ok := lastPlaycount[xxhash.Sum64String(e.File)]; ok && r.UIDs.Playcount == 0 {
+							if _, ok := lastPlaycount[xxhash.Sum64String(e.File)]; ok && !r.IsWatched() {
 								delete(lastPlaycount, xxhash.Sum64String(e.File))
 								continue
 							}
 							lastPlaycount[xxhash.Sum64String(e.File)] = true
 
-							if e.UIDs.Playcount == 0 {
+							if !e.IsWatched() {
 								toRun = true
 							}
 						}
@@ -320,7 +319,7 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 
 			for _, e := range s.Episodes {
 				has := hasItem(watchedTraktEpisodes, e.UIDs.Kodi)
-				if (has && e.UIDs.Playcount != 0) || (!has && e.UIDs.Playcount == 0) {
+				if (has && e.IsWatched()) || (!has && !e.IsWatched()) {
 					continue
 				}
 
@@ -329,7 +328,7 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 					Show:      s.UIDs.TMDB,
 					Season:    e.Season,
 					Episode:   e.Episode,
-					Watched:   !has && e.UIDs.Playcount != 0,
+					Watched:   !has && e.IsWatched(),
 				})
 			}
 		}
@@ -379,10 +378,10 @@ func updateMovieWatched(m *trakt.WatchedMovie, watched bool) {
 		return
 	}
 
-	if watched && r.UIDs.Playcount == 0 {
+	if watched && !r.IsWatched() {
 		r.UIDs.Playcount = 1
 		xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total), m.LastWatchedAt)
-	} else if !watched && r.UIDs.Playcount != 0 {
+	} else if !watched && r.IsWatched() {
 		r.UIDs.Playcount = 0
 		xbmc.SetMoviePlaycount(r.UIDs.Kodi, 0)
 	}
@@ -394,7 +393,7 @@ func updateShowWatched(s *trakt.WatchedShow, watched bool) {
 		return
 	}
 
-	if watched && s.Watched && r.UIDs.Playcount == 0 {
+	if watched && s.Watched && !r.IsWatched() {
 		r.UIDs.Playcount = 1
 		xbmc.SetShowWatchedWithDate(r.UIDs.Kodi, 1, s.LastWatchedAt)
 	}
@@ -403,10 +402,10 @@ func updateShowWatched(s *trakt.WatchedShow, watched bool) {
 		for _, episode := range season.Episodes {
 			e := r.GetEpisode(season.Number, episode.Number)
 			if e != nil {
-				if watched && e.UIDs.Playcount == 0 {
+				if watched && !e.IsWatched() {
 					e.UIDs.Playcount = 1
 					xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total), episode.LastWatchedAt)
-				} else if !watched && e.UIDs.Playcount != 0 {
+				} else if !watched && e.IsWatched() {
 					e.UIDs.Playcount = 0
 					xbmc.SetEpisodePlaycount(e.UIDs.Kodi, 0)
 				}
