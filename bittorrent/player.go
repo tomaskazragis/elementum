@@ -515,17 +515,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			//   in the torrent history table
 			go btp.smartMatch(choices)
 
-			var lastMatched int
-			var foundMatches int
-			// Case-insensitive, starting with a line-start or non-ascii, can have leading zeros, followed by non-ascii
-			// TODO: Add logic for matching S01E0102 (double episode filename)
-			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, btp.p.Season, btp.p.Episode))
-			for index, choice := range choices {
-				if re.MatchString(choice.Filename) {
-					lastMatched = index
-					foundMatches++
-				}
-			}
+			lastMatched, foundMatches := MatchEpisodeFilename(btp.p.Season, btp.p.Episode, false, nil, nil, nil, choices)
 
 			if foundMatches == 1 {
 				return files[choices[lastMatched].Index], nil
@@ -1064,22 +1054,9 @@ func (btp *Player) smartMatch(choices []*CandidateFile) {
 				continue
 			}
 
-			re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, season.Season, episode.EpisodeNumber))
-			for _, choice := range choices {
-				if re.MatchString(choice.Filename) {
-					database.GetStorm().AddTorrentLink(strconv.Itoa(episode.ID), btp.t.InfoHash(), b)
-				}
-			}
-
-			if show.IsAnime() {
-				if an, _ := show.AnimeInfoWithShow(episode, tvdbShow); an != 0 {
-					re := regexp.MustCompile(fmt.Sprintf(singleEpisodeMatchRegex, an))
-					for _, choice := range choices {
-						if re.MatchString(choice.Filename) {
-							database.GetStorm().AddTorrentLink(strconv.Itoa(episode.ID), btp.t.InfoHash(), b)
-						}
-					}
-				}
+			index, found := MatchEpisodeFilename(season.Season, episode.EpisodeNumber, len(show.Seasons) == 1, show, episode, tvdbShow, choices)
+			if index >= 0 && found == 1 {
+				database.GetStorm().AddTorrentLink(strconv.Itoa(episode.ID), btp.t.InfoHash(), b)
 			}
 		}
 	}
@@ -1335,4 +1312,41 @@ func TrimChoices(choices []*CandidateFile) {
 	sort.Slice(choices, func(i, j int) bool {
 		return choices[i].DisplayName < choices[j].DisplayName
 	})
+}
+
+// MatchEpisodeFilename matches season and episode in the filename to get ocurrence
+func MatchEpisodeFilename(s, e int, isSingleSeason bool, show *tmdb.Show, episode *tmdb.Episode, tvdbShow *tvdb.Show, choices []*CandidateFile) (index, found int) {
+	index = -1
+
+	re := regexp.MustCompile(fmt.Sprintf(episodeMatchRegex, s, e))
+	for i, choice := range choices {
+		if re.MatchString(choice.Filename) {
+			index = i
+			found++
+		}
+	}
+
+	if isSingleSeason && found == 0 {
+		re := regexp.MustCompile(fmt.Sprintf(singleEpisodeMatchRegex, e))
+		for i, choice := range choices {
+			if re.MatchString(choice.Filename) {
+				index = i
+				found++
+			}
+		}
+	}
+
+	if show != nil && episode != nil && show.IsAnime() {
+		if an, _ := show.AnimeInfoWithShow(episode, tvdbShow); an != 0 {
+			re := regexp.MustCompile(fmt.Sprintf(singleEpisodeMatchRegex, an))
+			for i, choice := range choices {
+				if re.MatchString(choice.Filename) {
+					index = i
+					found++
+				}
+			}
+		}
+	}
+
+	return
 }
