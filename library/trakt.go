@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	isTraktInitialized bool
+	// IsTraktInitialized used to mark if we need only incremental updates from Trakt
+	IsTraktInitialized bool
 	isKodiUpdated      bool
 )
 
@@ -49,7 +50,7 @@ func RefreshTrakt() error {
 	_ = cacheStore.Get("com.trakt.last_activities", &previousActivities)
 
 	// If nothing changed from last check - skip everything
-	isFirstRun := !isTraktInitialized || isKodiUpdated
+	isFirstRun := !IsTraktInitialized || isKodiUpdated
 	if !lastActivities.All.After(previousActivities.All) && !isFirstRun {
 		return nil
 	}
@@ -63,7 +64,7 @@ func RefreshTrakt() error {
 		l.WatchedTrakt = []uint64{}
 		l.mu.Trakt.Unlock()
 
-		isTraktInitialized = true
+		IsTraktInitialized = true
 		isKodiUpdated = false
 	}
 

@@ -184,6 +184,7 @@ func UpdateTrakt(ctx *gin.Context) {
 	xbmc.Notify("Elementum", "LOCALIZE[30358]", config.AddonIcon())
 	ctx.String(200, "")
 	go func() {
+		library.IsTraktInitialized = false
 		library.RefreshTrakt()
 		if config.Get().LibraryUpdate == 0 || (config.Get().LibraryUpdate == 1 && xbmc.DialogConfirmFocused("Elementum", "LOCALIZE[30288]")) {
 			xbmc.VideoLibraryScan()

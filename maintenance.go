@@ -196,10 +196,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 				library.PlanMoviesUpdate()
 			} else if request.Item.Type == showType {
 				library.RefreshShow(request.Item.ID, library.ActionUpdate)
-				library.PlanShowsUpdate()
 			} else if request.Item.Type == episodeType {
 				library.RefreshEpisode(request.Item.ID, library.ActionUpdate)
-				library.PlanShowsUpdate()
 			}
 		}()
 

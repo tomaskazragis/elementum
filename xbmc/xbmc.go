@@ -293,37 +293,21 @@ func VideoLibraryGetEpisodes(tvshowID int) (episodes *VideoLibraryEpisodes, err 
 }
 
 // VideoLibraryGetAllEpisodes ...
-func VideoLibraryGetAllEpisodes() (episodes *VideoLibraryEpisodes, err error) {
+func VideoLibraryGetAllEpisodes(shows []int) (episodes *VideoLibraryEpisodes, err error) {
 	defer perf.ScopeTimer()()
 
-	list := []interface{}{
-		"tvshowid",
-		"season",
-		"episode",
-		"playcount",
-		"file",
-		"dateadded",
-		"resume",
+	if len(shows) == 0 {
+		return episodes, nil
 	}
-	if KodiVersion > 16 {
-		list = append(list, "uniqueid")
-	}
-	params := map[string]interface{}{"properties": list}
 
-	for tries := 1; tries <= 3; tries++ {
-		err = executeJSONRPCO("VideoLibrary.GetEpisodes", &episodes, params)
-		if episodes == nil || err != nil {
-			time.Sleep(time.Duration(tries*2) * time.Second)
-			continue
+	episodes = &VideoLibraryEpisodes{}
+	for _, showID := range shows {
+		if es, err := VideoLibraryGetEpisodes(showID); err == nil && es != nil && len(es.Episodes) != 0 {
+			episodes.Episodes = append(episodes.Episodes, es.Episodes...)
 		}
-
-		break
 	}
 
-	if err != nil {
-		log.Error(err)
-	}
-	return
+	return episodes, nil
 }
 
 // SetMovieWatched ...

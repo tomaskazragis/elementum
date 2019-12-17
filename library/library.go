@@ -106,6 +106,8 @@ var (
 	initialized = false
 
 	resolveRegexp = regexp.MustCompile(`^plugin://plugin.video.elementum.*?(\d+)(\W|$)`)
+
+	pendingShows = []int{}
 )
 
 var l = &Library{
@@ -298,7 +300,7 @@ func Init() {
 	for {
 		select {
 		case <-watcherTicker.C:
-			if l.Running.IsOverall || l.Running.IsMovies || l.Running.IsShows || l.Running.IsKodi || l.Running.IsTrakt {
+			if l.Running.IsOverall || l.Running.IsMovies || l.Running.IsShows || l.Running.IsEpisodes || l.Running.IsKodi || l.Running.IsTrakt {
 				continue
 			} else if l.Pending.IsKodi {
 				go RefreshKodi()
@@ -308,6 +310,8 @@ func Init() {
 				go RefreshMovies()
 			} else if l.Pending.IsShows {
 				go RefreshShows()
+			} else if l.Pending.IsEpisodes {
+				go RefreshEpisodes()
 			} else if l.Pending.IsOverall {
 				go Refresh()
 			}

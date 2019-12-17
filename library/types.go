@@ -11,11 +11,12 @@ import (
 
 // Status represents library bool statuses
 type Status struct {
-	IsOverall bool
-	IsMovies  bool
-	IsShows   bool
-	IsTrakt   bool
-	IsKodi    bool
+	IsOverall  bool
+	IsMovies   bool
+	IsShows    bool
+	IsEpisodes bool
+	IsTrakt    bool
+	IsKodi     bool
 }
 
 // Library represents library
@@ -27,7 +28,6 @@ type Library struct {
 
 	Movies    []*Movie
 	Shows     []*Show
-	tempShows []*Show
 
 	WatchedTrakt []uint64
 
@@ -39,7 +39,6 @@ type lMutex struct {
 	UIDs      sync.RWMutex
 	Movies    sync.RWMutex
 	Shows     sync.RWMutex
-	tempShows sync.RWMutex
 	Trakt     sync.RWMutex
 }
 

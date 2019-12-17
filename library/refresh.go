@@ -167,21 +167,15 @@ func RefreshShows() error {
 		log.Debugf("Fetched %d shows from Kodi Library in %s", len(shows.Shows), time.Since(started))
 	}()
 
-	if len(l.Shows) == 0 {
-		l.mu.Shows.Lock()
-	}
-
-	l.mu.tempShows.Lock()
-	defer l.mu.tempShows.Unlock()
-
-	l.tempShows = make([]*Show, 0, len(shows.Shows))
+	l.mu.Shows.Lock()
+	l.Shows = make([]*Show, 0, len(shows.Shows))
 	for _, s := range shows.Shows {
 		s.UniqueIDs.Kodi = s.ID
 		if s.UniqueIDs.IMDB == "" && s.IMDBNumber != "" && strings.HasPrefix(s.IMDBNumber, "tt") {
 			s.UniqueIDs.IMDB = s.IMDBNumber
 		}
 
-		l.tempShows = append(l.tempShows, &Show{
+		l.Shows = append(l.Shows, &Show{
 			ID:        s.ID,
 			Title:     s.Title,
 			Seasons:   []*Season{},
@@ -192,8 +186,10 @@ func RefreshShows() error {
 			XbmcUIDs:  &s.UniqueIDs,
 		})
 
-		parseUniqueID(ShowType, l.tempShows[len(l.tempShows)-1].UIDs, l.tempShows[len(l.tempShows)-1].XbmcUIDs, "", l.tempShows[len(l.tempShows)-1].Year)
+		parseUniqueID(ShowType, l.Shows[len(l.Shows)-1].UIDs, l.Shows[len(l.Shows)-1].XbmcUIDs, "", l.Shows[len(l.Shows)-1].Year)
 	}
+
+	l.mu.Shows.Unlock()
 
 	if err := RefreshSeasons(); err != nil {
 		log.Debugf("RefreshSeasons got an error: %v", err)
@@ -204,7 +200,8 @@ func RefreshShows() error {
 
 	// TODO: This needs refactor to avoid setting global Lock on processing,
 	// should use temporary container to process and then sync to Shows
-	for _, show := range l.tempShows {
+	l.mu.Shows.Lock()
+	for _, show := range l.Shows {
 		// Step 1: try to get information from what we get from Kodi
 		parseUniqueID(ShowType, show.UIDs, show.XbmcUIDs, "", show.Year)
 
@@ -243,14 +240,6 @@ func RefreshShows() error {
 			parseUniqueID(EpisodeType, e.UIDs, e.XbmcUIDs, "", 0)
 		}
 	}
-
-	if len(l.Shows) == 0 {
-		l.mu.Shows.Unlock()
-	}
-
-	l.mu.Shows.Lock()
-	l.Shows = l.tempShows
-	l.tempShows = nil
 	l.mu.Shows.Unlock()
 
 	return nil
@@ -261,10 +250,12 @@ func RefreshSeasons() error {
 	started := time.Now()
 
 	// Collect all shows IDs for possibly doing one-by-one calls to Kodi
-	shows := make([]int, 0, len(l.tempShows))
-	for _, s := range l.tempShows {
+	l.mu.Shows.Lock()
+	shows := make([]int, 0, len(l.Shows))
+	for _, s := range l.Shows {
 		shows = append(shows, s.ID)
 	}
+	l.mu.Shows.Unlock()
 
 	seasons, err := xbmc.VideoLibraryGetAllSeasons(shows)
 	if err != nil {
@@ -277,6 +268,7 @@ func RefreshSeasons() error {
 		log.Debugf("Fetched %d seasons from Kodi Library in %s", len(seasons.Seasons), time.Since(started))
 	}()
 
+	l.mu.Shows.Lock()
 	cleanupCheck := map[int]bool{}
 	for _, s := range seasons.Seasons {
 		c, err := findShowByKodi(s.TVShowID)
@@ -300,15 +292,47 @@ func RefreshSeasons() error {
 			XbmcUIDs: &s.UniqueIDs,
 		})
 	}
+	l.mu.Shows.Unlock()
 
 	return nil
 }
 
 // RefreshEpisodes updates episodes list for selected show in the library
 func RefreshEpisodes() error {
+	if !l.Running.IsShows && len(pendingShows) == 0 {
+		return nil
+	}
+
+	l.Pending.IsEpisodes = false
+	l.Running.IsEpisodes = true
+
+	defer func() {
+		l.Running.IsEpisodes = false
+	}()
+
 	started := time.Now()
 
-	episodes, err := xbmc.VideoLibraryGetAllEpisodes()
+	var shows []int
+	if len(pendingShows) != 0 {
+		defer func() {
+			RefreshUIDs()
+		}()
+
+		shows = make([]int, 0, len(pendingShows))
+		for _, i := range pendingShows {
+			shows = append(shows, i)
+		}
+		pendingShows = []int{}
+	} else {
+		l.mu.Shows.Lock()
+		shows = make([]int, 0, len(l.Shows))
+		for _, i := range l.Shows {
+			shows = append(shows, i.XbmcUIDs.Kodi)
+		}
+		l.mu.Shows.Unlock()
+	}
+
+	episodes, err := xbmc.VideoLibraryGetAllEpisodes(shows)
 	if err != nil {
 		return err
 	} else if episodes == nil || episodes.Episodes == nil {
@@ -319,6 +343,7 @@ func RefreshEpisodes() error {
 		log.Debugf("Fetched %d episodes from Kodi Library in %s", len(episodes.Episodes), time.Since(started))
 	}()
 
+	l.mu.Shows.Lock()
 	cleanupCheck := map[int]bool{}
 	for _, e := range episodes.Episodes {
 		c, err := findShowByKodi(e.TVShowID)
@@ -354,6 +379,7 @@ func RefreshEpisodes() error {
 			c.Episodes[len(c.Episodes)-1].Resume.Total = e.Resume.Total
 		}
 	}
+	l.mu.Shows.Unlock()
 
 	return nil
 }
@@ -391,12 +417,13 @@ func RefreshMovie(kodiID, action int) {
 
 // RefreshShow ...
 func RefreshShow(kodiID, action int) {
-	if action == ActionDelete || action == ActionSafeDelete {
-		uids := GetUIDsFromKodi(kodiID)
-		if uids == nil || uids.TMDB == 0 {
-			return
-		}
+	uids := GetUIDsFromKodi(kodiID)
+	if uids == nil || uids.TMDB == 0 {
+		return
+	}
+	PlanShowUpdate(uids.Kodi)
 
+	if action == ActionDelete || action == ActionSafeDelete {
 		if action == ActionDelete {
 			id := strconv.Itoa(uids.TMDB)
 			if _, err := RemoveShow(id); err != nil {
@@ -423,12 +450,14 @@ func RefreshShow(kodiID, action int) {
 
 // RefreshEpisode ...
 func RefreshEpisode(kodiID, action int) {
-	if action != ActionDelete && action != ActionSafeDelete {
+	s, e := GetLibraryEpisode(kodiID)
+	if s == nil || e == nil {
 		return
 	}
 
-	s, e := GetLibraryEpisode(kodiID)
-	if s == nil || e == nil {
+	PlanShowUpdate(s.UIDs.Kodi)
+
+	if action != ActionDelete && action != ActionSafeDelete {
 		return
 	}
 
@@ -904,4 +933,10 @@ func PlanMoviesUpdate() {
 // PlanShowsUpdate ...
 func PlanShowsUpdate() {
 	l.Pending.IsShows = true
+}
+
+// PlanShowUpdate ...
+func PlanShowUpdate(showID int) {
+	pendingShows = append(pendingShows, showID)
+	l.Pending.IsEpisodes = true
 }
