@@ -670,7 +670,7 @@ func RemoveMovie(tmdbID int) (*tmdb.Movie, error) {
 		return nil, err
 	}
 	defer func() {
-		deleteDBItem(tmdbID, MovieType)
+		deleteDBItem(tmdbID, MovieType, true)
 	}()
 
 	ID := strconv.Itoa(tmdbID)
@@ -711,7 +711,7 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 	}
 	ID, _ := strconv.Atoi(tmdbID)
 	defer func() {
-		deleteDBItem(ID, ShowType)
+		deleteDBItem(ID, ShowType, true)
 	}()
 
 	show := tmdb.GetShow(ID, config.Get().StrmLanguage)
@@ -830,6 +830,22 @@ func IsDuplicateShow(tmdbID string) bool {
 	return false
 }
 
+// IsDuplicateShowByInt checks if show exists in the library
+func IsDuplicateShowByInt(tmdbID int) bool {
+	defer perf.ScopeTimer()()
+
+	l.mu.UIDs.Lock()
+	defer l.mu.UIDs.Unlock()
+
+	for _, u := range l.UIDs {
+		if u.TMDB != 0 && u.MediaType == ShowType && u.TMDB == tmdbID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsDuplicateEpisode checks if episode exists in the library
 func IsDuplicateEpisode(tmdbShowID int, seasonNumber int, episodeNumber int) bool {
 	l.mu.Shows.RLock()
@@ -905,14 +921,19 @@ func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) erro
 	return tx.Commit()
 }
 
-func deleteDBItem(tmdbID int, mediaType int) error {
+func deleteDBItem(tmdbID int, mediaType int, removal bool) error {
 	var li database.LibraryItem
 	if err := database.GetStormDB().One("TmdbID", strconv.Itoa(tmdbID), &li); err != nil {
 		log.Debugf("Cannot find deleted item: %s", err)
 		return err
 	}
 
-	li.State = StateDeleted
+	if removal {
+		li.State = StateDeleted
+	} else {
+		li.State = StateActive
+	}
+
 	if err := database.GetStormDB().Update(&li); err != nil {
 		log.Debugf("Cannot update deleted item: %s", err)
 		return err
@@ -1127,27 +1148,28 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 
 	var label string
 	var shows []*trakt.Shows
+	var previous []*trakt.Shows
+	var current []*trakt.Shows
 
 	switch listID {
 	case "watchlist":
-		previous, _ := trakt.PreviousWatchlistShows()
-		current, _ := trakt.WatchlistShows(isUpdateNeeded)
-		shows = trakt.DiffShows(previous, current)
+		previous, _ = trakt.PreviousWatchlistShows()
+		current, _ = trakt.WatchlistShows(isUpdateNeeded)
 
 		label = "LOCALIZE[30254]"
 	case "collection":
-		previous, _ := trakt.PreviousCollectionShows()
-		current, _ := trakt.CollectionShows(isUpdateNeeded)
-		shows = trakt.DiffShows(previous, current)
+		previous, _ = trakt.PreviousCollectionShows()
+		current, _ = trakt.CollectionShows(isUpdateNeeded)
 
 		label = "LOCALIZE[30257]"
 	default:
-		previous, _ := trakt.PreviousListItemsShows(listID)
-		current, _ := trakt.ListItemsShows(listID, isUpdateNeeded)
-		shows = trakt.DiffShows(previous, current)
+		previous, _ = trakt.PreviousListItemsShows(listID)
+		current, _ = trakt.ListItemsShows(listID, isUpdateNeeded)
 
 		label = "LOCALIZE[30263]"
 	}
+
+	shows = DiffTraktShows(previous, current, IsTraktInitialized)
 
 	if err != nil {
 		log.Error(err)
@@ -1235,6 +1257,28 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 		}
 	}
 	return nil
+}
+
+// DiffTraktShows ...
+func DiffTraktShows(previous, current []*trakt.Shows, isInitialized bool) []*trakt.Shows {
+	ret := make([]*trakt.Shows, 0, len(current))
+	found := false
+	for _, ce := range current {
+		found = false
+		for _, pr := range previous {
+			if pr.Show.IDs.Trakt == ce.Show.IDs.Trakt {
+				found = true
+				break
+			}
+		}
+
+		// If Trakt is not yet initialized - we can leave shows that are not yet in the library
+		if !found || (!isInitialized && !IsDuplicateShowByInt(ce.Show.IDs.TMDB)) {
+			ret = append(ret, ce)
+		}
+	}
+
+	return ret
 }
 
 //

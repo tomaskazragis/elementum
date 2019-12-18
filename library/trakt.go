@@ -152,6 +152,9 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		current, err := trakt.WatchedMovies(isRefreshNeeded)
 		if err != nil {
 			return err
+		} else if len(current) == 0 {
+			// Kind of strange check to make sure Trakt watched items are not empty
+			return nil
 		}
 
 		// Should parse all movies for Watched marks, but process only difference,
@@ -228,6 +231,9 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		current, err := trakt.WatchedShows(isRefreshNeeded)
 		if err != nil {
 			return err
+		} else if len(current) == 0 {
+			// Kind of strange check to make sure Trakt watched items are not empty
+			return nil
 		}
 
 		// Should parse all shows for Watched marks, but process only difference,

@@ -983,7 +983,8 @@ func Request(endPoint string, params napping.Params, isWithAuth bool, isUpdateNe
 	}
 
 	if err := resp.Unmarshal(&ret); err != nil {
-		log.Warning(err)
+		log.Warningf("Cannot unmarshal response: %s", err)
+		return err
 	}
 
 	cacheStore.Set(cacheKey, &ret, cacheExpiration)
@@ -1326,27 +1327,6 @@ func DiffWatchedShows(current, previous []*WatchedShow) (diff []*WatchedShow) {
 	}
 
 	return
-}
-
-// DiffShows ...
-func DiffShows(previous, current []*Shows) []*Shows {
-	ret := make([]*Shows, 0, len(current))
-	found := false
-	for _, ce := range current {
-		found = false
-		for _, pr := range previous {
-			if pr.Show.IDs.Trakt == ce.Show.IDs.Trakt {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			ret = append(ret, ce)
-		}
-	}
-
-	return ret
 }
 
 // DiffWatchedMovies ...
