@@ -423,6 +423,8 @@ func RefreshShow(kodiID, action int) {
 	}
 	PlanShowUpdate(uids.Kodi)
 
+	defer RefreshUIDs()
+
 	if action == ActionDelete || action == ActionSafeDelete {
 		if action == ActionDelete {
 			id := strconv.Itoa(uids.TMDB)
@@ -443,9 +445,9 @@ func RefreshShow(kodiID, action int) {
 			l.Shows = append(l.Shows[:foundIndex], l.Shows[foundIndex+1:]...)
 		}
 		l.mu.Shows.Unlock()
+	} else if action == ActionUpdate {
+		deleteDBItem(uids.TMDB, ShowType, false)
 	}
-
-	RefreshUIDs()
 }
 
 // RefreshEpisode ...
