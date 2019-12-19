@@ -509,7 +509,7 @@ func (btp *Player) chooseFile() (*File, error) {
 			}
 		}
 
-		if btp.p.Episode > 0 {
+		if btp.p.Season > 0 {
 			// In episode search we are using smart-match to store found episodes
 			//   in the torrent history table
 			go btp.smartMatch(choices)
@@ -1074,7 +1074,7 @@ func (btp *Player) GetIdent() {
 			btp.p.Resume = movie.Resume
 			btp.p.UIDs = movie.UIDs
 		}
-	} else if btp.p.ContentType == episodeType {
+	} else if btp.p.ContentType == episodeType && btp.p.Episode > 0 {
 		show, _ := library.GetShowByTMDB(btp.p.ShowID)
 		if show != nil {
 			episode := show.GetEpisode(btp.p.Season, btp.p.Episode)
