@@ -78,6 +78,7 @@ type PlayerParams struct {
 	Seeked          bool
 	WasPlaying      bool
 	WasSeeked       bool
+	DoneAudio       bool
 	DoneSubtitles   bool
 	KodiPosition    int
 	WatchedProgress int
@@ -1178,6 +1179,35 @@ func (btp *Player) findNextEpisode() {
 	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
 
 	log.Debugf("Next episode prepared: %#v", btp.next)
+}
+
+// InitAudio ...
+func (btp *Player) InitAudio() {
+	if btp.p.DoneAudio {
+		return
+	}
+
+	filePath := btp.chosenFile.Path
+	extension := filepath.Ext(filePath)
+
+	if !util.IsAudioExt(extension) {
+		_, f := filepath.Split(filePath)
+		currentPath := f[0 : len(f)-len(extension)]
+		collected := []string{}
+
+		for _, f := range btp.t.files {
+			if strings.Contains(f.Path, currentPath) && util.HasAudioExt(f.Path) {
+				collected = append(collected, util.GetHTTPHost()+"/files/"+f.Path)
+			}
+		}
+
+		if len(collected) > 0 {
+			log.Debugf("Adding player audio tracks: %#v", collected)
+			xbmc.PlayerSetSubtitles(collected)
+		}
+	}
+
+	btp.p.DoneAudio = true
 }
 
 // InitSubtitles ...

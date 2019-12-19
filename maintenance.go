@@ -97,6 +97,8 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 		go p.InitSubtitles()
+		// TODO: enable when find a way to provide external audio tracks
+		// go p.InitAudio()
 
 		if p.Params().WasSeeked {
 			log.Warningf("OnPlay. Player has been seeked already")
