@@ -155,8 +155,10 @@ func ClearDatabaseShows(ctx *gin.Context) {
 func ClearDatabaseTorrentHistory(ctx *gin.Context) {
 	log.Debug("Removing torrent history from database")
 
-	database.GetStormDB().Drop(&database.TorrentAssignMetadata{})
-	database.GetStormDB().Drop(&database.TorrentAssignItem{})
+	var tm database.TorrentAssignMetadata
+	var ti database.TorrentAssignItem
+	database.GetStormDB().Drop(ti)
+	database.GetStormDB().Drop(tm)
 
 	xbmc.Notify("Elementum", "LOCALIZE[30472]", config.AddonIcon())
 
