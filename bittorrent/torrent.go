@@ -295,7 +295,7 @@ func (t *Torrent) Buffer(file *File) {
 
 	startBufferSize := t.Service.GetBufferSize()
 	preBufferStart, preBufferEnd, preBufferOffset, preBufferSize := t.getBufferSize(file.Offset, 0, startBufferSize)
-	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-EndBufferSize, EndBufferSize)
+	postBufferStart, postBufferEnd, postBufferOffset, postBufferSize := t.getBufferSize(file.Offset, file.Size-int64(config.Get().EndBufferSize), int64(config.Get().EndBufferSize))
 
 	// TODO: Remove this piece of buffer adjustment?
 	// if config.Get().AutoAdjustBufferSize && preBufferEnd-preBufferStart < 10 {

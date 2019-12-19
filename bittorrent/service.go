@@ -363,7 +363,7 @@ func (s *Service) configure() {
 
 	log.Infof("DownloadStorage: %s", Storages[s.config.DownloadStorage])
 	if s.IsMemoryStorage() {
-		needSize := s.config.BufferSize + int(EndBufferSize) + 8*1024*1024
+		needSize := s.config.BufferSize + int(s.config.EndBufferSize) + 8*1024*1024
 
 		if config.Get().MemorySize < needSize {
 			log.Noticef("Raising memory size (%d) to fit all the buffer (%d)", config.Get().MemorySize, needSize)
@@ -1392,11 +1392,10 @@ func (s *Service) GetSeedTime() int64 {
 
 // GetBufferSize ...
 func (s *Service) GetBufferSize() int64 {
-	b := int64(s.config.BufferSize)
-	if b < EndBufferSize {
-		return EndBufferSize
+	if s.config.BufferSize < s.config.EndBufferSize {
+		return int64(s.config.EndBufferSize)
 	}
-	return b
+	return int64(s.config.BufferSize)
 }
 
 // GetMemorySize ...

@@ -626,7 +626,7 @@ func GetWithAuth(endPoint string, params url.Values) (resp *napping.Response, er
 		} else if resp.Status() == 401 {
 			err = fmt.Errorf("Trakt access token is not valid, please, re-authorize Trakt")
 			log.Warning(err)
-			xbmc.Notify("Elementum", err.Error(), config.AddonIcon())
+			xbmc.Notify("Elementum", "LOCALIZE[30576]", config.AddonIcon())
 			return err
 		} else if resp.Status() == 429 {
 			log.Warningf("Rate limit exceeded getting %s, cooling down...", endPoint)

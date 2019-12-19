@@ -86,6 +86,7 @@ type Configuration struct {
 	MinCandidateShowSize      int64
 	BufferTimeout             int
 	BufferSize                int
+	EndBufferSize             int
 	KodiBufferSize            int
 	UploadRateLimit           int
 	DownloadRateLimit         int
@@ -474,6 +475,7 @@ func Reload() *Configuration {
 		MinCandidateShowSize:      int64(settings["min_candidate_show_size"].(int) * 1024 * 1024),
 		BufferTimeout:             settings["buffer_timeout"].(int),
 		BufferSize:                settings["buffer_size"].(int) * 1024 * 1024,
+		EndBufferSize:             settings["end_buffer_size"].(int) * 1024 * 1024,
 		UploadRateLimit:           settings["max_upload_rate"].(int) * 1024,
 		DownloadRateLimit:         settings["max_download_rate"].(int) * 1024,
 		AutoloadTorrents:          settings["autoload_torrents"].(bool),
@@ -710,6 +712,9 @@ func Reload() *Configuration {
 	if newConfig.AutoKodiBufferSize && newConfig.KodiBufferSize > newConfig.BufferSize {
 		newConfig.BufferSize = newConfig.KodiBufferSize
 		log.Debugf("Adjusting buffer size according to Kodi advancedsettings.xml configuration to %s", humanize.Bytes(uint64(newConfig.BufferSize)))
+	}
+	if newConfig.EndBufferSize < 1*1024*1024 {
+		newConfig.EndBufferSize = 1 * 1024 * 1024
 	}
 
 	// Read Strm Language settings and cut-off ISO value

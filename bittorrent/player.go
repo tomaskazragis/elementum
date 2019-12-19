@@ -34,10 +34,8 @@ import (
 )
 
 const (
-	// EndBufferSize ...
-	EndBufferSize           int64 = 5400276 // ~5.5mb
-	episodeMatchRegex             = `(?i)(^|\W|_)(S0*%[1]d\W?E0*%[2]d|0*%[1]dx0*%[2]d)(\W|_)`
-	singleEpisodeMatchRegex       = `(?i)(^|\W|_)(E0*%[1]d|0*%[1]d)(\W|_)`
+	episodeMatchRegex       = `(?i)(^|\W|_)(S0*%[1]d\W?E0*%[2]d|0*%[1]dx0*%[2]d)(\W|_)`
+	singleEpisodeMatchRegex = `(?i)(^|\W|_)(E0*%[1]d|0*%[1]d)(\W|_)`
 )
 
 // Player ...
@@ -1174,7 +1172,7 @@ func (btp *Player) findNextEpisode() {
 
 	startBufferSize := btp.s.GetBufferSize()
 	_, _, _, preBufferSize := btp.t.getBufferSize(btp.next.f.Offset, 0, startBufferSize)
-	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-EndBufferSize, EndBufferSize)
+	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-int64(config.Get().EndBufferSize), int64(config.Get().EndBufferSize))
 
 	btp.next.bufferSize = preBufferSize + postBufferSize
 	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
