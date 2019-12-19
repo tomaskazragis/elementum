@@ -45,6 +45,12 @@ func Donate(ctx *gin.Context) {
 	ctx.String(200, "")
 }
 
+// Settings display
+func Settings(ctx *gin.Context) {
+	xbmc.AddonSettings("plugin.video.elementum")
+	ctx.String(200, "")
+}
+
 // Status display
 func Status(ctx *gin.Context) {
 	title := "LOCALIZE[30393]"

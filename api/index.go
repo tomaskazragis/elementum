@@ -31,6 +31,7 @@ func Index(s *bittorrent.Service) gin.HandlerFunc {
 			{Label: "LOCALIZE[30355]", Path: URLForXBMC("/changelog"), Thumbnail: config.AddonResource("img", "faq8.png")},
 			{Label: "LOCALIZE[30393]", Path: URLForXBMC("/status"), Thumbnail: config.AddonResource("img", "clock.png")},
 			{Label: "LOCALIZE[30527]", Path: URLForXBMC("/donate"), Thumbnail: config.AddonResource("img", "faq8.png")},
+			{Label: "LOCALIZE[30579]", Path: URLForXBMC("/settings"), Thumbnail: config.AddonResource("img", "settings.png")},
 		}))
 	}
 }
