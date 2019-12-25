@@ -129,6 +129,8 @@ type Configuration struct {
 	AutoScrapeLimitMovies    int
 	AutoScrapeInterval       int
 
+	TraktClientID                  string
+	TraktClientSecret              string
 	TraktUsername                  string
 	TraktToken                     string
 	TraktRefreshToken              string
@@ -552,6 +554,8 @@ func Reload() *Configuration {
 		AutoScrapeLimitMovies:    settings["autoscrape_limit_movies"].(int),
 		AutoScrapeInterval:       settings["autoscrape_interval"].(int),
 
+		TraktClientID:                  settings["trakt_client_id"].(string),
+		TraktClientSecret:              settings["trakt_client_secret"].(string),
 		TraktUsername:                  settings["trakt_username"].(string),
 		TraktToken:                     settings["trakt_token"].(string),
 		TraktRefreshToken:              settings["trakt_refresh_token"].(string),
@@ -642,6 +646,13 @@ func Reload() *Configuration {
 		CompletedShowsPath:  settings["completed_shows_path"].(string),
 
 		LocalOnlyClient: settings["local_only_client"].(bool),
+	}
+
+	if newConfig.TraktClientID == "" {
+		newConfig.TraktClientID = "2f911cee953f0af7833191d2b929e9a842bf8752e6b1afb458c8ff9ffc1d2c85"
+	}
+	if newConfig.TraktClientSecret == "" {
+		newConfig.TraktClientSecret = "b290a36c1144c4baa937dcc9023b3cd44398cca46975928a3d833f7593f00980"
 	}
 
 	// Fallback for old configuration with additional storage variants
