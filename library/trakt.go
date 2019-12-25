@@ -389,8 +389,8 @@ func updateMovieWatched(m *trakt.WatchedMovie, watched bool) {
 	if watched && !r.IsWatched() {
 		r.UIDs.Playcount = 1
 		xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, 0, 0, m.LastWatchedAt)
-	} else if watched && r.IsWatched() {
-		xbmc.SetMovieProgress(r.UIDs.Kodi, 0, 0)
+	} else if watched && r.IsWatched() && r.Resume != nil && r.Resume.Position > 0 {
+		xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, 0, 0, m.LastWatchedAt)
 	} else if !watched && r.IsWatched() {
 		r.UIDs.Playcount = 0
 		xbmc.SetMoviePlaycount(r.UIDs.Kodi, 0)
@@ -417,8 +417,8 @@ func updateShowWatched(s *trakt.WatchedShow, watched bool) {
 				if watched && !e.IsWatched() {
 					e.UIDs.Playcount = 1
 					xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, 0, 0, episode.LastWatchedAt)
-				} else if watched && e.IsWatched() {
-					xbmc.SetEpisodeProgress(e.UIDs.Kodi, 0, 0)
+				} else if watched && e.IsWatched() && e.Resume != nil && e.Resume.Position > 0 {
+					xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, 0, 0, episode.LastWatchedAt)
 				} else if !watched && e.IsWatched() {
 					e.UIDs.Playcount = 0
 					xbmc.SetEpisodePlaycount(e.UIDs.Kodi, 0)
