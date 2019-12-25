@@ -435,7 +435,7 @@ func (btp *Player) chooseFile() (*File, error) {
 		}
 
 		fileName := filepath.Base(f.Path)
-		re := regexp.MustCompile("(?i).*\\.rar")
+		re := regexp.MustCompile(`(?i).*\.rar$`)
 		if re.MatchString(fileName) && size > 10*1024*1024 {
 			btp.t.IsRarArchive = true
 			if !xbmc.DialogConfirm("Elementum", "LOCALIZE[30303]") {
@@ -807,7 +807,7 @@ func (btp *Player) findExtracted(destPath string) {
 	} else {
 		for _, file := range files {
 			fileName := file.Name()
-			re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
+			re := regexp.MustCompile(`(?i).*\.(mkv|mp4|mov|avi)`)
 			if re.MatchString(fileName) {
 				log.Info("Extracted", fileName)
 				btp.extracted = fileName

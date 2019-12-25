@@ -1233,7 +1233,7 @@ func (s *Service) downloadProgress() {
 						fileName := filepath.Base(filePath)
 
 						extracted := ""
-						re := regexp.MustCompile("(?i).*\\.rar")
+						re := regexp.MustCompile(`(?i).*\.rar$`)
 						if re.MatchString(fileName) {
 							extractedPath := filepath.Join(s.config.DownloadPath, filepath.Dir(filePath), "extracted")
 							files, err := ioutil.ReadDir(extractedPath)
@@ -1245,7 +1245,7 @@ func (s *Service) downloadProgress() {
 							} else {
 								for _, file := range files {
 									fileNameCurrent := file.Name()
-									re := regexp.MustCompile("(?i).*\\.(mkv|mp4|mov|avi)")
+									re := regexp.MustCompile(`(?i).*\.(mkv|mp4|mov|avi)`)
 									if re.MatchString(fileNameCurrent) {
 										extracted = fileNameCurrent
 										break
