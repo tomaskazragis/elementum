@@ -75,15 +75,12 @@ type Show struct {
 	Entity
 
 	EpisodeRunTime      []int        `json:"episode_run_time"`
-	Genres              []*Genre     `json:"genres"`
 	Homepage            string       `json:"homepage"`
 	InProduction        bool         `json:"in_production"`
-	FirstAirDate        string       `json:"first_air_date"`
 	LastAirDate         string       `json:"last_air_date"`
 	Networks            []*IDName    `json:"networks"`
 	NumberOfEpisodes    int          `json:"number_of_episodes"`
 	NumberOfSeasons     int          `json:"number_of_seasons"`
-	OriginalName        string       `json:"original_name"`
 	OriginCountry       []string     `json:"origin_country"`
 	Overview            string       `json:"overview"`
 	RawPopularity       interface{}  `json:"popularity"`
