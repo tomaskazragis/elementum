@@ -1757,3 +1757,13 @@ func (s *Service) readCustomSettings() map[string]string {
 
 	return ret
 }
+
+// StopNextEpisodes stops all torrents that wait for "next" playback
+func (s *Service) StopNextEpisodes() {
+	for _, t := range s.q.All() {
+		if t.IsNextEpisode && !t.IsPlayerAttached {
+			s.RemoveTorrent(t, false)
+		}
+	}
+
+}

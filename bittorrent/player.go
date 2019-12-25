@@ -109,7 +109,8 @@ type NextEpisode struct {
 
 	started        bool
 	done           bool
-	bufferSize     int64
+	preBufferSize  int64
+	postBufferSize int64
 	progressNeeded int
 }
 
@@ -153,6 +154,12 @@ func (btp *Player) GetTorrent() *Torrent {
 // SetTorrent ...
 func (btp *Player) SetTorrent(t *Torrent) {
 	btp.t = t
+	btp.t.IsPlayerAttached = true
+	btp.t.IsBuffering = false
+	btp.t.IsBufferingFinished = false
+	btp.t.IsNextEpisode = false
+
+	btp.t.stopNextTicker()
 }
 
 func (btp *Player) addTorrent() error {
@@ -625,7 +632,10 @@ func (btp *Player) Close() {
 	}()
 
 	isWatched := btp.IsWatched()
-	if btp.t.IsNextEpisode && xbmc.PlaylistLeft() > 0 {
+	if btp.t.IsNextEpisode {
+		btp.t.IsPlayerAttached = false
+
+		btp.t.startNextTicker()
 		return
 	}
 
@@ -863,7 +873,6 @@ playbackWaitLoop:
 		btp.p.TraktScrobbled = true
 	}
 
-	playlistSize := xbmc.PlaylistSize()
 	btp.t.IsPlaying = true
 
 playbackLoop:
@@ -915,7 +924,7 @@ playbackLoop:
 
 			btp.p.WatchedProgress = int(btp.p.WatchedTime / btp.p.VideoDuration * 100)
 
-			if playlistSize > 1 && btp.next.f != nil && btp.isReadyForNextEpisode() {
+			if btp.next.f != nil && btp.isReadyForNextEpisode() {
 				btp.startNextEpisode()
 			}
 		}
@@ -1156,7 +1165,7 @@ func (btp *Player) startNextEpisode() {
 }
 
 func (btp *Player) findNextEpisode() {
-	if btp.p.ShowID == 0 || btp.next.done || !config.Get().SmartEpisodeStart || xbmc.PlaylistSize() <= 1 {
+	if btp.p.ShowID == 0 || btp.next.done || !config.Get().SmartEpisodeStart {
 		return
 	}
 
@@ -1175,8 +1184,9 @@ func (btp *Player) findNextEpisode() {
 	_, _, _, preBufferSize := btp.t.getBufferSize(btp.next.f.Offset, 0, startBufferSize)
 	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-int64(config.Get().EndBufferSize), int64(config.Get().EndBufferSize))
 
-	btp.next.bufferSize = preBufferSize + postBufferSize
-	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.bufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
+	btp.next.preBufferSize = preBufferSize
+	btp.next.postBufferSize = postBufferSize
+	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.preBufferSize+btp.next.postBufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
 
 	log.Debugf("Next episode prepared: %#v", btp.next)
 }

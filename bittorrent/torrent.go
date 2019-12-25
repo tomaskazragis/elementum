@@ -70,6 +70,7 @@ type Torrent struct {
 	IsSeeding           bool
 	IsRarArchive        bool
 	IsNextEpisode       bool
+	IsPlayerAttached    bool
 
 	DBItem *database.BTItem
 
@@ -90,6 +91,7 @@ type Torrent struct {
 
 	bufferTicker     *time.Ticker
 	prioritizeTicker *time.Ticker
+	nextTicker       *time.Ticker
 }
 
 // NewTorrent ...
@@ -144,12 +146,14 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
+	t.nextTicker = time.NewTicker(10 * time.Hour)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
+	defer t.nextTicker.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -163,6 +167,11 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
+		case <-t.nextTicker.C:
+			if t.IsNextEpisode {
+				go t.Service.RemoveTorrent(t, false)
+			}
+
 		case <-sc:
 			t.Closer.Set()
 			return
@@ -171,6 +180,16 @@ func (t *Torrent) Watch() {
 			log.Debug("Stopping watch events")
 			return
 		}
+	}
+}
+
+func (t *Torrent) startNextTicker() {
+	t.nextTicker = time.NewTicker(15 * time.Minute)
+}
+
+func (t *Torrent) stopNextTicker() {
+	if t.nextTicker != nil {
+		t.nextTicker.Stop()
 	}
 }
 
@@ -365,6 +384,7 @@ func (t *Torrent) Buffer(file *File) {
 
 	t.muBuffer.Lock()
 	t.IsBuffering = true
+	t.IsBufferingFinished = false
 	t.BufferProgress = 0
 	t.BufferLength = preBufferSize + postBufferSize
 
