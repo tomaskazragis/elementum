@@ -384,9 +384,13 @@ func updateMovieWatched(m *trakt.WatchedMovie, watched bool) {
 		return
 	}
 
+	// Resetting Resume state to avoid having old resume states,
+	// when item is watched on another device
 	if watched && !r.IsWatched() {
 		r.UIDs.Playcount = 1
-		xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, int(r.Resume.Position), int(r.Resume.Total), m.LastWatchedAt)
+		xbmc.SetMovieWatchedWithDate(r.UIDs.Kodi, 1, 0, 0, m.LastWatchedAt)
+	} else if watched && r.IsWatched() {
+		xbmc.SetMovieProgress(r.UIDs.Kodi, 0, 0)
 	} else if !watched && r.IsWatched() {
 		r.UIDs.Playcount = 0
 		xbmc.SetMoviePlaycount(r.UIDs.Kodi, 0)
@@ -408,9 +412,13 @@ func updateShowWatched(s *trakt.WatchedShow, watched bool) {
 		for _, episode := range season.Episodes {
 			e := r.GetEpisode(season.Number, episode.Number)
 			if e != nil {
+				// Resetting Resume state to avoid having old resume states,
+				// when item is watched on another device
 				if watched && !e.IsWatched() {
 					e.UIDs.Playcount = 1
-					xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, int(e.Resume.Position), int(e.Resume.Total), episode.LastWatchedAt)
+					xbmc.SetEpisodeWatchedWithDate(e.UIDs.Kodi, 1, 0, 0, episode.LastWatchedAt)
+				} else if watched && e.IsWatched() {
+					xbmc.SetEpisodeProgress(e.UIDs.Kodi, 0, 0)
 				} else if !watched && e.IsWatched() {
 					e.UIDs.Playcount = 0
 					xbmc.SetEpisodePlaycount(e.UIDs.Kodi, 0)
