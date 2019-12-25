@@ -48,7 +48,7 @@ else ifeq ($(TARGET_OS), darwin)
 else ifeq ($(TARGET_OS), linux)
 	EXT =
 	GOOS = linux
-	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-L $(CROSS_ROOT)/lib/ -lm -lstdc++ -static"
+	GO_LDFLAGS += -linkmode=external -extld=$(CC) -extldflags "-L $(CROSS_ROOT)/lib/ -lm -lstdc++"
 else ifeq ($(TARGET_OS), android)
 	EXT =
 	GOOS = android
