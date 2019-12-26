@@ -47,7 +47,12 @@ func Donate(ctx *gin.Context) {
 
 // Settings display
 func Settings(ctx *gin.Context) {
-	xbmc.AddonSettings("plugin.video.elementum")
+	addon := ctx.Params.ByName("addon")
+	if addon == "" {
+		addon = "plugin.video.elementum"
+	}
+
+	xbmc.AddonSettings(addon)
 	ctx.String(200, "")
 }
 
