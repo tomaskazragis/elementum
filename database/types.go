@@ -61,10 +61,10 @@ type BTItem struct {
 
 // LibraryItem ...
 type LibraryItem struct {
-	TmdbID    string `storm:"id"`
-	MediaType int    `storm:"index"`
-	State     int    `storm:"index"`
-	ShowID    int    `storm:"index"`
+	ID        int `storm:"id"`
+	MediaType int `storm:"index"`
+	State     int `storm:"index"`
+	ShowID    int `storm:"index"`
 }
 
 // QueryHistory ...

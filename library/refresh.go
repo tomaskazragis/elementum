@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -870,7 +871,10 @@ func refreshLocalShows() {
 
 		if matches := showRegexp.FindSubmatch(fileContent); len(matches) > 1 {
 			showID, _ := strconv.Atoi(string(matches[1]))
-			IDs[showID] = true
+
+			if !wasRemoved(showID, ShowType) {
+				IDs[showID] = true
+			}
 		}
 	}
 
@@ -888,13 +892,23 @@ func refreshLocalShows() {
 
 func searchStrm(dir string) []string {
 	ret := []string{}
+	foundDirs := []string{}
 
 	godirwalk.Walk(dir, &godirwalk.Options{
 		FollowSymbolicLinks: true,
 		Callback: func(osPathname string, de *godirwalk.Dirent) error {
-			if strings.HasSuffix(osPathname, ".strm") {
-				ret = append(ret, osPathname)
+			if !strings.HasSuffix(osPathname, ".strm") {
+				return nil
 			}
+
+			// Make sure we return only one file per directory, no need to get all of them
+			dir := filepath.Dir(osPathname)
+			if hasStringItem(foundDirs, dir) {
+				return nil
+			}
+
+			foundDirs = append(foundDirs, dir)
+			ret = append(ret, osPathname)
 			return nil
 		},
 	})

@@ -383,6 +383,10 @@ func updateLibraryShows() error {
 	}
 
 	for _, i := range lis {
+		if i.ID == 0 || i.ShowID == 0 {
+			continue
+		}
+
 		if _, err := writeShowStrm(i.ShowID, false, false); err != nil {
 			log.Errorf("Error updating show: %s", err)
 		}
@@ -526,18 +530,19 @@ https://www.themoviedb.org/movie/%v
 }
 
 func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
+	// We should not write strm filex for shows that are marked as deleted
+	if wasRemoved(showID, ShowType) {
+		return nil, fmt.Errorf("Show is marked as removed")
+	}
+
+	defer perf.ScopeTimer()()
+
 	show := tmdb.GetShow(showID, config.Get().StrmLanguage)
 	if show == nil {
 		return nil, fmt.Errorf("Unable to get show (%d)", showID)
 	}
 
-	showName := show.OriginalName
-	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
-		showName = show.Name
-	}
-
-	showStrm := util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
-	showPath := filepath.Join(ShowsLibraryPath(), showStrm)
+	showPath, showStrm := getShowPath(show)
 
 	if _, err := os.Stat(showPath); os.IsNotExist(err) {
 		if err := os.Mkdir(showPath, 0755); err != nil {
@@ -593,11 +598,6 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 
 			if adding {
 				reAddIDs = append(reAddIDs, episode.ID)
-			} else {
-				// Check if single episode was previously removed
-				if wasRemoved(episode.ID, EpisodeType) {
-					continue
-				}
 			}
 
 			if !force && IsDuplicateEpisode(showID, season.Season, episode.EpisodeNumber) {
@@ -616,7 +616,7 @@ func writeShowStrm(showID int, adding, force bool) (*tmdb.Show, error) {
 			}
 		}
 		if len(reAddIDs) > 0 {
-			if err := updateBatchDBItem(reAddIDs, EpisodeType, StateActive, showID); err != nil {
+			if err := updateBatchDBItem(reAddIDs, StateActive, EpisodeType, showID); err != nil {
 				log.Error(err)
 			}
 		}
@@ -741,6 +741,7 @@ func RemoveShow(tmdbID string) (*tmdb.Show, error) {
 		return show, err
 	}
 
+	log.Warningf("Directory %s removed from disk", path)
 	log.Warningf("%s removed from library", show.Name)
 
 	return show, nil
@@ -885,8 +886,10 @@ func IsAddedToLibrary(id string, mediaType int) (isAdded bool) {
 //
 
 func updateDBItem(tmdbID int, state int, mediaType int, showID int) error {
+	defer perf.ScopeTimer()()
+
 	li := database.LibraryItem{
-		TmdbID:    strconv.Itoa(tmdbID),
+		ID:        tmdbID,
 		MediaType: mediaType,
 		ShowID:    showID,
 		State:     state,
@@ -899,6 +902,8 @@ func updateDBItem(tmdbID int, state int, mediaType int, showID int) error {
 }
 
 func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) error {
+	defer perf.ScopeTimer()()
+
 	tx, err := database.GetStormDB().Begin(true)
 	if err != nil {
 		return err
@@ -907,7 +912,7 @@ func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) erro
 
 	for _, id := range tmdbIds {
 		li := database.LibraryItem{
-			TmdbID:    strconv.Itoa(id),
+			ID:        id,
 			MediaType: mediaType,
 			ShowID:    showID,
 			State:     state,
@@ -922,8 +927,10 @@ func updateBatchDBItem(tmdbIds []int, state int, mediaType int, showID int) erro
 }
 
 func deleteDBItem(tmdbID int, mediaType int, removal bool) error {
+	defer perf.ScopeTimer()()
+
 	var li database.LibraryItem
-	if err := database.GetStormDB().One("TmdbID", strconv.Itoa(tmdbID), &li); err != nil {
+	if err := database.GetStormDB().One("ID", tmdbID, &li); err != nil {
 		log.Debugf("Cannot find deleted item: %s", err)
 		return err
 	}
@@ -934,7 +941,7 @@ func deleteDBItem(tmdbID int, mediaType int, removal bool) error {
 		li.State = StateActive
 	}
 
-	if err := database.GetStormDB().Update(&li); err != nil {
+	if err := database.GetStormDB().Save(&li); err != nil {
 		log.Debugf("Cannot update deleted item: %s", err)
 		return err
 	}
@@ -961,8 +968,10 @@ func deleteDBItem(tmdbID int, mediaType int, removal bool) error {
 // }
 
 func wasRemoved(id int, mediaType int) (wasRemoved bool) {
+	defer perf.ScopeTimer()()
+
 	var li database.LibraryItem
-	if err := database.GetStormDB().Select(q.Eq("MediaType", mediaType), q.Eq("TmdbID", id), q.Eq("State", StateDeleted)).First(&li); err != nil && li.TmdbID != "" {
+	if err := database.GetStormDB().Select(q.Eq("ID", id), q.Eq("MediaType", mediaType), q.Eq("State", StateDeleted)).First(&li); err != nil && li.ID != 0 {
 		return true
 	}
 
@@ -1169,7 +1178,12 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 		label = "LOCALIZE[30263]"
 	}
 
-	shows = DiffTraktShows(previous, current, IsTraktInitialized)
+	// For first run we will try to write all shows, not only the delta
+	if !IsTraktInitialized {
+		shows = current
+	} else {
+		shows = DiffTraktShows(previous, current, IsTraktInitialized)
+	}
 
 	if err != nil {
 		log.Error(err)
@@ -1214,10 +1228,6 @@ func SyncShowsList(listID string, updating bool, isUpdateNeeded bool) (err error
 			continue
 		}
 		showsLastUpdates[show.Show.IDs.Trakt] = show.Show.UpdatedAt
-
-		if updating && wasRemoved(show.Show.IDs.TMDB, ShowType) {
-			continue
-		}
 
 		if !updating && !isUpdateNeeded && IsDuplicateShow(tmdbID) {
 			continue
@@ -1328,12 +1338,12 @@ func AddShow(tmdbID string, force bool) (*tmdb.Show, error) {
 		return show, fmt.Errorf("Show already added")
 	}
 
-	if _, err := writeShowStrm(ID, true, force); err != nil {
-		log.Error(err)
+	if err := updateDBItem(ID, StateActive, ShowType, ID); err != nil {
 		return show, err
 	}
 
-	if err := updateDBItem(ID, StateActive, ShowType, 0); err != nil {
+	if _, err := writeShowStrm(ID, true, force); err != nil {
+		log.Errorf("Error writing strm for a show: %s", err)
 		return show, err
 	}
 
@@ -1406,4 +1416,16 @@ func GetShowForEpisode(kodiID int) (*Show, *Episode) {
 	}
 
 	return nil, nil
+}
+
+func getShowPath(show *tmdb.Show) (showPath, showStrm string) {
+	showName := show.OriginalName
+	if config.Get().StrmLanguage != config.Get().Language && show.Name != "" {
+		showName = show.Name
+	}
+
+	showStrm = util.ToFileName(fmt.Sprintf("%s (%s)", showName, strings.Split(show.FirstAirDate, "-")[0]))
+	showPath = filepath.Join(ShowsLibraryPath(), showStrm)
+
+	return
 }

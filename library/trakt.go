@@ -358,6 +358,16 @@ func hasItem(ary []int, item int) bool {
 	return false
 }
 
+func hasStringItem(ary []string, item string) bool {
+	for _, i := range ary {
+		if i == item {
+			return true
+		}
+	}
+
+	return false
+}
+
 func getKodiMovieByTraktIDs(ids *trakt.IDs) (r *Movie) {
 	if r == nil && ids.TMDB != 0 {
 		r, _ = GetMovieByTMDB(ids.TMDB)

@@ -10,8 +10,10 @@ import (
 
 	"github.com/asdine/storm"
 	"github.com/asdine/storm/q"
-	"github.com/elgatito/elementum/config"
+
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/elgatito/elementum/config"
 )
 
 // GetStorm returns common database
