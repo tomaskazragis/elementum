@@ -16,6 +16,7 @@ import (
 	"time"
 
 	lt "github.com/ElementumOrg/libtorrent-go"
+	"github.com/anacrolix/missinggo/perf"
 	"github.com/cespare/xxhash"
 	"github.com/dustin/go-humanize"
 	"github.com/sanity-io/litter"
@@ -273,6 +274,8 @@ func (btp *Player) waitCheckAvailableSpace() {
 }
 
 func (btp *Player) processMetadata() {
+	defer perf.ScopeTimer()()
+
 	// TODO: Do we need it?
 	// if btp.p.ResumeHash != "" {
 	// 	btp.t.th.AutoManaged(false)
@@ -358,6 +361,8 @@ func (btp *Player) processMetadata() {
 }
 
 func (btp *Player) statusStrings(progress float64, status lt.TorrentStatus) (string, string, string) {
+	defer perf.ScopeTimer()()
+
 	statusName := btp.t.GetStateString()
 	line1 := fmt.Sprintf("%s (%.2f%%)", statusName, progress)
 
@@ -689,6 +694,12 @@ func (btp *Player) Close() {
 }
 
 func (btp *Player) bufferDialog() {
+	if finished, err := btp.updateBufferDialog(); finished {
+		return
+	} else if err != nil {
+		log.Warningf("Got error from buffer dialog update: %s", err)
+	}
+
 	halfSecond := time.NewTicker(500 * time.Millisecond)
 	defer halfSecond.Stop()
 	oneSecond := time.NewTicker(1 * time.Second)
@@ -709,88 +720,105 @@ func (btp *Player) bufferDialog() {
 				return
 			}
 		case <-oneSecond.C:
-			status := btp.t.GetStatus()
-			defer lt.DeleteTorrentStatus(status)
-
-			// Handle "Checking" state for resumed downloads
-			if status.GetState() == StatusChecking || btp.t.IsRarArchive {
-				progress := btp.t.GetBufferProgress()
-				line1, line2, line3 := btp.statusStrings(progress, status)
-				if btp.dialogProgress != nil {
-					btp.dialogProgress.Update(int(progress), line1, line2, line3)
-				}
-
-				if btp.t.IsRarArchive && progress >= 100 {
-					archivePath := filepath.Join(btp.s.config.DownloadPath, btp.chosenFile.Path)
-					destPath := filepath.Join(btp.s.config.DownloadPath, filepath.Dir(btp.chosenFile.Path), "extracted")
-
-					if _, err := os.Stat(destPath); err == nil {
-						btp.findExtracted(destPath)
-						btp.setRateLimiting(true)
-						btp.bufferEvents.Signal()
-						return
-					}
-					os.MkdirAll(destPath, 0755)
-
-					cmdName := "unrar"
-					cmdArgs := []string{"e", archivePath, destPath}
-					if platform := xbmc.GetPlatform(); platform.OS == "windows" {
-						cmdName = "unrar.exe"
-					}
-					cmd := exec.Command(cmdName, cmdArgs...)
-
-					cmdReader, err := cmd.StdoutPipe()
-					if err != nil {
-						log.Error(err)
-						btp.bufferEvents.Broadcast(err)
-						xbmc.Notify("Elementum", "LOCALIZE[30304]", config.AddonIcon())
-						return
-					}
-
-					scanner := bufio.NewScanner(cmdReader)
-					go func() {
-						for scanner.Scan() {
-							log.Infof("unrar | %s", scanner.Text())
-						}
-					}()
-
-					err = cmd.Start()
-					if err != nil {
-						log.Error(err)
-						btp.bufferEvents.Broadcast(err)
-						xbmc.Notify("Elementum", "LOCALIZE[30305]", config.AddonIcon())
-						return
-					}
-
-					err = cmd.Wait()
-					if err != nil {
-						log.Error(err)
-						btp.bufferEvents.Broadcast(err)
-						xbmc.Notify("Elementum", "LOCALIZE[30306]", config.AddonIcon())
-						return
-					}
-
-					btp.findExtracted(destPath)
-					btp.setRateLimiting(true)
-					btp.bufferEvents.Signal()
-					return
-				}
-			} else {
-				status := btp.t.GetStatus()
-				defer lt.DeleteTorrentStatus(status)
-
-				line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
-				if btp.dialogProgress != nil {
-					btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
-				}
-				if !btp.t.IsBuffering && btp.t.HasMetadata() && btp.t.GetState() != StatusChecking {
-					btp.bufferEvents.Signal()
-					btp.setRateLimiting(true)
-					return
-				}
+			if finished, err := btp.updateBufferDialog(); finished {
+				return
+			} else if err != nil {
+				log.Warningf("Got error from buffer dialog update: %s", err)
 			}
 		}
 	}
+}
+
+func (btp *Player) updateBufferDialog() (bool, error) {
+	if btp.dialogProgress == nil || btp.dialogProgress.IsCanceled() {
+		log.Debugf("Dialog not yet available")
+		return false, nil
+	}
+
+	defer perf.ScopeTimer()()
+
+	status := btp.t.GetStatus()
+	defer lt.DeleteTorrentStatus(status)
+
+	// Handle "Checking" state for resumed downloads
+	if status.GetState() == StatusChecking || btp.t.IsRarArchive {
+		progress := btp.t.GetBufferProgress()
+		line1, line2, line3 := btp.statusStrings(progress, status)
+		if btp.dialogProgress != nil {
+			btp.dialogProgress.Update(int(progress), line1, line2, line3)
+		}
+
+		if btp.t.IsRarArchive && progress >= 100 {
+			archivePath := filepath.Join(btp.s.config.DownloadPath, btp.chosenFile.Path)
+			destPath := filepath.Join(btp.s.config.DownloadPath, filepath.Dir(btp.chosenFile.Path), "extracted")
+
+			if _, err := os.Stat(destPath); err == nil {
+				btp.findExtracted(destPath)
+				btp.setRateLimiting(true)
+				btp.bufferEvents.Signal()
+				return false, fmt.Errorf("File already exists")
+			}
+			os.MkdirAll(destPath, 0755)
+
+			cmdName := "unrar"
+			cmdArgs := []string{"e", archivePath, destPath}
+			if platform := xbmc.GetPlatform(); platform.OS == "windows" {
+				cmdName = "unrar.exe"
+			}
+			cmd := exec.Command(cmdName, cmdArgs...)
+
+			cmdReader, err := cmd.StdoutPipe()
+			if err != nil {
+				log.Error(err)
+				btp.bufferEvents.Broadcast(err)
+				xbmc.Notify("Elementum", "LOCALIZE[30304]", config.AddonIcon())
+				return false, err
+			}
+
+			scanner := bufio.NewScanner(cmdReader)
+			go func() {
+				for scanner.Scan() {
+					log.Infof("unrar | %s", scanner.Text())
+				}
+			}()
+
+			err = cmd.Start()
+			if err != nil {
+				log.Error(err)
+				btp.bufferEvents.Broadcast(err)
+				xbmc.Notify("Elementum", "LOCALIZE[30305]", config.AddonIcon())
+				return false, err
+			}
+
+			err = cmd.Wait()
+			if err != nil {
+				log.Error(err)
+				btp.bufferEvents.Broadcast(err)
+				xbmc.Notify("Elementum", "LOCALIZE[30306]", config.AddonIcon())
+				return false, err
+			}
+
+			btp.findExtracted(destPath)
+			btp.setRateLimiting(true)
+			btp.bufferEvents.Signal()
+			return true, nil
+		}
+	} else {
+		status := btp.t.GetStatus()
+		defer lt.DeleteTorrentStatus(status)
+
+		line1, line2, line3 := btp.statusStrings(btp.t.BufferProgress, status)
+		if btp.dialogProgress != nil {
+			btp.dialogProgress.Update(int(btp.t.BufferProgress), line1, line2, line3)
+		}
+		if !btp.t.IsBuffering && btp.t.HasMetadata() && btp.t.GetState() != StatusChecking {
+			btp.bufferEvents.Signal()
+			btp.setRateLimiting(true)
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (btp *Player) findExtracted(destPath string) {
@@ -1075,6 +1103,8 @@ func (btp *Player) GetIdent() {
 	if btp.p.TMDBId == 0 || btp.p.KodiID != 0 {
 		return
 	}
+
+	defer perf.ScopeTimer()()
 
 	if btp.p.ContentType == movieType {
 		movie, _ := library.GetMovieByTMDB(btp.p.TMDBId)

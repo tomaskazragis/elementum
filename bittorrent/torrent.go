@@ -306,6 +306,8 @@ func (t *Torrent) Buffer(file *File) {
 		return
 	}
 
+	defer perf.ScopeTimer()()
+
 	if t.Service.IsMemoryStorage() && t.MemorySize < t.pieceLength*10 {
 		t.AdjustMemorySize(t.pieceLength * 10)
 	}
@@ -475,6 +477,8 @@ func (t *Torrent) AdjustMemorySize(ms int64) {
 	if t.ms == nil {
 		return
 	}
+
+	defer perf.ScopeTimer()()
 
 	t.MemorySize = ms
 	log.Infof("Adjusting memory size to %s!", humanize.Bytes(uint64(t.MemorySize)))
@@ -712,6 +716,8 @@ func (t *Torrent) GetState() int {
 
 // GetStateString ...
 func (t *Torrent) GetStateString() string {
+	defer perf.ScopeTimer()()
+
 	if t.Service.IsMemoryStorage() {
 		if t.IsBuffering {
 			return StatusStrings[StatusBuffering]
@@ -806,6 +812,8 @@ func (t *Torrent) GetProgress() float64 {
 	if t == nil {
 		return 0
 	}
+
+	defer perf.ScopeTimer()()
 
 	// For memory storage let's show playback progress,
 	// because we can't know real progress of download
