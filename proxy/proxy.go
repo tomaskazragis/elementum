@@ -86,7 +86,7 @@ func handleResponse(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 	}
 
 	if cfResp, err := cfbypass.RunProxy(resp, ctx); err != nil {
-		log.Warningf("Could not solve the CloudFlare challenge: ", err)
+		log.Warningf("Could not solve the CloudFlare challenge: %s", err)
 	} else if cfResp != nil {
 		return cfResp
 	}
