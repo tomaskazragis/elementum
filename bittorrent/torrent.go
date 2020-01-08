@@ -36,6 +36,7 @@ type Torrent struct {
 	th             lt.TorrentHandle
 	ti             lt.TorrentInfo
 	lastStatus     lt.TorrentStatus
+	lastProgress   float64
 	ms             lt.MemoryStorage
 	fastResumeFile string
 	torrentFile    string
@@ -49,6 +50,7 @@ type Torrent struct {
 	lastPrioritization string
 
 	awaitingPieces *roaring.Bitmap
+	demandPieces   *roaring.Bitmap
 
 	ChosenFiles []*File
 	TorrentPath string
@@ -60,7 +62,6 @@ type Torrent struct {
 	BufferProgressPrevious float64
 	BufferPiecesLength     int64
 	BufferPiecesProgress   map[int]float64
-	BufferEndPieces        []int
 	MemorySize             int64
 
 	IsPlaying           bool
@@ -115,10 +116,10 @@ func NewTorrent(service *Service, handle lt.TorrentHandle, info lt.TorrentInfo, 
 		reservedPieces: []int{},
 
 		awaitingPieces: roaring.NewBitmap(),
+		demandPieces:   roaring.NewBitmap(),
 
 		BufferPiecesProgress: map[int]float64{},
 		BufferProgress:       -1,
-		BufferEndPieces:      []int{},
 
 		mu:        &sync.Mutex{},
 		muBuffer:  &sync.RWMutex{},
@@ -185,6 +186,8 @@ func (t *Torrent) Watch() {
 
 func (t *Torrent) startNextTicker() {
 	t.nextTicker = time.NewTicker(15 * time.Minute)
+
+	t.demandPieces.Clear()
 }
 
 func (t *Torrent) stopNextTicker() {
@@ -231,7 +234,7 @@ func (t *Torrent) bufferTickerEvent() {
 
 		seeds, seedsTotal, peers, peersTotal := t.GetConnections()
 		downSpeed, upSpeed := t.GetHumanizedSpeeds()
-		log.Debugf("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus.String())
+		log.Infof("Buffer. Pr: %d%%, Sp: %s / %s, Con: %d/%d + %d/%d, Pi: %s", int(thisProgress), downSpeed, upSpeed, seeds, seedsTotal, peers, peersTotal, piecesStatus.String())
 
 		// thisProgress := float64(t.BufferPiecesLength-progressCount) / float64(t.BufferPiecesLength) * 100
 		if thisProgress > t.BufferProgress {
@@ -285,7 +288,7 @@ func (t *Torrent) GetHumanizedSpeeds() (down, up string) {
 
 func (t *Torrent) bufferFinishedEvent() {
 	t.muBuffer.Lock()
-	log.Debugf("Buffer finished: %#v, %#v", t.IsBuffering, t.BufferPiecesProgress)
+	log.Infof("Buffer finished: %#v, %#v", t.IsBuffering, t.BufferPiecesProgress)
 
 	t.BufferPiecesProgress = map[int]float64{}
 	t.IsBuffering = false
@@ -301,14 +304,14 @@ func (t *Torrent) bufferFinishedEvent() {
 // Kodi sends two requests, one for onecoming file read handler,
 // another for a piece of file from the end (probably to get codec descriptors and so on)
 // We set it as post-buffer and include in required buffer pieces array.
-func (t *Torrent) Buffer(file *File) {
+func (t *Torrent) Buffer(file *File, isStartup bool) {
 	if file == nil {
 		return
 	}
 
 	defer perf.ScopeTimer()()
 
-	if t.Service.IsMemoryStorage() && t.MemorySize < t.pieceLength*10 {
+	if isStartup && t.Service.IsMemoryStorage() && t.MemorySize < t.pieceLength*10 {
 		t.AdjustMemorySize(t.pieceLength * 10)
 	}
 
@@ -350,8 +353,10 @@ func (t *Torrent) Buffer(file *File) {
 	// }
 
 	if t.Service.IsMemoryStorage() {
-		t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
-		t.ms.SetTorrentHandle(t.th)
+		if isStartup {
+			t.ms = t.th.GetMemoryStorage().(lt.MemoryStorage)
+			t.ms.SetTorrentHandle(t.th)
+		}
 
 		// Try to increase memory size to at most 25 pieces to have more comfortable playback.
 		// Also check for free memory to avoid spending too much!
@@ -388,6 +393,7 @@ func (t *Torrent) Buffer(file *File) {
 	t.IsBuffering = true
 	t.IsBufferingFinished = false
 	t.BufferProgress = 0
+	t.BufferProgressPrevious = 0
 	t.BufferLength = preBufferSize + postBufferSize
 
 	for i := preBufferStart; i <= preBufferEnd; i++ {
@@ -395,7 +401,6 @@ func (t *Torrent) Buffer(file *File) {
 	}
 	for i := postBufferStart; i <= postBufferEnd; i++ {
 		t.BufferPiecesProgress[i] = 0
-		t.BufferEndPieces = append(t.BufferEndPieces, i)
 	}
 
 	t.BufferPiecesLength = 0
@@ -405,7 +410,7 @@ func (t *Torrent) Buffer(file *File) {
 
 	t.muBuffer.Unlock()
 
-	log.Debugf("Setting buffer for file: %s (%s / %s). Desired: %s. Pieces: %#v-%#v + %#v-%#v, PieceLength: %s, Pre: %s, Post: %s, WithOffset: %#v / %#v (%#v)",
+	log.Infof("Setting buffer for file: %s (%s / %s). Desired: %s. Pieces: %#v-%#v + %#v-%#v, PieceLength: %s, Pre: %s, Post: %s, WithOffset: %#v / %#v (%#v)",
 		file.Path, humanize.Bytes(uint64(file.Size)), humanize.Bytes(uint64(t.ti.TotalSize())),
 		humanize.Bytes(uint64(t.Service.GetBufferSize())),
 		preBufferStart, preBufferEnd, postBufferStart, postBufferEnd,
@@ -414,15 +419,8 @@ func (t *Torrent) Buffer(file *File) {
 
 	t.Service.SetBufferingLimits()
 
-	piecesPriorities := lt.NewStdVectorInt()
-	defer lt.DeleteStdVectorInt(piecesPriorities)
-
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
-
-	// Let's try without reserving pieces
-	// Reserving first piece in this file, it is usually re-requested by Kodi
-	// t.reservedPieces = append(t.reservedPieces, preBufferStart, postBufferEnd)
 
 	// Properly set the pieces priority vector
 	curPiece := 0
@@ -431,26 +429,42 @@ func (t *Torrent) Buffer(file *File) {
 		defaultPriority = 1
 	}
 
-	for _ = 0; curPiece < preBufferStart; curPiece++ {
-		piecesPriorities.Add(defaultPriority)
+	if isStartup {
+		piecesPriorities := lt.NewStdVectorInt()
+		defer lt.DeleteStdVectorInt(piecesPriorities)
+
+		for _ = 0; curPiece < preBufferStart; curPiece++ {
+			piecesPriorities.Add(defaultPriority)
+		}
+		for _ = 0; curPiece <= preBufferEnd; curPiece++ { // get this part
+			piecesPriorities.Add(7)
+		}
+		for _ = 0; curPiece < postBufferStart; curPiece++ {
+			piecesPriorities.Add(defaultPriority)
+		}
+		for _ = 0; curPiece <= postBufferEnd; curPiece++ { // get this part
+			piecesPriorities.Add(7)
+		}
+		numPieces := t.ti.NumPieces()
+		for _ = 0; curPiece < numPieces; curPiece++ {
+			piecesPriorities.Add(defaultPriority)
+		}
+		t.th.PrioritizePieces(piecesPriorities)
+	} else {
+		for curPiece = preBufferStart; curPiece <= preBufferEnd; curPiece++ { // get this part
+			t.demandPieces.AddInt(curPiece)
+			t.th.PiecePriority(curPiece, 3)
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
+		for curPiece = postBufferStart; curPiece <= postBufferEnd; curPiece++ { // get this part
+			t.demandPieces.AddInt(curPiece)
+			t.th.PiecePriority(curPiece, 3)
+			t.th.SetPieceDeadline(curPiece, 0, 0)
+		}
 	}
-	for _ = 0; curPiece <= preBufferEnd; curPiece++ { // get this part
-		piecesPriorities.Add(7)
-	}
-	for _ = 0; curPiece < postBufferStart; curPiece++ {
-		piecesPriorities.Add(defaultPriority)
-	}
-	for _ = 0; curPiece <= postBufferEnd; curPiece++ { // get this part
-		piecesPriorities.Add(7)
-	}
-	numPieces := t.ti.NumPieces()
-	for _ = 0; curPiece < numPieces; curPiece++ {
-		piecesPriorities.Add(defaultPriority)
-	}
-	t.th.PrioritizePieces(piecesPriorities)
 
 	// Using libtorrent hack to pause and resume the torrent
-	if config.Get().UseLibtorrentPauseResume {
+	if config.Get().UseLibtorrentPauseResume && isStartup {
 		t.Pause()
 		t.Resume()
 	}
@@ -536,7 +550,7 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if t.IsBuffering || t.IsSeeding || !t.IsPlaying || t.th == nil {
+	if (t.IsBuffering && t.demandPieces.IsEmpty()) || t.IsSeeding || !t.IsPlaying || t.th == nil {
 		return
 	}
 
@@ -562,6 +576,13 @@ func (t *Torrent) PrioritizePieces() {
 	}
 	readerProgress := map[int]float64{}
 	readerPieces := make([]int, numPieces)
+
+	i := t.demandPieces.Iterator()
+	for i.HasNext() {
+		idx := int(i.Next())
+		readerPieces[idx] = 3
+		readerProgress[idx] = 0
+	}
 
 	for _, r := range t.readers {
 		pr := r.ReaderPiecesRange()
@@ -619,6 +640,7 @@ func (t *Torrent) PrioritizePieces() {
 	for i, k := range piecesKeys {
 		readerVector.Add(k)
 
+		// Should print only prioritized pieces
 		if readerPieces[k] > 1 {
 			progress := int(readerProgress[k] * 100)
 			comma := ""
@@ -819,14 +841,23 @@ func (t *Torrent) GetProgress() float64 {
 	// because we can't know real progress of download
 	if t.Service.IsMemoryStorage() {
 		if player := t.Service.GetActivePlayer(); player != nil && player.p.VideoDuration != 0 {
+			t.GetRealProgress()
 			return player.p.WatchedTime / player.p.VideoDuration * 100
 		}
 	}
 
+	return t.GetRealProgress()
+}
+
+// GetRealProgress returns progress of downloading in libtorrent.
+// Should be taken in mind that for memory storage it's a progress of downloading currently active pieces,
+// not the whole torrent.
+func (t *Torrent) GetRealProgress() float64 {
 	ts := t.th.Status()
 	defer lt.DeleteTorrentStatus(ts)
 
-	return float64(ts.GetProgress()) * 100
+	t.lastProgress = float64(ts.GetProgress()) * 100
+	return t.lastProgress
 }
 
 // DownloadAllFiles ...
@@ -1053,10 +1084,6 @@ func (t *Torrent) SaveMetainfo(path string) error {
 func (t *Torrent) GetReadaheadSize() (ret int64) {
 	defer perf.ScopeTimer()()
 
-	defer func() {
-		log.Debugf("Readahead size: %s", humanize.Bytes(uint64(ret)))
-	}()
-
 	defaultRA := int64(50 * 1024 * 1024)
 	if !t.Service.IsMemoryStorage() {
 		return defaultRA
@@ -1070,7 +1097,7 @@ func (t *Torrent) GetReadaheadSize() (ret int64) {
 		return 0
 	}
 
-	return int64(t.MemorySize - (int64(len(t.reservedPieces)+1))*t.pieceLength)
+	return int64(t.MemorySize - (int64(len(t.reservedPieces)+2))*t.pieceLength)
 }
 
 // CloseReaders ...
@@ -1141,6 +1168,23 @@ func (t *Torrent) ResetReaders() {
 		log.Infof("Setting readahead for reader %d as %s", r.id, humanize.Bytes(uint64(size)))
 		r.readahead = size
 	}
+}
+
+// ReadersReadaheadSum ...
+func (t *Torrent) ReadersReadaheadSum() int64 {
+	t.muReaders.Lock()
+	defer t.muReaders.Unlock()
+
+	if len(t.readers) == 0 {
+		return 0
+	}
+
+	res := int64(0)
+	for _, r := range t.readers {
+		res += r.Readahead()
+	}
+
+	return res
 }
 
 // GetMetadata ...

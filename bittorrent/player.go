@@ -108,11 +108,9 @@ type PlayerParams struct {
 type NextEpisode struct {
 	f *File
 
-	started        bool
-	done           bool
-	preBufferSize  int64
-	postBufferSize int64
-	progressNeeded int
+	started bool
+	done    bool
+	bufferSize int64
 }
 
 // CandidateFile ...
@@ -352,7 +350,7 @@ func (btp *Player) processMetadata() {
 
 	log.Info("Setting piece priorities")
 
-	go btp.t.Buffer(btp.chosenFile)
+	go btp.t.Buffer(btp.chosenFile, true)
 
 	// TODO find usage of resumeIndex. Do we need pause/resume for it?
 	// if btp.resumeIndex < 0 {
@@ -952,7 +950,7 @@ playbackLoop:
 
 			btp.p.WatchedProgress = int(btp.p.WatchedTime / btp.p.VideoDuration * 100)
 
-			if btp.next.f != nil && btp.isReadyForNextEpisode() {
+			if btp.next.f != nil && !btp.next.started && btp.isReadyForNextEpisode() {
 				btp.startNextEpisode()
 			}
 		}
@@ -981,7 +979,10 @@ playbackLoop:
 
 func (btp *Player) isReadyForNextEpisode() bool {
 	if btp.s.IsMemoryStorage() {
-		return btp.p.WatchedProgress > btp.next.progressNeeded
+		ra := btp.t.GetReadaheadSize()
+		sum := btp.t.ReadersReadaheadSum()
+
+		return ra > 0 && sum > 0 && ra > sum+btp.next.bufferSize && btp.t.awaitingPieces.IsEmpty() && btp.t.lastProgress > 90
 	}
 
 	return btp.p.WatchedProgress > config.Get().PlaybackPercent
@@ -1191,7 +1192,7 @@ func (btp *Player) startNextEpisode() {
 	}
 
 	btp.next.started = true
-	go btp.t.Buffer(btp.next.f)
+	go btp.t.Buffer(btp.next.f, false)
 }
 
 func (btp *Player) findNextEpisode() {
@@ -1214,11 +1215,9 @@ func (btp *Player) findNextEpisode() {
 	_, _, _, preBufferSize := btp.t.getBufferSize(btp.next.f.Offset, 0, startBufferSize)
 	_, _, _, postBufferSize := btp.t.getBufferSize(btp.next.f.Offset, btp.next.f.Size-int64(config.Get().EndBufferSize), int64(config.Get().EndBufferSize))
 
-	btp.next.preBufferSize = preBufferSize
-	btp.next.postBufferSize = postBufferSize
-	btp.next.progressNeeded = util.Max(90, int(100-(float64(btp.next.preBufferSize+btp.next.postBufferSize)/(float64(btp.chosenFile.Size)/100)))+2)
+	btp.next.bufferSize = preBufferSize + postBufferSize
 
-	log.Debugf("Next episode prepared: %#v", btp.next)
+	log.Infof("Next episode prepared: %#v", btp.next)
 }
 
 // InitAudio ...

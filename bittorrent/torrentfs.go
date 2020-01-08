@@ -310,18 +310,30 @@ func (tf *TorrentFSEntry) pieceFromOffset(offset int64) (int, int) {
 
 // ReaderPiecesRange ...
 func (tf *TorrentFSEntry) ReaderPiecesRange() (ret PieceRange) {
+	pos, _ := tf.Pos()
+	ra := tf.Readahead()
+
+	return tf.byteRegionPieces(tf.torrentOffset(pos), ra)
+}
+
+// Readahead returns current reader readahead
+func (tf *TorrentFSEntry) Readahead() int64 {
 	ra := tf.readahead
 	if ra < 1 {
 		// Needs to be at least 1, because [x, x) means we don't want
 		// anything.
 		ra = 1
 	}
-	pos, _ := tf.File.Seek(0, io.SeekCurrent)
+	pos, _ := tf.Pos()
 	if tf.f.Size > 0 && ra > tf.f.Size-pos {
 		ra = tf.f.Size - pos
 	}
+	return ra
+}
 
-	return tf.byteRegionPieces(tf.torrentOffset(pos), ra)
+// Pos returns current file position
+func (tf *TorrentFSEntry) Pos() (int64, error) {
+	return tf.File.Seek(0, io.SeekCurrent)
 }
 
 func (tf *TorrentFSEntry) torrentOffset(readerPos int64) int64 {
