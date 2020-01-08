@@ -142,6 +142,7 @@ type Configuration struct {
 	TraktSyncPlaybackProgress      bool
 	TraktSyncHidden                bool
 	TraktSyncWatched               bool
+	TraktSyncWatchedSingle         bool
 	TraktSyncWatchedBack           bool
 	TraktSyncAddedMovies           bool
 	TraktSyncAddedMoviesLocation   int
@@ -567,6 +568,7 @@ func Reload() *Configuration {
 		TraktSyncPlaybackProgress:      settings["trakt_sync_playback_progress"].(bool),
 		TraktSyncHidden:                settings["trakt_sync_hidden"].(bool),
 		TraktSyncWatched:               settings["trakt_sync_watched"].(bool),
+		TraktSyncWatchedSingle:         settings["trakt_sync_watched_single"].(bool),
 		TraktSyncWatchedBack:           settings["trakt_sync_watchedback"].(bool),
 		TraktSyncAddedMovies:           settings["trakt_sync_added_movies"].(bool),
 		TraktSyncAddedMoviesLocation:   settings["trakt_sync_added_movies_location"].(int),
@@ -649,10 +651,10 @@ func Reload() *Configuration {
 	}
 
 	if newConfig.TraktClientID == "" {
-		newConfig.TraktClientID = "2f911cee953f0af7833191d2b929e9a842bf8752e6b1afb458c8ff9ffc1d2c85"
+		newConfig.TraktClientID = "f37e372ec0fb7331c808a613b025ea175b771afee972c13b19ff9d7e583532bd"
 	}
 	if newConfig.TraktClientSecret == "" {
-		newConfig.TraktClientSecret = "b290a36c1144c4baa937dcc9023b3cd44398cca46975928a3d833f7593f00980"
+		newConfig.TraktClientSecret = "4897369f643ce492ffac809cee110ff3563ef9e92e110b84c6cbeb771b583bba"
 	}
 
 	// Fallback for old configuration with additional storage variants

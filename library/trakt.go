@@ -16,6 +16,7 @@ import (
 var (
 	// IsTraktInitialized used to mark if we need only incremental updates from Trakt
 	IsTraktInitialized bool
+	isKodiAdded        bool
 	isKodiUpdated      bool
 )
 
@@ -52,11 +53,15 @@ func RefreshTrakt() error {
 	// If nothing changed from last check - skip everything
 	isFirstRun := !IsTraktInitialized || isKodiUpdated
 	if !lastActivities.All.After(previousActivities.All) && !isFirstRun {
+		log.Debugf("Skipping Trakt sync due to stale activities")
 		return nil
 	}
 
+	isErrored := false
 	defer func() {
-		_ = cacheStore.Set("com.trakt.last_activities", lastActivities, 30*24*time.Hour)
+		if !isErrored {
+			_ = cacheStore.Set("com.trakt.last_activities", lastActivities, 30*24*time.Hour)
+		}
 	}()
 
 	if isFirstRun {
@@ -66,58 +71,101 @@ func RefreshTrakt() error {
 
 		IsTraktInitialized = true
 		isKodiUpdated = false
+		isKodiAdded = false
 	}
 
 	// Movies
-	if isFirstRun || lastActivities.Movies.WatchedAt.After(previousActivities.Movies.WatchedAt) {
-		RefreshTraktWatched(MovieType, lastActivities.Movies.WatchedAt.After(previousActivities.Movies.WatchedAt))
+	if isFirstRun || isKodiAdded || lastActivities.Movies.WatchedAt.After(previousActivities.Movies.WatchedAt) {
+		err := RefreshTraktWatched(MovieType, lastActivities.Movies.WatchedAt.After(previousActivities.Movies.WatchedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Movies.CollectedAt.After(previousActivities.Movies.CollectedAt) {
-		RefreshTraktCollected(MovieType, lastActivities.Movies.CollectedAt.After(previousActivities.Movies.CollectedAt))
+		err := RefreshTraktCollected(MovieType, lastActivities.Movies.CollectedAt.After(previousActivities.Movies.CollectedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Movies.WatchlistedAt.After(previousActivities.Movies.WatchlistedAt) {
-		RefreshTraktWatchlisted(MovieType, lastActivities.Movies.WatchlistedAt.After(previousActivities.Movies.WatchlistedAt))
+		err := RefreshTraktWatchlisted(MovieType, lastActivities.Movies.WatchlistedAt.After(previousActivities.Movies.WatchlistedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
-	if isFirstRun || lastActivities.Movies.PausedAt.After(previousActivities.Movies.PausedAt) {
-		RefreshTraktPaused(MovieType, lastActivities.Movies.PausedAt.After(previousActivities.Movies.PausedAt))
+	if isFirstRun || isKodiAdded || lastActivities.Movies.PausedAt.After(previousActivities.Movies.PausedAt) {
+		err := RefreshTraktPaused(MovieType, lastActivities.Movies.PausedAt.After(previousActivities.Movies.PausedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Movies.HiddenAt.After(previousActivities.Movies.HiddenAt) {
-		RefreshTraktHidden(MovieType, lastActivities.Movies.HiddenAt.After(previousActivities.Movies.HiddenAt))
+		err := RefreshTraktHidden(MovieType, lastActivities.Movies.HiddenAt.After(previousActivities.Movies.HiddenAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 
 	// Episodes
-	if isFirstRun || lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt) {
-		RefreshTraktWatched(EpisodeType, lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt))
+	if isFirstRun || isKodiAdded || lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt) {
+		err := RefreshTraktWatched(EpisodeType, lastActivities.Episodes.WatchedAt.After(previousActivities.Episodes.WatchedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Episodes.CollectedAt.After(previousActivities.Episodes.CollectedAt) {
-		RefreshTraktCollected(EpisodeType, lastActivities.Episodes.CollectedAt.After(previousActivities.Episodes.CollectedAt))
+		err := RefreshTraktCollected(EpisodeType, lastActivities.Episodes.CollectedAt.After(previousActivities.Episodes.CollectedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Episodes.WatchlistedAt.After(previousActivities.Episodes.WatchlistedAt) {
-		RefreshTraktWatchlisted(EpisodeType, lastActivities.Episodes.WatchlistedAt.After(previousActivities.Episodes.WatchlistedAt))
+		err := RefreshTraktWatchlisted(EpisodeType, lastActivities.Episodes.WatchlistedAt.After(previousActivities.Episodes.WatchlistedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
-	if isFirstRun || lastActivities.Episodes.PausedAt.After(previousActivities.Episodes.PausedAt) {
-		RefreshTraktPaused(EpisodeType, lastActivities.Episodes.PausedAt.After(previousActivities.Episodes.PausedAt))
+	if isFirstRun || isKodiAdded || lastActivities.Episodes.PausedAt.After(previousActivities.Episodes.PausedAt) {
+		err := RefreshTraktPaused(EpisodeType, lastActivities.Episodes.PausedAt.After(previousActivities.Episodes.PausedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 
 	// Shows
 	if isFirstRun || lastActivities.Shows.WatchlistedAt.After(previousActivities.Shows.WatchlistedAt) {
-		RefreshTraktWatchlisted(ShowType, lastActivities.Shows.WatchlistedAt.After(previousActivities.Shows.WatchlistedAt))
+		err := RefreshTraktWatchlisted(ShowType, lastActivities.Shows.WatchlistedAt.After(previousActivities.Shows.WatchlistedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Shows.HiddenAt.After(previousActivities.Shows.HiddenAt) {
-		RefreshTraktHidden(ShowType, lastActivities.Shows.HiddenAt.After(previousActivities.Shows.HiddenAt))
+		err := RefreshTraktHidden(ShowType, lastActivities.Shows.HiddenAt.After(previousActivities.Shows.HiddenAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 
 	// Seasons
 	if isFirstRun || lastActivities.Seasons.WatchlistedAt.After(previousActivities.Seasons.WatchlistedAt) {
-		RefreshTraktWatchlisted(SeasonType, lastActivities.Seasons.WatchlistedAt.After(previousActivities.Seasons.WatchlistedAt))
+		err := RefreshTraktWatchlisted(SeasonType, lastActivities.Seasons.WatchlistedAt.After(previousActivities.Seasons.WatchlistedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 	if isFirstRun || lastActivities.Seasons.HiddenAt.After(previousActivities.Seasons.HiddenAt) {
-		RefreshTraktHidden(SeasonType, lastActivities.Seasons.HiddenAt.After(previousActivities.Seasons.HiddenAt))
+		err := RefreshTraktHidden(SeasonType, lastActivities.Seasons.HiddenAt.After(previousActivities.Seasons.HiddenAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 
 	// Lists
 	if isFirstRun || lastActivities.Lists.UpdatedAt.After(previousActivities.Lists.UpdatedAt) {
-		RefreshTraktLists(lastActivities.Lists.UpdatedAt.After(previousActivities.Lists.UpdatedAt))
+		err := RefreshTraktLists(lastActivities.Lists.UpdatedAt.After(previousActivities.Lists.UpdatedAt))
+		if err != nil {
+			isErrored = true
+		}
 	}
 
 	return nil
@@ -151,6 +199,7 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		previous, _ := trakt.PreviousWatchedMovies()
 		current, err := trakt.WatchedMovies(isRefreshNeeded)
 		if err != nil {
+			log.Warningf("Got error from getting watched movies: %s", err)
 			return err
 		} else if len(current) == 0 {
 			// Kind of strange check to make sure Trakt watched items are not empty
@@ -164,8 +213,25 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 
 		watchedTraktMovies := make([]int, 0, len(current))
 
+		syncSingleMoviesDelete := []*trakt.WatchedItem{}
+		syncSingleMoviesAdd := []*trakt.WatchedItem{}
+
 		cacheStore.Get(cacheKey, &lastPlaycount)
 		for _, m := range current {
+			if m.Plays > 1 && config.Get().TraktSyncWatchedSingle {
+				syncSingleMoviesDelete = append(syncSingleMoviesDelete, &trakt.WatchedItem{
+					MediaType: "movie",
+					Movie:     m.Movie.IDs.TMDB,
+					Watched:   false,
+				})
+				syncSingleMoviesAdd = append(syncSingleMoviesAdd, &trakt.WatchedItem{
+					MediaType: "movie",
+					Movie:     m.Movie.IDs.TMDB,
+					Watched:   true,
+					WatchedAt: m.LastWatchedAt,
+				})
+			}
+
 			if r := getKodiMovieByTraktIDs(m.Movie.IDs); r != nil {
 				watchedTraktMovies = append(watchedTraktMovies, r.UIDs.TMDB)
 
@@ -192,6 +258,13 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		}
 		for _, m := range unwatchedMovies {
 			updateMovieWatched(m, false)
+		}
+
+		// If we have items that have multiple "plays", we should leave only 1,
+		// it will take off the load from Trakt API
+		if len(syncSingleMoviesDelete) > 0 && len(syncSingleMoviesAdd) > 0 {
+			trakt.SetMultipleWatched(syncSingleMoviesDelete)
+			trakt.SetMultipleWatched(syncSingleMoviesAdd)
 		}
 
 		if !config.Get().TraktSyncWatchedBack || len(l.Movies) == 0 {
@@ -230,6 +303,7 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 		previous, _ := trakt.PreviousWatchedShows()
 		current, err := trakt.WatchedShows(isRefreshNeeded)
 		if err != nil {
+			log.Warningf("Got error from getting watched shows: %s", err)
 			return err
 		} else if len(current) == 0 {
 			// Kind of strange check to make sure Trakt watched items are not empty
@@ -246,6 +320,9 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 
 		cacheStore.Get(cacheKey, &lastPlaycount)
 		for _, s := range current {
+			syncSingleShowsDelete := []*trakt.WatchedItem{}
+			syncSingleShowsAdd := []*trakt.WatchedItem{}
+
 			tmdbShow := tmdb.GetShowByID(strconv.Itoa(s.Show.IDs.TMDB), config.Get().Language)
 			completedSeasons := 0
 			for _, season := range s.Seasons {
@@ -260,6 +337,24 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 				}
 
 				for _, episode := range season.Episodes {
+					if episode.Plays > 1 && config.Get().TraktSyncWatchedSingle {
+						syncSingleShowsDelete = append(syncSingleShowsDelete, &trakt.WatchedItem{
+							MediaType: "episode",
+							Show:      s.Show.IDs.TMDB,
+							Season:    season.Number,
+							Episode:   episode.Number,
+							Watched:   false,
+						})
+						syncSingleShowsAdd = append(syncSingleShowsAdd, &trakt.WatchedItem{
+							MediaType: "episode",
+							Show:      s.Show.IDs.TMDB,
+							Season:    season.Number,
+							Episode:   episode.Number,
+							Watched:   true,
+							WatchedAt: episode.LastWatchedAt,
+						})
+					}
+
 					l.WatchedTrakt = append(l.WatchedTrakt,
 						xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TMDBScraper, s.Show.IDs.TMDB, season.Number, episode.Number)),
 						xxhash.Sum64String(fmt.Sprintf("%d_%d_%d_%d_%d", EpisodeType, TraktScraper, s.Show.IDs.Trakt, season.Number, episode.Number)))
@@ -301,6 +396,13 @@ func RefreshTraktWatched(itemType int, isRefreshNeeded bool) error {
 				if toRun || r.DateAdded.After(s.LastWatchedAt) {
 					updateShowWatched(s, true)
 				}
+			}
+
+			// If we have items that have multiple "plays", we should leave only 1,
+			// it will take off the load from Trakt API
+			if len(syncSingleShowsDelete) > 0 && len(syncSingleShowsAdd) > 0 {
+				trakt.SetMultipleWatched(syncSingleShowsDelete)
+				trakt.SetMultipleWatched(syncSingleShowsAdd)
 			}
 		}
 		cacheStore.Set(cacheKey, &lastPlaycount, 30*24*time.Hour)

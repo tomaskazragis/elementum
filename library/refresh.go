@@ -926,6 +926,11 @@ func MarkKodiUpdated() {
 	isKodiUpdated = true
 }
 
+// MarkKodiAdded ...
+func MarkKodiAdded() {
+	isKodiAdded = true
+}
+
 // PlanOverallUpdate ...
 func PlanOverallUpdate() {
 	l.Pending.IsOverall = true

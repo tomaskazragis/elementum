@@ -192,7 +192,11 @@ func Notification(w http.ResponseWriter, r *http.Request, s *bittorrent.Service)
 		}
 
 		go func() {
-			if request.Added || request.Playcount != -1 {
+			if request.Added {
+				library.MarkKodiUpdated()
+				library.MarkKodiAdded()
+			}
+			if request.Playcount != -1 {
 				library.MarkKodiUpdated()
 			}
 

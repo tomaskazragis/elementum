@@ -52,8 +52,8 @@ var (
 	activitiesExpiration    = 7 * 24 * time.Hour
 	progressExpiration      = 7 * 24 * time.Hour
 
-	watchedMoviesKey    = "com.trakt.movies.watched.list"
-	watchedShowsKey     = "com.trakt.shows.watched.list"
+	watchedMoviesKey    = "com.trakt.movies.watched.list.2"
+	watchedShowsKey     = "com.trakt.shows.watched.list.2"
 	pausedMoviesKey     = "com.trakt.movies.playback.list"
 	pausedShowsKey      = "com.trakt.shows.playback.list"
 	watchlistMoviesKey  = "com.trakt.movies.watchlist.list"
@@ -418,6 +418,7 @@ type WatchedItem struct {
 	Season    int
 	Episode   int
 	Watched   bool
+	WatchedAt time.Time
 }
 
 // WatchedMovie ...
@@ -910,6 +911,10 @@ func Authorize(fromSettings bool) error {
 		return err
 	}
 
+	// Cleanup last activities to force requesting again
+	cacheStore := cache.NewDBStore()
+	_ = cacheStore.Set("com.trakt.last_activities", "", 1)
+
 	success := "Woohoo!"
 	if fromSettings {
 		success += " (Save your settings!)"
@@ -1167,6 +1172,9 @@ func SetMultipleWatched(items []*WatchedItem) (resp *napping.Response, err error
 
 func (item *WatchedItem) String() (query string) {
 	watchedAt := fmt.Sprintf(`"watched_at": "%s",`, time.Now().UTC().Format("20060102-15:04:05.000"))
+	if !item.WatchedAt.IsZero() {
+		watchedAt = fmt.Sprintf(`"watched_at": "%s",`, item.WatchedAt.Format("20060102-15:04:05.000"))
+	}
 
 	if item.Movie != 0 {
 		query = fmt.Sprintf(`{ %s "ids": {"tmdb": %d }}`, watchedAt, item.Movie)
