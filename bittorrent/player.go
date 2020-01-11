@@ -153,6 +153,7 @@ func (btp *Player) GetTorrent() *Torrent {
 // SetTorrent ...
 func (btp *Player) SetTorrent(t *Torrent) {
 	btp.t = t
+
 	btp.t.IsPlayerAttached = true
 	btp.t.IsBuffering = false
 	btp.t.IsBufferingFinished = false
@@ -169,7 +170,7 @@ func (btp *Player) addTorrent() error {
 			return err
 		}
 
-		btp.t = torrent
+		btp.SetTorrent(torrent)
 	}
 	if btp.t == nil || btp.t.th == nil {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.p.URI)
@@ -636,8 +637,6 @@ func (btp *Player) Close() {
 
 	isWatched := btp.IsWatched()
 	if btp.t.IsNextEpisode {
-		btp.t.IsPlayerAttached = false
-
 		btp.t.startNextTicker()
 		return
 	}

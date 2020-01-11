@@ -147,14 +147,18 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
-	t.nextTicker = time.NewTicker(10 * time.Hour)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
-	defer t.nextTicker.Stop()
+	defer func() {
+		if t.nextTicker != nil {
+			t.nextTicker.Stop()
+			t.nextTicker = nil
+		}
+	}()
 	defer close(t.bufferFinished)
 
 	for {
