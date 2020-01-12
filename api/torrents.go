@@ -463,38 +463,7 @@ func RemoveTorrent(s *bittorrent.Service) gin.HandlerFunc {
 			return
 		}
 
-		// Delete torrent file
-		infoHash := torrent.InfoHash()
-		if _, err := os.Stat(torrent.TorrentPath); err == nil {
-			torrentsLog.Infof("Removed torrent file %s", torrent.TorrentPath)
-			defer os.Remove(torrent.TorrentPath)
-		}
-
-		// Delete torrent file, in case it it not 'infohash' + '.torrent'
-		torrentsPath := config.Get().TorrentsPath
-		torrentFile := filepath.Join(torrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-		if _, err := os.Stat(torrentFile); err == nil {
-			torrentsLog.Infof("Removed torrent file %s", torrentFile)
-			defer os.Remove(torrentFile)
-		}
-
-		torrentsLog.Infof("Removed %s from database", infoHash)
-
-		keepSetting := config.Get().KeepFilesFinished
-		deleteAnswer := false
-		if keepSetting == 1 && deleteFiles == "" && xbmc.DialogConfirm("Elementum", "LOCALIZE[30269]") {
-			deleteAnswer = true
-		} else if keepSetting == 2 {
-			deleteAnswer = true
-		}
-
-		if deleteAnswer == true || deleteFiles == trueType {
-			torrentsLog.Info("Removing the torrent and deleting files from the web ...")
-			s.RemoveTorrent(torrent, true)
-		} else {
-			torrentsLog.Info("Removing the torrent without deleting files from the web ...")
-			s.RemoveTorrent(torrent, false)
-		}
+		s.RemoveTorrent(torrent, true, deleteFiles != "", false)
 
 		xbmc.Refresh()
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")

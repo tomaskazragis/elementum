@@ -70,8 +70,9 @@ type Torrent struct {
 	IsBufferingFinished bool
 	IsSeeding           bool
 	IsRarArchive        bool
-	IsNextEpisode       bool
 	IsPlayerAttached    bool
+	IsNextEpisode       bool
+	HasNextEpisode      bool
 
 	DBItem *database.BTItem
 
@@ -92,7 +93,8 @@ type Torrent struct {
 
 	bufferTicker     *time.Ticker
 	prioritizeTicker *time.Ticker
-	nextTicker       *time.Ticker
+
+	nextTimer *time.Timer
 }
 
 // NewTorrent ...
@@ -147,18 +149,14 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
+	t.nextTimer = time.NewTimer(0)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
-	defer func() {
-		if t.nextTicker != nil {
-			t.nextTicker.Stop()
-			t.nextTicker = nil
-		}
-	}()
+	defer t.nextTimer.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -172,9 +170,9 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-t.nextTicker.C:
+		case <-t.nextTimer.C:
 			if t.IsNextEpisode {
-				go t.Service.RemoveTorrent(t, false)
+				go t.Service.RemoveTorrent(t, false, false, false)
 			}
 
 		case <-sc:
@@ -188,15 +186,18 @@ func (t *Torrent) Watch() {
 	}
 }
 
-func (t *Torrent) startNextTicker() {
-	t.nextTicker = time.NewTicker(15 * time.Minute)
+func (t *Torrent) startNextTimer() {
+	t.IsNextEpisode = true
 
+	t.nextTimer.Reset(15 * time.Minute)
 	t.demandPieces.Clear()
 }
 
-func (t *Torrent) stopNextTicker() {
-	if t.nextTicker != nil {
-		t.nextTicker.Stop()
+func (t *Torrent) stopNextTimer() {
+	t.IsNextEpisode = false
+
+	if t.nextTimer != nil {
+		t.nextTimer.Stop()
 	}
 }
 

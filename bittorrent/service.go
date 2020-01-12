@@ -736,24 +736,76 @@ func (s *Service) AddTorrent(uri string, paused bool) (*Torrent, error) {
 }
 
 // RemoveTorrent ...
-func (s *Service) RemoveTorrent(torrent *Torrent, removeFiles bool) bool {
-	log.Debugf("Removing torrent: %s", torrent.Name())
-	if torrent == nil {
+func (s *Service) RemoveTorrent(t *Torrent, forceDrop, forceDelete, isWatched bool) bool {
+	log.Infof("Removing torrent: %s", t.Name())
+	if t == nil {
 		return false
 	}
 
 	defer func() {
-		database.GetStorm().DeleteBTItem(torrent.InfoHash())
+		database.GetStorm().DeleteBTItem(t.InfoHash())
 	}()
 
-	if t := s.q.FindByHash(torrent.InfoHash()); t != nil {
-		s.q.Delete(torrent)
-
-		t.Drop(removeFiles)
-		return true
+	t = s.q.FindByHash(t.InfoHash())
+	if t == nil {
+		return false
 	}
 
-	return false
+	s.q.Delete(t)
+
+	keepDownloading := false
+	if forceDrop || config.Get().KeepDownloading == 2 {
+		keepDownloading = false
+	} else if config.Get().KeepDownloading == 0 || xbmc.DialogConfirm("Elementum", "LOCALIZE[30146]") {
+		keepDownloading = true
+	}
+
+	keepSetting := config.Get().KeepFilesPlaying
+	if isWatched {
+		keepSetting = config.Get().KeepFilesFinished
+	}
+
+	deleteAnswer := false
+	if keepDownloading == false {
+		if forceDelete {
+			deleteAnswer = true
+		} else if keepSetting == 0 {
+			deleteAnswer = false
+		} else if keepSetting == 2 || xbmc.DialogConfirm("Elementum", "LOCALIZE[30269]") {
+			deleteAnswer = true
+		}
+	}
+
+	if keepDownloading == false || s.IsMemoryStorage() {
+		// Delete torrent file
+		if len(t.torrentFile) > 0 {
+			if _, err := os.Stat(t.torrentFile); err == nil {
+				log.Infof("Deleting torrent file at %s", t.torrentFile)
+				defer os.Remove(t.torrentFile)
+			}
+		}
+
+		infoHash := t.InfoHash()
+		savedFilePath := filepath.Join(s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
+		if _, err := os.Stat(savedFilePath); err == nil {
+			log.Infof("Deleting saved torrent file at %s", savedFilePath)
+			defer os.Remove(savedFilePath)
+		}
+
+		log.Infof("Removed %s from database", t.Name())
+
+		if deleteAnswer == true {
+			log.Info("Removing the torrent and deleting files after playing ...")
+		} else {
+			log.Info("Removing the torrent without deleting files after playing ...")
+		}
+	}
+
+	if !keepDownloading {
+		t.Drop(deleteAnswer)
+	}
+
+	return true
 }
 
 func (s *Service) onStateChanged(stateAlert lt.StateChangedAlert) {
@@ -1199,7 +1251,7 @@ func (s *Service) downloadProgress() {
 
 					log.Info("Removing the torrent without deleting files after Completed move ...")
 					t := s.GetTorrentByHash(infoHash)
-					s.RemoveTorrent(t, false)
+					s.RemoveTorrent(t, false, false, false)
 
 					// Delete leftover .parts file if any
 					partsFile := filepath.Join(config.Get().DownloadPath, fmt.Sprintf(".%s.parts", infoHash))
@@ -1594,12 +1646,12 @@ func (s *Service) HasTorrentByEpisode(tmdbID int, season, episode int) (string, 
 
 		if t.DBItem.ShowID == tmdbID && t.DBItem.Season == season && t.DBItem.Episode == episode {
 			// This is a strict match
-			return t.InfoHash(), t.IsNextEpisode
+			return t.InfoHash(), t.HasNextEpisode
 		} else if t.DBItem.ShowID == tmdbID {
 			// Try to find an episode
 			for _, choice := range t.files {
 				if re.MatchString(choice.Path) {
-					return t.InfoHash(), t.IsNextEpisode
+					return t.InfoHash(), t.HasNextEpisode
 				}
 			}
 		}
@@ -1767,8 +1819,11 @@ func (s *Service) readCustomSettings() map[string]string {
 // StopNextEpisodes stops all torrents that wait for "next" playback
 func (s *Service) StopNextEpisodes() {
 	for _, t := range s.q.All() {
-		if t.IsNextEpisode && !t.IsPlayerAttached && t.nextTicker != nil {
-			s.RemoveTorrent(t, false)
+		if t.IsNextEpisode && !t.IsPlayerAttached {
+			log.Infof("Stopping torrent '%s' as a not-needed next episode", t.Name())
+
+			t.stopNextTimer()
+			s.RemoveTorrent(t, false, false, false)
 		}
 	}
 
