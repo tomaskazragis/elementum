@@ -864,12 +864,6 @@ playbackLoop:
 					trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 				}
 			} else if xbmc.PlayerIsPaused() {
-				if playing == true {
-					playing = false
-					if btp.scrobble {
-						trakt.Scrobble("pause", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
-					}
-				}
 				if btp.overlayStatusEnabled == true {
 					status := btp.t.GetStatus()
 					defer lt.DeleteTorrentStatus(status)
@@ -882,16 +876,22 @@ playbackLoop:
 						overlayStatusActive = true
 					}
 				}
+				if playing == true {
+					playing = false
+					if btp.scrobble {
+						trakt.Scrobble("pause", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
+					}
+				}
 			} else {
+				if overlayStatusActive == true {
+					btp.overlayStatus.Hide()
+					overlayStatusActive = false
+				}
 				if playing == false {
 					playing = true
 					if btp.scrobble {
 						trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 					}
-				}
-				if overlayStatusActive == true {
-					btp.overlayStatus.Hide()
-					overlayStatusActive = false
 				}
 			}
 
