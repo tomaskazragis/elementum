@@ -630,6 +630,7 @@ func (btp *Player) Close() {
 	}()
 
 	if btp.t.HasNextEpisode {
+		log.Infof("Leaving torrent '%s' awaiting for next episode playback", btp.t.Name())
 		btp.t.startNextTimer()
 		return
 	}

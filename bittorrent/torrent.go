@@ -427,6 +427,10 @@ func (t *Torrent) Buffer(file *File, isStartup bool) {
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
 
+	if t.Closer.IsSet() {
+		return
+	}
+
 	// Properly set the pieces priority vector
 	curPiece := 0
 	defaultPriority := 0
@@ -541,7 +545,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 
 // PrioritizePiece ...
 func (t *Torrent) PrioritizePiece(piece int) {
-	if t.IsBuffering || t.th == nil {
+	if t.IsBuffering || t.th == nil || t.Closer.IsSet() {
 		return
 	}
 
@@ -555,7 +559,7 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if (t.IsBuffering && t.demandPieces.IsEmpty()) || t.IsSeeding || !t.IsPlaying || t.th == nil {
+	if (t.IsBuffering && t.demandPieces.IsEmpty()) || t.IsSeeding || (!t.IsPlaying && !t.IsNextEpisode) || t.th == nil || t.Closer.IsSet() {
 		return
 	}
 
@@ -674,6 +678,10 @@ func (t *Torrent) PrioritizePieces() {
 		reservedVector.Add(piece)
 	}
 
+	if t.Closer.IsSet() {
+		return
+	}
+
 	if t.Service.IsMemoryStorage() && t.th != nil && t.ms != nil {
 		t.ms.UpdateReaderPieces(readerVector)
 		t.ms.UpdateReservedPieces(reservedVector)
@@ -716,6 +724,8 @@ func (t *Torrent) PrioritizePieces() {
 	status := fmt.Sprintf("%d:%d;%d:%d;%d", minPiece, minPriority, maxPiece, maxPriority, countPiece)
 	if status == t.lastPrioritization {
 		log.Debugf("Skipping prioritization due to stale priorities")
+		return
+	} else if t.Closer.IsSet() {
 		return
 	}
 
@@ -803,6 +813,10 @@ func (t *Torrent) GetBufferProgress() float64 {
 }
 
 func (t *Torrent) piecesProgress(pieces map[int]float64) {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	queue := lt.NewStdVectorPartialPieceInfo()
@@ -836,7 +850,7 @@ func (t *Torrent) piecesProgress(pieces map[int]float64) {
 
 // GetProgress ...
 func (t *Torrent) GetProgress() float64 {
-	if t == nil {
+	if t == nil || t.Closer.IsSet() {
 		return 0
 	}
 
@@ -1029,6 +1043,10 @@ func (t *Torrent) Drop(removeFiles bool) {
 
 // Pause ...
 func (t *Torrent) Pause() {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	log.Infof("Pausing torrent: %s", t.InfoHash())
 
 	t.th.AutoManaged(false)
@@ -1039,6 +1057,10 @@ func (t *Torrent) Pause() {
 
 // Resume ...
 func (t *Torrent) Resume() {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	log.Infof("Resuming torrent: %s", t.InfoHash())
 
 	t.th.AutoManaged(true)
@@ -1252,7 +1274,7 @@ func (t *Torrent) updatePieces() error {
 	t.piecesMx.Lock()
 	defer t.piecesMx.Unlock()
 
-	if time.Now().Before(t.piecesLastUpdated.Add(piecesRefreshDuration)) {
+	if time.Now().Before(t.piecesLastUpdated.Add(piecesRefreshDuration)) || t.Closer.IsSet() {
 		return nil
 	}
 
