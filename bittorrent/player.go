@@ -49,10 +49,6 @@ type Player struct {
 	next                     NextEpisode
 	contentType              string
 	scrobble                 bool
-	deleteAfter              bool
-	keepDownloading          int
-	keepFilesPlaying         int
-	keepFilesFinished        int
 	overlayStatusEnabled     bool
 	chosenFile               *File
 	subtitlesFile            *File
@@ -108,8 +104,8 @@ type PlayerParams struct {
 type NextEpisode struct {
 	f *File
 
-	started bool
-	done    bool
+	started    bool
+	done       bool
 	bufferSize int64
 }
 
@@ -129,9 +125,6 @@ func NewPlayer(bts *Service, params PlayerParams) *Player {
 		p: &params,
 
 		overlayStatusEnabled: config.Get().EnableOverlayStatus == true,
-		keepDownloading:      config.Get().KeepDownloading,
-		keepFilesPlaying:     config.Get().KeepFilesPlaying,
-		keepFilesFinished:    config.Get().KeepFilesFinished,
 		scrobble:             config.Get().Scrobble == true && params.TMDBId > 0 && config.Get().TraktToken != "",
 		hasChosenFile:        false,
 		fileSize:             0,
@@ -153,12 +146,14 @@ func (btp *Player) GetTorrent() *Torrent {
 // SetTorrent ...
 func (btp *Player) SetTorrent(t *Torrent) {
 	btp.t = t
+
 	btp.t.IsPlayerAttached = true
 	btp.t.IsBuffering = false
 	btp.t.IsBufferingFinished = false
 	btp.t.IsNextEpisode = false
+	btp.t.HasNextEpisode = false
 
-	btp.t.stopNextTicker()
+	btp.t.stopNextTimer()
 }
 
 func (btp *Player) addTorrent() error {
@@ -169,7 +164,7 @@ func (btp *Player) addTorrent() error {
 			return err
 		}
 
-		btp.t = torrent
+		btp.SetTorrent(torrent)
 	}
 	if btp.t == nil || btp.t.th == nil {
 		return fmt.Errorf("Unable to add torrent with URI %s", btp.p.URI)
@@ -634,61 +629,13 @@ func (btp *Player) Close() {
 		go btp.s.PlayerStop()
 	}()
 
-	isWatched := btp.IsWatched()
-	if btp.t.IsNextEpisode {
-		btp.t.IsPlayerAttached = false
-
-		btp.t.startNextTicker()
+	if btp.t.HasNextEpisode {
+		log.Infof("Leaving torrent '%s' awaiting for next episode playback", btp.t.Name())
+		btp.t.startNextTimer()
 		return
 	}
 
-	keepDownloading := false
-	if btp.keepDownloading == 2 {
-		keepDownloading = false
-	} else if btp.keepDownloading == 0 || xbmc.DialogConfirm("Elementum", "LOCALIZE[30146]") {
-		keepDownloading = true
-	}
-
-	keepSetting := btp.keepFilesPlaying
-	if isWatched {
-		keepSetting = btp.keepFilesFinished
-	}
-
-	deleteAnswer := false
-	if keepDownloading == false {
-		if keepSetting == 0 {
-			deleteAnswer = false
-		} else if keepSetting == 2 || xbmc.DialogConfirm("Elementum", "LOCALIZE[30269]") {
-			deleteAnswer = true
-		}
-	}
-
-	if keepDownloading == false || deleteAnswer == true || btp.notEnoughSpace || btp.s.IsMemoryStorage() {
-		// Delete torrent file
-		if len(btp.t.torrentFile) > 0 {
-			if _, err := os.Stat(btp.t.torrentFile); err == nil {
-				log.Infof("Deleting torrent file at %s", btp.t.torrentFile)
-				defer os.Remove(btp.t.torrentFile)
-			}
-		}
-
-		infoHash := btp.t.InfoHash()
-		savedFilePath := filepath.Join(btp.s.config.TorrentsPath, fmt.Sprintf("%s.torrent", infoHash))
-		if _, err := os.Stat(savedFilePath); err == nil {
-			log.Infof("Deleting saved torrent file at %s", savedFilePath)
-			defer os.Remove(savedFilePath)
-		}
-
-		log.Infof("Removed %s from database", btp.t.Name())
-
-		if btp.deleteAfter || deleteAnswer == true || btp.notEnoughSpace {
-			log.Info("Removing the torrent and deleting files after playing ...")
-			btp.s.RemoveTorrent(btp.t, true)
-		} else {
-			log.Info("Removing the torrent without deleting files after playing ...")
-			btp.s.RemoveTorrent(btp.t, false)
-		}
-	}
+	btp.s.RemoveTorrent(btp.t, false, btp.notEnoughSpace, btp.IsWatched())
 }
 
 func (btp *Player) bufferDialog() {
@@ -917,12 +864,6 @@ playbackLoop:
 					trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 				}
 			} else if xbmc.PlayerIsPaused() {
-				if playing == true {
-					playing = false
-					if btp.scrobble {
-						trakt.Scrobble("pause", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
-					}
-				}
 				if btp.overlayStatusEnabled == true {
 					status := btp.t.GetStatus()
 					defer lt.DeleteTorrentStatus(status)
@@ -935,16 +876,22 @@ playbackLoop:
 						overlayStatusActive = true
 					}
 				}
+				if playing == true {
+					playing = false
+					if btp.scrobble {
+						trakt.Scrobble("pause", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
+					}
+				}
 			} else {
+				if overlayStatusActive == true {
+					btp.overlayStatus.Hide()
+					overlayStatusActive = false
+				}
 				if playing == false {
 					playing = true
 					if btp.scrobble {
 						trakt.Scrobble("start", btp.p.ContentType, btp.p.TMDBId, btp.p.WatchedTime, btp.p.VideoDuration)
 					}
-				}
-				if overlayStatusActive == true {
-					btp.overlayStatus.Hide()
-					overlayStatusActive = false
 				}
 			}
 
@@ -974,7 +921,9 @@ playbackLoop:
 		btp.p.VideoDuration = 0
 	}()
 
-	btp.overlayStatus.Close()
+	if btp.overlayStatus != nil {
+		btp.overlayStatus.Close()
+	}
 }
 
 func (btp *Player) isReadyForNextEpisode() bool {
@@ -1187,7 +1136,7 @@ func (btp *Player) onStateChanged(stateAlert lt.StateChangedAlert) {
 }
 
 func (btp *Player) startNextEpisode() {
-	if btp.p.ShowID == 0 || !btp.t.IsNextEpisode || !btp.next.done || btp.next.f == nil || btp.t.IsBuffering || btp.next.started {
+	if btp.p.ShowID == 0 || !btp.t.HasNextEpisode || !btp.next.done || btp.next.f == nil || btp.t.IsBuffering || btp.next.started {
 		return
 	}
 
@@ -1205,11 +1154,11 @@ func (btp *Player) findNextEpisode() {
 
 	// Searching if we have next episode in the torrent
 	if btp.next.f = btp.t.GetNextEpisodeFile(btp.p.Season, btp.p.Episode+1); btp.next.f == nil || btp.chosenFile == nil || btp.chosenFile.Size == 0 {
-		btp.t.IsNextEpisode = false
+		btp.t.HasNextEpisode = false
 		return
 	}
 
-	btp.t.IsNextEpisode = true
+	btp.t.HasNextEpisode = true
 
 	startBufferSize := btp.s.GetBufferSize()
 	_, _, _, preBufferSize := btp.t.getBufferSize(btp.next.f.Offset, 0, startBufferSize)

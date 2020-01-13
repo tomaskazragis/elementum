@@ -70,8 +70,9 @@ type Torrent struct {
 	IsBufferingFinished bool
 	IsSeeding           bool
 	IsRarArchive        bool
-	IsNextEpisode       bool
 	IsPlayerAttached    bool
+	IsNextEpisode       bool
+	HasNextEpisode      bool
 
 	DBItem *database.BTItem
 
@@ -92,7 +93,8 @@ type Torrent struct {
 
 	bufferTicker     *time.Ticker
 	prioritizeTicker *time.Ticker
-	nextTicker       *time.Ticker
+
+	nextTimer *time.Timer
 }
 
 // NewTorrent ...
@@ -147,14 +149,14 @@ func (t *Torrent) Watch() {
 	t.bufferFinished = make(chan struct{}, 5)
 
 	t.prioritizeTicker = time.NewTicker(1 * time.Second)
-	t.nextTicker = time.NewTicker(10 * time.Hour)
+	t.nextTimer = time.NewTimer(0)
 
 	sc := t.Service.Closer.C()
 	tc := t.Closer.C()
 
 	defer t.bufferTicker.Stop()
 	defer t.prioritizeTicker.Stop()
-	defer t.nextTicker.Stop()
+	defer t.nextTimer.Stop()
 	defer close(t.bufferFinished)
 
 	for {
@@ -168,9 +170,9 @@ func (t *Torrent) Watch() {
 		case <-t.prioritizeTicker.C:
 			go t.PrioritizePieces()
 
-		case <-t.nextTicker.C:
+		case <-t.nextTimer.C:
 			if t.IsNextEpisode {
-				go t.Service.RemoveTorrent(t, false)
+				go t.Service.RemoveTorrent(t, false, false, false)
 			}
 
 		case <-sc:
@@ -184,15 +186,18 @@ func (t *Torrent) Watch() {
 	}
 }
 
-func (t *Torrent) startNextTicker() {
-	t.nextTicker = time.NewTicker(15 * time.Minute)
+func (t *Torrent) startNextTimer() {
+	t.IsNextEpisode = true
 
+	t.nextTimer.Reset(15 * time.Minute)
 	t.demandPieces.Clear()
 }
 
-func (t *Torrent) stopNextTicker() {
-	if t.nextTicker != nil {
-		t.nextTicker.Stop()
+func (t *Torrent) stopNextTimer() {
+	t.IsNextEpisode = false
+
+	if t.nextTimer != nil {
+		t.nextTimer.Stop()
 	}
 }
 
@@ -422,6 +427,10 @@ func (t *Torrent) Buffer(file *File, isStartup bool) {
 	t.muBuffer.Lock()
 	defer t.muBuffer.Unlock()
 
+	if t.Closer.IsSet() {
+		return
+	}
+
 	// Properly set the pieces priority vector
 	curPiece := 0
 	defaultPriority := 0
@@ -536,7 +545,7 @@ func (t *Torrent) getBufferSize(fileOffset int64, off, length int64) (startPiece
 
 // PrioritizePiece ...
 func (t *Torrent) PrioritizePiece(piece int) {
-	if t.IsBuffering || t.th == nil {
+	if t.IsBuffering || t.th == nil || t.Closer.IsSet() {
 		return
 	}
 
@@ -550,7 +559,7 @@ func (t *Torrent) PrioritizePiece(piece int) {
 
 // PrioritizePieces ...
 func (t *Torrent) PrioritizePieces() {
-	if (t.IsBuffering && t.demandPieces.IsEmpty()) || t.IsSeeding || !t.IsPlaying || t.th == nil {
+	if (t.IsBuffering && t.demandPieces.IsEmpty()) || t.IsSeeding || (!t.IsPlaying && !t.IsNextEpisode) || t.th == nil || t.Closer.IsSet() {
 		return
 	}
 
@@ -669,6 +678,10 @@ func (t *Torrent) PrioritizePieces() {
 		reservedVector.Add(piece)
 	}
 
+	if t.Closer.IsSet() {
+		return
+	}
+
 	if t.Service.IsMemoryStorage() && t.th != nil && t.ms != nil {
 		t.ms.UpdateReaderPieces(readerVector)
 		t.ms.UpdateReservedPieces(reservedVector)
@@ -711,6 +724,8 @@ func (t *Torrent) PrioritizePieces() {
 	status := fmt.Sprintf("%d:%d;%d:%d;%d", minPiece, minPriority, maxPiece, maxPriority, countPiece)
 	if status == t.lastPrioritization {
 		log.Debugf("Skipping prioritization due to stale priorities")
+		return
+	} else if t.Closer.IsSet() {
 		return
 	}
 
@@ -798,6 +813,10 @@ func (t *Torrent) GetBufferProgress() float64 {
 }
 
 func (t *Torrent) piecesProgress(pieces map[int]float64) {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	defer perf.ScopeTimer()()
 
 	queue := lt.NewStdVectorPartialPieceInfo()
@@ -831,7 +850,7 @@ func (t *Torrent) piecesProgress(pieces map[int]float64) {
 
 // GetProgress ...
 func (t *Torrent) GetProgress() float64 {
-	if t == nil {
+	if t == nil || t.Closer.IsSet() {
 		return 0
 	}
 
@@ -1024,6 +1043,10 @@ func (t *Torrent) Drop(removeFiles bool) {
 
 // Pause ...
 func (t *Torrent) Pause() {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	log.Infof("Pausing torrent: %s", t.InfoHash())
 
 	t.th.AutoManaged(false)
@@ -1034,6 +1057,10 @@ func (t *Torrent) Pause() {
 
 // Resume ...
 func (t *Torrent) Resume() {
+	if t.Closer.IsSet() {
+		return
+	}
+
 	log.Infof("Resuming torrent: %s", t.InfoHash())
 
 	t.th.AutoManaged(true)
@@ -1247,7 +1274,7 @@ func (t *Torrent) updatePieces() error {
 	t.piecesMx.Lock()
 	defer t.piecesMx.Unlock()
 
-	if time.Now().Before(t.piecesLastUpdated.Add(piecesRefreshDuration)) {
+	if time.Now().Before(t.piecesLastUpdated.Add(piecesRefreshDuration)) || t.Closer.IsSet() {
 		return nil
 	}
 
